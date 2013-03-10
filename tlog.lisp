@@ -24,8 +24,9 @@ it probably means that another transaction log that writes the
 same variables is being committed."
 
   (declare (type tlog log))
-  (let1 acquired nil
-    (stm.commit.dribble "Commiting transaction log...")
+  (let ((acquired nil)
+        (id (tlog-id log)))
+    (stm.commit.dribble "Tlog ~A committing..." id)
     (unwind-protect
          (progn
            (dohash (writes-of log) var val
@@ -35,15 +36,16 @@ same variables is being committed."
                      (push var acquired)
                      (stm.commit.dribble "Acquired lock ~A" lock))
                    (progn
-                     (stm.commit.debug   "Transaction log not committed: could not acquire lock ~A" lock)
+                     (stm.commit.debug "Tlog ~A ...not committed: could not acquire lock ~A"
+                                       id lock)
                      (return-from commit nil)))))
            (unless (check? log)
-             (stm.commit.debug "Transaction log not committed: log is invalid")
+             (stm.commit.debug "Tlog ~A ...not committed: log is invalid" id)
              (return-from commit nil))
            (dohash (writes-of log) var val
              (setf (value-of var) val)
              (stm.commit.dribble "Tvar ~A value updated to ~A, version incremented by 1" var val))
-           (stm.commit.debug "Transaction log committed")
+           (stm.commit.debug "Tlog ~A ...committed" id)
            (return-from commit t))
       (dolist (var acquired)
         (let1 lock (lock-of var)
@@ -56,16 +58,18 @@ same variables is being committed."
 
 (defun check? (log)
   (declare (type tlog log))
-  (stm.check.dribble "Checking transaction log...")
-  (dohash (reads-of log) var ver
-    (if (= ver (version-of var))
-        (stm.check.dribble "Version ~A is valid" ver)
-        (progn
-          (stm.check.dribble "Version ~A doesn't match ~A" ver (version-of var))
-          (stm.check.debug   "Transaction log invalid")
-          (return-from check? nil))))
-  (stm.check.dribble "Transaction log valid")
-  (return-from check? t))
+  (let1 id (tlog-id log)
+    (stm.check.dribble "Tlog ~A checking.." id)
+    (dohash (reads-of log) var ver
+      (let1 actual-ver (version-of var)
+        (if (= ver actual-ver)
+            (stm.check.dribble "Version ~A is valid" ver)
+            (progn
+              (stm.check.dribble "Version ~A doesn't match ~A" ver actual-ver)
+              (stm.check.debug   "Tlog ~A ..invalid" id)
+              (return-from check? nil)))))
+    (stm.check.dribble "Tlog ~A ..valid" id)
+    (return-from check? t)))
 
 ;;;; ** Merging
 

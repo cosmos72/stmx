@@ -5,6 +5,8 @@
 ;;;; * Protocol
 
 
+(defvar *tlog-id-counter* 0)
+
 (defclass tlog ()
   ((reads :accessor reads-of
           :initarg :reads
@@ -18,7 +20,10 @@
            :documentation "Mapping variables written to new values")
    (semaphore :accessor semaphore-of
               :initarg :semaphore
-              :initform (make-condition-variable)))
+              :initform (make-condition-variable))
+   (id :reader tlog-id
+       :initform (incf *tlog-id-counter*)
+       :type integer))
 
   (:documentation "A transaction log (TLOG) is a record of what
 reads and writes have been done.

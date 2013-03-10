@@ -5,7 +5,7 @@
 ;;;; * Logging
 
 (deflogger stm-logger ()
-  :level +info+
+  :level +dribble+
   :appender (new 'brief-stream-log-appender :stream *debug-io*))
 
 (deflogger stm.check    (stm-logger))

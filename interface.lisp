@@ -31,18 +31,19 @@
      (setf (gethash tx ids) (compute-id-of tx)))))
 
 (defun run-once (tx)
-  (stm.run-once.dribble "Creating fresh transaction log")
   (let1 id (id-of tx)
     (with-new-tlog log
-      (stm.run-once.dribble "Executing transaction ~A" id)
+      (stm.run-once.dribble "Tlog ~A created" (tlog-id log))
+      (stm.run-once.dribble "Transaction ~A starting..." id)
       (let1 x (catch 'retry (multiple-value-list (funcall tx)))
         (etypecase x
           (tlog
            (stm.run-once.debug "Transaction ~A retried" id)
            (values t x))
           (list
-           (stm.run-once.debug "Transaction ~A finished executing with: ~{~A ~}" id x)
+           (stm.run-once.debug "Transaction ~A completed, return values: ~{~A ~}" id x)
            (values nil log x)))))))
+
 
 (defun execute (tx)
   (let1 id (id-of tx)
@@ -51,7 +52,7 @@
      (multiple-value-bind (retry? log values) (run-once tx)
        (if retry?
            (progn
-             (stm.execute.dribble "Trying to re-execute transaction ~A" id)
+             (stm.execute.dribble "Transaction ~A will be re-executed" id)
              (wait-tlog log)
              (go execute))
            (progn
@@ -61,11 +62,11 @@
      commit
      (if (not (check? x-tlog))
          (progn
-           (stm.execute.dribble "Trying to re-execute transaction ~A" id)
+           (stm.execute.dribble "Transaction ~A will be re-executed immediately" id)
            (go execute))
          (if (not (commit x-tlog))
              (progn
-               (stm.execute.dribble "Trying to re-commit transaction ~A" id)
+               (stm.execute.dribble "Transaction ~A will be re-committed" id)
                (wait-tlog x-tlog)
                (go commit))
              (go done)))
@@ -82,7 +83,7 @@
         (id2 (id-of tx2)))
     (prog (log1 log2 x-values)
      execute-tx1
-     (multiple-value-bind (retry? log values) (execute tx1)
+     (multiple-value-bind (retry? log values) (run-once tx1)
        (if retry?
            (progn
              (stm.orelse.dribble "Transaction ~A retried, trying transaction ~A" id1 id2)
@@ -94,16 +95,17 @@
      commit-tx1
      (if (not (check? log1))
          (progn
-           (stm.orelse.dribble "Transaction log of ~A invalid, trying transaction ~A" id1 id2)
+           (stm.orelse.dribble "Tlog ~A of transaction ~A invalid, trying transaction ~A"
+                               (tlog-id log1) id1 id2)
            (go execute-tx2))
          (if (not (commit log1))
              (progn
-               (stm.orelse.dribble "Transaction log of ~A not committed, trying transaction ~A"
-                                   id1 id2)
+               (stm.orelse.dribble "Tlog ~A of transaction ~A not committed, trying transaction ~A"
+                                   (tlog-id log1) id1 id2)
                (go execute-tx2))
              (go done)))
      execute-tx2
-     (multiple-value-bind (retry? log values) (execute tx2)
+     (multiple-value-bind (retry? log values) (run-once tx2)
        (if retry?
            (progn
              (stm.orelse.dribble "Transaction ~A retried, retrying both ~A and ~A"
@@ -116,13 +118,13 @@
      commit-tx2
      (if (not (check? log2))
          (progn
-           (stm.orelse.dribble "Transaction log of ~A invalid, retrying both ~A and ~A"
-                               id2 id1 id2)
+           (stm.orelse.dribble "Tlog ~A of transaction ~A invalid, retrying both ~A and ~A"
+                               (tlog-id log2) id2 id1 id2)
            (throw 'retry (merge-tlogs log1 log2)))
          (if (not (commit log2))
              (progn
-               (stm.orelse.dribble "Transaction log of ~A not committed, retrying both ~A and ~A"
-                                   id2 id1 id2)
+               (stm.orelse.dribble "Tlog ~A of transaction  ~A not committed, retrying both ~A and ~A"
+                                   (tlog-id log2) id2 id1 id2)
                (throw 'retry (merge-tlogs log1 log2)))
              (go done)))
      done

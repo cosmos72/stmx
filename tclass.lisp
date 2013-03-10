@@ -96,24 +96,24 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
                                    (slot transactional-effective-slot))
   (declare (ignore instance))
   
-  (cond
-    ((not (slot-transactional slot))
-     (call-next-method))
+  (let1 obj (call-next-method)
+    (cond
+      ((not (slot-transactional slot))
+       obj)
     
-    ((recording?)
-     ;; Record the reading of the tvar (which is found with
-     ;; `call-next-method') to the current tlog.  We turn off
-     ;; recording and returning because we want the actual tvar,
-     ;; not the value inside it.
-     (read-tvar (call-next-method)))
+      ;; Record the reading of the tvar (which is found with
+      ;; `call-next-method') to the current tlog.
+      ((recording?)
+       (read-tvar (the tvar obj)))
     
-    ((returning?)
-     ;; Return the value inside the tvar.
-     (value-of (the tvar (call-next-method))))
+      ;; Return the value inside the tvar.
+      ((returning?)
+       (value-of (the tvar obj)))
     
-    (t
-     ;; Return the tvar itself.
-     (call-next-method))))
+      (t
+       ;; Return the tvar itself.
+       (the tvar obj)))))
+
 
 (defun slot-raw-tvar (class instance slot)
   "Return the raw tvar stored in a transactional slot"
@@ -139,7 +139,7 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
      (let1 var (slot-raw-tvar class instance slot)
        (setf (value-of var) value)))
     (t
-     ;; raw access: set the tvar in the slot
+     ;; Set the tvar in the slot
      (call-next-method))))
 
 
@@ -154,11 +154,11 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
      (error "slot-boundp not supported during transactions, ~S in ~S" slot instance))
 
     ((returning?)
-     ;; check if the tvar has a bound value.
+     ;; Check if the tvar has a bound value.
      (boundp-tvar (slot-raw-tvar class instance slot)))
     
     (t
-     ;; raw access: check if the slot is bound to a tvar
+     ;; Raw access: check if the slot is bound to a tvar
      (call-next-method))))
 
 

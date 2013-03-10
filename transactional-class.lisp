@@ -92,16 +92,10 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
 
 ;;;; ** Slot access
 
-;;(defvar *getf-depth* 0)
 (defmethod slot-value-using-class ((class transactional-class) instance
                                    (slot transactional-effective-slot))
   (declare (ignore instance))
-
-  ;;(let ((*getf-depth* (1+ *getf-depth*)))
-    ;;(format t "slot-value-using-class (~S ~S ~S)~%" class instance slot)
-    ;;(format t "getf-depth ~S slot-transactional ~S recording? ~S returning? ~S~%" *getf-depth* (slot-transactional slot) (recording?) (returning?))
-    ;;(cerror "Continue" "stacktrace for debug purposes")
-
+  
   (cond
     ((not (slot-transactional slot))
      (call-next-method))
@@ -127,32 +121,26 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
     (without-returning
       (slot-value-using-class class instance slot))))
 
-;;(defvar *setf-depth* 0)
 (defmethod (setf slot-value-using-class) (value    (class transactional-class)
                                           instance (slot transactional-effective-slot))
-  ;;(let ((*setf-depth* (1+ *setf-depth*)))
-    ;;(format t "(setf slot-value-using-class) (~S ~S ~S ~S)~%" value class instance slot)
-    ;;(format t "setf-depth ~S slot-transactional ~S recording? ~S returning? ~S~%" *setf-depth* (slot-transactional slot) (recording?) (returning?))
-    ;;(cerror "Continue" "stacktrace for debug purposes")
+  (cond
+    ((not (slot-transactional slot))
+     (call-next-method))
     
-    (cond
-      ((not (slot-transactional slot))
-       (call-next-method))
-    
-      ((recording?)
-       ;; Record the writing of the tvar to the current tlog.
-       ;; We get the tvar from the slot  and write it in the current tlog
-       ;; together with the new value
-       (let1 var (slot-raw-tvar class instance slot)
-         (write-tvar var value)))
+    ((recording?)
+     ;; Record the writing of the tvar to the current tlog.
+     ;; We get the tvar from the slot  and write it in the current tlog
+     ;; together with the new value
+     (let1 var (slot-raw-tvar class instance slot)
+       (write-tvar var value)))
       
-      ((returning?)
-       ;; Get the tvar from the slot and write inside it
-       (let1 var (slot-raw-tvar class instance slot)
-         (setf (value-of var) value)))
-      (t
-       ;; raw access: set the tvar in the slot
-       (call-next-method))))
+    ((returning?)
+     ;; Get the tvar from the slot and write inside it
+     (let1 var (slot-raw-tvar class instance slot)
+       (setf (value-of var) value)))
+    (t
+     ;; raw access: set the tvar in the slot
+     (call-next-method))))
 
 
 

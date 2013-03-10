@@ -20,15 +20,15 @@ see the class TRANSACTIONAL-DIRECT-SLOT for details."))
   ((transactional :accessor slot-transactional
                   :initarg :transactional
                   :initform t))
-  (:documentation "The class for direct slots of transactional
-classes.
+  (:documentation "The class for direct slots of transactional classes.
 
 Other than the initargs for standard slots the following
 options can be passed to component slots:
 
-:transactional [ T | NIL ] - Specify that this slot is a
+:transactional [ T | NIL ] - Specify whether this slot is a
 transactional slot and that all reads and writes should be
-committed to log."))
+committed to log. If :transactional [ T | NIL ] is not specified,
+the slot is transactional"))
 
 (defclass transactional-effective-slot (standard-effective-slot-definition)
   ((transactional :accessor slot-transactional
@@ -37,6 +37,8 @@ committed to log."))
 classes.
 
 Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
+
+
 
 ;;;; ** Inheritance
 
@@ -47,20 +49,25 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
 
 ;;;; ** Slot definitions
 
-(defmethod direct-slot-definition-class ((class transactional-class)
-                                         &rest initargs)
-  (declare (ignore initargs))
-  (find-class 'transactional-direct-slot))
+(let1 transactional-direct-slot-class (find-class 'transactional-direct-slot)
+  (defmethod direct-slot-definition-class ((class transactional-class)
+                                           &rest initargs)
+    (declare (ignore initargs))
+    transactional-direct-slot-class))
 
-(defmethod effective-slot-definition-class ((class transactional-class)
-                                            &rest initargs)
-  (declare (ignore initargs))
-  (find-class 'transactional-effective-slot))
+
+
+(let1 transactional-effective-slot-class (find-class 'transactional-effective-slot)
+  (defmethod effective-slot-definition-class ((class transactional-class)
+                                              &rest initargs)
+    (declare (ignore initargs))
+    transactional-effective-slot-class))
+
 
 
 (let1 lambda-new-tvar (lambda () (new 'tvar))
   (defmethod compute-effective-slot-definition ((class transactional-class)
-                                              slot-name direct-slots)
+                                                slot-name direct-slots)
     (declare (ignore slot-name))
     (let ((effective-slot (call-next-method))
           (direct-slots (remove-if-not [typep _ 'transactional-direct-slot] direct-slots)))
@@ -201,12 +208,25 @@ use this macro to wrap a normal defclass as follows:
 the effect is the same as DEFCLASS, plus the default metaclass is
 TRANSACTIONAL-CLASS, slots are transactional by default, and it inherits
 from TRANSACTIONAL-OBJECT by default."
-  (let1 direct-superclasses (or direct-superclasses '(transactional-object))
+;  (let1 direct-superclasses (or direct-superclasses '(transactional-object))
     `(eval-always
        (,defclass ,class ,direct-superclasses
          ,direct-slots
          ,@class-options
-         (:metaclass transactional-class)))))
+         (:metaclass transactional-class))))
+
+
+(let1 transactional-object-class (find-class 'transactional-object)
+  (defmethod compute-class-precedence-list ((class transactional-class))
+    ;; add transactional-object as the first superclass of a transactional object
+    ;; if not already present in the superclass list
+    (let1 superclasses (call-next-method)
+      (if (member transactional-object-class superclasses)
+	  superclasses
+	  `(,(first superclasses) ;; this is the class itself being defined
+	     ,transactional-object-class
+	     ,@(rest superclasses))))))
+
 
 ;;;; ** Initializing
 

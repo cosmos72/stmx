@@ -14,14 +14,21 @@
            (funcall ,tx)
            (execute ,tx)))))
 
-(defun id-of (tx)
+
+
+(defun compute-id-of (tx)
   (let* ((str (format nil "~A" tx))
          (beg (position #\{ str))
          (end (position #\} str)))
     (if (and beg end)
         (subseq str (1+ beg) end)
         str)))
-         
+
+(let1 ids (make-hash-table :test 'eq :size 100 :weakness :key)
+  (defun id-of (tx)
+    (or
+     (gethash tx ids)
+     (setf (gethash tx ids) (compute-id-of tx)))))
 
 (defun run-once (tx)
   (stm.run-once.dribble "Creating fresh transaction log")

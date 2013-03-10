@@ -34,18 +34,15 @@
            #:retry
            #:trans
            #:untrans
-           #:deftransaction
 
            #:transactional-class
            #:transactional-direct-slot
            #:transactional-effective-slot
            #:transactional-object
-           #:deftclass
 
+           #:transactional
            #:transaction
-           #:standard-transaction
-           #:perform
-           #:execute
+           #:atomic
            #:orelse
            #:sequence
 
@@ -67,12 +64,6 @@
            #:current-tlog
            #:with-tlog
            #:with-new-tlog
-
-           #:stm
-           #:unstm
-           #:stms
-           #:unstms
-           #:with-stm
 
            #:counter
            #:count-of
@@ -101,7 +92,7 @@
            #:write-chan
 
            #:sleep-after
-           #:nob
+           #:nonblock
            #:repeat
            ))
 

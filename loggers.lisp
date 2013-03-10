@@ -5,14 +5,14 @@
 ;;;; * Logging
 
 (deflogger stm-logger ()
-  :level +dribble+
+  :level +info+
   :appender (new 'brief-stream-log-appender :stream *debug-io*))
 
-(deflogger stm.check   (stm-logger))
-(deflogger stm.commit  (stm-logger))
-(deflogger stm.execute (stm-logger))
-(deflogger stm.orelse  (stm-logger))
-(deflogger stm.perform (stm-logger))
+(deflogger stm.check    (stm-logger))
+(deflogger stm.commit   (stm-logger))
+(deflogger stm.run-once (stm-logger))
+(deflogger stm.execute  (stm-logger))
+(deflogger stm.orelse   (stm-logger))
 
 (defun stm-logger.level ()
   (log.level (get-logger 'stm-logger)))

@@ -29,23 +29,20 @@ same variables is being committed."
     (unwind-protect
          (progn
            (dohash (writes-of log) var val
-              ;; (declare (ignore val))
-              (let1 lock (lock-of var)
-                (if (acquire-lock lock nil)
-                    (progn
-                      (push var acquired)
-                      (stm.commit.dribble "Acquired lock ~A" lock))
-                    (progn
-                      (stm.commit.debug   "Transaction log not committed: could not acquire lock ~A" lock)
-                      (return-from commit nil)))))
+             (let1 lock (lock-of var)
+               (if (acquire-lock lock nil)
+                   (progn
+                     (push var acquired)
+                     (stm.commit.dribble "Acquired lock ~A" lock))
+                   (progn
+                     (stm.commit.debug   "Transaction log not committed: could not acquire lock ~A" lock)
+                     (return-from commit nil)))))
            (unless (check? log)
-             (stm.commit.debug "Transaction log not committed: log is inconsistent")
+             (stm.commit.debug "Transaction log not committed: log is invalid")
              (return-from commit nil))
            (dohash (writes-of log) var val
-              (setf (value-of var) val)
-              (stm.commit.dribble "Tvar ~A value updated to ~A" var val)
-              (incf (version-of var))
-              (stm.commit.dribble "Tvar ~A version updated to ~A" var (version-of var)))
+             (setf (value-of var) val)
+             (stm.commit.dribble "Tvar ~A value updated to ~A, version incremented by 1" var val))
            (stm.commit.debug "Transaction log committed")
            (return-from commit t))
       (dolist (var acquired)

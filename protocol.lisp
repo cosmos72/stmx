@@ -33,12 +33,8 @@ are committed to memory by COMMIT later on."))
   ((lock :accessor lock-of
          :initarg :lock
          :initform (make-lock "TVAR"))
-   (value :accessor value-of
-          :initarg :value)
-   (version :accessor version-of
-            :initarg :version
-            :initform 0
-            :type integer)
+   (vbox :accessor vbox-of ;; versioned box
+         :type vbox)
    (waiting :accessor waiting-for
             :initarg :waiting
             :initform (new 'queue :element-type 'tlog)
@@ -106,11 +102,11 @@ variable itself.")
      (with-recording
        ,@body)))
 
-(defmacro with-new-tlog (var &body body)
+(defmacro with-new-tlog (log &body body)
   "Execute BODY with the default transaction log being a newly
-allocated transaction log bound to VAR."
-  `(let1 ,var (new 'standard-tlog)
-     (with-tlog ,var
+allocated transaction log bound to LOG."
+  `(let1 ,log (new 'tlog)
+     (with-tlog ,log
        ,@body)))
 
 

@@ -155,7 +155,7 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
 
     ((returning?)
      ;; Check if the tvar has a bound value.
-     (boundp-tvar (slot-raw-tvar class instance slot)))
+     (tvar-bound? (slot-raw-tvar class instance slot)))
     
     (t
      ;; Raw access: check if the slot is bound to a tvar
@@ -173,7 +173,7 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
 
     ((returning?)
      ;; keep the slot bound to the tvar, only unbind the tvar contents
-     (makunbound-tvar (slot-raw-tvar class instance slot)))
+     (tvar-unbind (slot-raw-tvar class instance slot)))
     
     (t
      ;; raw access: unbind the slot.

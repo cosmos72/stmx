@@ -11,11 +11,14 @@
                :closer-mop)
 
   :components ((:static-file "cl-stm2.asd")
-               (:file "packages")
-               (:file "loggers" :depends-on ("packages"))
-               (:file "protocol" :depends-on ("packages"))
-               (:file "tlog" :depends-on ("protocol" "loggers"))
-               (:file "tvar" :depends-on ("tlog"))
+               (:file "package")
+               (:file "vbox")
+               (:file "loggers"   :depends-on ("package"))
+               (:file "protocol"  :depends-on ("package" "vbox"))
+               (:file "tlog"      :depends-on ("protocol" "loggers"))
+               (:file "tvar"      :depends-on ("vbox" "tlog"))
+               (:file "tclass"    :depends-on ("tlog" "tvar"))
+               (:file "interface" :depends-on ("tlog" "tvar"))
 
 #|
                (:file "standard-transaction" :depends-on ("tlog"))

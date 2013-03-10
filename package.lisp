@@ -30,21 +30,17 @@
                           #:standard-generic-function
                           #:ensure-generic-function
                           #:defgeneric)
-  (:export #:try
+  (:export #:atomic
+           #:atomic-try
            #:retry
-           #:trans
-           #:untrans
+
+           #:transactional
+           #:transaction
 
            #:transactional-class
            #:transactional-direct-slot
            #:transactional-effective-slot
            #:transactional-object
-
-           #:transactional
-           #:transaction
-           #:atomic
-           #:orelse
-           #:sequence
 
            #:tlog
            #:commit

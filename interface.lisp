@@ -48,6 +48,7 @@
 (defun execute (tx)
   (let1 id (id-of tx)
     (prog (x-tlog x-values)
+
      execute
      (multiple-value-bind (retry? log values) (run-once tx)
        (if retry?
@@ -59,6 +60,7 @@
              (setq x-tlog   log
                    x-values values)
              (go commit))))
+
      commit
      (if (not (check? x-tlog))
          (progn
@@ -82,16 +84,20 @@
   (let ((id1 (id-of tx1))
         (id2 (id-of tx2)))
     (prog (log1 log2 x-values)
+
      execute-tx1
+     (setq log1 nil
+           log2 nil)
      (multiple-value-bind (retry? log values) (run-once tx1)
+       (setf log1 log)
        (if retry?
            (progn
              (stm.orelse.dribble "Transaction ~A retried, trying transaction ~A" id1 id2)
              (go execute-tx2))
            (progn
-             (setq log1     log
-                   x-values values)
+             (setf x-values values)
              (go commit-tx1))))
+
      commit-tx1
      (if (not (check? log1))
          (progn
@@ -104,29 +110,39 @@
                                    (tlog-id log1) id1 id2)
                (go execute-tx2))
              (go done)))
+
      execute-tx2
      (multiple-value-bind (retry? log values) (run-once tx2)
+       (setf log2 log)
        (if retry?
            (progn
              (stm.orelse.dribble "Transaction ~A retried, retrying both ~A and ~A"
                                  id2 id1 id2)
-             (throw 'retry (merge-tlogs log1 log)))
+             (go wait-reexecute))
            (progn
-             (setq log2     log
-                   x-values values)
+             (setf x-values values)
              (go commit-tx2))))
+
      commit-tx2
      (if (not (check? log2))
          (progn
            (stm.orelse.dribble "Tlog ~A of transaction ~A invalid, retrying both ~A and ~A"
                                (tlog-id log2) id2 id1 id2)
-           (throw 'retry (merge-tlogs log1 log2)))
+           (go wait-reexecute))
          (if (not (commit log2))
              (progn
-               (stm.orelse.dribble "Tlog ~A of transaction  ~A not committed, retrying both ~A and ~A"
+               (stm.orelse.dribble "Tlog ~A of transaction ~A not committed, retrying both ~A and ~A"
                                    (tlog-id log2) id2 id1 id2)
-               (throw 'retry (merge-tlogs log1 log2)))
+               (go wait-reexecute))
              (go done)))
+
+     wait-reexecute
+     (progn
+       (stm.orelse.debug "Waiting for other threads before retrying both transactions ~A and ~A"
+                         id1 id2)
+       (wait-tlog (merge-tlogs log1 log2))
+       (go execute-tx1))
+
      done
      (return-from execute-orelse (values-list x-values)))))
 
@@ -136,12 +152,11 @@
                    (lambda () ,form2)))
   
 
-(defmacro try (&body body)
-  "Return a transaction that executes each transaction in BODY
+(defmacro atomic-try (&body body)
+  "Execute each transaction in BODY
 atomically from left to right until one succeeds.
 
-The return value of the transaction is the value of the
-transaction that succeeds."
+Returns the value of the transaction that succeeds."
   (reduce [list 'orelse] body :from-end t))
 
 

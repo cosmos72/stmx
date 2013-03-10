@@ -90,15 +90,18 @@ same variables is being committed."
 
 (defun wait-tlog (log)
   (declare (type tlog log))
-  (dohash (reads-of log) var val
-    ;; (declare (ignore val))
-    (with-slots (waiting waiting-lock) var
-      (with-lock-held (waiting-lock)
-        (enqueue waiting log))))
-  (let1 dummy (make-lock "dummy lock")
-    ;; Max: making a new lock for each call to (wait) seems a bit wasteful
-    (acquire-lock dummy)
-    (condition-wait (semaphore-of log) dummy)))
+  (let1 reads (reads-of log)
+    (when (zerop (hash-table-count reads))
+      (error "Tried to wait on tlog ~A, but no tvars to wait on.~%  This is a BUG either in the STM library or in the application code!~%  Possible reason: code analogous to (atomic (retry)) is invalid~%  and will signal the current error because it does not read any tvar~%  before retrying." (tlog-id log)))
+    (dohash reads var val
+      ;; (declare (ignore val))
+      (with-slots (waiting waiting-lock) var
+        (with-lock-held (waiting-lock)
+          (enqueue waiting log))))
+    (let1 dummy (make-lock "dummy lock")
+      ;; Max: making a new lock for each call to (wait) seems a bit wasteful
+      (acquire-lock dummy)
+      (condition-wait (semaphore-of log) dummy))))
 
 
 (defun unwait-tlog (log)

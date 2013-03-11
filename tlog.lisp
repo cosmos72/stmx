@@ -25,7 +25,7 @@ same variables is being committed."
 
   (declare (type tlog log))
   (let1 acquired nil
-    (log:trace "Tlog ~A committing..." (tlog-id log))
+    (log:trace "Tlog ~A committing..." (! log))
     (unwind-protect
          (progn
            (dohash (writes-of log) var val
@@ -36,15 +36,15 @@ same variables is being committed."
                      (log:trace "Acquired lock ~A" lock))
                    (progn
                      (log:debug "Tlog ~A ...not committed: could not acquire lock ~A"
-                                       (tlog-id log) lock)
+                                       (! log) lock)
                      (return-from commit nil)))))
            (unless (check? log)
-             (log:debug "Tlog ~A ...not committed: log is invalid" (tlog-id log))
+             (log:debug "Tlog ~A ...not committed: log is invalid" (! log))
              (return-from commit nil))
            (dohash (writes-of log) var val
              (setf (value-of var) val)
              (log:trace "Tvar ~A value updated to ~A, version incremented by 1" var val))
-           (log:debug "Tlog ~A ...committed" (tlog-id log))
+           (log:debug "Tlog ~A ...committed" (! log))
            (return-from commit t))
       (dolist (var acquired)
         (let1 lock (lock-of var)
@@ -57,16 +57,16 @@ same variables is being committed."
 
 (defun check? (log)
   (declare (type tlog log))
-  (log:trace "Tlog ~A checking.." (tlog-id log))
+  (log:trace "Tlog ~A checking.." (! log))
   (dohash (reads-of log) var ver
     (let1 actual-ver (version-of var)
       (if (= ver actual-ver)
           (log:trace "Version ~A is valid" ver)
           (progn
             (log:trace "Version ~A doesn't match ~A" ver actual-ver)
-            (log:debug "Tlog ~A ..invalid" (tlog-id log))
+            (log:debug "Tlog ~A ..invalid" (! log))
             (return-from check? nil)))))
-  (log:trace "Tlog ~A ..valid" (tlog-id log))
+  (log:trace "Tlog ~A ..valid" (! log))
   (return-from check? t))
 
 ;;;; ** Merging
@@ -90,7 +90,7 @@ same variables is being committed."
   (declare (type tlog log))
   (let1 reads (reads-of log)
     (when (zerop (hash-table-count reads))
-      (error "Tried to wait on tlog ~A, but no tvars to wait on.~%  This is a BUG either in the STM library or in the application code!~%  Possible reason: code analogous to (atomic (retry)) is invalid~%  and will signal the current error because it does not read any tvar~%  before retrying." (tlog-id log)))
+      (error "Tried to wait on tlog ~A, but no tvars to wait on.~%  This is a BUG either in the STM library or in the application code!~%  Possible reason: code analogous to (atomic (retry)) is invalid~%  and will signal the current error because it does not read any tvar~%  before retrying." (! log)))
     (dohash reads var val
       ;; (declare (ignore val))
       (with-slots (waiting waiting-lock) var
@@ -135,3 +135,21 @@ same variables is being committed."
 ;; THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 ;; (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ;; OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+
+;; Copyright (c) 2013, Massimiliano Ghilardi
+;; This file is part of STMX.
+;;
+;; STMX is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU Lesser General Public License
+;; as published by the Free Software Foundation, either version 3
+;; of the License, or (at your option) any later version.
+;;
+;; STMX is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty
+;; of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+;; See the GNU Lesser General Public License for more details.
+;;
+;; You should have received a copy of the GNU Lesser General Public
+;; License along with STMX. If not, see <http://www.gnu.org/licenses/>.

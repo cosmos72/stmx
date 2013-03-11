@@ -8,72 +8,58 @@
 ;;;; ** Running
 
 (defmacro atomic (&body body)
-  (let1 tx (gensym)
-    `(let ((,tx (lambda () ,@body)))
-       (if (recording?)
-           (funcall ,tx)
-           (execute ,tx)))))
+  `(execute (lambda () ,@body)))
 
 
-
-(defun compute-id-of (tx)
-  (let* ((str (format nil "~A" tx))
-         (beg (position #\{ str))
-         (end (position #\} str)))
-    (if (and beg end)
-        (subseq str (1+ beg) end)
-        str)))
-
-(let1 ids (make-hash-table :test 'eq :size 100 :weakness :key)
-  (defun id-of (tx)
-    (or
-     (gethash tx ids)
-     (setf (gethash tx ids) (compute-id-of tx)))))
 
 (defun run-once (tx)
-  (let1 id (id-of tx)
-    (with-new-tlog log
-      (log:trace "Tlog ~A created" (tlog-id log))
-      (log:trace "Transaction ~A starting..." id)
-      (let1 x (catch 'retry (multiple-value-list (funcall tx)))
-        (etypecase x
-          (tlog
-           (log:debug "Transaction ~A retried" id)
-           (values t x))
-          (list
-           (log:debug "Transaction ~A completed, return values: ~{~A ~}" id x)
-           (values nil log x)))))))
+  (declare (type function tx))
+  (with-new-tlog log
+    (log:trace "Tlog ~A created" (! log))
+    (log:trace "Transaction ~A starting..." (! tx))
+    (let1 x (catch 'retry (multiple-value-list (funcall tx)))
+      (etypecase x
+        (tlog
+         (log:debug "Transaction ~A retried" (! tx))
+         (values t x))
+        (list
+         (log:debug "Transaction ~A completed, return values: ~{~A ~}" (! tx) x)
+         (values nil log x))))))
 
 
 (defun execute (tx)
-  (let1 id (id-of tx)
-    (prog (x-tlog x-values)
+  (declare (type function tx))
 
-     execute
-     (multiple-value-bind (retry? log values) (run-once tx)
-       (if retry?
-           (progn
-             (log:trace "Transaction ~A will be re-executed" id)
-             (wait-tlog log)
-             (go execute))
-           (progn
-             (setq x-tlog   log
-                   x-values values)
-             (go commit))))
+  (when (recording?)
+    (return-from execute (funcall tx)))
 
-     commit
-     (if (not (check? x-tlog))
+  (prog (x-tlog x-values)
+
+   execute
+   (multiple-value-bind (retry? log values) (run-once tx)
+     (if retry?
          (progn
-           (log:trace "Transaction ~A will be re-executed immediately" id)
+           (log:trace "Transaction ~A will be re-executed" (! tx))
+           (wait-tlog log)
            (go execute))
-         (if (not (commit x-tlog))
-             (progn
-               (log:trace "Transaction ~A will be re-committed" id)
-               (wait-tlog x-tlog)
-               (go commit))
-             (go done)))
-     done
-     (return-from execute (values-list x-values)))))
+         (progn
+           (setq x-tlog   log
+                 x-values values)
+           (go commit))))
+
+   commit
+   (if (not (check? x-tlog))
+       (progn
+         (log:trace "Transaction ~A will be re-executed immediately" (! tx))
+         (go execute))
+       (if (not (commit x-tlog))
+           (progn
+             (log:trace "Transaction ~A will be re-committed" (! tx))
+             (wait-tlog x-tlog)
+             (go commit))
+           (go done)))
+   done
+   (return-from execute (values-list x-values))))
 
 
 
@@ -81,70 +67,69 @@
 ;;;; ** Composing
 
 (defun execute-orelse (tx1 tx2)
-  (let ((id1 (id-of tx1))
-        (id2 (id-of tx2)))
-    (prog (log1 log2 x-values)
+  (declare (type function tx1 tx2))
+  (prog (log1 log2 x-values)
 
-     execute-tx1
-     (setq log1 nil
-           log2 nil)
-     (multiple-value-bind (retry? log values) (run-once tx1)
-       (setf log1 log)
-       (if retry?
-           (progn
-             (log:trace "Transaction ~A retried, trying transaction ~A" id1 id2)
-             (go execute-tx2))
-           (progn
-             (setf x-values values)
-             (go commit-tx1))))
-
-     commit-tx1
-     (if (not (check? log1))
+   execute-tx1
+   (setq log1 nil
+         log2 nil)
+   (multiple-value-bind (retry? log values) (run-once tx1)
+     (setf log1 log)
+     (if retry?
          (progn
-           (log:trace "Tlog ~A of transaction ~A invalid, trying transaction ~A"
-                               (tlog-id log1) id1 id2)
+           (log:trace "Transaction ~A retried, trying transaction ~A" (! tx1) (! tx2))
            (go execute-tx2))
-         (if (not (commit log1))
-             (progn
-               (log:trace "Tlog ~A of transaction ~A not committed, trying transaction ~A"
-                                   (tlog-id log1) id1 id2)
-               (go execute-tx2))
-             (go done)))
-
-     execute-tx2
-     (multiple-value-bind (retry? log values) (run-once tx2)
-       (setf log2 log)
-       (if retry?
-           (progn
-             (log:trace "Transaction ~A retried, retrying both ~A and ~A"
-                                 id2 id1 id2)
-             (go wait-reexecute))
-           (progn
-             (setf x-values values)
-             (go commit-tx2))))
-
-     commit-tx2
-     (if (not (check? log2))
          (progn
-           (log:trace "Tlog ~A of transaction ~A invalid, retrying both ~A and ~A"
-                               (tlog-id log2) id2 id1 id2)
+           (setf x-values values)
+           (go commit-tx1))))
+   
+   commit-tx1
+   (if (not (check? log1))
+       (progn
+         (log:trace "Tlog ~A of transaction ~A invalid, trying transaction ~A"
+                    (! log1) (! tx1) (! tx2))
+         (go execute-tx2))
+       (if (not (commit log1))
+           (progn
+             (log:trace "Tlog ~A of transaction ~A not committed, trying transaction ~A"
+                        (! log1) (! tx1) (! tx2))
+             (go execute-tx2))
+           (go done)))
+
+   execute-tx2
+   (multiple-value-bind (retry? log values) (run-once tx2)
+     (setf log2 log)
+     (if retry?
+         (progn
+           (log:trace "Transaction ~A retried, retrying both ~A and ~A"
+                      (! tx2) (! tx1) (! tx2))
            (go wait-reexecute))
-         (if (not (commit log2))
-             (progn
-               (log:trace "Tlog ~A of transaction ~A not committed, retrying both ~A and ~A"
-                                   (tlog-id log2) id2 id1 id2)
-               (go wait-reexecute))
-             (go done)))
+         (progn
+           (setf x-values values)
+           (go commit-tx2))))
 
-     wait-reexecute
-     (progn
-       (log:debug "Waiting for other threads before retrying both transactions ~A and ~A"
-                         id1 id2)
-       (wait-tlog (merge-tlogs log1 log2))
-       (go execute-tx1))
+   commit-tx2
+   (if (not (check? log2))
+       (progn
+         (log:trace "Tlog ~A of transaction ~A invalid, retrying both ~A and ~A"
+                    (! log2) (! tx2) (! tx1) (! tx2))
+         (go wait-reexecute))
+       (if (not (commit log2))
+           (progn
+             (log:trace "Tlog ~A of transaction ~A not committed, retrying both ~A and ~A"
+                        (! log2) (! tx2) (! tx1) (! tx2))
+             (go wait-reexecute))
+           (go done)))
 
-     done
-     (return-from execute-orelse (values-list x-values)))))
+   wait-reexecute
+   (progn
+     (log:debug "Waiting for other threads before retrying both transactions ~A and ~A"
+                (! tx1) (! tx2))
+     (wait-tlog (merge-tlogs log1 log2))
+     (go execute-tx1))
+   
+   done
+   (return-from execute-orelse (values-list x-values))))
 
 
 (defmacro orelse (form1 form2)
@@ -200,3 +185,21 @@ far during the transaction."
 ;; THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 ;; (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ;; OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+
+;; Copyright (c) 2013, Massimiliano Ghilardi
+;; This file is part of STMX.
+;;
+;; STMX is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU Lesser General Public License
+;; as published by the Free Software Foundation, either version 3
+;; of the License, or (at your option) any later version.
+;;
+;; STMX is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty
+;; of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+;; See the GNU Lesser General Public License for more details.
+;;
+;; You should have received a copy of the GNU Lesser General Public
+;; License along with STMX. If not, see <http://www.gnu.org/licenses/>.

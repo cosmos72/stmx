@@ -12,7 +12,8 @@
                :log4cl)
 
   :components ((:static-file "cl-stm2.asd")
-               (:file "package")
+               (:file "utils")
+               (:file "package"   :depends-on ("utils"))
                (:file "vbox")
                (:file "protocol"  :depends-on ("package" "vbox"))
                (:file "tlog"      :depends-on ("protocol"))

@@ -2,38 +2,29 @@
 
 (in-package :cl-stm2)
 
-(declaim (inline new-vbox vbox-version vbox-value vbox-bound?))
+;;;; * Utilities
 
-;;;; ** Versioned boxes
+(defgeneric id-of (obj))
 
-(defvar +unbound+ (gensym "UNBOUND-"))
+(declaim (inline !))
+(defun ! (obj) (id-of obj))
 
-(deftype vbox () 'cons)
+(defun compute-id-of (obj)
+  (declare (type t obj))
+  (let* ((str (the string (format nil "~A" obj)))
+         (beg (position #\{ str))
+         (end (position #\} str)))
+    (the string
+      (if (and beg end)
+          (subseq str (1+ beg) end)
+          str))))
 
-(defun new-vbox (&key (version 0) (value +unbound+))
-  "Create and return a new versioned box"
-  (declare (type integer version))
-  (cons version value))
-
-
-;;;; ** Readers
-
-(defun vbox-version (box)
-  "Return the version stored in the versioned box"
-  (declare (type cons box))
-  (the integer (car box)))
-
-(defun vbox-value (box)
-  "Return the value stored in the versioned box"
-  (declare (type cons box))
-  (cdr box))
-
-(defun vbox-bound? (box)
-  "Return true if the versioned box is bound to a value."
-  (declare (type cons box))
-  (not (eq (vbox-value box) +unbound+)))
-
-
+(let1 ids (make-hash-table :test 'eq :size 100 :weakness :key)
+  (defmethod id-of (obj)
+    (the string
+      (or
+       (gethash obj ids)
+       (setf (gethash obj ids) (compute-id-of obj))))))
 
 
 ;; Copyright (c) 2013, Massimiliano Ghilardi

@@ -10,7 +10,6 @@
   (:use :arnesi
         :bordeaux-threads
         :cl
-        :cl-user
         :closer-mop)
   (:nicknames :stm2)
   (:shadowing-import-from :arnesi

@@ -33,15 +33,15 @@
 (defun run-once (tx)
   (let1 id (id-of tx)
     (with-new-tlog log
-      (stm.run-once.dribble "Tlog ~A created" (tlog-id log))
-      (stm.run-once.dribble "Transaction ~A starting..." id)
+      (log:trace "Tlog ~A created" (tlog-id log))
+      (log:trace "Transaction ~A starting..." id)
       (let1 x (catch 'retry (multiple-value-list (funcall tx)))
         (etypecase x
           (tlog
-           (stm.run-once.debug "Transaction ~A retried" id)
+           (log:debug "Transaction ~A retried" id)
            (values t x))
           (list
-           (stm.run-once.debug "Transaction ~A completed, return values: ~{~A ~}" id x)
+           (log:debug "Transaction ~A completed, return values: ~{~A ~}" id x)
            (values nil log x)))))))
 
 
@@ -53,7 +53,7 @@
      (multiple-value-bind (retry? log values) (run-once tx)
        (if retry?
            (progn
-             (stm.execute.dribble "Transaction ~A will be re-executed" id)
+             (log:trace "Transaction ~A will be re-executed" id)
              (wait-tlog log)
              (go execute))
            (progn
@@ -64,11 +64,11 @@
      commit
      (if (not (check? x-tlog))
          (progn
-           (stm.execute.dribble "Transaction ~A will be re-executed immediately" id)
+           (log:trace "Transaction ~A will be re-executed immediately" id)
            (go execute))
          (if (not (commit x-tlog))
              (progn
-               (stm.execute.dribble "Transaction ~A will be re-committed" id)
+               (log:trace "Transaction ~A will be re-committed" id)
                (wait-tlog x-tlog)
                (go commit))
              (go done)))
@@ -92,7 +92,7 @@
        (setf log1 log)
        (if retry?
            (progn
-             (stm.orelse.dribble "Transaction ~A retried, trying transaction ~A" id1 id2)
+             (log:trace "Transaction ~A retried, trying transaction ~A" id1 id2)
              (go execute-tx2))
            (progn
              (setf x-values values)
@@ -101,12 +101,12 @@
      commit-tx1
      (if (not (check? log1))
          (progn
-           (stm.orelse.dribble "Tlog ~A of transaction ~A invalid, trying transaction ~A"
+           (log:trace "Tlog ~A of transaction ~A invalid, trying transaction ~A"
                                (tlog-id log1) id1 id2)
            (go execute-tx2))
          (if (not (commit log1))
              (progn
-               (stm.orelse.dribble "Tlog ~A of transaction ~A not committed, trying transaction ~A"
+               (log:trace "Tlog ~A of transaction ~A not committed, trying transaction ~A"
                                    (tlog-id log1) id1 id2)
                (go execute-tx2))
              (go done)))
@@ -116,7 +116,7 @@
        (setf log2 log)
        (if retry?
            (progn
-             (stm.orelse.dribble "Transaction ~A retried, retrying both ~A and ~A"
+             (log:trace "Transaction ~A retried, retrying both ~A and ~A"
                                  id2 id1 id2)
              (go wait-reexecute))
            (progn
@@ -126,19 +126,19 @@
      commit-tx2
      (if (not (check? log2))
          (progn
-           (stm.orelse.dribble "Tlog ~A of transaction ~A invalid, retrying both ~A and ~A"
+           (log:trace "Tlog ~A of transaction ~A invalid, retrying both ~A and ~A"
                                (tlog-id log2) id2 id1 id2)
            (go wait-reexecute))
          (if (not (commit log2))
              (progn
-               (stm.orelse.dribble "Tlog ~A of transaction ~A not committed, retrying both ~A and ~A"
+               (log:trace "Tlog ~A of transaction ~A not committed, retrying both ~A and ~A"
                                    (tlog-id log2) id2 id1 id2)
                (go wait-reexecute))
              (go done)))
 
      wait-reexecute
      (progn
-       (stm.orelse.debug "Waiting for other threads before retrying both transactions ~A and ~A"
+       (log:debug "Waiting for other threads before retrying both transactions ~A and ~A"
                          id1 id2)
        (wait-tlog (merge-tlogs log1 log2))
        (go execute-tx1))

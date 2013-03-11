@@ -26,7 +26,7 @@ same variables is being committed."
   (declare (type tlog log))
   (let ((acquired nil)
         (id (tlog-id log)))
-    (stm.commit.dribble "Tlog ~A committing..." id)
+    (log:trace "Tlog ~A committing..." id)
     (unwind-protect
          (progn
            (dohash (writes-of log) var val
@@ -34,41 +34,41 @@ same variables is being committed."
                (if (acquire-lock lock nil)
                    (progn
                      (push var acquired)
-                     (stm.commit.dribble "Acquired lock ~A" lock))
+                     (log:trace "Acquired lock ~A" lock))
                    (progn
-                     (stm.commit.debug "Tlog ~A ...not committed: could not acquire lock ~A"
+                     (log:debug "Tlog ~A ...not committed: could not acquire lock ~A"
                                        id lock)
                      (return-from commit nil)))))
            (unless (check? log)
-             (stm.commit.debug "Tlog ~A ...not committed: log is invalid" id)
+             (log:debug "Tlog ~A ...not committed: log is invalid" id)
              (return-from commit nil))
            (dohash (writes-of log) var val
              (setf (value-of var) val)
-             (stm.commit.dribble "Tvar ~A value updated to ~A, version incremented by 1" var val))
-           (stm.commit.debug "Tlog ~A ...committed" id)
+             (log:trace "Tvar ~A value updated to ~A, version incremented by 1" var val))
+           (log:debug "Tlog ~A ...committed" id)
            (return-from commit t))
       (dolist (var acquired)
         (let1 lock (lock-of var)
           (release-lock lock)
-          (stm.commit.dribble "Released lock ~A" lock)))
+          (log:trace "Released lock ~A" lock)))
       (dolist (var acquired)
         (unwait-tvar var)
-        (stm.commit.dribble "Notified threads waiting on ~A" var)))))
+        (log:trace "Notified threads waiting on ~A" var)))))
 
 
 (defun check? (log)
   (declare (type tlog log))
   (let1 id (tlog-id log)
-    (stm.check.dribble "Tlog ~A checking.." id)
+    (log:trace "Tlog ~A checking.." id)
     (dohash (reads-of log) var ver
       (let1 actual-ver (version-of var)
         (if (= ver actual-ver)
-            (stm.check.dribble "Version ~A is valid" ver)
+            (log:trace "Version ~A is valid" ver)
             (progn
-              (stm.check.dribble "Version ~A doesn't match ~A" ver actual-ver)
-              (stm.check.debug   "Tlog ~A ..invalid" id)
+              (log:trace "Version ~A doesn't match ~A" ver actual-ver)
+              (log:debug "Tlog ~A ..invalid" id)
               (return-from check? nil)))))
-    (stm.check.dribble "Tlog ~A ..valid" id)
+    (log:trace "Tlog ~A ..valid" id)
     (return-from check? t)))
 
 ;;;; ** Merging

@@ -8,14 +8,14 @@
 
   :depends-on (:arnesi
                :bordeaux-threads
-               :closer-mop)
+               :closer-mop
+               :log4cl)
 
   :components ((:static-file "cl-stm2.asd")
                (:file "package")
                (:file "vbox")
-               (:file "loggers"   :depends-on ("package"))
                (:file "protocol"  :depends-on ("package" "vbox"))
-               (:file "tlog"      :depends-on ("protocol" "loggers"))
+               (:file "tlog"      :depends-on ("protocol"))
                (:file "tvar"      :depends-on ("vbox" "tlog"))
                (:file "tclass"    :depends-on ("tlog" "tvar"))
                (:file "interface" :depends-on ("tlog" "tvar"))

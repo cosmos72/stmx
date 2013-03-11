@@ -24,9 +24,8 @@ it probably means that another transaction log that writes the
 same variables is being committed."
 
   (declare (type tlog log))
-  (let ((acquired nil)
-        (id (tlog-id log)))
-    (log:trace "Tlog ~A committing..." id)
+  (let1 acquired nil
+    (log:trace "Tlog ~A committing..." (tlog-id log))
     (unwind-protect
          (progn
            (dohash (writes-of log) var val
@@ -37,15 +36,15 @@ same variables is being committed."
                      (log:trace "Acquired lock ~A" lock))
                    (progn
                      (log:debug "Tlog ~A ...not committed: could not acquire lock ~A"
-                                       id lock)
+                                       (tlog-id log) lock)
                      (return-from commit nil)))))
            (unless (check? log)
-             (log:debug "Tlog ~A ...not committed: log is invalid" id)
+             (log:debug "Tlog ~A ...not committed: log is invalid" (tlog-id log))
              (return-from commit nil))
            (dohash (writes-of log) var val
              (setf (value-of var) val)
              (log:trace "Tvar ~A value updated to ~A, version incremented by 1" var val))
-           (log:debug "Tlog ~A ...committed" id)
+           (log:debug "Tlog ~A ...committed" (tlog-id log))
            (return-from commit t))
       (dolist (var acquired)
         (let1 lock (lock-of var)
@@ -58,18 +57,17 @@ same variables is being committed."
 
 (defun check? (log)
   (declare (type tlog log))
-  (let1 id (tlog-id log)
-    (log:trace "Tlog ~A checking.." id)
-    (dohash (reads-of log) var ver
-      (let1 actual-ver (version-of var)
-        (if (= ver actual-ver)
-            (log:trace "Version ~A is valid" ver)
-            (progn
-              (log:trace "Version ~A doesn't match ~A" ver actual-ver)
-              (log:debug "Tlog ~A ..invalid" id)
-              (return-from check? nil)))))
-    (log:trace "Tlog ~A ..valid" id)
-    (return-from check? t)))
+  (log:trace "Tlog ~A checking.." (tlog-id log))
+  (dohash (reads-of log) var ver
+    (let1 actual-ver (version-of var)
+      (if (= ver actual-ver)
+          (log:trace "Version ~A is valid" ver)
+          (progn
+            (log:trace "Version ~A doesn't match ~A" ver actual-ver)
+            (log:debug "Tlog ~A ..invalid" (tlog-id log))
+            (return-from check? nil)))))
+  (log:trace "Tlog ~A ..valid" (tlog-id log))
+  (return-from check? t))
 
 ;;;; ** Merging
 

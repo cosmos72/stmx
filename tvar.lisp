@@ -1,6 +1,6 @@
 ;; -*- lisp -*-
 
-(in-package :cl-stm2)
+(in-package :stmx)
 
 ;;;; ** Transactional variables
 

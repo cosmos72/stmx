@@ -6,7 +6,7 @@
 
 (in-package :cl-user)
 
-(defpackage :cl-stm2
+(defpackage :stmx
   (:use :arnesi
         :bordeaux-threads
         :cl

@@ -1,13 +1,13 @@
 ;; -*- lisp -*-
 
-(in-package :cl-stm2)
+(in-package :stmx)
 
 ;;;; * Utilities
 
 (defgeneric id-of (obj))
 
-(declaim (inline !))
-(defun ! (obj) (id-of obj))
+(declaim (inline ~))
+(defun ~ (obj) (id-of obj))
 
 (defun compute-id-of (obj)
   (declare (type t obj))

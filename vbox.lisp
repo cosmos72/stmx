@@ -1,6 +1,6 @@
 ;; -*- lisp -*-
 
-(in-package :cl-stm2)
+(in-package :stmx)
 
 (declaim (inline new-vbox vbox-version vbox-value vbox-bound?))
 

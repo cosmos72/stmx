@@ -1,6 +1,6 @@
 ;; -*- lisp -*-
 
-(in-package :cl-stm2)
+(in-package :stmx)
 
 (eval-always
   (enable-pf-reader))
@@ -15,15 +15,15 @@
 (defun run-once (tx)
   (declare (type function tx))
   (with-new-tlog log
-    (log:trace "Tlog ~A created" (! log))
-    (log:trace "Transaction ~A starting..." (! tx))
+    (log:trace "Tlog ~A created" (~ log))
+    (log:trace "Transaction ~A starting..." (~ tx))
     (let1 x (catch 'retry (multiple-value-list (funcall tx)))
       (etypecase x
         (tlog
-         (log:debug "Transaction ~A retried" (! tx))
+         (log:debug "Transaction ~A retried" (~ tx))
          (values t x))
         (list
-         (log:debug "Transaction ~A completed, return values: ~{~A ~}" (! tx) x)
+         (log:debug "Transaction ~A completed, return values: ~{~A ~}" (~ tx) x)
          (values nil log x))))))
 
 
@@ -39,7 +39,7 @@
    (multiple-value-bind (retry? log values) (run-once tx)
      (if retry?
          (progn
-           (log:trace "Transaction ~A will be re-executed" (! tx))
+           (log:trace "Transaction ~A will be re-executed" (~ tx))
            (wait-tlog log)
            (go execute))
          (progn
@@ -50,11 +50,11 @@
    commit
    (if (not (check? x-tlog))
        (progn
-         (log:trace "Transaction ~A will be re-executed immediately" (! tx))
+         (log:trace "Transaction ~A will be re-executed immediately" (~ tx))
          (go execute))
        (if (not (commit x-tlog))
            (progn
-             (log:trace "Transaction ~A will be re-committed" (! tx))
+             (log:trace "Transaction ~A will be re-committed" (~ tx))
              (wait-tlog x-tlog)
              (go commit))
            (go done)))
@@ -77,7 +77,7 @@
      (setf log1 log)
      (if retry?
          (progn
-           (log:trace "Transaction ~A retried, trying transaction ~A" (! tx1) (! tx2))
+           (log:trace "Transaction ~A retried, trying transaction ~A" (~ tx1) (~ tx2))
            (go execute-tx2))
          (progn
            (setf x-values values)
@@ -87,12 +87,12 @@
    (if (not (check? log1))
        (progn
          (log:trace "Tlog ~A of transaction ~A invalid, trying transaction ~A"
-                    (! log1) (! tx1) (! tx2))
+                    (~ log1) (~ tx1) (~ tx2))
          (go execute-tx2))
        (if (not (commit log1))
            (progn
              (log:trace "Tlog ~A of transaction ~A not committed, trying transaction ~A"
-                        (! log1) (! tx1) (! tx2))
+                        (~ log1) (~ tx1) (~ tx2))
              (go execute-tx2))
            (go done)))
 
@@ -102,7 +102,7 @@
      (if retry?
          (progn
            (log:trace "Transaction ~A retried, retrying both ~A and ~A"
-                      (! tx2) (! tx1) (! tx2))
+                      (~ tx2) (~ tx1) (~ tx2))
            (go wait-reexecute))
          (progn
            (setf x-values values)
@@ -112,19 +112,19 @@
    (if (not (check? log2))
        (progn
          (log:trace "Tlog ~A of transaction ~A invalid, retrying both ~A and ~A"
-                    (! log2) (! tx2) (! tx1) (! tx2))
+                    (~ log2) (~ tx2) (~ tx1) (~ tx2))
          (go wait-reexecute))
        (if (not (commit log2))
            (progn
              (log:trace "Tlog ~A of transaction ~A not committed, retrying both ~A and ~A"
-                        (! log2) (! tx2) (! tx1) (! tx2))
+                        (~ log2) (~ tx2) (~ tx1) (~ tx2))
              (go wait-reexecute))
            (go done)))
 
    wait-reexecute
    (progn
      (log:debug "Waiting for other threads before retrying both transactions ~A and ~A"
-                (! tx1) (! tx2))
+                (~ tx1) (~ tx2))
      (wait-tlog (merge-tlogs log1 log2))
      (go execute-tx1))
    

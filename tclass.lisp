@@ -90,25 +90,26 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
             (setf (slot-definition-initfunction effective-slot) effective-initfunction))))
       effective-slot)))
 
+
+
+
 ;;;; ** Slot access
 
 (defmethod slot-value-using-class ((class transactional-class) instance
                                    (slot transactional-effective-slot))
   (declare (ignore instance))
   
+  ;; Get the TVAR from the slot
   (let1 obj (call-next-method)
     (cond
       ((not (slot-transactional slot))
        obj)
     
-      ;; Record the reading of the tvar (which is found with
-      ;; `call-next-method') to the current tlog.
-      ((recording?)
-       (read-tvar (the tvar obj)))
-    
-      ;; Return the value inside the tvar.
-      ((returning?)
-       (value-of (the tvar obj)))
+      ;; Return the value inside the TVAR.
+      ;; During transactions, reading of the tvar (which is found with
+      ;; `call-next-method') is recorded to the current tlog.
+      ((or (recording?) (returning?))
+       ($ (the tvar obj)))
     
       (t
        ;; Return the tvar itself.
@@ -127,17 +128,12 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
     ((not (slot-transactional slot))
      (call-next-method))
     
-    ((recording?)
-     ;; Record the writing of the tvar to the current tlog.
-     ;; We get the tvar from the slot  and write it in the current tlog
-     ;; together with the new value
+    ((or (recording?) (returning?))
+     ;; Get the tvar from the slot and write inside it.
+     ;; During transactions, writing of the tvar is recorded into the current tlog.
      (let1 var (slot-raw-tvar class instance slot)
-       (write-tvar var value)))
+       (setf ($ var) value)))
       
-    ((returning?)
-     ;; Get the tvar from the slot and write inside it
-     (let1 var (slot-raw-tvar class instance slot)
-       (setf (value-of var) value)))
     (t
      ;; Set the tvar in the slot
      (call-next-method))))
@@ -150,15 +146,14 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
     ((not (slot-transactional slot))
      (call-next-method))
     
-    ((recording?)
-     (error "slot-boundp not supported during transactions, ~S in ~S" slot instance))
+    ((or (recording?) (returning?))
+     ;; Get the tvar from the slot, and return true if it is bound to a value.
+     ;; During transactions, the checking whether the tvar is bound
+     ;; is recorded to the current tlog.
+     (bound-$? (slot-raw-tvar class instance slot)))
 
-    ((returning?)
-     ;; Check if the tvar has a bound value.
-     (tvar-bound? (slot-raw-tvar class instance slot)))
-    
     (t
-     ;; Raw access: check if the slot is bound to a tvar
+     ;; Raw access: check if the slot itself is bound
      (call-next-method))))
 
 
@@ -168,12 +163,10 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
     ((not (slot-transactional slot))
      (call-next-method))
     
-    ((recording?)
-     (error "slot-makunbound not supported during transactions, ~S in ~S" slot instance))
-
-    ((returning?)
-     ;; keep the slot bound to the tvar, only unbind the tvar contents
-     (tvar-unbind (slot-raw-tvar class instance slot)))
+    ((or (recording?) (returning?))
+     ;; Get the tvar from the slot, and unbind its value.
+     ;; During transactions, unbinding the tvar is recorded into the current tlog.
+     (unbind-$? (slot-raw-tvar class instance slot)))
     
     (t
      ;; raw access: unbind the slot.
@@ -184,6 +177,9 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
   ()
   (:metaclass transactional-class)
   (:documentation "Superclass of all transactional objects."))
+
+
+
 
 ;;;; ** Defining
 

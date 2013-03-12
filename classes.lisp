@@ -2,31 +2,7 @@
 
 (in-package :stmx)
 
-;;;; * Utilities
-
-(defgeneric id-of (obj))
-
-(declaim (inline !))
-(defun ! (obj) (id-of obj))
-
-(defun compute-id-of (obj)
-  (declare (type t obj))
-  (let* ((str (the string (format nil "~A" obj)))
-         (beg (position #\{ str))
-         (end (position #\} str)))
-    (the string
-      (if (and beg end)
-          (subseq str (1+ beg) end)
-          str))))
-
-(let1 ids (make-hash-table :test 'eq :size 100 :weakness :key)
-  (defmethod id-of (obj)
-    (the string
-      (or
-       (gethash obj ids)
-       (setf (gethash obj ids) (compute-id-of obj))))))
-
-;;;; * Protocol
+;;;; ** Implementation classes
 
 (declaim (type integer *tlog-id-counter*))
 (defvar *tlog-id-counter* 0)
@@ -58,12 +34,14 @@ are committed to memory by COMMIT later on."))
 
 
 
+(defvar +unbound+ (gensym "UNBOUND-"))
+
 (defclass tvar ()
   ((lock :accessor lock-of
          :initarg :lock
          :initform (make-lock "TVAR"))
-   (vbox :accessor vbox-of ;; versioned box
-         :type vbox)
+   (value :accessor raw-value-of
+          :initform +unbound+)
    (waiting :accessor waiting-for
             :initarg :waiting
             :initform (new 'queue :element-type 'tlog)

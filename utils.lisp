@@ -27,6 +27,15 @@
        (setf (gethash obj ids) (compute-id-of obj))))))
 
 
+
+(defmacro dohash (hash key value &body body)
+  "execute body on each key/value pair contained in hash table"
+  `(loop for ,key being each hash-key in ,hash
+        using (hash-value ,value)
+        do (progn ,@body)))
+        
+
+
 ;; Copyright (c) 2013, Massimiliano Ghilardi
 ;; This file is part of STMX.
 ;;

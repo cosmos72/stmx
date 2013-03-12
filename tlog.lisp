@@ -4,25 +4,39 @@
 
 ;;;; * Transaction logs
 
-;;;; ** Utilities
-
-(defmacro dohash (hash key value &body body)
-  "execute body on each key/value pair contained in hash table"
-  `(loop for ,key being each hash-key in ,hash
-        using (hash-value ,value)
-        do (progn ,@body)))
-        
-
 ;;;; ** Committing
 
+(defun valid? (log)
+  "Return t if a TLOG is valid, i.e. it contains an up-to-date view
+of TVARs that were read during the transaction."
+
+  (declare (type tlog log))
+  (log:trace "Tlog ~A valid?.." (~ log))
+  (dohash (reads-of log) var val
+    (let1 actual-val (value-of var)
+      (if (eq val actual-val)
+          (log:trace "Tvar ~A is up-to-date" var)
+          (progn
+            (log:trace "Conflict for tvar ~A: expecting ~A, found ~A" var (~ val) (~ actual-val))
+            (log:debug "Tlog ~A ..not valid" (~ log))
+            (return-from valid? nil)))))
+  (log:trace "Tlog ~A ..is  valid" (~ log))
+  (return-from valid? t))
+
+
+
 (defun commit (log)
-  "Commit a LOG to memory.
+  "Commit a TLOG to memory.
 
 It returns a boolean specifying whether or not the transaction
-log was committed.  If the transaction log couldn't be committed
-it probably means that another transaction log that writes the
-same variables is being committed."
-
+log was committed.  If the transaction log cannot be committed
+it either means that:
+a) the TLOG is invalid - then the whole transaction must be re-executed
+b) another TLOG is writing the same TVARs being committed
+   so that TVARs locks could not be aquired - also in this case
+   the whole transaction must be re-executed, as there is little hope
+   that the TLOG will still be valid."
+   
   (declare (type tlog log))
   (let1 acquired nil
     (log:trace "Tlog ~A committing..." (~ log))
@@ -38,7 +52,7 @@ same variables is being committed."
                      (log:debug "Tlog ~A ...not committed: could not acquire lock ~A"
                                        (~ log) lock)
                      (return-from commit nil)))))
-           (unless (check? log)
+           (unless (valid? log)
              (log:debug "Tlog ~A ...not committed: log is invalid" (~ log))
              (return-from commit nil))
            (dohash (writes-of log) var val
@@ -51,34 +65,20 @@ same variables is being committed."
           (release-lock lock)
           (log:trace "Released lock ~A" lock)))
       (dolist (var acquired)
-        (unwait-tvar var)
+        (notify-tvar var)
         (log:trace "Notified threads waiting on ~A" var)))))
 
-
-(defun check? (log)
-  (declare (type tlog log))
-  (log:trace "Tlog ~A checking.." (~ log))
-  (dohash (reads-of log) var ver
-    (let1 actual-ver (version-of var)
-      (if (= ver actual-ver)
-          (log:trace "Version ~A is valid" ver)
-          (progn
-            (log:trace "Version ~A doesn't match ~A" ver actual-ver)
-            (log:debug "Tlog ~A ..invalid" (~ log))
-            (return-from check? nil)))))
-  (log:trace "Tlog ~A ..valid" (~ log))
-  (return-from check? t))
 
 ;;;; ** Merging
 
 (defun merge-tlogs (log1 log2)
+  ;; TODO Max: merge-tlogs must be revised when implementing orelse
   (declare (type tlog log1 log2))
   (dohash (writes-of log2) var val
     (setf (gethash var (writes-of log1)) val))
   (dohash (reads-of log2) var ver
     (setf (gethash var (reads-of log1))
           (max ver
-               ;; Max: needed? I expected log2 to be *always* more up-to-date...
                (aif2 (gethash var (reads-of log1))
                      it
                      0))))
@@ -90,7 +90,7 @@ same variables is being committed."
   (declare (type tlog log))
   (let1 reads (reads-of log)
     (when (zerop (hash-table-count reads))
-      (error "Tried to wait on tlog ~A, but no tvars to wait on.~%  This is a BUG either in the STM library or in the application code!~%  Possible reason: code analogous to (atomic (retry)) is invalid~%  and will signal the current error because it does not read any tvar~%  before retrying." (~ log)))
+      (error "Tried to wait on TLOG ~A, but no TVARs to wait on.~%  This is a BUG either in the STMX library or in the application code!~%  Possible reason is some application code analogous to (atomic (retry))~%  Such code is not allowed and will signal the current error~%  because it does not read any TVAR before retrying." (~ log)))
     (dohash reads var val
       ;; (declare (ignore val))
       (with-slots (waiting waiting-lock) var
@@ -102,7 +102,7 @@ same variables is being committed."
       (condition-wait (semaphore-of log) dummy))))
 
 
-(defun unwait-tlog (log)
+(defun notify-tlog (log)
   (declare (type tlog log))
   (condition-notify (semaphore-of log)))
 

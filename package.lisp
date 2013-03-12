@@ -7,11 +7,10 @@
 (in-package :cl-user)
 
 (defpackage :stmx
-  (:use :arnesi
+  (:use :cl
+        :arnesi
         :bordeaux-threads
-        :cl
         :closer-mop)
-  (:nicknames :stm2)
   (:shadowing-import-from :arnesi
                           #:else
                           #:specializer ; closer-mop
@@ -22,45 +21,31 @@
                           #:defmethod
                           #:standard-generic-function
                           #:ensure-generic-function
-                          #:defgeneric
-                          #:defclass
-                          #:standard-class
-                          #:defmethod
-                          #:standard-generic-function
-                          #:ensure-generic-function
                           #:defgeneric)
   (:export #:atomic
-           #:atomic-try
+           #:orelse ;; try ?
            #:retry
 
            #:transactional
            #:transaction
 
-           #:transactional-class
-           #:transactional-direct-slot
-           #:transactional-effective-slot
-           #:transactional-object
+           #:sleep-after
+           #:nonblock
+           #:repeat
 
-           #:tlog
-           #:commit
-           #:check?
-           #:merge-tlogs
-           #:wait-tlog
 
            #:tvar
-           #:read-tvar
-           #:write-tvar
-           #:unwait-tvar
+           #:$
+           #:bound-$?
+           #:unbind-$))
 
-           #:recording?
-           #:with-recording
-           #:without-recording
 
-           #:current-tlog
-           #:with-tlog
-           #:with-new-tlog
+(defpackage :stmx.util
+  
+  (:use :cl
+        :stmx)
 
-           #:counter
+  (:export #:counter
            #:count-of
            #:increment
            #:decrement
@@ -77,19 +62,14 @@
            #:tqueue
            #:deq
            #:enq
-           #:empty?
-           #:full?
+           #:empty-queue?
+           #:full-queue?
            #:qlength
 
            #:chan
            #:port
            #:read-port
-           #:write-chan
-
-           #:sleep-after
-           #:nonblock
-           #:repeat
-           ))
+           #:write-chan))
 
 ;; Copyright (c) 2006 Hoan Ton-That
 ;; All rights reserved.

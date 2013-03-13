@@ -1,11 +1,12 @@
-CL-STM
+STMX
 ======
 
 Summary
 -------
 
-CL-STM2 is an extension of Common Lisp to support composable Software
-Transactional Memory. STM makes concurrent programming qualitatively better.
+STMX is an extension of Common Lisp to support composable Software
+Transactional Memory. Transactional Memory makes concurrent programming
+easier to write and understand, and possibly qualitatively better.
 Instead of traditional lock-based programming, you program with atomic
 transactions. Atomic transactions can be composed together to make larger
 atomic transactions. Finally, it just so happens that transactions run
@@ -17,13 +18,11 @@ and it resolves the tension between granularity and concurrency.
 Documentation
 -------------
 
-Have a look at the [tutorial](doc/tutorial.html) for
-a beginners' guide.  For more information see the [API](doc/index.html),
-which is generated from the source code.
+Have a look at the [tutorial](doc/tutorial.html) for a beginners' guide.
+For more information see the [API](doc/index.html), which is generated from the source code.
 
 [Composable Memory Transactions](http://research.microsoft.com/~simonpj/papers/stm/stm.pdf)
-gives you a deeper understanding of concept of transactions, and how they are
-combined.
+gives you a deeper understanding of concept of transactions, and how they are combined.
 
 Mailing List
 ------------
@@ -36,6 +35,9 @@ developments.  If you don't want your inbox clogged then browse the
 Status
 ------
 
-CL-STM has been developed by Hoan Ton-That for the Google Summer of Code 2006.
-Feel free to mail any questions and comments at
-[hoan@ton-that.org](mailto:hoan@ton-that.org)
+STMX is being written by Massimiliano Ghilardi. Feel free to use the
+[Mailing List](http://common-lisp.net/cgi-bin/mailman/listinfo/cl-stm-devel)
+for questions and comments.
+
+STMX is a rewrite of CL-STM, which has been developed by Hoan Ton-That
+for the Google Summer of Code 2006.

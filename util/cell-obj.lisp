@@ -1,8 +1,8 @@
 ;; -*- lisp -*-
 
-(in-package :stmx)
+(in-package :stmx.util)
 
-;;;; ** Concurrent cell
+;;;; ** Concurrent cell implemented with a transactional object
 
 (defvar *empty-cell* (gensym "EMPTY"))
 
@@ -12,29 +12,38 @@
            :initarg :value
            :initform *empty-cell*))))
 
+(defmethod empty? ((cell cell))
+  (atomic
+    (eq (value-of cell) *empty-cell*)))
+
+(defmethod empty! ((cell cell))
+  "Remove value from cell."
+  (atomic
+    (setf (value-of cell) *empty-cell*)))
+
+(defmethod take ((cell cell))
+  (atomic
+    (if (empty? cell)
+        (retry)
+        (prog1 (value-of cell)
+          (empty! cell)))))
+
+(defmethod put ((cell cell) value)
+  (atomic
+    (if (empty? cell)
+        (setf (value-of cell) value)
+        (retry))))
+
 #|
-(deftransaction empty? ((cell cell))
-  (eq (value-of cell) *empty-cell*))
+(defmethod try-take ((cell cell))
+  (atomic
+    (nonblocking
+     (take cell))))
 
-(deftransaction empty! ((cell cell))
-  (setf (value-of cell) *empty-cell*))
-
-(deftransaction take ((cell cell))
-  (if (empty? cell)
-      (retry)
-      (prog1 (value-of cell)
-        (empty! cell))))
-
-(deftransaction put ((cell cell) val)
-  (if (not (empty? cell))
-      (retry)
-      (setf (value-of cell) val)))
-
-(deftransaction try-take ((cell cell))
-  (nob (take cell)))
-
-(deftransaction try-put ((cell cell) val)
-  (nob (put cell val)))
+(defmethod try-put ((cell cell) val)
+  (atomic
+    (nonblocking
+     (put cell val))))
 |#
 
 
@@ -67,3 +76,22 @@
 ;; THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 ;; (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ;; OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+
+
+;; Copyright (c) 2013, Massimiliano Ghilardi
+;; This file is part of STMX.
+;;
+;; STMX is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU Lesser General Public License
+;; as published by the Free Software Foundation, either version 3
+;; of the License, or (at your option) any later version.
+;;
+;; STMX is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty
+;; of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+;; See the GNU Lesser General Public License for more details.
+;;
+;; You should have received a copy of the GNU Lesser General Public
+;; License along with STMX. If not, see <http://www.gnu.org/licenses/>.

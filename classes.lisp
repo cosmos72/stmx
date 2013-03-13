@@ -41,6 +41,7 @@ are committed to memory by COMMIT later on."))
          :initarg :lock
          :initform (make-lock "TVAR"))
    (value :accessor raw-value-of
+          :initarg :value
           :initform +unbound+)
    (waiting :accessor waiting-for
             :initarg :waiting

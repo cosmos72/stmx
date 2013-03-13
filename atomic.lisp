@@ -5,10 +5,43 @@
 (eval-always
   (enable-pf-reader))
 
+
+;;;; ** Defining
+
+(defmacro transactional ((defclass class direct-superclasses direct-slots &rest class-options))
+  "Define a new transactional class called CLASS.
+
+use this macro to wrap a normal defclass as follows:
+\(TRANSACTIONAL (DEFCLASS class-name (superclasses) (slots) [options]))
+the effect is the same as DEFCLASS, plus the default metaclass is
+TRANSACTIONAL-CLASS, slots are transactional by default, and it inherits
+from TRANSACTIONAL-OBJECT by default."
+;  (let1 direct-superclasses (or direct-superclasses '(transactional-object))
+    `(eval-always
+       (,defclass ,class ,direct-superclasses
+         ,direct-slots
+         ,@class-options
+         (:metaclass transactional-class))))
+
+
+(defmacro transaction ((defun-or-defmethod func args &body body))
+  "Define a new atomic function or method called FUNC.
+
+use this macro to wrap a normal defun or defmethod as follows:
+\(TRANSACTION (DEFUN function-name (arguments) body))
+the effect is the same as DEFUN - or DEFMETHOD, plus the body is wrapped
+inside (atomic ...)."
+    `(eval-always
+       (,defun-or-defmethod ,func ,args
+         (atomic
+           ,@body))))
+
+
+
 ;;;; ** Running
 
 (defmacro atomic (&body body)
-  `(execute (lambda () ,@body)))
+  `(run-atomic (lambda () ,@body)))
 
 
 
@@ -17,56 +50,53 @@
   (with-new-tlog log
     (log:trace "Tlog ~A created" (~ log))
     (log:trace "Transaction ~A starting..." (~ tx))
+    ;; TODO: handler-case to capture errors signaled by tx!
     (let1 x (catch 'retry (multiple-value-list (funcall tx)))
       (etypecase x
         (tlog
-         (log:debug "Transaction ~A retried" (~ tx))
+         (log:debug "Transaction ~A wants to retry" (~ tx))
          (values t x))
         (list
-         (log:debug "Transaction ~A completed, return values: ~{~A ~}" (~ tx) x)
+         (log:debug "Transaction ~A wants to commit, returned: ~{~A ~}" (~ tx) x)
          (values nil log x))))))
 
 
-(defun execute (tx)
+(defun run-atomic (tx)
   (declare (type function tx))
 
   (when (recording?)
-    (return-from execute (funcall tx)))
+    (return-from run-atomic (funcall tx)))
 
   (prog (x-tlog x-values)
 
    execute
    (multiple-value-bind (retry? log values) (run-once tx)
-     (if retry?
-         (progn
-           (log:trace "Transaction ~A will be re-executed" (~ tx))
-           (wait-tlog log)
-           (go execute))
-         (progn
-           (setq x-tlog   log
-                 x-values values)
-           (go commit))))
+     (unless (valid? log)
+         (log:trace "Transaction ~A has invalid log, re-executing it immediately" (~ tx))
+         (go execute))
+     (when retry?
+       (log:trace "Transaction ~A will wait, then will retry (re-execute)" (~ tx))
+       (wait-tlog log)
+       (go execute))
+     (setq x-tlog   log
+           x-values values)
+     (go commit))
 
    commit
-   (if (not (check? x-tlog))
-       (progn
-         (log:trace "Transaction ~A will be re-executed immediately" (~ tx))
-         (go execute))
-       (if (not (commit x-tlog))
-           (progn
-             (log:trace "Transaction ~A will be re-committed" (~ tx))
-             (wait-tlog x-tlog)
-             (go commit))
-           (go done)))
+   (when (commit x-tlog)
+       (go done))
+   (log:trace "Transaction ~A could not commit, re-executing it immediately" (~ tx))
+   (go execute)
+
    done
-   (return-from execute (values-list x-values))))
+   (return-from run-atomic (values-list x-values))))
 
 
 
 
 ;;;; ** Composing
 
-(defun execute-orelse (tx1 tx2)
+(defun run-orelse (tx1 tx2)
   (declare (type function tx1 tx2))
   (prog (log1 log2 x-values)
 
@@ -129,12 +159,12 @@
      (go execute-tx1))
    
    done
-   (return-from execute-orelse (values-list x-values))))
+   (return-from run-orelse (values-list x-values))))
 
 
 (defmacro orelse (form1 form2)
-  `(execute-orelse (lambda () ,form1)
-                   (lambda () ,form2)))
+  `(run-orelse (lambda () ,form1)
+               (lambda () ,form2)))
   
 
 (defmacro atomic-try (&body body)

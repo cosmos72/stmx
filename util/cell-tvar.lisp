@@ -1,76 +1,47 @@
 ;; -*- lisp -*-
 
-;;;; * Welcome to CL-STM2
+(in-package :stmx.util)
 
-;;;; CL-STM2 depends on arnesi, bordeaux-threads, and closer-mop.
+;;;; ** Concurrent cell implemented with a raw TVAR
 
-(in-package :cl-user)
+;;; Max: here we could use the same trick as cell-obj.lisp:
+;;; a special *empty-tvar* value to mean "cell is empty".
+;;; Anyway, using tvar functions bound-$? and unbind-$ is less verbose
 
-(defpackage :stmx
-  (:use :cl
-        :arnesi
-        :bordeaux-threads
-        :closer-mop)
-  (:shadowing-import-from :arnesi
-                          #:else
-                          #:specializer ; closer-mop
-                          #:until)
-  (:shadowing-import-from :closer-mop
-                          #:defclass
-                          #:standard-class
-                          #:defmethod
-                          #:standard-generic-function
-                          #:ensure-generic-function
-                          #:defgeneric)
-  (:export #:atomic
-           #:orelse ;; try ?
-           #:retry
+(defmethod empty? ((var tvar))
+  (atomic
+    (bound-$? var)))
 
-           #:transactional
-           #:transaction
+(defmethod empty! ((var tvar))
+  "Remove value from tvar."
+  (atomic
+    (unbind-$ var)))
 
-           #:sleep-after
-           #:nonblock
-           #:repeat
+(defmethod take ((var tvar))
+  (atomic
+    (if (empty? var)
+        (retry)
+        (prog1 ($ var)
+          (empty! var)))))
 
+(defmethod put ((var tvar) value)
+  (atomic
+    (if (empty? var)
+        (setf ($ var) value)
+        (retry))))
 
-           #:tvar
-           #:$
-           #:bound-$?
-           #:unbind-$))
+#|
+(defmethod try-take ((cell cell))
+  (atomic
+    (nonblocking
+     (take cell))))
 
+(defmethod try-put ((cell cell) val)
+  (atomic
+    (nonblocking
+     (put cell val))))
+|#
 
-(defpackage :stmx.util
-  
-  (:use :cl
-        :arnesi
-        :stmx)
-
-  (:export #:counter
-           #:count-of
-           #:increment
-           #:decrement
-           #:reset
-           #:swap
-
-           #:cell
-           #:empty?
-           #:empty!
-           #:take
-           #:put
-           #:try-put
-
-           #:tqueue
-           #:deq
-           #:enq
-           #:empty-queue?
-           #:full-queue?
-           #:qlength
-
-           #:chan
-           #:port
-           #:read-port
-           #:write-chan))
 
 ;; Copyright (c) 2006 Hoan Ton-That
 ;; All rights reserved.
@@ -101,6 +72,8 @@
 ;; THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 ;; (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ;; OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
 
 
 

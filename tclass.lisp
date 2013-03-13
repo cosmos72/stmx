@@ -184,22 +184,6 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
 ;;;; ** Defining
 
 
-(defmacro transactional ((defclass class direct-superclasses direct-slots &rest class-options))
-  "Define a new transactional class called CLASS.
-
-use this macro to wrap a normal defclass as follows:
-\(TRANSACTIONAL (DEFCLASS class-name (superclasses) (slots) [options]))
-the effect is the same as DEFCLASS, plus the default metaclass is
-TRANSACTIONAL-CLASS, slots are transactional by default, and it inherits
-from TRANSACTIONAL-OBJECT by default."
-;  (let1 direct-superclasses (or direct-superclasses '(transactional-object))
-    `(eval-always
-       (,defclass ,class ,direct-superclasses
-         ,direct-slots
-         ,@class-options
-         (:metaclass transactional-class))))
-
-
 (let1 transactional-object-class (find-class 'transactional-object)
   (defmethod compute-class-precedence-list ((class transactional-class))
     ;; add transactional-object as the first superclass of a transactional object
@@ -210,6 +194,7 @@ from TRANSACTIONAL-OBJECT by default."
 	  `(,(first superclasses) ;; this is the class itself being defined
 	     ,transactional-object-class
 	     ,@(rest superclasses))))))
+
 
 
 ;;;; ** Initializing

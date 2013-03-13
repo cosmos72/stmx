@@ -103,7 +103,7 @@ and to check for any value stored in the log."
                (raw-value-of var)))))
 
 
-(defun unbind-$? (var)
+(defun unbind-$ (var)
     "Unbind the value inside transactional variable VAR.
 Works both outside and inside transactions.
     

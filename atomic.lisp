@@ -48,17 +48,19 @@ inside (atomic ...)."
 (defun run-once (tx)
   (declare (type function tx))
   (with-new-tlog log
-    (log:trace "Tlog ~A created" (~ log))
-    (log:trace "Transaction ~A starting..." (~ tx))
-    ;; TODO: handler-case to capture errors signaled by tx!
-    (let1 x (catch 'retry (multiple-value-list (funcall tx)))
-      (etypecase x
-        (tlog
-         (log:debug "Transaction ~A wants to retry" (~ tx))
-         (values t x))
-        (list
-         (log:debug "Transaction ~A wants to commit, returned: ~{~A ~}" (~ tx) x)
-         (values nil log x))))))
+    (with-recording
+      (log:trace "Tlog ~A created" (~ log))
+      (log:trace "Transaction ~A starting..." (~ tx))
+      ;; TODO: handler-case to capture errors signaled by tx!
+      (let1 x (catch 'retry
+                (multiple-value-list (funcall tx)))
+        (etypecase x
+          (tlog
+           (log:debug "Transaction ~A wants to retry" (~ tx))
+           (values t x))
+          (list
+           (log:debug "Transaction ~A wants to commit, returned: ~{~A ~}" (~ tx) x)
+           (values nil log x)))))))
 
 
 (defun run-atomic (tx)
@@ -72,8 +74,8 @@ inside (atomic ...)."
    execute
    (multiple-value-bind (retry? log values) (run-once tx)
      (unless (valid? log)
-         (log:trace "Transaction ~A has invalid log, re-executing it immediately" (~ tx))
-         (go execute))
+       (log:trace "Transaction ~A has invalid log, re-executing it immediately" (~ tx))
+       (go execute))
      (when retry?
        (log:trace "Transaction ~A will wait, then will retry (re-execute)" (~ tx))
        (wait-tlog log)
@@ -81,15 +83,15 @@ inside (atomic ...)."
      (setq x-tlog   log
            x-values values)
      (go commit))
-
+   
    commit
    (when (commit x-tlog)
-       (go done))
+     (go done))
    (log:trace "Transaction ~A could not commit, re-executing it immediately" (~ tx))
    (go execute)
-
+     
    done
-   (return-from run-atomic (values-list x-values))))
+   (return-from run-atomic (values-list x-values)))))
 
 
 

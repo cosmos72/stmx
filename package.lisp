@@ -33,11 +33,14 @@
            #:nonblock
            #:repeat
 
-
            #:tvar
            #:$
            #:bound-$?
-           #:unbind-$))
+           #:unbind-$
+
+
+           #:transactional-class
+           #:transactional-object))
 
 
 (defpackage :stmx.util

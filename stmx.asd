@@ -18,7 +18,7 @@
                (:file "tlog"      :depends-on ("classes"))
                (:file "tvar"      :depends-on ("tlog"))
                (:file "tclass"    :depends-on ("tlog" "tvar"))
-               (:file "atomic"    :depends-on ("tlog" "tvar"))
+               (:file "atomic"    :depends-on ("tlog" "tvar" "tclass"))
 
                (:module :util
                 :components ((:file "cell-obj")

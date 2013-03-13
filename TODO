@@ -1,3 +1,8 @@
-1) implement (tvar-value ...) and (setf (tvar-value ...) ...)
+TO DO:
+1) in atomic.lisp (run-once) handler-case to capture errors signaled by tx
+
+DONE:
+1) implement ($ tvar) and (setf ($ tvar) value)
    for transactional access to tvars.
-   useful when encapsulating tvars in transactional objects is considered excessive
+   useful when dealing directly with tvars,
+   for example in cases transactional objects are too heavyweight

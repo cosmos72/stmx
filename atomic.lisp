@@ -33,15 +33,18 @@ the effect is the same as DEFUN - or DEFMETHOD, plus the body is wrapped
 inside (atomic ...)."
     `(eval-always
        (,defun-or-defmethod ,func ,args
-         (atomic
+         (atomic :id ',func
            ,@body))))
 
 
 
 ;;;; ** Running
 
-(defmacro atomic (&body body)
-  `(run-atomic (lambda () ,@body)))
+(defmacro atomic (&rest args)
+  (let1 id (when (eq :id (first args))
+             (pop args)
+             (pop args))
+    `(run-atomic (lambda () ,@args) :id ,id)))
 
 
 
@@ -49,8 +52,7 @@ inside (atomic ...)."
   (declare (type function tx))
   (with-new-tlog log
     (with-recording
-      (log:trace "Tlog ~A created" (~ log))
-      (log:trace "Transaction ~A starting..." (~ tx))
+      (log:trace "Transaction ~A starting with new tlog ~A" (~ tx) (~ log))
       ;; TODO: handler-case to capture errors signaled by tx!
       (let1 x (catch 'retry
                 (multiple-value-list (funcall tx)))
@@ -63,11 +65,14 @@ inside (atomic ...)."
            (values nil log x)))))))
 
 
-(defun run-atomic (tx)
+(defun run-atomic (tx &key (id nil))
   (declare (type function tx))
 
   (when (recording?)
     (return-from run-atomic (funcall tx)))
+
+  (when id
+    (setf (~ tx) id))
 
   (prog (x-tlog x-values)
 
@@ -116,7 +121,7 @@ inside (atomic ...)."
            (go commit-tx1))))
    
    commit-tx1
-   (if (not (check? log1))
+   (if (not (valid? log1))
        (progn
          (log:trace "Tlog ~A of transaction ~A invalid, trying transaction ~A"
                     (~ log1) (~ tx1) (~ tx2))
@@ -141,7 +146,7 @@ inside (atomic ...)."
            (go commit-tx2))))
 
    commit-tx2
-   (if (not (check? log2))
+   (if (not (valid? log2))
        (progn
          (log:trace "Tlog ~A of transaction ~A invalid, retrying both ~A and ~A"
                     (~ log2) (~ tx2) (~ tx1) (~ tx2))

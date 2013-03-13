@@ -20,7 +20,7 @@ of TVARs that were read during the transaction."
             (log:trace "Conflict for tvar ~A: expecting ~A, found ~A" var (~ val) (~ actual-val))
             (log:debug "Tlog ~A ..not valid" (~ log))
             (return-from valid? nil)))))
-  (log:trace "Tlog ~A ..is  valid" (~ log))
+  (log:trace "Tlog ~A ..is valid" (~ log))
   (return-from valid? t))
 
 

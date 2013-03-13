@@ -4,10 +4,15 @@
 
 ;;;; * Utilities
 
-(defgeneric id-of (obj))
+(defmacro dohash (hash key value &body body)
+  "execute body on each key/value pair contained in hash table"
+  `(loop for ,key being each hash-key in ,hash
+        using (hash-value ,value)
+        do (progn ,@body)))
+        
 
-(declaim (inline ~))
-(defun ~ (obj) (id-of obj))
+
+(defgeneric id-of (obj))
 
 (defun compute-id-of (obj)
   (declare (type t obj))
@@ -24,16 +29,20 @@
     (the string
       (or
        (gethash obj ids)
-       (setf (gethash obj ids) (compute-id-of obj))))))
+       (setf (gethash obj ids) (compute-id-of obj)))))
+
+  (defmethod (setf id-of) (value obj)
+    (setf (gethash obj ids) (format nil "~A" value))))
 
 
+(declaim (inline ~ (setf ~)))
 
-(defmacro dohash (hash key value &body body)
-  "execute body on each key/value pair contained in hash table"
-  `(loop for ,key being each hash-key in ,hash
-        using (hash-value ,value)
-        do (progn ,@body)))
-        
+(defun ~ (obj)
+  (id-of obj))
+
+(defun (setf ~) (value obj)
+  (setf (id-of obj) value))
+
 
 
 ;; Copyright (c) 2013, Massimiliano Ghilardi

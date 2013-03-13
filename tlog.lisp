@@ -86,7 +86,7 @@ b) another TLOG is writing the same TVARs being committed
 
 ;;;; ** Waiting
 
-(defun wait-tlog (log)
+(defun wait-once-tlog (log)
   (declare (type tlog log))
   (let1 reads (reads-of log)
     (when (zerop (hash-table-count reads))
@@ -100,6 +100,17 @@ b) another TLOG is writing the same TVARs being committed
       ;; Max: making a new lock for each call to (wait) seems a bit wasteful
       (acquire-lock dummy)
       (condition-wait (semaphore-of log) dummy))))
+
+(defun wait-tlog (log)
+  "Wait until the TVARs read during transaction have changed.
+
+When some other threads notifies the one waiting in this function,
+check if the log is valid. In case it's valid, re-executing
+the last transaction is useless: it means the relevant TVARs
+did not change, but the transaction is waiting for them to change
+\(see CMT paragraph 6.3)"
+  (loop do (wait-once-tlog log)
+       while (valid? log)))
 
 
 (defun notify-tlog (log)

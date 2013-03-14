@@ -28,7 +28,7 @@
 ;;;; ** Reading and Writing
 
 (defun read-tvar (var &optional (log (current-tlog)))
-  "Record the reading of VAR to LOG.
+  "Record the reading of VAR to LOG and return VAR value.
 
 READ-TVAR is only called when transactions are being recorded,
 and LOG is normally the special variable *LOG*.
@@ -39,9 +39,17 @@ normally would on transactional objects, or, if you *really* want
 to use TVARs directly, use ($ VAR)"
   (declare (type tvar var)
            (type tlog log))
-  (aif2 (gethash var (writes-of log))
-        it
-        (setf (gethash var (reads-of log)) (raw-value-of var))))
+  (multiple-value-bind (value value?)
+      (gethash var (writes-of log))
+    (when value?
+      (return-from read-tvar value)))
+
+  (multiple-value-bind (value value?)
+      (gethash var (reads-of log))
+    (when value?
+      (return-from read-tvar value)))
+
+  (setf (gethash var (reads-of log)) (raw-value-of var)))
 
 
 (defun write-tvar (var value &optional (log (current-tlog)))

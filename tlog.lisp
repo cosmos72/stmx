@@ -13,7 +13,7 @@ of TVARs that were read during the transaction."
   (declare (type tlog log))
   (log:trace "Tlog ~A valid?.." (~ log))
   (dohash (reads-of log) var val
-    (let1 actual-val (value-of var)
+    (let1 actual-val (raw-value-of var)
       (if (eq val actual-val)
           (log:trace "Tvar ~A is up-to-date" (~ var))
           (progn

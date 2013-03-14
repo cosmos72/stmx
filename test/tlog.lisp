@@ -2,7 +2,7 @@
 
 (in-package :stmx.test)
 
-(in-suite :stmx)
+(in-suite stmx)
 
 (test read-tvar
   (let ((log (new 'tlog))
@@ -12,14 +12,6 @@
     (write-tvar var 2 log)
     (is-true (= 1 (raw-value-of var)))
     (is-true (= 2 (read-tvar var log)))))
-
-(test commit ()
-  (let ((log (new 'tlog))
-	(v1  (new 'tvar :value 1))
-	(v2  (new 'tvar :value 2)))
-    (write-tvar v1 (read-tvar v2 log) log)
-    (commit log)
-    (is-true (= (raw-value-of v1) (raw-value-of v2)))))
 
 (test valid?
   (let ((log (new 'tlog))
@@ -34,8 +26,28 @@
     (setf (raw-value-of v1) 1)
     (is-true (valid? log)))))
     
+(test commit
+  (let ((log (new 'tlog))
+	(v1  (new 'tvar :value 1)))
+    (write-tvar v1 2 log)
+    (commit log)
+    (is-true (= (raw-value-of v1) 2))))
 
-(test unwait
+(test $
+  (let1 v1  (new 'tvar :value 1)
+    (is-true (= ($ v1) 1))
+    (with-new-tlog log
+      (with-recording
+        (is-true (= ($ v1) 1))
+        (setf ($ v1) 2)
+        (is-true (= ($ v1) 2))
+        (is-true (= (raw-value-of v1) 1))
+        (is-true (valid? log))
+        (commit log)))
+    (is-true (= ($ v1) 1))))
+    
+
+(test notify-tvar
   (without-returning
     (let1 c (new 'counter :count 1)
       (is-true (= (value-of (count-of c)) 1))

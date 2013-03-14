@@ -54,19 +54,19 @@
         :arnesi
         :stmx)
 
-  (:export #:counter
-           #:count-of
-           #:increment
-           #:decrement
-           #:reset
-           #:swap
-
-           #:cell
+  (:export #:cell
            #:empty?
            #:empty!
            #:take
            #:put
            #:try-put
+
+           #:counter
+           #:count-of
+           #:increment
+           #:decrement
+           #:reset
+           #:swap
 
            #:tqueue
            #:deq

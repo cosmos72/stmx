@@ -1,6 +1,6 @@
 ;; -*- lisp -*-
 
-(in-package :stmx)
+(in-package :cl-user)
 
 (defpackage :stmx.test
   (:use :cl
@@ -16,9 +16,13 @@
                 :read-tvar
                 :write-tvar
                 :with-tlog
+                :with-new-tlog
+                :with-recording
                 :without-returning))
 
-(fiveam:def-suite :stmx)
+(in-package :stmx.test)
+
+(fiveam:def-suite stmx)
 
 ;; Copyright (c) 2006 Hoan Ton-That
 ;; All rights reserved.

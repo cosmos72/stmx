@@ -17,9 +17,10 @@
     (eq (value-of cell) *empty-cell*)))
 
 (defmethod empty! ((cell cell))
-  "Remove value from cell."
+  "Remove value from cell. does not return any value"
   (atomic
-    (setf (value-of cell) *empty-cell*)))
+    (setf (value-of cell) *empty-cell*))
+  (values))
 
 (defmethod take ((cell cell))
   (atomic

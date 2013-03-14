@@ -52,7 +52,8 @@
   
   (:use :cl
         :arnesi
-        :stmx)
+        :stmx
+        :stmx.util)
 
   (:export #:cell
            #:empty?

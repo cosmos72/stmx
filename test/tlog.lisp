@@ -15,64 +15,95 @@
 
 (test valid?
   (let ((log (new 'tlog))
-	(v1  (new 'tvar :value 1)))
+	(var  (new 'tvar :value 1)))
     (is-true (valid? log))
-    (read-tvar v1 log)
+    (read-tvar var log)
     (is-true (valid? log))
-    (setf (raw-value-of v1) 2)
+    (setf (raw-value-of var) 2)
     (is-false (valid? log))
-    (read-tvar v1 log)
+    (read-tvar var log)
     (is-false (valid? log))
-    (setf (raw-value-of v1) 1)
+    (setf (raw-value-of var) 1)
     (is-true (valid? log)))))
     
 (test commit
   (let ((log (new 'tlog))
-	(v1  (new 'tvar :value 1)))
-    (write-tvar v1 2 log)
+	(var (new 'tvar :value 1)))
+    (write-tvar var 2 log)
+    (is-true (valid? log))
     (commit log)
-    (is-true (= (raw-value-of v1) 2))))
-
+    (is-true (= (raw-value-of var) 2))))
 
 (test $
-  (let1 v1  (new 'tvar :value 1)
-    (is-true (= ($ v1) 1))
+  (let1 var (new 'tvar :value 1)
+    (is-true (= ($ var) 1))
     (with-new-tlog log
       (with-recording
-        (is-true (= ($ v1) 1))
-        (setf ($ v1) 2)
-        (is-true (= ($ v1) 2))
-        (is-true (= (raw-value-of v1) 1))
+        (is-true (= ($ var) 1))
+        (setf ($ var) 2)
+        (is-true (= ($ var) 2))
+        (is-true (= (raw-value-of var) 1))
         (is-true (valid? log))
         (commit log)
-        (is-true (= (raw-value-of v1) 2))))
-    (is-true (= ($ v1) 2))))
+        (is-true (= (raw-value-of var) 2))))
+    (is-true (= ($ var) 2))))
 
 (test atomic
-  (let1 v1  (new 'tvar :value 1)
-    (is-true (= ($ v1) 1))
+  (let1 var  (new 'tvar :value 1)
     (atomic :id 'test-atomic
-      (is-true (= ($ v1) 1))
-      (setf ($ v1) 2)
-      (is-true (= ($ v1) 2))
-      (is-true (= (raw-value-of v1) 1))
+      (is-true (= ($ var) 1))
+      (setf ($ var) 2)
+      (is-true (= ($ var) 2))
+      (is-true (= (raw-value-of var) 1))
       (is-true (valid? (current-tlog))))
-    (is-true (= ($ v1) 1))))
-  
+    (is-true (= ($ var) 2))))
+
+(defun cell-test ()
+  (let1 c (new 'cell :value 1)
+    (is-false (empty? c))
+    (empty! c)
+    (is-true (empty? c))
+    (put c 2)
+    (is-false (empty? c))
+    (is-true (= (take c) 2))
+    (is-true (empty? c))))
+
+(test cell
+  (cell-test))
+
+(test cell-atomic
+  (atomic (cell-test)))
+
+#|
+(test wait
+  (let1 var (new 'tvar :value 1)
+    (flet ((f1 ()
+             (atomic (incf ($ var)))
+             
+    
+        (t1 (make-thread
+    
+    (is-true (= ($ var) 2))
+    (acquire-lock (lock-of var))
+    (unwind-protect
+         (progn
+           (atomic (incf ($ var)))
+           (is-true (= ($ var) 2)))
+      (release-lock (lock-of var)))
+    (notify-tvar var)
+    (is-true (= ($ var) 3))))
+
+(test retry
+  (let1 var  (new 'tvar :value 1)
+    (atomic :id 'test-retry
+      (is-true (= ($ var) 1))
+      (setf ($ var) 2)
+      (is-true (= ($ var) 2))
+      (is-true (= (raw-value-of var) 1))
+      (is-false (valid? (current-tlog))))
+|#
     
 
-(test notify-tvar
-  (without-returning
-    (let1 c (new 'counter :count 1)
-      (is-true (= (value-of (count-of c)) 1))
-      (perform (increment c))
-      (is-true (= (value-of (count-of c)) 2))
-      (acquire-lock (lock-of (count-of c)))
-      (perform (increment c))
-      (is-true (= (value-of (count-of c)) 2))
-      (release-lock (lock-of (count-of c)))
-      (unwait (count-of c))
-      (is-true (= (value-of (count-of c)) 3)))))
 
 ;; Copyright (c) 2006 Hoan Ton-That
 ;; All rights reserved.

@@ -5,11 +5,13 @@
 (defpackage :stmx.test
   (:use :cl
         :stmx
+        :stmx.util
         :arnesi
         :fiveam)
   (:import-from :bordeaux-threads
                 :acquire-lock
-                :release-lock)
+                :release-lock
+                :make-thread)
   (:import-from :stmx
                 :lock-of
                 :raw-value-of

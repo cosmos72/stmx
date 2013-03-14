@@ -48,21 +48,36 @@ inside (atomic ...)."
 
 
 
+(define-condition retry-error (error)
+  ((log :type tlog
+        :reader log-of
+        :initarg log
+        :initform (error "missing argument :log instantiating 'retry-error"))))
+
+
 (defun run-once (tx)
   (declare (type function tx))
   (with-new-tlog log
     (with-recording
       (log:trace "Transaction ~A starting with new tlog ~A" (~ tx) (~ log))
       ;; TODO: handler-case to capture errors signaled by tx!
-      (let1 x (catch 'retry
-                (multiple-value-list (funcall tx)))
-        (etypecase x
-          (tlog
-           (log:debug "Transaction ~A wants to retry" (~ tx))
-           (values t x))
-          (list
-           (log:debug "Transaction ~A wants to commit, returned: ~{~A ~}" (~ tx) x)
-           (values nil log x)))))))
+      (let ((x-retry? nil)
+            (x-log log)
+            (x-error nil)
+            (x-values nil))
+        (handler-case
+            (progn
+              (setf x-values (multiple-value-list (funcall tx)))
+              (log:trace "Transaction ~A wants to commit, returned: ~{~A ~}" (~ tx) x-values))
+          (retry-error (err)
+            (log:trace "Transaction ~A wants to retry" (~ tx))
+            (setf x-retry? t)
+            (setf x-log (log-of err)))
+          (t (err)
+            (log:trace "Transaction ~A wants to rollback, signaled ~A: ~A"
+                       (~ tx) (type-of err) (~ err))
+            (setf x-error err)))
+        (values x-retry? x-log x-error x-values)))))
 
 
 (defun run-atomic (tx &key (id nil))
@@ -74,26 +89,30 @@ inside (atomic ...)."
   (when id
     (setf (~ tx) id))
 
-  (prog (x-tlog x-values)
+  (prog (x-log x-values)
 
    execute
-   (multiple-value-bind (retry? log values) (run-once tx)
+   (multiple-value-bind (retry? log err values) (run-once tx)
      (unless (valid? log)
-       (log:trace "Transaction ~A has invalid log, re-executing it immediately" (~ tx))
+       (log:debug "Transaction ~A has invalid log, retrying it immediately" (~ tx))
        (go execute))
      (when retry?
-       (log:trace "Transaction ~A will wait, then will retry (re-execute)" (~ tx))
+       (log:debug "Transaction ~A will wait, then retry" (~ tx))
        (wait-tlog log)
        (go execute))
-     (setq x-tlog   log
+     (when err
+       (log:debug "Transaction ~A will rollback and signal" (~ tx))
+       (error err))
+     (setq x-log    log
            x-values values)
      (go commit))
    
    commit
-   (when (commit x-tlog)
-     (go done))
-   (log:trace "Transaction ~A could not commit, re-executing it immediately" (~ tx))
-   (go execute)
+   (if (commit x-log)
+       (go done)
+       (progn
+         (log:debug "Transaction ~A could not commit, retrying it immediately" (~ tx))
+         (go execute)))
      
    done
    (return-from run-atomic (values-list x-values))))
@@ -185,10 +204,11 @@ Returns the value of the transaction that succeeds."
 ;;;; ** Retrying
 
 (defun retry ()
-  "Abort the current transaction and re-executes it from scratch.
+  "Abort the current transaction and re-execute it from scratch.
 
-The transaction will wait on all variables that have been read so
-far during the transaction."
+Before re-executing, the transaction will wait on all variables
+that have been read so far during the transaction
+until at least one of them changes."
   (throw 'retry (current-tlog)))
 
   

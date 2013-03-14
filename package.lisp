@@ -33,11 +33,16 @@
            #:nonblock
            #:repeat
 
+           ;; low-level API to use TVARs directly
            #:tvar
            #:$
            #:bound-$?
            #:unbind-$
 
+           ;; low-level API to use TLOGs directly
+           #:tlog
+           #:commit
+           #:valid?
 
            #:transactional-class
            #:transactional-object))

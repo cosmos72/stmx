@@ -15,9 +15,10 @@ of TVARs that were read during the transaction."
   (dohash (reads-of log) var val
     (let1 actual-val (value-of var)
       (if (eq val actual-val)
-          (log:trace "Tvar ~A is up-to-date" var)
+          (log:trace "Tvar ~A is up-to-date" (~ var))
           (progn
-            (log:trace "Conflict for tvar ~A: expecting ~A, found ~A" var (~ val) (~ actual-val))
+            (log:trace "Conflict for tvar ~A: expecting ~A, found ~A"
+                       (~ var) (~ val) (~ actual-val))
             (log:debug "Tlog ~A ..not valid" (~ log))
             (return-from valid? nil)))))
   (log:trace "Tlog ~A ..is valid" (~ log))
@@ -43,30 +44,28 @@ b) another TLOG is writing the same TVARs being committed
     (unwind-protect
          (progn
            (dohash (writes-of log) var val
-             (let1 lock (lock-of var)
-               (if (acquire-lock lock nil)
-                   (progn
-                     (push var acquired)
-                     (log:trace "Acquired lock ~A" lock))
-                   (progn
-                     (log:debug "Tlog ~A ...not committed: could not acquire lock ~A"
-                                       (~ log) lock)
-                     (return-from commit nil)))))
+             (if (acquire-lock (lock-of var) nil)
+                 (progn
+                   (push var acquired)
+                   (log:trace "Locked tvar ~A" (~ var)))
+                 (progn
+                   (log:debug "Tlog ~A ...not committed: could not lock tvar ~A"
+                              (~ log) (~ var))
+                   (return-from commit nil))))
            (unless (valid? log)
              (log:debug "Tlog ~A ...not committed: log is invalid" (~ log))
              (return-from commit nil))
            (dohash (writes-of log) var val
              (setf (value-of var) val)
-             (log:trace "Tvar ~A value updated to ~A, version incremented by 1" var val))
+             (log:trace "Tvar ~A value updated to ~A" (~ var) val))
            (log:debug "Tlog ~A ...committed" (~ log))
            (return-from commit t))
       (dolist (var acquired)
-        (let1 lock (lock-of var)
-          (release-lock lock)
-          (log:trace "Released lock ~A" lock)))
+        (release-lock (lock-of var))
+        (log:trace "Unlocked tvar ~A" (~ var)))
       (dolist (var acquired)
         (notify-tvar var)
-        (log:trace "Notified threads waiting on ~A" var)))))
+        (log:trace "Notified threads waiting on tvar ~A" (~ var))))))
 
 
 ;;;; ** Merging

@@ -25,7 +25,6 @@
       value)))
 
   
-
 ;;;; ** Reading and Writing
 
 (defun read-tvar (var &optional (log (current-tlog)))
@@ -126,6 +125,7 @@ During transactions, it uses transaction log to record the 'unbound' value."
 (defmethod (setf value-of) (value (var tvar))
   "Set the value inside a TVAR. Works both outside and inside transactions."
   (setf ($ var) value))
+
 
 
 

@@ -14,9 +14,18 @@
 
 (defgeneric id-of (obj))
 
+(defun compute-string-of (obj)
+  (handler-case
+      (format nil "~A" obj)
+    (t ()
+      (handler-case
+          (format nil "~S" obj)
+        (t ()
+          "<error printing object>")))))
+
 (defun compute-id-of (obj)
   (declare (type t obj))
-  (let* ((str (the string (format nil "~A" obj)))
+  (let* ((str (the string (compute-string-of obj)))
          (beg (position #\{ str))
          (end (position #\} str)))
     (the string

@@ -31,3 +31,12 @@
 |#
                              )
                 :depends-on ("atomic"))))
+
+
+
+(asdf:defsystem :stmx.test
+  :components ((:module :test
+                :components ((:file "suite")
+                             (:file "tlog" :depends-on ("suite")))))
+  :depends-on (:cl-stm :fiveam)
+  :in-order-to ((compile-op (load-op :stmx))))

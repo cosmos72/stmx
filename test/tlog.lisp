@@ -33,6 +33,7 @@
     (commit log)
     (is-true (= (raw-value-of v1) 2))))
 
+
 (test $
   (let1 v1  (new 'tvar :value 1)
     (is-true (= ($ v1) 1))
@@ -43,8 +44,21 @@
         (is-true (= ($ v1) 2))
         (is-true (= (raw-value-of v1) 1))
         (is-true (valid? log))
-        (commit log)))
+        (commit log)
+        (is-true (= (raw-value-of v1) 2))))
+    (is-true (= ($ v1) 2))))
+
+(test atomic
+  (let1 v1  (new 'tvar :value 1)
+    (is-true (= ($ v1) 1))
+    (atomic :id 'test-atomic
+      (is-true (= ($ v1) 1))
+      (setf ($ v1) 2)
+      (is-true (= ($ v1) 2))
+      (is-true (= (raw-value-of v1) 1))
+      (is-true (valid? (current-tlog))))
     (is-true (= ($ v1) 1))))
+  
     
 
 (test notify-tvar

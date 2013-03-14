@@ -56,7 +56,7 @@ b) another TLOG is writing the same TVARs being committed
              (log:debug "Tlog ~A ...not committed: log is invalid" (~ log))
              (return-from commit nil))
            (dohash (writes-of log) var val
-             (setf (value-of var) val)
+             (setf (raw-value-of var) val)
              (log:trace "Tvar ~A value updated to ~A" (~ var) val))
            (log:debug "Tlog ~A ...committed" (~ log))
            (return-from commit t))

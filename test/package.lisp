@@ -15,8 +15,8 @@
                 :raw-value-of
                 :read-tvar
                 :write-tvar
-                :with-tlog
                 :with-new-tlog
+                :current-tlog
                 :with-recording
                 :without-returning))
 

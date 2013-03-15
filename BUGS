@@ -1,0 +1,31 @@
+KNOWN BUGS
+
+1) (commit) may call (condition-notify) too early, before the relevant thread
+   is sleeping in (condition-wait) inside (wait-once).
+   
+   Solution: since we cannot keep locks on tlogs while also locking
+   tvars (DEADLOCK!), we add a flag "please don't sleep" to tlog,
+   always read/write it while holding a lock on the tlog,
+   
+   then we do in (commit):
+   (with-lock-held (lock-of log)
+      (setf (dont-sleep log) t)
+      (condition-notify log (lock-of log)))
+   
+   and in (wait-once):
+   (with-lock-held (lock-of log)
+      (setf (dont-sleep log) nil) ;; needed? should be the initial value
+      
+   ;; ... loop on (reads-of log) to enqueue on their waiting list,
+   ;;     WHILE checking if they changed ...
+   
+   (with-lock-held (lock-of log)
+      (unless (dont-sleep log)
+         (condition-wait log (lock-of log))))
+
+2) before (wait-once) returns, does not remove the log from tvars
+   waiting list. Each tvar will remove all the waiting logs when it
+   notifies it has changed, but unchanged vars can accumulate a LOT
+   of enqueued logs, leaking memory
+   
+   replace queue with a hash-table :weakness :key ?

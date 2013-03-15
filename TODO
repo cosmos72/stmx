@@ -1,7 +1,10 @@
 TO DO:
-1) in atomic.lisp (run-once) handler-case to capture errors signaled by tx
+4) orelse and nested transactions
+3) (error 'retry-error ...) should show message "attempt to RETRY outside ATOMIC block"
+   when printed
 
 DONE:
+2) in atomic.lisp (run-once) handler-case to capture errors signaled by tx
 1) implement ($ tvar) and (setf ($ tvar) value)
    for transactional access to tvars.
    useful when dealing directly with tvars,

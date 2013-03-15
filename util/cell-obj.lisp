@@ -12,28 +12,31 @@
            :initarg :value
            :initform *empty-cell*))))
 
-(defmethod empty? ((cell cell))
-  (atomic
-    (eq (value-of cell) *empty-cell*)))
+(transaction
+ (defmethod empty? ((cell cell))
+   (eq (value-of cell) *empty-cell*)))
 
-(defmethod empty! ((cell cell))
-  "Remove value from cell. does not return any value"
-  (atomic
-    (setf (value-of cell) *empty-cell*))
-  (values))
+(defmethod full? ((cell cell))
+  (not (empty? cell)))
 
-(defmethod take ((cell cell))
-  (atomic
-    (if (empty? cell)
-        (retry)
-        (prog1 (value-of cell)
-          (empty! cell)))))
+(transaction
+ (defmethod empty! ((cell cell))
+   "Remove value from cell. does not return any value"
+   (setf (value-of cell) *empty-cell*)
+   (values)))
 
-(defmethod put ((cell cell) value)
-  (atomic
-    (if (empty? cell)
-        (setf (value-of cell) value)
-        (retry))))
+(transaction
+ (defmethod take ((cell cell))
+   (if (empty? cell)
+       (retry)
+       (prog1 (value-of cell)
+         (empty! cell)))))
+
+(transaction
+ (defmethod put ((cell cell) value)
+   (if (empty? cell)
+       (setf (value-of cell) value)
+       (retry))))
 
 #|
 (defmethod try-take ((cell cell))

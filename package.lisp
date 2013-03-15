@@ -1,8 +1,6 @@
 ;; -*- lisp -*-
 
-;;;; * Welcome to CL-STM2
-
-;;;; CL-STM2 depends on arnesi, bordeaux-threads, and closer-mop.
+;;;; * Welcome to STMX
 
 (in-package :cl-user)
 
@@ -33,53 +31,15 @@
            #:nonblock
            #:repeat
 
+           ;; metaclasses
+           #:transactional-object
+
            ;; low-level API to use TVARs directly
            #:tvar
            #:$
            #:bound-$?
-           #:unbind-$
+           #:unbind-$))
 
-           ;; low-level API to use TLOGs directly
-           #:tlog
-           #:commit
-           #:valid?
-
-           #:transactional-class
-           #:transactional-object))
-
-
-(defpackage :stmx.util
-  
-  (:use :cl
-        :arnesi
-        :stmx
-        :stmx.util)
-
-  (:export #:cell
-           #:empty?
-           #:empty!
-           #:take
-           #:put
-           #:try-put
-
-           #:counter
-           #:count-of
-           #:increment
-           #:decrement
-           #:reset
-           #:swap
-
-           #:tqueue
-           #:deq
-           #:enq
-           #:empty-queue?
-           #:full-queue?
-           #:qlength
-
-           #:chan
-           #:port
-           #:read-port
-           #:write-chan))
 
 ;; Copyright (c) 2006 Hoan Ton-That
 ;; All rights reserved.

@@ -1,34 +1,42 @@
 ;; -*- lisp -*-
 
+;;;; * Welcome to STMX
+
 (in-package :cl-user)
 
-(defpackage :stmx.test
+(defpackage :stmx.util
+  
   (:use :cl
         :arnesi
-        :fiveam
-        :stmx
-        :stmx.util)
+        :stmx)
 
-  (:import-from :bordeaux-threads
-                :make-thread
-                :join-thread)
+  (:export #:cell
+           #:empty?
+           #:empty!
+           #:full?
+           #:take
+           #:put
+           #:try-put
 
-  (:import-from :stmx
-                :lock-of
-                :raw-value-of
-                :read-tvar
-                :write-tvar
-                :tlog
-                :commit
-                :valid?
-                :current-tlog
-                :with-new-tlog
-                :with-recording
-                :without-returning))
+           #:counter
+           #:count-of
+           #:increment
+           #:decrement
+           #:reset
+           #:swap
 
-(in-package :stmx.test)
+           #:tqueue
+           #:deq
+           #:enq
+           #:empty-queue?
+           #:full-queue?
+           #:qlength
 
-(fiveam:def-suite stmx.test)
+           #:chan
+           #:port
+           #:read-port
+           #:write-chan))
+
 
 ;; Copyright (c) 2013, Massimiliano Ghilardi
 ;; This file is part of STMX.
@@ -45,6 +53,8 @@
 ;;
 ;; You should have received a copy of the GNU Lesser General Public
 ;; License along with STMX. If not, see <http://www.gnu.org/licenses/>.
+
+
 
 
 
@@ -77,6 +87,3 @@
 ;; THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 ;; (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ;; OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-
-

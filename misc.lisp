@@ -13,6 +13,7 @@
 
 
 (defgeneric id-of (obj))
+(defgeneric (setf id-of) (value obj))
 
 (defun compute-string-of (obj)
   (handler-case

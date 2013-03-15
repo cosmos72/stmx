@@ -2,7 +2,10 @@
 
 (in-package :stmx.test)
 
-(in-suite stmx)
+(in-suite stmx.test)
+
+(defun configure-log4cl ()
+  (log:config :sane :this-console))
 
 (test read-tvar
   (let ((log (new 'tlog))
@@ -24,7 +27,7 @@
     (read-tvar var log)
     (is-false (valid? log))
     (setf (raw-value-of var) 1)
-    (is-true (valid? log)))))
+    (is-true (valid? log))))
     
 (test commit
   (let ((log (new 'tlog))
@@ -60,19 +63,63 @@
 
 (defun cell-test ()
   (let1 c (new 'cell :value 1)
-    (is-false (empty? c))
+    (is (full? c))
     (empty! c)
-    (is-true (empty? c))
+    (is (empty? c))
     (put c 2)
-    (is-false (empty? c))
-    (is-true (= (take c) 2))
-    (is-true (empty? c))))
+    (is (full? c))
+    (is (= (take c) 2))
+    (is (empty? c))))
 
 (test cell
   (cell-test))
 
 (test cell-atomic
   (atomic (cell-test)))
+
+
+(defun retry-test ()
+  (let ((c1 (new 'cell)) ;; cell has unbound value
+        (c2 (new 'cell)))
+
+    (flet ((f1 ()
+             (let1 x 1
+               (log:info "putting ~A in cell c1" x)
+               (put c1 x)
+
+               (log:info "taking from cell c2")
+               (setf x (take c2))
+               (log:info "took ~A from cell c2" x)
+               (log:info "done")
+               x))
+      
+           (f2 ()
+             (log:info "taking from cell c1")
+             (let1 x (take c1)
+               (log:info "took ~A from cell c1" x)
+
+               (log:info "putting ~A in cell c2" (1+ x))
+               (put c2 (1+ x))
+
+               (log:info "done")
+               x)))
+
+      (let* ((t1 (make-thread #'f1 :name "t1"))
+             (t2 (make-thread #'f2 :name "t2"))
+             (x1 (join-thread t1))
+             (x2 (join-thread t2)))
+        (log:info "t1 returned ~A" x1)
+        (log:info "t2 returned ~A" x2)
+        (is (= x1 2))
+        (is (= x2 1))
+        (is-true (empty? c1))
+        (is-true (empty? c2))))))
+
+
+(test retry
+  (retry-test))
+
+
 
 #|
 (test wait
@@ -93,14 +140,6 @@
     (notify-tvar var)
     (is-true (= ($ var) 3))))
 
-(test retry
-  (let1 var  (new 'tvar :value 1)
-    (atomic :id 'test-retry
-      (is-true (= ($ var) 1))
-      (setf ($ var) 2)
-      (is-true (= ($ var) 2))
-      (is-true (= (raw-value-of var) 1))
-      (is-false (valid? (current-tlog))))
 |#
     
 

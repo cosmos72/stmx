@@ -17,6 +17,9 @@
   (atomic
     (unbind-$ var)))
 
+(defmethod full? ((var tvar))
+  (not (empty? var)))
+
 (defmethod take ((var tvar))
   (atomic
     (if (empty? var)

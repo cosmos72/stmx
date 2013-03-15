@@ -15,10 +15,10 @@ of TVARs that were read during the transaction."
   (dohash (reads-of log) var val
     (let1 actual-val (raw-value-of var)
       (if (eq val actual-val)
-          (log:trace "Tvar ~A is up-to-date" (~ var))
+          (log:trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
           (progn
-            (log:trace "Conflict for tvar ~A: expecting ~A, found ~A"
-                       (~ var) (~ val) (~ actual-val))
+            (log:trace "Tlog ~A conflict for tvar ~A: expecting ~A, found ~A"
+                       (~ log) (~ var) (~ val) (~ actual-val))
             (log:debug "Tlog ~A ..not valid" (~ log))
             (return-from valid? nil)))))
   (log:trace "Tlog ~A ..is valid" (~ log))
@@ -47,7 +47,7 @@ b) another TLOG is writing the same TVARs being committed
              (if (acquire-lock (lock-of var) nil)
                  (progn
                    (push var acquired)
-                   (log:trace "Locked tvar ~A" (~ var)))
+                   (log:trace "Tlog ~A locked tvar ~A" (~ log) (~ var)))
                  (progn
                    (log:debug "Tlog ~A ...not committed: could not lock tvar ~A"
                               (~ log) (~ var))
@@ -57,15 +57,15 @@ b) another TLOG is writing the same TVARs being committed
              (return-from commit nil))
            (dohash (writes-of log) var val
              (setf (raw-value-of var) val)
-             (log:trace "Tvar ~A value updated to ~A" (~ var) val))
+             (log:trace "Tlog ~A tvar ~A value updated to ~A" (~ log) (~ var) val))
            (log:debug "Tlog ~A ...committed" (~ log))
            (return-from commit t))
       (dolist (var acquired)
         (release-lock (lock-of var))
-        (log:trace "Unlocked tvar ~A" (~ var)))
+        (log:trace "Tlog ~A unlocked tvar ~A" (~ log) (~ var)))
       (dolist (var acquired)
         (notify-tvar var)
-        (log:trace "Notified threads waiting on tvar ~A" (~ var))))))
+        (log:trace "Tlog ~A notified threads waiting on tvar ~A" (~ log) (~ var))))))
 
 
 ;;;; ** Merging
@@ -85,20 +85,46 @@ b) another TLOG is writing the same TVARs being committed
 
 ;;;; ** Waiting
 
-(defun wait-once-tlog (log)
+(defun wait-once (log)
+  "Wait for tvars to change.
+
+Return t if log is valid, return nil if invalid."
+
   (declare (type tlog log))
   (let1 reads (reads-of log)
+
     (when (zerop (hash-table-count reads))
       (error "Tried to wait on TLOG ~A, but no TVARs to wait on.~%  This is a BUG either in the STMX library or in the application code!~%  Possible reason is some application code analogous to (atomic (retry))~%  Such code is not allowed and will signal the current error~%  because it does not read any TVAR before retrying." (~ log)))
     (dohash reads var val
       ;; (declare (ignore val))
       (with-slots (waiting waiting-lock) var
         (with-lock-held (waiting-lock)
-          (enqueue waiting log))))
+          (let1 actual-val (raw-value-of var)
+            (if (eq val actual-val)
+                (progn
+                  (log:trace "Tlog ~A listening for tvar ~A changes" (~ log) (~ var))
+                  (enqueue waiting log))
+                (progn
+                  (log:trace "Tlog ~A: tvar ~A changed, not going to sleep"
+                             (~ log) (~ var))
+                  (return-from wait-once)))))))
+
+    (log:debug "Tlog ~A sleeping now" (~ log))
     (let1 dummy (make-lock "dummy lock")
-      ;; Max: making a new lock for each call to (wait) seems a bit wasteful
+      ;; FIXME: this is a race condition!
+      ;; (commit) calls (condition-notify) to wake the (condition-wait) call below,
+      ;; but we CAN be notified BEFORE we call (condition-wait) -> the notification is LOST
       (acquire-lock dummy)
-      (condition-wait (semaphore-of log) dummy))))
+      (condition-wait (semaphore-of log) dummy))
+    (log:debug "Tlog ~A woke up" (~ log))))
+      
+  ;; notify-tvar dequeues all logs enqueued on it
+  ;; but this log may be enqueued on other tvars that did not change,
+  ;; so we must dequeue this log from each tvar waiting list.
+  ;; (and since we are at it, we may as well validate the log in the meantime)
+  ;; FIXME: dequeue removes the OLDEST element from queue!
+  ;; not what we need. use hash-tables for queues, maybe with weak keys?
+          
 
 (defun wait-tlog (log)
   "Wait until the TVARs read during transaction have changed.
@@ -108,12 +134,14 @@ check if the log is valid. In case it's valid, re-executing
 the last transaction is useless: it means the relevant TVARs
 did not change, but the transaction is waiting for them to change
 \(see CMT paragraph 6.3)"
-  (loop do (wait-once-tlog log)
-       while (valid? log)))
+  (loop do (wait-once log)
+       while (valid? log))
+  (log:debug "Tlog ~A not valid: tvars changed while it slept (good), re-executing now" (~ log)))
 
 
 (defun notify-tlog (log)
   (declare (type tlog log))
+  (log:debug "Waking up tlog ~A" (~ log))
   (condition-notify (semaphore-of log)))
 
 ;; Copyright (c) 2006 Hoan Ton-That

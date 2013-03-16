@@ -12,15 +12,21 @@
           :initarg :reads
           :initform (make-hash-table :test #'eq :size 16)
           :type hash-table
-          :documentation "Mapping reads done to versions")
+          :documentation "Mapping reads done to values")
    (writes :accessor writes-of
            :initarg :writes
            :initform (make-hash-table :test #'eq :size 16)
            :type hash-table
            :documentation "Mapping variables written to new values")
+   (lock :accessor lock-of
+         :initform nil)
    (semaphore :accessor semaphore-of
-              :initarg :semaphore
-              :initform (make-condition-variable))
+	      :initform nil)
+   (prevent-sleep :accessor prevent-sleep-of
+         :initform nil
+	 :type boolean
+	 :documentation "Flag to prevent TLOGs from sleeping.
+Set by TVARs when they change")
    (id :reader id-of
        :initform (incf *tlog-id-counter*)
        :type integer))
@@ -29,30 +35,27 @@
 reads and writes have been done.
 
 Transaction logs are written during the execution of a
-transaction (using READ-TVAR and WRITE-TVAR).  Transactions logs
-are committed to memory by COMMIT later on."))
+transaction (by reading and writing transactional objects or TVARs).
+Transactions logs are committed to memory by COMMIT later on."))
 
 
 
 (defvar +unbound+ (gensym "UNBOUND-"))
 
 (defclass tvar ()
-  ((lock :accessor lock-of
-         :initarg :lock
-         :initform (make-lock "TVAR"))
-   (value :accessor raw-value-of
+  ((value :accessor raw-value-of
           :initarg :value
           :initform +unbound+)
+   (lock :accessor lock-of
+         :initform (make-lock "TVAR"))
    (waiting :accessor waiting-for
-            :initarg :waiting
-            :initform (new 'queue :element-type 'tlog)
-            :type queue)
+            :initform (make-hash-table :test 'eq :weakness :key)
+            :type hash-table)
    (waiting-lock :accessor waiting-lock-of
-                 :initarg :waiting-lock
                  :initform (make-lock "WAITING-LOCK")))
 
   (:documentation "A transactional variable (TVAR) holds a value.
-See READ-TVAR and WRITE-TVAR for reading and writing them."))
+See ($ tvar) and (SETF ($ tvar) value) for reading and writing them."))
 
 
 

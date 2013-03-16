@@ -25,6 +25,21 @@ of TVARs that were read during the transaction."
   (return-from valid? t))
 
 
+(defun lock-tvar-nonblock (var log)
+  "Try to acquire VAR lock non-blocking. Return t if acquired, else return nil."
+
+  (declare (type tvar var)
+	   (type tlog log))
+  (if (acquire-lock (lock-of var) nil)
+      (progn
+	(log:trace "Tlog ~A locked tvar ~A" (~ log) (~ var))
+	t)
+      (progn
+	(log:debug "Tlog ~A ...not committed: could not lock tvar ~A"
+		   (~ log) (~ var))
+	nil)))
+
+
 
 (defun commit (log)
   "Commit a TLOG to memory.
@@ -39,31 +54,47 @@ b) another TLOG is writing the same TVARs being committed
    that the TLOG will still be valid."
    
   (declare (type tlog log))
-  (let1 acquired nil
+  (let ((reads (reads-of log))
+	(writes (writes-of log))
+	acquired nil
+	changed nil)
     (log:trace "Tlog ~A committing..." (~ log))
     (unwind-protect
          (progn
-           (dohash (writes-of log) var val
-             (if (acquire-lock (lock-of var) nil)
-                 (progn
-                   (push var acquired)
-                   (log:trace "Tlog ~A locked tvar ~A" (~ log) (~ var)))
-                 (progn
-                   (log:debug "Tlog ~A ...not committed: could not lock tvar ~A"
-                              (~ log) (~ var))
-                   (return-from commit nil))))
+           (dohash reads var val
+             (if (lock-tvar-nonblock var log)
+	       (push var acquired)
+	       (return-from commit nil)))
            (unless (valid? log)
              (log:debug "Tlog ~A ...not committed: log is invalid" (~ log))
              (return-from commit nil))
-           (dohash (writes-of log) var val
-             (setf (raw-value-of var) val)
-             (log:trace "Tlog ~A tvar ~A value updated to ~A" (~ log) (~ var) val))
+
+	   ;; we must lock also TVARs that will be written: expensive,
+	   ;; but needed to ensure other threads sees the writes as atomic
+           (dohash writes var val
+	     (multiple-value-bind (dummy read?) (gethash var reads)
+	       ;; skip locking TVARs present in (reads-of log), we already locked them
+	       (when (not read?)
+		 (if (lock-tvar-nonblock var log)
+		     (push var acquired)
+		     (return-from commit nil)))))
+
+	   ;; actually write new values into TVARs
+           (dohash writes var val
+	     (let1 old-val (raw-value-of var)
+	       (when (not (eq val old-val))
+		 (setf (raw-value-of var) val)
+		 (push var changed)
+		 (log:trace "Tlog ~A tvar ~A value changed from ~A to ~A"
+			    (~ log) (~ var) old-val val))))
+
            (log:debug "Tlog ~A ...committed" (~ log))
            (return-from commit t))
+
       (dolist (var acquired)
         (release-lock (lock-of var))
         (log:trace "Tlog ~A unlocked tvar ~A" (~ log) (~ var)))
-      (dolist (var acquired)
+      (dolist (var changed)
         (notify-tvar var)
         (log:trace "Tlog ~A notified threads waiting on tvar ~A" (~ log) (~ var))))))
 
@@ -85,38 +116,31 @@ b) another TLOG is writing the same TVARs being committed
 
 ;;;; ** Waiting
 
-(defun wait-once (log)
-  "Wait for tvars to change.
 
-Return t if log is valid, return nil if invalid."
+(defun listen-tvars-of (log)
+  "Listen on tvars, i.e. register to get notified if they change.
+
+Return t if log is valid and wait-tlog should sleep, otherwise return nil."
 
   (declare (type tlog log))
   (let1 reads (reads-of log)
 
     (when (zerop (hash-table-count reads))
       (error "Tried to wait on TLOG ~A, but no TVARs to wait on.~%  This is a BUG either in the STMX library or in the application code!~%  Possible reason is some application code analogous to (atomic (retry))~%  Such code is not allowed and will signal the current error~%  because it does not read any TVAR before retrying." (~ log)))
-    (dohash reads var val
-      ;; (declare (ignore val))
-      (with-slots (waiting waiting-lock) var
-        (with-lock-held (waiting-lock)
-          (let1 actual-val (raw-value-of var)
-            (if (eq val actual-val)
-                (progn
-                  (log:trace "Tlog ~A listening for tvar ~A changes" (~ log) (~ var))
-                  (enqueue waiting log))
-                (progn
-                  (log:trace "Tlog ~A: tvar ~A changed, not going to sleep"
-                             (~ log) (~ var))
-                  (return-from wait-once)))))))
 
-    (log:debug "Tlog ~A sleeping now" (~ log))
-    (let1 dummy (make-lock "dummy lock")
-      ;; FIXME: this is a race condition!
-      ;; (commit) calls (condition-notify) to wake the (condition-wait) call below,
-      ;; but we CAN be notified BEFORE we call (condition-wait) -> the notification is LOST
-      (acquire-lock dummy)
-      (condition-wait (semaphore-of log) dummy))
-    (log:debug "Tlog ~A woke up" (~ log))))
+    (dohash reads var val
+      (let1 actual-val (raw-value-of var)
+	(if (eq val actual-val)
+	    (progn
+	      (log:trace "Tlog ~A listening for tvar ~A changes" (~ log) (~ var))
+	      (listen-tvar var log))
+	    (progn
+	      (log:trace "Tlog ~A: tvar ~A changed, not going to sleep"
+			 (~ log) (~ var))
+	      (return-from listen-tvars-of nil))))))
+  (return-from listen-tvars-of t))
+
+
       
   ;; notify-tvar dequeues all logs enqueued on it
   ;; but this log may be enqueued on other tvars that did not change,
@@ -126,16 +150,49 @@ Return t if log is valid, return nil if invalid."
   ;; not what we need. use hash-tables for queues, maybe with weak keys?
           
 
-(defun wait-tlog (log)
-  "Wait until the TVARs read during transaction have changed.
+(defun wait-once (log)
+  "Sleep, i.e. wait for relevat TVARs to change.
 
+After sleeping, return t if log is valid, otherwise return nil."
+
+ 
+  (declare (type tlog log))
+  (log:debug "Tlog ~A sleeping now" (~ log))
+  (let ((lock (lock-of log))
+	(valid t))
+
+    (with-lock-held (lock)
+      (when (setf valid (not (prevent-sleep-of log)))
+	(condition-wait (semaphore-of log) lock)))
+
+    (if valid
+	(progn
+	  (setf valid (valid? log))
+	  (log:debug "Tlog ~A woke up, is now ~A" (~ log) (if valid "valid" "invalid")))
+	(log:debug "Tlog ~A prevented from sleeping, some TVAR must have changed" (~ log)))
+    valid))
+
+
+(defun wait-tlog (log &key once)
+  "Wait until the TVARs read during transaction have changed.
+Return t if log is valid after sleeping, otherwise return nil.
+
+Note from (CMT paragraph 6.3):
 When some other threads notifies the one waiting in this function,
 check if the log is valid. In case it's valid, re-executing
 the last transaction is useless: it means the relevant TVARs
-did not change, but the transaction is waiting for them to change
-\(see CMT paragraph 6.3)"
-  (loop do (wait-once log)
-       while (valid? log))
+did not change, but the transaction is waiting for them to change"
+
+  (when (null (lock-of log))
+    (setf (lock-of log) (make-lock (format nil "~A-~A" 'tlog (~ log))))
+    (setf (semaphore-of log) (make-condition-variable)))
+
+  ;; we are going to sleep, unless some TVAR changes and/or tells us not to.
+  (setf (prevent-sleep-of log) nil)
+
+  (when (listen-tvars-of log)
+    (loop while (wait-once log)))
+
   (log:debug "Tlog ~A not valid: tvars changed while it slept (good), re-executing now" (~ log)))
 
 
@@ -143,6 +200,25 @@ did not change, but the transaction is waiting for them to change
   (declare (type tlog log))
   (log:debug "Waking up tlog ~A" (~ log))
   (condition-notify (semaphore-of log)))
+
+
+;; Copyright (c) 2013, Massimiliano Ghilardi
+;; This file is part of STMX.
+;;
+;; STMX is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU Lesser General Public License
+;; as published by the Free Software Foundation, either version 3
+;; of the License, or (at your option) any later version.
+;;
+;; STMX is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty
+;; of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+;; See the GNU Lesser General Public License for more details.
+;;
+;; You should have received a copy of the GNU Lesser General Public
+;; License along with STMX. If not, see <http://www.gnu.org/licenses/>.
+
+
 
 ;; Copyright (c) 2006 Hoan Ton-That
 ;; All rights reserved.
@@ -173,21 +249,3 @@ did not change, but the transaction is waiting for them to change
 ;; THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 ;; (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ;; OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-
-
-;; Copyright (c) 2013, Massimiliano Ghilardi
-;; This file is part of STMX.
-;;
-;; STMX is free software: you can redistribute it and/or modify
-;; it under the terms of the GNU Lesser General Public License
-;; as published by the Free Software Foundation, either version 3
-;; of the License, or (at your option) any later version.
-;;
-;; STMX is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty
-;; of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-;; See the GNU Lesser General Public License for more details.
-;;
-;; You should have received a copy of the GNU Lesser General Public
-;; License along with STMX. If not, see <http://www.gnu.org/licenses/>.

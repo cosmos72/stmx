@@ -73,7 +73,6 @@ until at least one of them changes."
   (with-new-tlog log
     (with-recording
       (log:debug "Tlog ~A transaction ~A starting" (~ log) (~ tx))
-      ;; TODO: handler-case to capture errors signaled by tx!
       (let ((x-retry? nil)
             (x-log log)
             (x-error nil)
@@ -97,7 +96,7 @@ until at least one of them changes."
 (defun run-atomic (tx &key (id nil))
   (declare (type function tx))
 
-  (when (recording?)
+  (when (and (recording?) (current-tlog))
     (return-from run-atomic (funcall tx)))
 
   (when id

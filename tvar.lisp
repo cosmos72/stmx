@@ -137,16 +137,25 @@ During transactions, it uses transaction log to record the 'unbound' value."
 
 
 
-;;;; ** Waiting
+;;;; ** Listening and notifying
+
+(defun listen-tvar (var log)
+  "LISTEN-TVAR tells VAR that LOG must be notified if VAR changes."
+
+  (declare (type tvar var)
+	   (type tlog log))
+  (with-lock-held ((waiting-lock-of var))
+    (setf (gethash log (waiting-for var)) t))))
+
 
 (defun notify-tvar (var)
-  "NOTIFY-TVAR causes all threads waiting for VAR to
-change to wake up."
+  "NOTIFY-TVAR wakes up all threads waiting for VAR to change."
+
   (declare (type tvar var))
-  (with-slots (waiting waiting-lock) var
-    (with-lock-held (waiting-lock)
-      (until (queue-empty-p waiting)
-        (notify-tlog (dequeue waiting))))))
+  (with-lock-held ((waiting-lock-of var))
+    (dohash (waiting-for var) log dummy
+      (setf (prevent-sleep-of log) t) ;; FIXME: do we need to acquire (lock-of log) ?
+      (notify-tlog log))))
 
 
 ;;;; ** Printing

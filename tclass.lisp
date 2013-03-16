@@ -2,9 +2,6 @@
 
 (in-package :stmx)
 
-(eval-always
-  (enable-pf-reader))
-
 ;;;; * Transactional classes
 
 ;;;; ** Metaclasses
@@ -70,7 +67,9 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
                                                 slot-name direct-slots)
     (declare (ignore slot-name))
     (let ((effective-slot (call-next-method))
-          (direct-slots (remove-if-not [typep _ 'transactional-direct-slot] direct-slots)))
+          (direct-slots (remove-if-not
+			 (lambda (x) (typep x 'transactional-direct-slot))
+			 direct-slots)))
       (unless (null (cdr direct-slots))
         (error "More than one :transactional specifier"))
 
@@ -166,7 +165,7 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
     ((or (recording?) (returning?))
      ;; Get the tvar from the slot, and unbind its value.
      ;; During transactions, unbinding the tvar is recorded into the current tlog.
-     (unbind-$? (slot-raw-tvar class instance slot)))
+     (unbind-$ (slot-raw-tvar class instance slot)))
     
     (t
      ;; raw access: unbind the slot.

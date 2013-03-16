@@ -56,8 +56,8 @@ b) another TLOG is writing the same TVARs being committed
   (declare (type tlog log))
   (let ((reads (reads-of log))
 	(writes (writes-of log))
-	acquired nil
-	changed nil)
+	(acquired nil)
+	(changed nil))
     (log:trace "Tlog ~A committing..." (~ log))
     (unwind-protect
          (progn

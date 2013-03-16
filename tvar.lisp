@@ -145,7 +145,7 @@ During transactions, it uses transaction log to record the 'unbound' value."
   (declare (type tvar var)
 	   (type tlog log))
   (with-lock-held ((waiting-lock-of var))
-    (setf (gethash log (waiting-for var)) t))))
+    (setf (gethash log (waiting-for var)) t)))
 
 
 (defun notify-tvar (var)

@@ -190,10 +190,15 @@ did not change, but the transaction is waiting for them to change"
   ;; we are going to sleep, unless some TVAR changes and/or tells us not to.
   (setf (prevent-sleep-of log) nil)
 
-  (when (listen-tvars-of log)
-    (loop while (wait-once log)))
+  (and (listen-tvars-of log)
+       (if once
+	   (wait-once log)
+	   (progn
+	     (loop while (wait-once log))
+	     (log:debug "Tlog ~A not valid: tvars changed while it slept (good), re-executing now" (~ log))
+	     nil))))
+      
 
-  (log:debug "Tlog ~A not valid: tvars changed while it slept (good), re-executing now" (~ log)))
 
 
 (defun notify-tlog (log)

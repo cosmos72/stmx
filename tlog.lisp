@@ -135,10 +135,23 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
 	      (log:trace "Tlog ~A listening for tvar ~A changes" (~ log) (~ var))
 	      (listen-tvar var log))
 	    (progn
-	      (log:trace "Tlog ~A: tvar ~A changed, not going to sleep"
+	      (log:debug "Tlog ~A: tvar ~A changed, not going to sleep"
 			 (~ log) (~ var))
 	      (return-from listen-tvars-of nil))))))
   (return-from listen-tvars-of t))
+
+
+
+(defun unlisten-tvars-of (log)
+  "Un-listen on tvars, i.e. deregister not to get notifications if they change."
+
+  (declare (type tlog log))
+  (let1 reads (reads-of log)
+
+    (dohash reads var val
+      (unlisten-tvar var log)))
+  (values))
+
 
 
       
@@ -167,8 +180,8 @@ After sleeping, return t if log is valid, otherwise return nil."
 
     (if valid
 	(progn
-	  (setf valid (valid? log))
-	  (log:debug "Tlog ~A woke up, is now ~A" (~ log) (if valid "valid" "invalid")))
+	  (log:debug "Tlog ~A woke up" (~ log))
+	  (setf valid (valid? log)))
 	(log:debug "Tlog ~A prevented from sleeping, some TVAR must have changed" (~ log)))
     valid))
 
@@ -190,13 +203,12 @@ did not change, but the transaction is waiting for them to change"
   ;; we are going to sleep, unless some TVAR changes and/or tells us not to.
   (setf (prevent-sleep-of log) nil)
 
-  (and (listen-tvars-of log)
-       (if once
-	   (wait-once log)
-	   (progn
-	     (loop while (wait-once log))
-	     (log:debug "Tlog ~A not valid: tvars changed while it slept (good), re-executing now" (~ log))
-	     nil))))
+  (prog1
+      (and (listen-tvars-of log)
+	   (if once
+	       (wait-once log)
+	       (loop while (wait-once log))))
+    (unlisten-tvars-of log)))
       
 
 

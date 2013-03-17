@@ -10,12 +10,12 @@
 (defclass tlog ()
   ((reads :accessor reads-of
           :initarg :reads
-          :initform (make-hash-table :test #'eq :size 16)
+          :initform (make-hash-table :test 'eq :size 16)
           :type hash-table
           :documentation "Mapping reads done to values")
    (writes :accessor writes-of
            :initarg :writes
-           :initform (make-hash-table :test #'eq :size 16)
+           :initform (make-hash-table :test 'eq :size 16)
            :type hash-table
            :documentation "Mapping variables written to new values")
    (lock :accessor lock-of
@@ -49,7 +49,7 @@ Transactions logs are committed to memory by COMMIT later on."))
    (lock :accessor lock-of
          :initform (make-lock "TVAR"))
    (waiting :accessor waiting-for
-            :initform (make-hash-table :test 'eq :weakness :key)
+            :initform (make-hash-table :test 'eq)
             :type hash-table)
    (waiting-lock :accessor waiting-lock-of
                  :initform (make-lock "WAITING-LOCK")))

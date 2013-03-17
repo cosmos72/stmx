@@ -78,46 +78,62 @@
   (atomic (cell-test)))
 
 
-(defun retry-test ()
+(defun retry-funs (n c1 c2)
+  (declare (type fixnum n)
+	   (type cell c1 c2))
+
+  (flet ((f1 ()
+	   (let1 x 0
+	     (declare (type fixnum x))
+	     (dotimes (i n)
+	       (log:info "putting ~A in cell c1" x)
+	       (put c1 x)
+	       (log:info "taking from cell c2")
+	       (setf x (take c2))
+	       (log:info "took ~A from cell c2" x)
+	       (log:info "done"))
+	     x))
+      
+	 (f2 ()
+	   (let1 x 0
+	     (declare (type fixnum x))
+	     (dotimes (i n)
+	       (log:info "taking from cell c1")
+	       (setf x (take c1))
+	       (log:info "took ~A from cell c1" x)
+	       
+	       (log:info "putting ~A in cell c2" (1+ x))
+	       (put c2 (the fixnum (1+ x))))
+	     (log:info "done")
+	     x)))
+    (values #'f1 #'f2)))
+
+(defun retry-test (&optional (n 1))
+  (declare (type fixnum n))
   (let ((c1 (new 'cell)) ;; cell has unbound value
         (c2 (new 'cell)))
 
-    (flet ((f1 ()
-             (let1 x 1
-               (log:info "putting ~A in cell c1" x)
-               (put c1 x)
+    (multiple-value-bind (f1 f2) (retry-funs n c1 c2)
 
-               (log:info "taking from cell c2")
-               (setf x (take c2))
-               (log:info "took ~A from cell c2" x)
-               (log:info "done")
-               x))
-      
-           (f2 ()
-             (log:info "taking from cell c1")
-             (let1 x (take c1)
-               (log:info "took ~A from cell c1" x)
+      (let* ((t1 (make-thread f1 :name "t1"))
+	     (t2 (make-thread f2 :name "t2"))
+	     (x1 (the fixnum (join-thread t1)))
+	     (x2 (the fixnum (join-thread t2))))
+	(log:info "t1 returned ~A" x1)
+	(log:info "t2 returned ~A" x2)
 
-               (log:info "putting ~A in cell c2" (1+ x))
-               (put c2 (1+ x))
-
-               (log:info "done")
-               x)))
-
-      (let* ((t1 (make-thread #'f1 :name "t1"))
-             (t2 (make-thread #'f2 :name "t2"))
-             (x1 (join-thread t1))
-             (x2 (join-thread t2)))
-        (log:info "t1 returned ~A" x1)
-        (log:info "t2 returned ~A" x2)
-        (is (= x1 2))
-        (is (= x2 1))
-        (is-true (empty? c1))
-        (is-true (empty? c2))))))
+	(values x1 x2 (empty? c1) (empty? c2))))))
 
 
 (test retry
-  (retry-test))
+  (let1 n 1000
+    (multiple-value-bind (x1 x2 empty-c1? empty-c2?)
+	(retry-test n)
+      (is (= x1 n))
+      (is (= x2 (1- n)))
+      (is-true empty-c1?)
+      (is-true empty-c2?))))
+
 
 
 

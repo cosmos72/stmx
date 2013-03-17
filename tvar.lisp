@@ -148,6 +148,15 @@ During transactions, it uses transaction log to record the 'unbound' value."
     (setf (gethash log (waiting-for var)) t)))
 
 
+(defun unlisten-tvar (var log)
+  "remove LOG from VAR's waiting list, so that LOG will *not* be notified if VAR will change in the future."
+
+  (declare (type tvar var)
+	   (type tlog log))
+  (with-lock-held ((waiting-lock-of var))
+    (remhash log (waiting-for var))))
+
+
 (defun notify-tvar (var)
   "NOTIFY-TVAR wakes up all threads waiting for VAR to change."
 

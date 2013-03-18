@@ -58,6 +58,11 @@ b) another TLOG is writing the same TVARs being committed
 	(writes (writes-of log))
 	(acquired nil)
 	(changed nil))
+
+    (when (zerop (hash-table-count writes))
+      (log:trace "Tlog ~A committed, nothing to write" (~ log))
+      (return-from commit t))
+
     (log:trace "Tlog ~A committing..." (~ log))
     (unwind-protect
          (progn
@@ -131,16 +136,21 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
       (error "Tried to wait on TLOG ~A, but no TVARs to wait on.~%  This is a BUG either in the STMX library or in the application code!~%  Possible reason is some application code analogous to (atomic (retry))~%  Such code is not allowed and will signal the current error~%  because it does not read any TVAR before retrying." (~ log)))
 
     (dohash reads var val
-      (let1 actual-val (raw-value-of var)
-	(if (eq val actual-val)
-	    (progn
-	      (listen-tvar var log)
-	      (log:trace "Tlog ~A listening for tvar ~A changes"
-			 (~ log) (~ var)))
-	    (progn
-	      (log:debug "Tlog ~A: tvar ~A changed, not going to sleep"
-			 (~ log) (~ var))
-	      (return-from listen-tvars-of nil))))))
+      (listen-tvar var log)
+      ;; check raw-value AFTER listening to avoid deadlocks.
+      ;; otherwise if we
+      ;;   1) check raw-value and decide whether to listen
+      ;;   2) listen
+      ;; the tvar could change BETWEEN 1) and 2) and we would miss it
+      ;; => DEADLOCK
+      (if (eq val (raw-value-of var))
+	  (log:trace "Tlog ~A listening for tvar ~A changes"
+		     (~ log) (~ var))
+	  (progn
+	    (unlisten-tvar var log)
+	    (log:debug "Tlog ~A: tvar ~A changed, not going to sleep"
+		       (~ log) (~ var))
+	    (return-from listen-tvars-of nil)))))
   (return-from listen-tvars-of t))
 
 

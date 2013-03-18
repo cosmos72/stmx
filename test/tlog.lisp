@@ -5,7 +5,7 @@
 (in-suite stmx.test)
 
 (defun configure-log4cl ()
-  (log:config :sane :this-console))
+  (log:config :sane :this-console :pattern "[%D{%H:%M:%S}] [%5P] {%t} <%c{}{}{:downcase}> - %m%n"))
 
 (test read-tvar
   (let ((log (new 'tlog))

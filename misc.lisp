@@ -45,17 +45,10 @@
     (setf (gethash obj ids) (format nil "~A" value))))
 
 
-;; FIXME specialization on bordeaux-threads:thread is not accepted :(
-(defmethod id-of ((obj sb-thread:thread))
-  (thread-name obj))
+(declaim (inline ~ (setf ~)))
 
-
-
-
-(declaim (inline (setf ~)))
-
-(defmacro ~ (&optional (obj nil obj?))
-  (if obj? `(id-of ,obj) `(id-of (current-thread))))
+(defun ~ (obj)
+  (id-of obj))
 
 (defun (setf ~) (value obj)
   (setf (id-of obj) value))

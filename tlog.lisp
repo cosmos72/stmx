@@ -73,6 +73,7 @@ b) another TLOG is writing the same TVARs being committed
 	   ;; but needed to ensure other threads sees the writes as atomic
            (dohash writes var val
 	     (multiple-value-bind (dummy read?) (gethash var reads)
+	       (declare (ignore dummy))
 	       ;; skip locking TVARs present in (reads-of log), we already locked them
 	       (when (not read?)
 		 (if (lock-tvar-nonblock var log)
@@ -95,8 +96,9 @@ b) another TLOG is writing the same TVARs being committed
         (release-lock (lock-of var))
         (log:trace "Tlog ~A unlocked tvar ~A" (~ log) (~ var)))
       (dolist (var changed)
-        (notify-tvar var)
-        (log:trace "Tlog ~A notified threads waiting on tvar ~A" (~ log) (~ var))))))
+	(log:trace "Tlog ~A notifying threads waiting on tvar ~A"
+		   (~ log) (~ var))
+        (notify-tvar var)))))
 
 
 ;;;; ** Merging
@@ -118,7 +120,7 @@ b) another TLOG is writing the same TVARs being committed
 
 
 (defun listen-tvars-of (log)
-  "Listen on tvars, i.e. register to get notified if they change.
+  "Listen on tqvars, i.e. register to get notified if they change.
 
 Return t if log is valid and wait-tlog should sleep, otherwise return nil."
 
@@ -132,8 +134,9 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
       (let1 actual-val (raw-value-of var)
 	(if (eq val actual-val)
 	    (progn
-	      (log:trace "Tlog ~A listening for tvar ~A changes" (~ log) (~ var))
-	      (listen-tvar var log))
+	      (listen-tvar var log)
+	      (log:trace "Tlog ~A listening for tvar ~A changes"
+			 (~ log) (~ var)))
 	    (progn
 	      (log:debug "Tlog ~A: tvar ~A changed, not going to sleep"
 			 (~ log) (~ var))
@@ -200,8 +203,10 @@ did not change, but the transaction is waiting for them to change"
     (setf (lock-of log) (make-lock (format nil "~A-~A" 'tlog (~ log))))
     (setf (semaphore-of log) (make-condition-variable)))
 
-  ;; we are going to sleep, unless some TVAR changes and/or tells us not to.
-  (setf (prevent-sleep-of log) nil)
+  ;; we are going to sleep, unless some TVAR changes
+  ;; and/or tells us not to.
+  (with-lock-held ((lock-of log))
+    (setf (prevent-sleep-of log) nil))
 
   (prog1
       (and (listen-tvars-of log)
@@ -213,10 +218,15 @@ did not change, but the transaction is waiting for them to change"
 
 
 
-(defun notify-tlog (log)
-  (declare (type tlog log))
-  (log:debug "Waking up tlog ~A" (~ log))
-  (condition-notify (semaphore-of log)))
+(defun notify-tlog (log var)
+  (declare (type tlog log)
+	   (type tvar var))
+  (log:debug "Waking up tlog ~A listening on tvar ~A" (~ log) (~ var))
+  ;; do we also need to acquire (lock-of log)?
+  ;; YES! otherwise we can deadlock (tested, it happens)
+  (with-lock-held ((lock-of log))
+    (setf (prevent-sleep-of log) t)
+    (condition-notify (semaphore-of log))))
 
 
 ;; Copyright (c) 2013, Massimiliano Ghilardi

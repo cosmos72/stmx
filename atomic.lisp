@@ -72,7 +72,8 @@ until at least one of them changes."
   (declare (type function tx))
   (with-new-tlog log
     (with-recording
-      (log:debug "Tlog ~A transaction ~A starting" (~ log) (~ tx))
+      (log:debug "Tlog ~A transaction ~A thread ~A starting"
+		 (~ log) (~ tx) (~))
       (let ((x-retry? nil)
             (x-log log)
             (x-error nil)
@@ -80,15 +81,16 @@ until at least one of them changes."
         (handler-case
             (progn
               (setf x-values (multiple-value-list (funcall tx)))
-              (log:trace "Tlog ~A transaction ~A wants to commit, returned: ~{~A ~}"
-                         (~ log) (~ tx) x-values))
+              (log:trace "Tlog ~A transaction ~A thread ~A wants to commit, returned: ~{~A ~}"
+                         (~ log) (~ tx) (~) x-values))
           (retry-error (err)
             (setf x-retry? t)
             (setf x-log (log-of err))
-            (log:trace "Tlog ~A transaction ~A wants to retry" (~ x-log) (~ tx)))
+            (log:trace "Tlog ~A transaction ~A thread ~A wants to retry"
+		       (~ x-log) (~ tx) (~)))
           (t (err)
-            (log:trace "Tlog ~A transaction ~A wants to rollback, signaled ~A: ~A"
-                       (~ log) (~ tx) (type-of err) (~ err))
+            (log:trace "Tlog ~A transaction ~A thread ~A wants to rollback, signaled ~A: ~A"
+                       (~ log) (~ tx) (~) (type-of err) (~ err))
             (setf x-error err)))
         (values x-retry? x-log x-error x-values)))))
 

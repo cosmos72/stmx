@@ -163,9 +163,7 @@ During transactions, it uses transaction log to record the 'unbound' value."
   (declare (type tvar var))
   (with-lock-held ((waiting-lock-of var))
     (dohash (waiting-for var) log dummy
-      ;; FIXME: do we also need to acquire (lock-of log) ?
-      (setf (prevent-sleep-of log) t)
-      (notify-tlog log))))
+      (notify-tlog log var))))
 
 
 ;;;; ** Printing

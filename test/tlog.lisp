@@ -110,7 +110,7 @@
 
 (defun retry-test (&optional (n 1))
   (declare (type fixnum n))
-  (let ((c1 (new 'cell)) ;; cell has unbound value
+  (let ((c1 (new 'cell)) ;; cells have unbound value
         (c2 (new 'cell)))
 
     (multiple-value-bind (f1 f2) (retry-funs n c1 c2)

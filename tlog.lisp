@@ -60,7 +60,7 @@ b) another TLOG is writing the same TVARs being committed
 	(changed nil))
 
     (when (zerop (hash-table-count writes))
-      (log:trace "Tlog ~A committed, nothing to write" (~ log))
+      (log:debug "Tlog ~A ...committed (nothing to write)" (~ log))
       (return-from commit t))
 
     (log:trace "Tlog ~A committing..." (~ log))
@@ -87,12 +87,12 @@ b) another TLOG is writing the same TVARs being committed
 
 	   ;; actually write new values into TVARs
            (dohash writes var val
-	     (let1 old-val (raw-value-of var)
-	       (when (not (eq val old-val))
+	     (let1 actual-val (raw-value-of var)
+	       (when (not (eq val actual-val))
 		 (setf (raw-value-of var) val)
 		 (push var changed)
 		 (log:trace "Tlog ~A tvar ~A value changed from ~A to ~A"
-			    (~ log) (~ var) old-val val))))
+			    (~ log) (~ var) actual-val val))))
 
            (log:debug "Tlog ~A ...committed" (~ log))
            (return-from commit t))
@@ -107,6 +107,12 @@ b) another TLOG is writing the same TVARs being committed
 
 
 ;;;; ** Merging
+
+
+(defun clear-tlog (log)
+  (clrhash (reads-of log))
+  (clrhash (writes-of log))
+  log)
 
 (defun merge-tlogs (log1 log2)
   ;; TODO Max: merge-tlogs must be revised when implementing orelse
@@ -137,7 +143,7 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
 
     (dohash reads var val
       (listen-tvar var log)
-      ;; check raw-value AFTER listening to avoid deadlocks.
+      ;; to avoid deadlocks, check raw-value AFTER listening on tvar.
       ;; otherwise if we
       ;;   1) check raw-value and decide whether to listen
       ;;   2) listen

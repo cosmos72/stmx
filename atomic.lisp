@@ -40,12 +40,14 @@ inside (atomic ...)."
 
 ;;;; ** Retrying
 
-;;; TODO: printing retry-error should result in "attempt to RETRY outside an ATOMIC block"
 (define-condition retry-error (error)
   ((log :type tlog
         :reader log-of
         :initarg :log
-        :initform (error "missing argument :log instantiating RETRY-ERROR"))))
+        :initform (error "missing argument :log instantiating RETRY-ERROR")))
+  (:report (lambda (condition stream)
+             (declare (ignore condition))
+             (format stream "Attempt to ~A outside an ~A block" 'retry 'atomic))))
 
 
 (defun retry ()
@@ -68,9 +70,10 @@ until at least one of them changes."
 
 
 
-(defun run-once (tx)
-  (declare (type function tx))
-  (with-new-tlog log
+(defun run-once (tx log)
+  (declare (type function tx)
+           (type tlog log))
+  (with-tlog log
     (with-recording
       (log:debug "Tlog ~A transaction ~A starting" (~ log) (~ tx))
       (let ((x-retry? nil)
@@ -103,48 +106,61 @@ until at least one of them changes."
   (when id
     (setf (~ tx) id))
 
-  (prog (x-log x-values)
+  (let1 log (new 'tlog)
 
-   execute
-   (multiple-value-bind (retry? log err values) (run-once tx)
-     (unless (valid? log)
-       (log:debug "Tlog ~A transaction ~A is invalid, retrying immediately" (~ log) (~ tx))
-       (go execute))
-     (when retry?
-       (log:debug "Tlog ~A transaction ~A will sleep, then retry" (~ log) (~ tx))
-       (wait-tlog log)
-       (go execute))
-     (when err
-       (log:debug "Tlog ~A transaction ~A will rollback and signal" (~ log) (~ tx))
-       (error err))
-     (setq x-log    log
-           x-values values)
-     (go commit))
+    (prog (x-log x-values)
+
+     execute
+     (multiple-value-bind (retry? log err values) (run-once tx log)
+       (unless (valid? log)
+         (log:debug "Tlog ~A transaction ~A is invalid, retrying immediately" (~ log) (~ tx))
+         (go re-execute))
+       (when retry?
+         (log:debug "Tlog ~A transaction ~A will sleep, then retry" (~ log) (~ tx))
+         (wait-tlog log)
+         (go re-execute))
+       (when err
+         (log:debug "Tlog ~A transaction ~A will rollback and signal" (~ log) (~ tx))
+         (error err))
+       (setq x-log    log
+             x-values values)
+       (go commit))
    
-   commit
-   (if (commit x-log)
-       (go done)
-       (progn
-         (log:debug "Tlog ~A transaction ~A could not commit, retrying it immediately"
-                    (~ x-log) (~ tx))
-         (go execute)))
+     re-execute
+     (clear-tlog log)
+     (go execute)
+
+     commit
+     (if (commit x-log)
+         (go done)
+         (progn
+           (log:debug "Tlog ~A transaction ~A could not commit, retrying it immediately"
+                      (~ x-log) (~ tx))
+           (go re-execute)))
      
-   done
-   (return-from run-atomic (values-list x-values))))
+     done
+     (return-from run-atomic (values-list x-values)))))
 
 
 
 
 ;;;; ** Composing
 
+;; UNFINISHED!
+
+#|
 (defun run-orelse (tx1 tx2)
   (declare (type function tx1 tx2))
+
   (prog (log1 log2 x-values)
 
-   execute-tx1
-   (setq log1 nil
+   initialize
+   (setq log1 (new 'tlog)
          log2 nil)
-   (multiple-value-bind (retry? log values) (run-once tx1)
+   (go execute-tx1)
+
+   execute-tx1
+   (multiple-value-bind (retry? log values) (run-once tx1 log1)
      (setf log1 log)
      (if retry?
          (progn
@@ -166,9 +182,9 @@ until at least one of them changes."
                         (~ log1) (~ tx1) (~ tx2))
              (go execute-tx2))
            (go done)))
-
+   
    execute-tx2
-   (multiple-value-bind (retry? log values) (run-once tx2)
+   (multiple-value-bind (retry? log values) (run-once tx2 log2)
      (setf log2 log)
      (if retry?
          (progn
@@ -215,6 +231,26 @@ atomically from left to right until one succeeds.
 Returns the value of the transaction that succeeds."
   (reduce [list 'orelse] body :from-end t))
 
+|#
+
+
+
+;; Copyright (c) 2013, Massimiliano Ghilardi
+;; This file is part of STMX.
+;;
+;; STMX is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU Lesser General Public License
+;; as published by the Free Software Foundation, either version 3
+;; of the License, or (at your option) any later version.
+;;
+;; STMX is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty
+;; of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+;; See the GNU Lesser General Public License for more details.
+;;
+;; You should have received a copy of the GNU Lesser General Public
+;; License along with STMX. If not, see <http://www.gnu.org/licenses/>.
+
 
 
 ;; Copyright (c) 2006 Hoan Ton-That
@@ -246,21 +282,3 @@ Returns the value of the transaction that succeeds."
 ;; THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 ;; (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ;; OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-
-
-;; Copyright (c) 2013, Massimiliano Ghilardi
-;; This file is part of STMX.
-;;
-;; STMX is free software: you can redistribute it and/or modify
-;; it under the terms of the GNU Lesser General Public License
-;; as published by the Free Software Foundation, either version 3
-;; of the License, or (at your option) any later version.
-;;
-;; STMX is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty
-;; of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-;; See the GNU Lesser General Public License for more details.
-;;
-;; You should have received a copy of the GNU Lesser General Public
-;; License along with STMX. If not, see <http://www.gnu.org/licenses/>.

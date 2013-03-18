@@ -219,6 +219,25 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
         (apply #'call-next-method instance slot-names initargs)))))
 
 
+
+;; Copyright (c) 2013, Massimiliano Ghilardi
+;; This file is part of STMX.
+;;
+;; STMX is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU Lesser General Public License
+;; as published by the Free Software Foundation, either version 3
+;; of the License, or (at your option) any later version.
+;;
+;; STMX is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty
+;; of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+;; See the GNU Lesser General Public License for more details.
+;;
+;; You should have received a copy of the GNU Lesser General Public
+;; License along with STMX. If not, see <http://www.gnu.org/licenses/>.
+
+
+
 ;; Copyright (c) 2006 Hoan Ton-That
 ;; All rights reserved.
 ;;
@@ -248,21 +267,3 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
 ;; THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 ;; (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ;; OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-
-
-;; Copyright (c) 2013, Massimiliano Ghilardi
-;; This file is part of STMX.
-;;
-;; STMX is free software: you can redistribute it and/or modify
-;; it under the terms of the GNU Lesser General Public License
-;; as published by the Free Software Foundation, either version 3
-;; of the License, or (at your option) any later version.
-;;
-;; STMX is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty
-;; of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-;; See the GNU Lesser General Public License for more details.
-;;
-;; You should have received a copy of the GNU Lesser General Public
-;; License along with STMX. If not, see <http://www.gnu.org/licenses/>.

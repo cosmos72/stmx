@@ -38,6 +38,7 @@
            #:write-chan))
 
 
+
 ;; Copyright (c) 2013, Massimiliano Ghilardi
 ;; This file is part of STMX.
 ;;
@@ -53,8 +54,6 @@
 ;;
 ;; You should have received a copy of the GNU Lesser General Public
 ;; License along with STMX. If not, see <http://www.gnu.org/licenses/>.
-
-
 
 
 

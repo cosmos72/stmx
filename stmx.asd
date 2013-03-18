@@ -12,18 +12,20 @@
                :log4cl)
 
   :components ((:static-file "stmx.asd")
-               (:file "package")
-               (:file "misc"      :depends-on ("package"))
-               (:file "classes"   :depends-on ("misc"))
-               (:file "tlog"      :depends-on ("classes"))
-               (:file "tvar"      :depends-on ("tlog"))
-               (:file "tclass"    :depends-on ("tvar"))
-               (:file "atomic"    :depends-on ("tclass"))
+
+               (:module :src
+                :components ((:file "package")
+                             (:file "misc"      :depends-on ("package"))
+                             (:file "classes"   :depends-on ("misc"))
+                             (:file "tlog"      :depends-on ("classes"))
+                             (:file "tvar"      :depends-on ("tlog"))
+                             (:file "tclass"    :depends-on ("tvar"))
+                             (:file "atomic"    :depends-on ("tclass"))))
 
                (:module :util
                 :components ((:file "package")
-                             (:file "cell-obj"   :depends-on ("package"))
-                             (:file "cell-tvar"  :depends-on ("package"))
+                             (:file "cell-obj"  :depends-on ("package"))
+                             (:file "cell-tvar" :depends-on ("package"))
 #|
                              (:file "chan")
                              (:file "counter")
@@ -31,7 +33,7 @@
                              (:file "utils")
 |#
                              )
-                :depends-on ("atomic"))))
+                :depends-on (:src))))
 
 
 (asdf:defsystem :stmx.test

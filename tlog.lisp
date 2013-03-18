@@ -120,7 +120,7 @@ b) another TLOG is writing the same TVARs being committed
 
 
 (defun listen-tvars-of (log)
-  "Listen on tqvars, i.e. register to get notified if they change.
+  "Listen on tvars, i.e. register to get notified if they change.
 
 Return t if log is valid and wait-tlog should sleep, otherwise return nil."
 

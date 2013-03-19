@@ -74,8 +74,8 @@ understand.
 For the *very* impatient, STMX offers four Lisp special forms (macros)
 and a function:
 
-- `TRANSACTIONAL` declares that a class is transactional, i.e. that it
-  contains transactional slots. Use it to wrap a class definition:
+- `TRANSACTIONAL` declares that a class is transactional, i.e. that its
+  slots contain transactional data. Use it to wrap a class definition:
   
         (transactional
           (defclass foo ()
@@ -125,20 +125,22 @@ and a function:
   As described in the summary, transactions will commit if they return normally,
   while they will rollback if they signal an error or condition.
 
-  RETRY offers a third option: if invoked inside a transaction, it tells
-  STMX that the transaction cannot complete immediately, for example
-  because some data is not available, and instructs STMX to re-execute
-  the transaction from scratch after the data has changed.
+  The `(retry)` function call offers a third option: if invoked inside
+  a transaction, it tells STMX that the transaction cannot complete
+  immediately, for example because some data is currently not
+  available, and instructs STMX to re-execute the transaction from
+  scratch after the data has changed.
 
-  How does RETRY know which data it should monitor for changes?
-  Simple: it will monitor *all* transactional slots (i.e. slots of
+  How does `(retry)` know which data it should monitor for changes?
+  Simple: it will monitor *all* transactional data (including slots of
   transactional objects) that were read since the beginning of the
-  transaction and until (retry) was invoked. 
+  transaction and until `(retry)` was invoked. 
 
   With RETRY, reliable communication among threads is (hopefully)
   extremely simple to implement: one thread can read one (or more)
   transactional objects, checking for values that some other thread
-  will write there, and just RETRY if no values are there yet.
+  will write there, and just `(retry)` if no appropriate values are
+  there yet.
 
 - `ORELSE` is a macro to combine two or more transactions as alternatives:
   if the first retries, the second will be executed and so on, until one
@@ -156,7 +158,7 @@ seems to be abandoned since 2006. A new one will be created as soon as possible.
 Status
 ------
 
-STMX is being written by Massimiliano Ghilardi.
+As of March 2013, STMX is being written by Massimiliano Ghilardi.
 
 STMX is a rewrite of CL-STM, which has been developed by Hoan Ton-That
 for the Google Summer of Code 2006.

@@ -18,7 +18,7 @@ Finally, it just so happens that transactions run in parallel,
 and are re-executed from the beginning if there are conflicts.
 
 STM gives freedom from deadlocks, automatic roll-back on failure,
-and it resolves the tension between granularity and concurrency.
+and it aims at resolving the tension between granularity and concurrency.
 
 
 Installation and loading
@@ -30,21 +30,31 @@ resolve and download STMX dependencies.
 
 Once quicklisp is installed, download STMX into your Quicklisp
 local-projects folder with the commands:
+
     $ cd ~/quicklisp/local-projects
     $ git clone git://github.com/cosmos72/stmx.git
+
 then load a REPL and run:
+
      CL-USER> (ql:quickload "stmx")
+     
 If all goes well, it will automatically download and install STMX dependencies:
+
 - `bordeaux-threads`
 - `closer-mop`
 - `arnesi`
+
 then it will load STMX and be ready to use.
 
 In case you get errors:
+
 - check that quicklisp is installed correctly, for example by executing at REPL:
+
      CL-USER> (ql:quickload "arnesi")
-- check that STMX is downloaded into your Quicklisp local-projects
-folder, usually `~/quicklisp/local-projects`
+
+- check that you downloaded STMX and uncompressed it, creating an
+  stmx/ folder, inside your Quicklisp local-projects folder, usually
+  `~/quicklisp/local-projects`
 
 
 Documentation
@@ -64,7 +74,8 @@ For the *very* impatient, STMX offers four Lisp special forms (macros)
 and a function:
 
 - TRANSACTIONAL declares that a class is transactional, i.e. that it
-contains transactional slots. Use it to wrap a class definition:
+  contains transactional slots. Use it to wrap a class definition:
+  
     (transactional
       (defclass foo ()
         ((value1 :type integer)
@@ -73,14 +84,17 @@ contains transactional slots. Use it to wrap a class definition:
         )))
 
 - TRANSACTION declares that a method or function is an atomic
-transaction, and is actually just a convenience macro for ATOMIC.
-Use it to wrap a function definition
+  transaction, and is actually just a convenience macro for ATOMIC.
+  Use it to wrap a function definition
+  
     (transaction
       (defun bar (x y)
         (format t "hello from atomic function bar ~A ~A~%" x y)
         ;; ...
       ))
-or a method definition
+      
+  or a method definition
+  
     (transaction
       (defmethod baz (x y)
         (format t "hello from atomic method baz ~A ~A~%" x y)
@@ -88,7 +102,8 @@ or a method definition
       ))
 
 - ATOMIC is the main macro: it wraps Lisp forms into a transaction.
-The above function and method could also be written as:
+  The above functions and methods could also be written as:
+  
     (defun bar (x y)
       (atomic
         (format t "hello from atomic function bar ~A ~A~%" x y)
@@ -100,34 +115,36 @@ The above function and method could also be written as:
         (format t "hello from atomic method baz ~A ~A~%" x y)
         ;; ...
       ))
-with the difference that `atomic` is not limited to functions and
-methods: it can be used to wrap *any* list of forms (it contains an
-implicit `progn`).
+      
+  with the difference that `atomic` is not limited to functions and
+  methods: it can be used to wrap *any* list of forms (it contains an
+  implicit `progn`).
 
 - RETRY is a function. It is more tricky to understand, but really powerful.
-As described in the summary, transactions will commit if they return normally,
-while they will rollback if they signal an error or condition.
+  As described in the summary, transactions will commit if they return normally,
+  while they will rollback if they signal an error or condition.
 
-RETRY offers a third option: if invoked inside a transaction, it tells
-STMX that the transaction cannot complete immediately, for example
-because some data is not available, and instructs STMX to re-execute
-the transaction from scratch after the data has changed.
+  RETRY offers a third option: if invoked inside a transaction, it tells
+  STMX that the transaction cannot complete immediately, for example
+  because some data is not available, and instructs STMX to re-execute
+  the transaction from scratch after the data has changed.
 
-How does RETRY know which data it should monitor for changes?
-Simple: it will monitor *all* transactional slots that were read since the
-beginning of the transaction and until (retry) was invoked.
+  How does RETRY know which data it should monitor for changes?
+  Simple: it will monitor *all* transactional slots (i.e. slots of
+  transactional objects) that were read since the beginning of the
+  transaction and until (retry) was invoked. 
 
-With RETRY, reliable communication among threads is (hopefully) extremely
-simple to implement: one thread can read one (or more) transactional 
-objects, checking for values that some other thread will write there, and
-just RETRY if no values are there yet.
+  With RETRY, reliable communication among threads is (hopefully)
+  extremely simple to implement: one thread can read one (or more)
+  transactional objects, checking for values that some other thread
+  will write there, and just RETRY if no values are there yet.
 
 - ORELSE is a macro to combine two or more transactions as alternatives:
-if the first retries, the second will be executed and so on, until one
-transaction either commits (returns normally) or rollbacks (signals an error
-or condition).
+  if the first retries, the second will be executed and so on, until one
+  transaction either commits (returns normally) or rollbacks (signals an error
+  or condition).
 
-NOTE: ORELSE IS NOT YET IMPLEMENTED.
+  NOTE: ORELSE IS NOT YET IMPLEMENTED.
 
 Mailing List
 ------------

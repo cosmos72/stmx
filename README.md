@@ -40,20 +40,21 @@ then load a REPL and run:
      
 If all goes well, it will automatically download and install STMX dependencies:
 
-- `bordeaux-threads`
-- `closer-mop`
 - `arnesi`
+- `closer-mop`
+- `bordeaux-threads`
 
 then it will load STMX and be ready to use.
 
 In case you get errors:
 
-- check that quicklisp is installed correctly, for example by executing at REPL:
+- check that quicklisp is installed correctly, for example by executing at
+  REPL:
 
-     CL-USER> (ql:quickload "arnesi")
+       CL-USER> (ql:quickload "arnesi")
 
 - check that you downloaded STMX and uncompressed it, creating an
-  stmx/ folder, inside your Quicklisp local-projects folder, usually
+  `stmx/` folder, inside your Quicklisp local-projects folder, usually
   `~/quicklisp/local-projects`
 
 
@@ -73,48 +74,48 @@ understand.
 For the *very* impatient, STMX offers four Lisp special forms (macros)
 and a function:
 
-- TRANSACTIONAL declares that a class is transactional, i.e. that it
+- `TRANSACTIONAL` declares that a class is transactional, i.e. that it
   contains transactional slots. Use it to wrap a class definition:
   
-    (transactional
-      (defclass foo ()
-        ((value1 :type integer)
-         (value2 :type string)
-         ;; ...
-        )))
+      (transactional
+        (defclass foo ()
+          ((value1 :type integer)
+           (value2 :type string)
+           ;; ...
+          )))
 
 - TRANSACTION declares that a method or function is an atomic
   transaction, and is actually just a convenience macro for ATOMIC.
   Use it to wrap a function definition
   
-    (transaction
-      (defun bar (x y)
-        (format t "hello from atomic function bar ~A ~A~%" x y)
-        ;; ...
-      ))
+      (transaction
+        (defun bar (x y)
+          (format t "hello from atomic function bar ~A ~A~%" x y)
+          ;; ...
+        ))
       
   or a method definition
   
-    (transaction
-      (defmethod baz (x y)
-        (format t "hello from atomic method baz ~A ~A~%" x y)
-        ;; ...
-      ))
+      (transaction
+        (defmethod baz (x y)
+          (format t "hello from atomic method baz ~A ~A~%" x y)
+          ;; ...
+        ))
 
 - ATOMIC is the main macro: it wraps Lisp forms into a transaction.
   The above functions and methods could also be written as:
   
-    (defun bar (x y)
-      (atomic
-        (format t "hello from atomic function bar ~A ~A~%" x y)
-        ;; ...
-      ))
+      (defun bar (x y)
+        (atomic
+          (format t "hello from atomic function bar ~A ~A~%" x y)
+          ;; ...
+        ))
       
-    (defmethod baz (x y)
-      (atomic
-        (format t "hello from atomic method baz ~A ~A~%" x y)
-        ;; ...
-      ))
+      (defmethod baz (x y)
+        (atomic
+          (format t "hello from atomic method baz ~A ~A~%" x y)
+          ;; ...
+        ))
       
   with the difference that `atomic` is not limited to functions and
   methods: it can be used to wrap *any* list of forms (it contains an

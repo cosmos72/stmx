@@ -37,6 +37,8 @@ local-projects folder with the commands:
 then load a REPL and run:
 
      CL-USER> (ql:quickload "stmx")
+     [...]
+     CL-USER> (use-package :stmx)
      
 If all goes well, it will automatically download and install STMX dependencies:
 

@@ -4,29 +4,28 @@ STMX
 Summary
 -------
 
-STMX is an extension of Common Lisp to support composable Software
-Transactional Memory. Transactional Memory makes concurrent programming
-easier to write and understand, and possibly qualitatively better.
-Instead of traditional lock-based programming, you program with atomic
+STMX is a high-performance implementation of composable Software Transactional
+Memory (STM) for Common Lisp. Transactional Memory aims at making concurrent
+programming easier to write and understand, and possibly qualitatively better.
+Instead of traditional lock-based programming, one programs with atomic
 transactions. Atomic transactions can be composed together to make larger
 atomic transactions.
 
-A transaction gets committed if it returns normally it, while it gets
-rolled back if it signals an error (and the error is propagated to the caller).
+A transaction gets committed if it returns normally, while it gets rolled
+back if it signals an error (and the error is propagated to the caller).
 
-Finally, it just so happens that transactions run in parallel,
+Finally, transactions can safely run in parallel in different threads,
 are re-executed from the beginning if there are conflicts, and effects
-of a transaction are not visible in other threads until it commits.
+of a transaction are not visible from other threads until it commits.
 
 STM gives freedom from deadlocks, automatic roll-back on failure,
 and it aims at resolving the tension between granularity and concurrency.
 
-
 Installation and loading
 ------------------------
 
-STMX is packaged with asdf. The simplest way to install STMX is to
-first install [Quicklisp](http://www.quicklisp.org), as it can automatically
+STMX is packaged with asdf. The simplest way to install it is to first
+install [Quicklisp](http://www.quicklisp.org), as it can automatically
 resolve and download STMX dependencies.
 
 Once quicklisp is installed, download STMX into your Quicklisp
@@ -54,8 +53,8 @@ In case you get errors:
 
        CL-USER> (ql:quickload "arnesi")
 
-- check that you downloaded STMX and uncompressed it, creating an
-  `stmx/` folder, inside your Quicklisp local-projects folder, usually
+- check that you downloaded STMX creating an `stmx/` folder, inside
+  your Quicklisp local-projects folder, usually
   `~/quicklisp/local-projects`
 
 
@@ -63,7 +62,9 @@ Documentation
 -------------
 
 [Composable Memory Transactions](http://research.microsoft.com/~simonpj/papers/stm/stm.pdf)
-gives a very good - though a bit technical - explanation of transactions and how they are used and combined.
+is a very good - though a bit technical - explanation of transactions and
+how they are used and combined. For the interested reader, it also goes in
+deep detail on how to actually implement memory transactions.
 
 Basic usage
 -----------
@@ -73,7 +74,7 @@ examples and utilities build with STMX, and should be quite easy to
 understand.
 
 For the *very* impatient, STMX offers four Lisp special forms (macros)
-and a function:
+and one function:
 
 - `TRANSACTIONAL` declares that a class is transactional, i.e. that its
   slots contain transactional data. Use it to wrap a class definition:

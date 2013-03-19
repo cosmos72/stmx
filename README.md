@@ -15,7 +15,8 @@ A transaction gets committed if it returns normally it, while it gets
 rolled back if it signals an error (and the error is propagated to the caller).
 
 Finally, it just so happens that transactions run in parallel,
-and are re-executed from the beginning if there are conflicts.
+are re-executed from the beginning if there are conflicts, and effects
+of a transaction are not visible in other threads until it commits.
 
 STM gives freedom from deadlocks, automatic roll-back on failure,
 and it aims at resolving the tension between granularity and concurrency.
@@ -79,41 +80,53 @@ and a function:
   
         (transactional
           (defclass foo ()
-            ((value1 :type integer)
-             (value2 :type string)
+            ((value1 :type integer :accessor :value1-of)
+             (value2 :type string  :accessor :value2-of)
              ;; ...
             )))
 
 - `TRANSACTION` declares that a method or function is an atomic
-  transaction, and is actually just a convenience macro for ATOMIC.
-  Use it to wrap a function definition
+  transaction, and is actually just a convenience macro for `ATOMIC`.
+  Use it to wrap a function definition:
   
         (transaction
-          (defun bar (x y)
-            (format t "hello from atomic function bar ~A ~A~%" x y)
+          (defun bar (obj)
+            (declare (type foo obj))
+            (format t "atomic function bar: foo is ~A ~A~%"
+              (value1-of obj) (value2-of obj))
             ;; ...
           ))
       
-  or a method definition
+  or a method definition:
   
         (transaction
-          (defmethod baz (x y)
-            (format t "hello from atomic method baz ~A ~A~%" x y)
+          (defmethod baz ((obj foo) value1 value2)
+            (declare (type integer value1)
+                     (type string value2))
+            (setf (value1-of obj) value1)
+            (setf (value2-of obj) value2)
+            (format t "atomic method baz: foo is now ~A ~A~%" value1 value2)
             ;; ...
           ))
 
 - `ATOMIC` is the main macro: it wraps Lisp forms into a transaction.
   The above functions and methods could also be written as:
   
-        (defun bar (x y)
+        (defun bar (obj)
+          (declare (type foo obj))
           (atomic
-            (format t "hello from atomic function bar ~A ~A~%" x y)
+            (format t "atomic function bar: foo is ~A ~A~%"
+              (value1-of obj) (value2-of obj))
             ;; ...
           ))
       
-        (defmethod baz (x y)
+        (defmethod baz ((obj foo) value1 value2)
+          (declare (type integer value1)
+                   (type string value2))
           (atomic
-            (format t "hello from atomic method baz ~A ~A~%" x y)
+            (setf (value1-of obj) value1)
+            (setf (value2-of obj) value2)
+            (format t "atomic method baz: foo is now ~A ~A~%" value1 value2)
             ;; ...
           ))
       
@@ -127,9 +140,9 @@ and a function:
 
   The `(retry)` function call offers a third option: if invoked inside
   a transaction, it tells STMX that the transaction cannot complete
-  immediately, for example because some data is currently not
-  available, and instructs STMX to re-execute the transaction from
-  scratch after the data has changed.
+  immediately, for example because some necessary data is not
+  currently available, and instructs STMX to re-execute the
+  transaction from scratch after the data has changed.
 
   How does `(retry)` know which data it should monitor for changes?
   Simple: it will monitor *all* transactional data (including slots of
@@ -137,8 +150,8 @@ and a function:
   transaction and until `(retry)` was invoked. 
 
   With RETRY, reliable communication among threads is (hopefully)
-  extremely simple to implement: one thread can read one (or more)
-  transactional objects, checking for values that some other thread
+  extremely simple to implement: a thread can read one (or more)
+  transactional data, checking for values that some other thread
   will write there, and just `(retry)` if no appropriate values are
   there yet.
 

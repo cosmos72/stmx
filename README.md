@@ -77,51 +77,51 @@ and a function:
 - `TRANSACTIONAL` declares that a class is transactional, i.e. that it
   contains transactional slots. Use it to wrap a class definition:
   
-      (transactional
-        (defclass foo ()
-          ((value1 :type integer)
-           (value2 :type string)
-           ;; ...
-          )))
+        (transactional
+          (defclass foo ()
+            ((value1 :type integer)
+             (value2 :type string)
+             ;; ...
+            )))
 
-- TRANSACTION declares that a method or function is an atomic
+- `TRANSACTION` declares that a method or function is an atomic
   transaction, and is actually just a convenience macro for ATOMIC.
   Use it to wrap a function definition
   
-      (transaction
-        (defun bar (x y)
-          (format t "hello from atomic function bar ~A ~A~%" x y)
-          ;; ...
-        ))
+        (transaction
+          (defun bar (x y)
+            (format t "hello from atomic function bar ~A ~A~%" x y)
+            ;; ...
+          ))
       
   or a method definition
   
-      (transaction
-        (defmethod baz (x y)
-          (format t "hello from atomic method baz ~A ~A~%" x y)
-          ;; ...
-        ))
+        (transaction
+          (defmethod baz (x y)
+            (format t "hello from atomic method baz ~A ~A~%" x y)
+            ;; ...
+          ))
 
-- ATOMIC is the main macro: it wraps Lisp forms into a transaction.
+- `ATOMIC` is the main macro: it wraps Lisp forms into a transaction.
   The above functions and methods could also be written as:
   
-      (defun bar (x y)
-        (atomic
-          (format t "hello from atomic function bar ~A ~A~%" x y)
-          ;; ...
-        ))
+        (defun bar (x y)
+          (atomic
+            (format t "hello from atomic function bar ~A ~A~%" x y)
+            ;; ...
+          ))
       
-      (defmethod baz (x y)
-        (atomic
-          (format t "hello from atomic method baz ~A ~A~%" x y)
-          ;; ...
-        ))
+        (defmethod baz (x y)
+          (atomic
+            (format t "hello from atomic method baz ~A ~A~%" x y)
+            ;; ...
+          ))
       
   with the difference that `atomic` is not limited to functions and
   methods: it can be used to wrap *any* list of forms (it contains an
   implicit `progn`).
 
-- RETRY is a function. It is more tricky to understand, but really powerful.
+- `RETRY` is a function. It is more tricky to understand, but really powerful.
   As described in the summary, transactions will commit if they return normally,
   while they will rollback if they signal an error or condition.
 
@@ -140,7 +140,7 @@ and a function:
   transactional objects, checking for values that some other thread
   will write there, and just RETRY if no values are there yet.
 
-- ORELSE is a macro to combine two or more transactions as alternatives:
+- `ORELSE` is a macro to combine two or more transactions as alternatives:
   if the first retries, the second will be executed and so on, until one
   transaction either commits (returns normally) or rollbacks (signals an error
   or condition).

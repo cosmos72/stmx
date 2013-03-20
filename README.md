@@ -75,8 +75,7 @@ For the impatient, see the [util](util) folder, which contains several
 examples and utilities build with STMX, and should be quite easy to
 understand.
 
-For the *very* impatient, STMX offers four Lisp special forms (macros)
-and one function:
+For the *very* impatient, STMX offers the following Lisp macros and functions:
 
 - `TRANSACTIONAL` declares that a class is transactional, i.e. that its
   slots contain transactional data. Use it to wrap a class definition:
@@ -158,12 +157,27 @@ and one function:
   will write there, and just `(retry)` if no appropriate values are
   there yet.
 
-- `ORELSE` is a macro to combine two or more transactions as alternatives:
+- `ORELSE` is a macro to combine two transactions as alternatives:
   if the first retries, the second will be executed and so on, until one
   transaction either commits (returns normally) or rollbacks (signals an error
   or condition).
 
-  NOTE: ORELSE IS NOT YET IMPLEMENTED.
+- `TRY` is the n-ary version of `ORELSE`: it combines two *or more*
+  transactions as alternatives
+
+- `NONBLOCKING` is an utility macro based on `ORELSE` to convert a blocking
+  transaction into another that returns NIL instead of blocking
+  (and otherwise returns T followed by the values or the original transaction)
+  
+        (nonblocking (x) (y) (z))
+        
+  basically expands to
+  
+        (orelse (values t (progn (x) (y) (z))) nil)
+        
+  with the difference that (nonblocking ...) actually captures all the values
+  returned by the transaction, not just the first as in the example above.
+
 
 Mailing List
 ------------

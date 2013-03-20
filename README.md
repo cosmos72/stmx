@@ -5,17 +5,16 @@ Summary
 -------
 
 STMX is a high-performance implementation of composable Software Transactional
-Memory (STM) for Common Lisp. Transactional Memory aims at making concurrent
-programming easier to write and understand, and possibly qualitatively better.
-Instead of traditional lock-based programming, one programs with atomic
-transactions. Atomic transactions can be composed together to make larger
-atomic transactions.
+Memory (STM) for Common Lisp. STM is a concurrency control mechanism aimed
+at making concurrent programming easier to write and understand. Instead of
+traditional lock-based programming, one programs with atomic transactions.
+Atomic transactions can be composed together to make larger atomic transactions.
 
 A transaction gets committed if it returns normally, while it gets rolled
 back if it signals an error (and the error is propagated to the caller).
 
 Finally, transactions can safely run in parallel in different threads,
-are re-executed from the beginning if there are conflicts, and effects
+are re-executed from the beginning in case of conflicts, and effects
 of a transaction are not visible from other threads until it commits.
 
 STM gives freedom from deadlocks, automatic roll-back on failure,
@@ -55,9 +54,8 @@ In case you get errors:
 
        CL-USER> (ql:quickload "arnesi")
 
-- check that you downloaded STMX creating an `stmx/` folder, inside
-  your Quicklisp local-projects folder, usually
-  `~/quicklisp/local-projects`
+- check that you downloaded STMX creating an `stmx/` folder inside
+  your Quicklisp local-projects folder, usually `~/quicklisp/local-projects`
 
 
 Documentation
@@ -148,7 +146,7 @@ For the *very* impatient, STMX offers the following Lisp macros and functions:
 
   How does `(retry)` know which data it should monitor for changes?
   Simple: it will monitor *all* transactional data (including slots of
-  transactional objects) that were read since the beginning of the
+  transactional objects) that was read since the beginning of the
   transaction and until `(retry)` was invoked. 
 
   With RETRY, reliable communication among threads is (hopefully)
@@ -188,7 +186,14 @@ seems to be abandoned since 2006. A new one will be created as soon as possible.
 Status
 ------
 
-As of March 2013, STMX is being written by Massimiliano Ghilardi.
+As of March 2013, STMX is being written by Massimiliano Ghilardi
+and is considered by the author to be in BETA status.
 
-STMX is a rewrite of CL-STM, which has been developed by Hoan Ton-That
+STMX is a full rewrite of CL-STM, which has been developed by Hoan Ton-That
 for the Google Summer of Code 2006.
+
+Legal
+-----
+
+STMX is released under the terms of the [Lisp Lesser General Public
+License](http://opensource.franz.com/preamble.html), known as the LLGPL.

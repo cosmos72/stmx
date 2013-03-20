@@ -1,5 +1,18 @@
 ;; -*- lisp -*-
 
+;; This file is part of STMX.
+;; Copyright (c) 2013 Massimiliano Ghilardi
+;;
+;; This library is free software: you can redistribute it and/or
+;; modify it under the terms of the Lisp Lesser General Public License
+;; (http://opensource.franz.com/preamble.html), known as the LLGPL.
+;;
+;; This library is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty
+;; of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+;; See the Lisp Lesser General Public License for more details.
+
+
 (in-package :stmx)
 
 ;;;; * Transactional classes
@@ -13,36 +26,36 @@
 Classes defined with this metaclass have extra slot options,
 see the class TRANSACTIONAL-DIRECT-SLOT for details."))
 
+
 (defclass transactional-direct-slot (standard-direct-slot-definition)
   ((transactional :accessor slot-transactional
                   :initarg :transactional
-                  :initform t))
+                  :initform t
+                  :type boolean))
   (:documentation "The class for direct slots of transactional classes.
 
-Other than the initargs for standard slots the following
+Beyond the normal initargs for standard slots, the following
 options can be passed to component slots:
 
-:transactional [ T | NIL ] - Specify whether this slot is a
-transactional slot and that all reads and writes should be
-committed to log. If :transactional [ T | NIL ] is not specified,
-the slot is transactional"))
+:transactional [ T | NIL ] - Specify whether this slot is transactional.
+- If true, all reads and writes will be transactional.
+- If not specified, the default is to make a transactional slot."))
+
+
 
 (defclass transactional-effective-slot (standard-effective-slot-definition)
   ((transactional :accessor slot-transactional
-                  :initarg :transactional))
-  (:documentation "The class for effective slots of transactional
-classes.
+                  :initarg :transactional
+                  :type boolean))
+  (:documentation "The class for effective slots of transactional classes.
+Exactly analogous to TRANSACTIONAL-DIRECT-SLOT."))
 
-Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
-
-
-
-;;;; ** Inheritance
 
 (defmethod validate-superclass ((class transactional-class)
                                 (superclass standard-class))
   (declare (ignore class superclass))
   t)
+
 
 ;;;; ** Slot definitions
 
@@ -105,9 +118,8 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
        obj)
     
       ;; Return the value inside the TVAR.
-      ;; During transactions, reading of the tvar (which is found with
-      ;; `call-next-method') is recorded to the current tlog.
-      ((or (recording?) (returning?))
+      ;; During transactions, reading from tvars is recorded to the current tlog.
+      ((or (recording?) (hide-tvars?))
        ($ (the tvar obj)))
     
       (t
@@ -115,11 +127,11 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
        (the tvar obj)))))
 
 
+(declaim (inline slot-raw-tvar))
 (defun slot-raw-tvar (class instance slot)
-  "Return the raw tvar stored in a transactional slot"
-  (without-recording
-    (without-returning
-      (slot-value-using-class class instance slot))))
+  "Return the raw tvar stored in a transactional slot."
+  (without-recording-with-show-tvars
+    (slot-value-using-class class instance slot)))
 
 (defmethod (setf slot-value-using-class) (value    (class transactional-class)
                                           instance (slot transactional-effective-slot))
@@ -127,9 +139,9 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
     ((not (slot-transactional slot))
      (call-next-method))
     
-    ((or (recording?) (returning?))
+    ((or (recording?) (hide-tvars?))
      ;; Get the tvar from the slot and write inside it.
-     ;; During transactions, writing of the tvar is recorded into the current tlog.
+     ;; During transactions, writing tvars is recorded into the current tlog.
      (let1 var (slot-raw-tvar class instance slot)
        (setf ($ var) value)))
       
@@ -145,7 +157,7 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
     ((not (slot-transactional slot))
      (call-next-method))
     
-    ((or (recording?) (returning?))
+    ((or (recording?) (hide-tvars?))
      ;; Get the tvar from the slot, and return true if it is bound to a value.
      ;; During transactions, the checking whether the tvar is bound
      ;; is recorded to the current tlog.
@@ -162,7 +174,7 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
     ((not (slot-transactional slot))
      (call-next-method))
     
-    ((or (recording?) (returning?))
+    ((or (recording?) (hide-tvars?))
      ;; Get the tvar from the slot, and unbind its value.
      ;; During transactions, unbinding the tvar is recorded into the current tlog.
      (unbind-$ (slot-raw-tvar class instance slot)))
@@ -172,6 +184,9 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
      (call-next-method))))
 
 
+
+;;;; ** Inheritance and initialization
+
 (defclass transactional-object ()
   ()
   (:metaclass transactional-class)
@@ -179,14 +194,10 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
 
 
 
-
-;;;; ** Defining
-
-
 (let1 transactional-object-class (find-class 'transactional-object)
   (defmethod compute-class-precedence-list ((class transactional-class))
-    ;; add transactional-object as the first superclass of a transactional object
-    ;; if not already present in the superclass list
+    "Add transactional-object as the first superclass of a transactional object
+if not already present in the superclass list."
     (let1 superclasses (call-next-method)
       (if (member transactional-object-class superclasses)
 	  superclasses
@@ -196,11 +207,9 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
 
 
 
-;;;; ** Initializing
-
 (defmethod shared-initialize ((instance transactional-object)
                               slot-names &rest initargs)
-  ;; For every transactional slot we turn its initarg into a tvar.
+  "For every transactional slot, turn its initarg into a tvar."
   (let1 initargs (copy-list initargs)
     (dolist (slot (class-slots (class-of instance)))
       ;; Only check those where `slot-transactional' is true.
@@ -211,59 +220,7 @@ Exactly like TRANSACTIONAL-EFFECTIVE-SLOT."))
             (when fragment
               (setf (first fragment) (new 'tvar :value (first fragment))))))))
 
-    ;; We turn off recording in the initialization so that any slot
-    ;; changes are NOT recorded to the log.
-    ;; We turn off returning so that (setf slot-value) will set the tvar, not its contents
-    (without-recording
-      (without-returning
-        (apply #'call-next-method instance slot-names initargs)))))
-
-
-
-;; Copyright (c) 2013, Massimiliano Ghilardi
-;; This file is part of STMX.
-;;
-;; STMX is free software: you can redistribute it and/or modify
-;; it under the terms of the GNU Lesser General Public License
-;; as published by the Free Software Foundation, either version 3
-;; of the License, or (at your option) any later version.
-;;
-;; STMX is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty
-;; of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-;; See the GNU Lesser General Public License for more details.
-;;
-;; You should have received a copy of the GNU Lesser General Public
-;; License along with STMX. If not, see <http://www.gnu.org/licenses/>.
-
-
-
-;; Copyright (c) 2006 Hoan Ton-That
-;; All rights reserved.
-;;
-;; Redistribution and use in source and binary forms, with or without
-;; modification, are permitted provided that the following conditions are
-;; met:
-;;
-;;  - Redistributions of source code must retain the above copyright
-;;    notice, this list of conditions and the following disclaimer.
-;;
-;;  - Redistributions in binary form must reproduce the above copyright
-;;    notice, this list of conditions and the following disclaimer in the
-;;    documentation and/or other materials provided with the distribution.
-;;
-;;  - Neither the name of Hoan Ton-That, nor the names of its
-;;    contributors may be used to endorse or promote products derived
-;;    from this software without specific prior written permission.
-;;
-;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-;; "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-;; LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-;; A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT
-;; OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-;; SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-;; LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-;; DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-;; THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-;; (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-;; OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+    ;; Disable recording so that slots initialization is NOT recorded to the log.
+    ;; Show-tvars so that (setf slot-value) will set the tvar, not its contents
+    (without-recording-with-show-tvars
+      (apply #'call-next-method instance slot-names initargs))))

@@ -1,5 +1,18 @@
 ;; -*- lisp -*-
 
+;; This file is part of STMX.
+;; Copyright (c) 2013 Massimiliano Ghilardi
+;;
+;; This library is free software: you can redistribute it and/or
+;; modify it under the terms of the Lisp Lesser General Public License
+;; (http://opensource.franz.com/preamble.html), known as the LLGPL.
+;;
+;; This library is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty
+;; of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+;; See the Lisp Lesser General Public License for more details.
+
+
 (in-package :stmx)
 
 (eval-always
@@ -70,34 +83,34 @@ until at least one of them changes."
 (defun run-once (tx log)
   (declare (type function tx)
            (type tlog log))
-  (with-tlog log
-    (with-recording
 
-      (when (log:debug)
-        (let1 parent (parent-of log)
-          (if parent
-              (log:debug "Tlog ~A {~A} starting, parent is tlog ~A"
-                         (~ log) (~ tx) (~ parent))
-              (log:debug "Tlog ~A {~A} starting" (~ log) (~ tx)))))
+  (with-recording-to-tlog log
 
-      (let ((x-retry? nil)
-            (x-error nil)
-            (x-values nil))
-        (handler-case
-            (progn
-              (setf x-values (multiple-value-list (funcall tx)))
-              (log:trace "Tlog ~A {~A} wants to commit, returned: ~{~A ~}"
-                         (~ log) (~ tx) x-values))
-          (retry-error (err)
-            (declare (ignore err))
-            (setf x-retry? t)
-            (log:trace "Tlog ~A {~A} wants to retry"
-		       (~ log) (~ tx)))
-          (t (err)
-            (log:trace "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
-                       (~ log) (~ tx) (type-of err) (~ err))
-            (setf x-error err)))
-        (values x-retry? x-error x-values)))))
+    (when (log:debug)
+      (let1 parent (parent-of log)
+        (if parent
+            (log:debug "Tlog ~A {~A} starting, parent is tlog ~A"
+                       (~ log) (~ tx) (~ parent))
+            (log:debug "Tlog ~A {~A} starting" (~ log) (~ tx)))))
+
+    (let ((x-retry? nil)
+          (x-error nil)
+          (x-values nil))
+      (handler-case
+          (progn
+            (setf x-values (multiple-value-list (funcall tx)))
+            (log:trace "Tlog ~A {~A} wants to commit, returned: ~{~A ~}"
+                       (~ log) (~ tx) x-values))
+        (retry-error (err)
+          (declare (ignore err))
+          (setf x-retry? t)
+          (log:trace "Tlog ~A {~A} wants to retry"
+                     (~ log) (~ tx)))
+        (t (err)
+          (log:trace "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
+                     (~ log) (~ tx) (type-of err) (~ err))
+          (setf x-error err)))
+      (values x-retry? x-error x-values))))
 
 
 (defun run-atomic (tx &key id)
@@ -123,7 +136,7 @@ until at least one of them changes."
          (wait-tlog log)
          (go re-execute))
        (when err
-         (log:debug "Tlog ~A {~A} will rollback and signal" (~ log) (~ tx))
+         (log:debug "Tlog ~A {~A} will rollback and signal ~A" (~ log) (~ tx) (type-of err))
          (error err))
 
        (setf x-values values)
@@ -155,7 +168,6 @@ until at least one of them changes."
              (declare (ignore err))
              (format stream "Attempt to use ~A or ~A outside an ~A block" 'try 'orelse 'atomic))))
 
-;; UNFINISHED!
 
 (defun run-orelse (tx1 tx2 &key id1 id2)
   (declare (type function tx1 tx2))
@@ -269,7 +281,7 @@ or signals the error raised by the transaction that failed.
 
 Can only be used inside an ATOMIC block."
 
-  (reduce [list 'orelse] body :from-end t))
+  (reduce (lambda (x y) (list 'orelse x y)) body :from-end t))
 
 
 
@@ -304,53 +316,3 @@ Can only be used inside an ATOMIC block."
              (pop body)
              (pop body))
     `(run-nonblocking (lambda () ,@body) :id ,id)))
-
-
-
-;; Copyright (c) 2013, Massimiliano Ghilardi
-;; This file is part of STMX.
-;;
-;; STMX is free software: you can redistribute it and/or modify
-;; it under the terms of the GNU Lesser General Public License
-;; as published by the Free Software Foundation, either version 3
-;; of the License, or (at your option) any later version.
-;;
-;; STMX is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty
-;; of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-;; See the GNU Lesser General Public License for more details.
-;;
-;; You should have received a copy of the GNU Lesser General Public
-;; License along with STMX. If not, see <http://www.gnu.org/licenses/>.
-
-
-
-;; Copyright (c) 2006 Hoan Ton-That
-;; All rights reserved.
-;;
-;; Redistribution and use in source and binary forms, with or without
-;; modification, are permitted provided that the following conditions are
-;; met:
-;;
-;;  - Redistributions of source code must retain the above copyright
-;;    notice, this list of conditions and the following disclaimer.
-;;
-;;  - Redistributions in binary form must reproduce the above copyright
-;;    notice, this list of conditions and the following disclaimer in the
-;;    documentation and/or other materials provided with the distribution.
-;;
-;;  - Neither the name of Hoan Ton-That, nor the names of its
-;;    contributors may be used to endorse or promote products derived
-;;    from this software without specific prior written permission.
-;;
-;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-;; "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-;; LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-;; A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT
-;; OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-;; SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-;; LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-;; DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-;; THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-;; (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-;; OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

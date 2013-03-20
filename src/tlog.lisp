@@ -106,26 +106,76 @@ b) another TLOG is writing the same TVARs being committed
         (notify-tvar var)))))
 
 
-;;;; ** Merging
+;;;; ** Nesting and merging
 
 
-(defun clear-tlog (log)
-  (clrhash (reads-of log))
-  (clrhash (writes-of log))
+(defun make-tlog (&key parent)
+  "Create and return a tlog.
+
+If PARENT is not nil, it will be the parent of returned tlog"
+  (declare (type (or null tlog) parent))
+  (if parent
+      (new 'tlog :parent parent
+           :reads (copy-hash-table (reads-of parent))
+           :writes (copy-hash-table (writes-of parent)))
+      (new 'tlog)))
+
+                                            
+(defun clear-tlog (log &key parent)
+  "Remove all transactional reads and writes stored in LOG; return LOG itself.
+
+If PARENT is not nil, it will be set as the parent of LOG."
+  (declare (type tlog log)
+           (type (or null tlog) parent))
+  (reset-hash-table (reads-of log)  :defaults (when parent (reads-of parent)))
+  (reset-hash-table (writes-of log) :defaults (when parent (writes-of parent)))
   log)
 
+
+(defun make-or-clear-tlog (log &key parent)
+  "If LOG is not nil, clear it as per (clear-tlog), otherwise create a new log as per (make-tlog).
+
+In both cases the tlog is returned, and its parent is set to PARENT."
+  (declare (type (or null tlog) log parent))
+  (if log
+      (clear-tlog log :parent parent)
+      (make-tlog :parent parent)))
+
+
 (defun merge-tlogs (log1 log2)
-  ;; TODO Max: merge-tlogs must be revised when implementing orelse
+  "Merge LOG2 into LOG1; return LOG1."
+
   (declare (type tlog log1 log2))
-  (dohash (writes-of log2) var val
-    (setf (gethash var (writes-of log1)) val))
-  (dohash (reads-of log2) var ver
-    (setf (gethash var (reads-of log1))
-          (max ver
-               (aif2 (gethash var (reads-of log1))
-                     it
-                     0))))
+
+  (let ((h1 (writes-of log1))
+        (h2 (writes-of log2)))
+    (dohash h2 var val
+      (set-hash h1 var val)))
+
+  (let ((h1 (reads-of log1))
+        (h2 (reads-of log2)))
+    (dohash h2 var val
+      (set-hash h1 var val)))
+
   log1)
+
+(defun compatible-tlogs (log1 log2)
+  "Return t if LOG1 and LOG2 are compatible, i.e. if they contain
+the same values for the TVARs present in both their (reads-of)."
+
+  (declare (type tlog log1 log2))
+  (let ((reads1 (reads-of log1))
+        (reads2 (reads-of log2)))
+        
+    (when (> (hash-table-count reads1) (hash-table-count reads2))
+      (rotatef reads1 reads2))
+
+    (dohash reads1 var val
+      (unless (eq val (gethash var reads2))
+        (return-from compatible-tlogs nil)))
+    t))
+
+
 
 ;;;; ** Waiting
 
@@ -243,6 +293,10 @@ did not change, but the transaction is waiting for them to change"
   (with-lock-held ((lock-of log))
     (setf (prevent-sleep-of log) t)
     (condition-notify (semaphore-of log))))
+
+
+  
+           
 
 
 ;; Copyright (c) 2013, Massimiliano Ghilardi

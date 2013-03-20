@@ -41,12 +41,9 @@ inside (atomic ...)."
 ;;;; ** Retrying
 
 (define-condition retry-error (error)
-  ((log :type tlog
-        :reader log-of
-        :initarg :log
-        :initform (error "missing argument :log instantiating RETRY-ERROR")))
-  (:report (lambda (condition stream)
-             (declare (ignore condition))
+  ()
+  (:report (lambda (err stream)
+             (declare (ignore err))
              (format stream "Attempt to ~A outside an ~A block" 'retry 'atomic))))
 
 
@@ -56,17 +53,17 @@ inside (atomic ...)."
 Before re-executing, the transaction will wait on all variables
 that have been read so far during the transaction
 until at least one of them changes."
-  (error 'retry-error :log (current-tlog)))
+  (error 'retry-error))
 
   
 ;;;; ** Running
 
 
-(defmacro atomic (&rest args)
-  (let1 id (when (eq :id (first args))
-             (pop args)
-             (pop args))
-    `(run-atomic (lambda () ,@args) :id ,id)))
+(defmacro atomic (&rest body)
+  (let1 id (when (eq :id (first body))
+             (pop body)
+             (pop body))
+    `(run-atomic (lambda () ,@body) :id ,id)))
 
 
 
@@ -75,29 +72,35 @@ until at least one of them changes."
            (type tlog log))
   (with-tlog log
     (with-recording
-      (log:debug "Tlog ~A transaction ~A starting" (~ log) (~ tx))
+
+      (when (log:debug)
+        (let1 parent (parent-of log)
+          (if parent
+              (log:debug "Tlog ~A {~A} starting, parent is tlog ~A"
+                         (~ log) (~ tx) (~ parent))
+              (log:debug "Tlog ~A {~A} starting" (~ log) (~ tx)))))
+
       (let ((x-retry? nil)
-            (x-log log)
             (x-error nil)
             (x-values nil))
         (handler-case
             (progn
               (setf x-values (multiple-value-list (funcall tx)))
-              (log:trace "Tlog ~A transaction ~A wants to commit, returned: ~{~A ~}"
+              (log:trace "Tlog ~A {~A} wants to commit, returned: ~{~A ~}"
                          (~ log) (~ tx) x-values))
           (retry-error (err)
+            (declare (ignore err))
             (setf x-retry? t)
-            (setf x-log (log-of err))
-            (log:trace "Tlog ~A transaction ~A wants to retry"
-		       (~ x-log) (~ tx)))
+            (log:trace "Tlog ~A {~A} wants to retry"
+		       (~ log) (~ tx)))
           (t (err)
-            (log:trace "Tlog ~A transaction ~A wants to rollback, signaled ~A: ~A"
+            (log:trace "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
                        (~ log) (~ tx) (type-of err) (~ err))
             (setf x-error err)))
-        (values x-retry? x-log x-error x-values)))))
+        (values x-retry? x-error x-values)))))
 
 
-(defun run-atomic (tx &key (id nil))
+(defun run-atomic (tx &key id)
   (declare (type function tx))
 
   (when (and (recording?) (current-tlog))
@@ -108,22 +111,22 @@ until at least one of them changes."
 
   (let1 log (new 'tlog)
 
-    (prog (x-log x-values)
+    (prog (x-values)
 
      execute
-     (multiple-value-bind (retry? log err values) (run-once tx log)
+     (multiple-value-bind (retry? err values) (run-once tx log)
        (unless (valid? log)
-         (log:debug "Tlog ~A transaction ~A is invalid, retrying immediately" (~ log) (~ tx))
+         (log:debug "Tlog ~A {~A} is invalid, retrying immediately" (~ log) (~ tx))
          (go re-execute))
        (when retry?
-         (log:debug "Tlog ~A transaction ~A will sleep, then retry" (~ log) (~ tx))
+         (log:debug "Tlog ~A {~A} will sleep, then retry" (~ log) (~ tx))
          (wait-tlog log)
          (go re-execute))
        (when err
-         (log:debug "Tlog ~A transaction ~A will rollback and signal" (~ log) (~ tx))
+         (log:debug "Tlog ~A {~A} will rollback and signal" (~ log) (~ tx))
          (error err))
-       (setq x-log    log
-             x-values values)
+
+       (setf x-values values)
        (go commit))
    
      re-execute
@@ -131,11 +134,11 @@ until at least one of them changes."
      (go execute)
 
      commit
-     (if (commit x-log)
+     (if (commit log)
          (go done)
          (progn
-           (log:debug "Tlog ~A transaction ~A could not commit, retrying it immediately"
-                      (~ x-log) (~ tx))
+           (log:debug "Tlog ~A {~A} could not commit, retrying immediately"
+                      (~ log) (~ tx))
            (go re-execute)))
      
      done
@@ -146,92 +149,161 @@ until at least one of them changes."
 
 ;;;; ** Composing
 
+(define-condition orelse-error (error)
+  ()
+  (:report (lambda (err stream)
+             (declare (ignore err))
+             (format stream "Attempt to use ~A or ~A outside an ~A block" 'try 'orelse 'atomic))))
+
 ;; UNFINISHED!
 
-#|
-(defun run-orelse (tx1 tx2)
+(defun run-orelse (tx1 tx2 &key id1 id2)
   (declare (type function tx1 tx2))
 
-  (prog (log1 log2 x-values)
+  (let1 parent-log (current-tlog)
+    (unless parent-log
+      (error 'orelse-error))
 
-   initialize
-   (setq log1 (new 'tlog)
-         log2 nil)
-   (go execute-tx1)
+    (when id1
+      (setf (~ tx1) id1))
+    (when id2
+      (setf (~ tx2) id2))
 
-   execute-tx1
-   (multiple-value-bind (retry? log values) (run-once tx1 log1)
-     (setf log1 log)
-     (if retry?
-         (progn
-           (log:trace "Transaction ~A retried, trying transaction ~A" (~ tx1) (~ tx2))
-           (go execute-tx2))
-         (progn
-           (setf x-values values)
-           (go commit-tx1))))
-   
-   commit-tx1
-   (if (not (valid? log1))
-       (progn
-         (log:trace "Tlog ~A of transaction ~A invalid, trying transaction ~A"
+    (prog (log1 log2 x-values)
+
+     execute-tx1
+     (setf log1 (make-or-clear-tlog log1 :parent parent-log))
+
+     (multiple-value-bind (retry? err values) (run-once tx1 log1)
+       (when retry?
+         (log:debug "Tlog ~A {~A} wants to retry, trying {~A}"
                     (~ log1) (~ tx1) (~ tx2))
          (go execute-tx2))
-       (if (not (commit log1))
-           (progn
-             (log:trace "Tlog ~A of transaction ~A not committed, trying transaction ~A"
-                        (~ log1) (~ tx1) (~ tx2))
-             (go execute-tx2))
-           (go done)))
-   
-   execute-tx2
-   (multiple-value-bind (retry? log values) (run-once tx2 log2)
-     (setf log2 log)
-     (if retry?
-         (progn
-           (log:trace "Tlog ~A transaction ~A wants to retry, retrying both ~A and ~A"
-                      (~ log) (~ tx2) (~ tx1) (~ tx2))
-           (go wait-reexecute))
-         (progn
-           (setf x-values values)
-           (go commit-tx2))))
+       (unless (valid? log1)
+         (log:debug "Tlog ~A {~A} is invalid, trying {~A}"
+                    (~ log1) (~ tx1) (~ tx2))
+         (go execute-tx2))
+       (when err
+         (log:debug "Tlog ~A {~A} will rollback and signal"
+                    (~ log1) (~ tx1))
+         (error err))
 
-   commit-tx2
-   (if (not (valid? log2))
-       (progn
-         (log:trace "Tlog ~A of transaction ~A invalid, retrying both ~A and ~A"
+       (setf x-values values)
+       (go commit-tx1))
+   
+     commit-tx1
+     (merge-tlogs parent-log log1)
+     (log:debug "Tlog ~A {~A} merged with parent tlog ~A"
+                (~ log1) (~ tx1) (~ parent-log))
+     (go done)
+   
+     execute-tx2
+     (setf log2 (make-or-clear-tlog log2 :parent parent-log))
+
+     (multiple-value-bind (retry? err values) (run-once tx2 log2)
+       (when retry?
+         (log:trace "Tlog ~A {~A} wants to retry, sleeping then retrying both {~A} and {~A}"
                     (~ log2) (~ tx2) (~ tx1) (~ tx2))
          (go wait-reexecute))
-       (if (not (commit log2))
+       (unless (valid? log2)
+         (log:debug "Tlog ~A {~A} is invalid, trying {~A}"
+                    (~ log2) (~ tx2) (~ tx1))
+         (go execute-tx1))
+       (when err
+         (log:debug "Tlog ~A {~A} will rollback and signal"
+                    (~ log2) (~ tx2))
+         (error err))
+       
+       (setf x-values values)
+       (go commit-tx2))
+
+     commit-tx2
+     (merge-tlogs parent-log log2)
+     (log:debug "Tlog ~A {~A} merged with parent tlog ~A"
+                (~ log2) (~ tx2) (~ parent-log))
+     (go done)
+
+     wait-reexecute
+     (unless (or (null log2) (compatible-tlogs log1 log2))
+       (log:debug "Tlog ~A {~A} and tlog ~A {~A} are incompatible, not going to sleep"
+                  (~ log1) (~ tx1) (~ log2) (~ tx2))
+       (if (valid? log1)
            (progn
-             (log:trace "Tlog ~A of transaction ~A not committed, retrying both ~A and ~A"
-                        (~ log2) (~ tx2) (~ tx1) (~ tx2))
-             (go wait-reexecute))
-           (go done)))
+             (log:debug "Tlog ~A {~A} is invalid, retrying it"
+                        (~ log1) (~ tx1))
+             (go execute-tx1))
+           (progn
+             (log:debug "Tlog ~A {~A} deduced to be invalid, retrying it"
+                        (~ log2) (~ tx2))
+             (go execute-tx2))))
 
-   wait-reexecute
-   (progn
-     (log:debug "Waiting for other threads before retrying both transactions ~A and ~A"
-                (~ tx1) (~ tx2))
+     (log:debug "Sleeping for both tlog ~A {~A} and tlog ~A {~A}"
+                (~ log1) (~ tx1) (~ log2) (~ tx2))
      (wait-tlog (merge-tlogs log1 log2))
-     (go execute-tx1))
-   
-   done
-   (return-from run-orelse (values-list x-values))))
+     (go execute-tx1)
+
+     done
+     (return-from run-orelse (values-list x-values)))))
 
 
-(defmacro orelse (form1 form2)
+(defmacro orelse (form1 form2 &key id1 id2)
+  "Execute first FORM1, then FORM2 in separate, nested transactions
+until one succeeds (i.e. commits) or signals an error.
+
+Returns the value of the transaction that succeeded,
+or signals the error raised by the transaction that failed.
+
+Can only be used inside an ATOMIC block."
   `(run-orelse (lambda () ,form1)
-               (lambda () ,form2)))
+               (lambda () ,form2)
+               :id1 ,id1
+               :id2 ,id2))
   
 
-(defmacro atomic-try (&body body)
-  "Execute each transaction in BODY
-atomically from left to right until one succeeds.
+(defmacro try (&body body)
+  "Execute each form in BODY from left to right in separate, nested transactions
+until one succeeds (i.e. commits) or signals an error.
 
-Returns the value of the transaction that succeeds."
+Returns the value of the transaction that succeeded,
+or signals the error raised by the transaction that failed.
+
+Can only be used inside an ATOMIC block."
+
   (reduce [list 'orelse] body :from-end t))
 
-|#
+
+
+(defun run-nonblocking (tx &key id)
+  "Function version of NONBLOCKING macro: execute the function tx in a nested transaction and:
+a) if the nested transaction succeeds (i.e. commits), return multiple values:
+   T followed by the values returned by the transaction.
+b) if the nested transaction signals an error, raise such error.
+c) if the nested transaction attempts to retry,
+   immediately return NIL without waiting/sleeping.
+
+Can only be used inside an ATOMIC block."
+
+  (declare (type function tx))
+  (orelse (multiple-value-call #'values t (funcall tx))
+          nil
+          :id1 (if id id 'nonblocking)
+          :id2 'nonblocking-return-nil))
+
+
+(defmacro nonblocking (&body body)
+  "Execute all the form in BODY in a single nested transaction and:
+a) if the nested transaction succeeds (i.e. commits), return multiple values:
+   T followed by the values returned by the transaction.
+b) if the nested transaction signals an error, raise such error.
+c) if the nested transaction attempts to retry,
+   immediately return NIL without waiting/sleeping.
+
+Can only be used inside an ATOMIC block."
+
+  (let1 id (when (eq :id (first body))
+             (pop body)
+             (pop body))
+    `(run-nonblocking (lambda () ,@body) :id ,id)))
 
 
 

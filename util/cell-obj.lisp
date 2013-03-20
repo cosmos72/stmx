@@ -38,17 +38,37 @@
        (setf (value-of cell) value)
        (retry))))
 
-#|
-(defmethod try-take ((cell cell))
-  (atomic
-    (nonblocking
+(transaction
+ (defmethod try-take.redundant-but-general ((cell cell))
+   "this method shows a general technique to convert a blocking, atomic operation
+into a nonblocking, atomic one: simply wrap it in (atomic (nonblocking ...))"
+   (nonblocking
      (take cell))))
 
-(defmethod try-put ((cell cell) val)
-  (atomic
-    (nonblocking
+(transaction
+ (defmethod try-put.redundant-but-general ((cell cell) val)
+   "this method shows a general technique to convert a blocking, atomic operation
+into a nonblocking, atomic one: simply wrap it in (atomic (nonblocking ...))"
+   (nonblocking
      (put cell val))))
-|#
+
+
+(transaction
+ (defmethod try-take ((cell cell))
+   (if (empty? cell)
+       nil
+       (let1 value (value-of cell)
+         (empty! cell)
+         (values t value)))))
+
+(transaction
+ (defmethod try-put ((cell cell) value)
+   (if (empty? cell)
+       (progn
+         (setf (value-of cell) value)
+         (values t value))
+       nil)))
+
 
 
 

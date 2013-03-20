@@ -2,15 +2,54 @@
 
 (in-package :stmx)
 
-;;;; * Utilities
+;;;; * Hash-table utilities
 
 (defmacro dohash (hash key value &body body)
-  "execute body on each key/value pair contained in hash table"
+  "Execute body on each key/value pair contained in hash table"
   `(loop for ,key being each hash-key in ,hash
         using (hash-value ,value)
         do (progn ,@body)))
         
+(declaim (inline get-hash set-hash))
 
+(defun get-hash (hash key)
+  "Same as (gethash key hash), only with reversed arguments."
+  (declare (type hash-table hash))
+  (gethash key hash))
+
+(defun set-hash (hash key value)
+  "Shortcut for (setf (gethash key hash) value)"
+  (declare (type hash-table hash))
+  (setf (gethash key hash) value))
+
+
+(defun reset-hash-table (hash &key defaults)
+  "Clear HASH hash table. If DEFAULTS is not nil, copy it into HASH.
+
+In both cases, return HASH."
+
+  (declare (type hash-table hash)
+           (type (or null hash-table) defaults))
+  (clrhash hash)
+  (when defaults
+    (dohash defaults key value
+      (set-hash hash key value)))
+  hash)
+
+
+(defun copy-hash-table (hash)
+  "Create and return a new hash-table containing the same keys and values as HASH."
+  (declare (type hash-table hash))
+  (let1 copy (make-hash-table :test (hash-table-test hash)
+                              :size (hash-table-size hash))
+    (dohash hash key value
+      (set-hash copy key value))
+    copy))
+
+
+
+
+;;;; * Printing utilities
 
 (defgeneric id-of (obj))
 (defgeneric (setf id-of) (value obj))
@@ -38,11 +77,11 @@
   (defmethod id-of (obj)
     (the string
       (or
-       (gethash obj ids)
-       (setf (gethash obj ids) (compute-id-of obj)))))
+       (get-hash ids obj)
+       (set-hash ids obj (compute-id-of obj)))))
 
   (defmethod (setf id-of) (value obj)
-    (setf (gethash obj ids) (format nil "~A" value))))
+    (set-hash ids obj (format nil "~A" value))))
 
 
 (declaim (inline ~ (setf ~)))

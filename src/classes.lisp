@@ -8,24 +8,29 @@
 (defvar *tlog-id-counter* 0)
 
 (defclass tlog ()
-  ((reads :accessor reads-of
-          :initarg :reads
-          :initform (make-hash-table :test 'eq :size 16)
-          :type hash-table
-          :documentation "Mapping reads done to values")
+  ((reads  :accessor reads-of
+           :initarg :reads
+           :initform (make-hash-table :test 'eq :size 16)
+           :type hash-table
+           :documentation "TVARs read during transaction, mapped to their read value")
    (writes :accessor writes-of
            :initarg :writes
            :initform (make-hash-table :test 'eq :size 16)
            :type hash-table
-           :documentation "Mapping variables written to new values")
-   (lock :accessor lock-of
-         :initform nil)
+           :documentation "TVARs written during transaction, mapped to their new values")
+   (parent :accessor parent-of
+           :initarg :parent
+           :initform nil
+           :type (or null tlog)
+           :documentation "Parent of this TLOG. Used for nested transactions")
+   (lock   :accessor lock-of
+           :initform nil)
    (semaphore :accessor semaphore-of
 	      :initform nil)
    (prevent-sleep :accessor prevent-sleep-of
-         :initform nil
-	 :type boolean
-	 :documentation "Flag to prevent TLOGs from sleeping.
+                  :initform nil
+                  :type boolean
+                  :documentation "Flag to prevent TLOGs from sleeping.
 Set by TVARs when they change")
    (id :reader id-of
        :initform (incf *tlog-id-counter*)
@@ -34,8 +39,8 @@ Set by TVARs when they change")
   (:documentation "A transaction log (TLOG) is a record of what
 reads and writes have been done.
 
-Transaction logs are written during the execution of a
-transaction (by reading and writing transactional objects or TVARs).
+Transaction logs are written during the execution of a transaction
+\(by reading and writing transactional objects or TVARs).
 Transactions logs are committed to memory by COMMIT later on."))
 
 

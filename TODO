@@ -8,9 +8,13 @@ TO DO:
    "I have a very crude and quite horribly written one laying around for
     Common Lisp: https://github.com/lnostdal/SW-STM"
 
-4) orelse and nested transactions
+4ter) optimize nested transaction: copying all the parent TLOG reads and writes is slow.
+
+4bit) also allow try/orelse/nonblocking to work even without a parent transaction,
+      i.e. outside (atomic ...) ?
 
 DONE:
+4) orelse and nested transactions
 3) (error 'retry-error ...) should show message "attempt to RETRY outside ATOMIC block"
    when printed
 2) in atomic.lisp (run-once) add handler-case to capture errors signaled by tx

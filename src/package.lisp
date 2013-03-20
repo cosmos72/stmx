@@ -9,27 +9,23 @@
         :arnesi
         :bordeaux-threads
         :closer-mop)
-  (:shadowing-import-from :arnesi
-                          #:else
-                          #:specializer ; closer-mop
-                          #:until)
   (:shadowing-import-from :closer-mop
                           #:defclass
                           #:standard-class
-                          #:defmethod
                           #:standard-generic-function
-                          #:ensure-generic-function
+                          #:defmethod
                           #:defgeneric)
   (:export #:atomic
-           #:orelse ;; try ?
            #:retry
+           #:orelse
+           #:try
 
            #:transactional
            #:transaction
 
-           #:sleep-after
-           #:nonblock
-           #:repeat
+           ;; utilities
+           #:nonblocking
+           ;; #:blocking ;; implement?
 
            ;; metaclasses
            #:transactional-object

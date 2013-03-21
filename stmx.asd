@@ -38,8 +38,9 @@
 
                (:module :util
                 :components ((:file "package")
-                             (:file "cell-obj"  :depends-on ("package"))
-                             (:file "cell-tvar" :depends-on ("package")))
+                             (:file "cell"      :depends-on ("package"))
+                             (:file "cell-tobj" :depends-on ("cell"))
+                             (:file "cell-tvar" :depends-on ("cell")))
                 :depends-on (:src))))
 
 

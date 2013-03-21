@@ -13,7 +13,7 @@ TO DO:
 4bis) also allow try/orelse/nonblocking to work even without a parent transaction,
       i.e. outside (atomic ...) ?
 
-4) test orelse and nested transactions!
+4) test orelse and nested transactions. test try-take and try-put.
 
 DONE:
 4) orelse and nested transactions

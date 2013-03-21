@@ -15,11 +15,14 @@
 
 (in-package :stmx.util)
 
-;;;; ** Concurrent cell implemented with a raw TVAR
+;;;; ** Concurrent cell implemented with a TVAR
 
 ;;; Max: here we could use the same trick as cell-tobj.lisp:
 ;;; a special *empty-tvar* value to mean "cell is empty".
 ;;; Anyway, using tvar functions bound-$? and unbind-$ is less verbose
+;;;
+;;; Max: for illustration purposes, here we use (defmethod ... (atomic ... ))
+;;; instead of (transaction (defmethod ...)) - they are equivalent.
 
 (defmethod empty? ((var tvar))
   (atomic
@@ -30,8 +33,11 @@
   (atomic
     (unbind-$ var)))
 
+;; no need to specialize (full?) on TVARs: the method in cell.lisp is enough
+#|
 (defmethod full? ((var tvar))
   (not (empty? var)))
+|#
 
 (defmethod take ((var tvar))
   (atomic
@@ -46,12 +52,24 @@
         (setf ($ var) value)
         (retry))))
 
-(defmethod try-take ((cell cell))
-  (atomic
-    (nonblocking
-     (take cell))))
+(defmethod try-take ((var tvar))
+   "hand-made, nonblocking version of (take place) for TVARs.
+less general but probably faster than the unspecialized (try-take place)
+which calls (atomic (nonblocking (take place)))"
+   (atomic
+    (if (empty? var)
+        nil
+        (let1 value ($ var)
+          (empty! var)
+          (values t value)))))
 
-(defmethod try-put ((cell cell) val)
-  (atomic
-    (nonblocking
-     (put cell val))))
+(defmethod try-put ((var tvar) value)
+   "hand-made, nonblocking version of (put place) for TVARs.
+less general but probably faster than the unspecialized (try-put place)
+which calls (atomic (nonblocking (put place value)))"
+   (atomic
+    (if (empty? var)
+        (progn
+          (setf ($ var) value)
+          (values t value))
+        nil)))

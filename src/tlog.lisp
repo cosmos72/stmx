@@ -71,6 +71,10 @@ of TVARs that were read during the transaction."
   (log:trace "Tlog ~A ..is valid" (~ log))
   (return-from valid? t))
 
+(declaim (inline invalid?))
+(defun invalid? (log)
+  (declare (type tlog log))
+  (not (valid? log)))
 
 (defun lock-tvar-nonblock (var log)
   "Try to acquire VAR lock non-blocking. Return t if acquired, else return nil."
@@ -117,7 +121,7 @@ b) another TLOG is writing the same TVARs being committed
              (if (lock-tvar-nonblock var log)
 	       (push var acquired)
 	       (return-from commit nil)))
-           (unless (valid? log)
+           (when (invalid? log)
              (log:debug "Tlog ~A ...not committed: log is invalid" (~ log))
              (return-from commit nil))
 
@@ -181,12 +185,14 @@ the same values for the TVARs present in both their (reads-of)."
   (let ((reads1 (reads-of log1))
         (reads2 (reads-of log2)))
         
+    ;; choose the smaller hash table for looping
     (when (> (hash-table-count reads1) (hash-table-count reads2))
       (rotatef reads1 reads2))
 
-    (dohash reads1 var val
-      (unless (eq val (gethash var reads2))
-        (return-from compatible-tlogs nil)))
+    (dohash reads1 var val1
+      (multiple-value-bind (val2 present2?) (gethash var reads2)
+        (when (and (present2? (not (eq val1 val2))))
+          (return-from compatible-tlogs nil))))
     t))
 
 

@@ -60,6 +60,14 @@ inside (atomic ...)."
              (format stream "Attempt to ~A outside an ~A block" 'retry 'atomic))))
 
 
+(define-condition rerun-error (error)
+  ()
+  (:report (lambda (err stream)
+             (declare (ignore err))
+             (format stream "Attempt to ~A outside an ~A block" 'rerun 'orelse)))
+  (:documentation "Signaled by orelse to force re-executing the parent transaction."))
+
+
 (defun retry ()
   "Abort the current transaction and re-execute it from scratch.
 
@@ -67,6 +75,12 @@ Before re-executing, the transaction will wait on all variables
 that have been read so far during the transaction
 until at least one of them changes."
   (error 'retry-error))
+
+
+(defun rerun ()
+  "Abort the current transaction and immediately re-execute it from scratch
+without waiting. Used by orelse"
+  (error 'rerun-error))
 
   
 ;;;; ** Running
@@ -85,32 +99,43 @@ until at least one of them changes."
            (type tlog log))
 
   (with-recording-to-tlog log
+    (let1 parent (parent-of log)
 
-    (when (log:debug)
-      (let1 parent (parent-of log)
-        (if parent
-            (log:debug "Tlog ~A {~A} starting, parent is tlog ~A"
-                       (~ log) (~ tx) (~ parent))
-            (log:debug "Tlog ~A {~A} starting" (~ log) (~ tx)))))
+      (prog (x-retry? x-error x-values)
 
-    (let ((x-retry? nil)
-          (x-error nil)
-          (x-values nil))
-      (handler-case
-          (progn
-            (setf x-values (multiple-value-list (funcall tx)))
-            (log:trace "Tlog ~A {~A} wants to commit, returned: ~{~A ~}"
-                       (~ log) (~ tx) x-values))
-        (retry-error (err)
-          (declare (ignore err))
-          (setf x-retry? t)
-          (log:trace "Tlog ~A {~A} wants to retry"
-                     (~ log) (~ tx)))
-        (t (err)
-          (log:trace "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
-                     (~ log) (~ tx) (type-of err) (~ err))
-          (setf x-error err)))
-      (values x-retry? x-error x-values))))
+       execute
+       (when (log:debug)
+         (if parent
+             (log:debug "Tlog ~A {~A} starting, parent is tlog ~A"
+                        (~ log) (~ tx) (~ parent))
+             (log:debug "Tlog ~A {~A} starting" (~ log) (~ tx))))
+
+       (handler-case
+           (progn
+             (setf x-values (multiple-value-list (funcall tx)))
+             (log:trace "Tlog ~A {~A} wants to commit, returned: ~{~A ~}"
+                        (~ log) (~ tx) x-values))
+
+         (rerun-error (err)
+           (declare (ignore err))
+           (log:trace "Tlog ~A {~A} wants to rerun" (~ log) (~ tx))
+           (clear-tlog log :parent parent)
+           (setf x-values nil) ;; paranoia
+           (go execute))
+         
+         (retry-error (err)
+           (declare (ignore err))
+           (setf x-retry? t)
+           (log:trace "Tlog ~A {~A} wants to retry" (~ log) (~ tx)))
+
+         (t (err)
+           (log:trace "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
+                      (~ log) (~ tx) (type-of err) (~ err))
+           (setf x-error err)))
+
+       done ;; fallthrough
+       (return-from run-once (values x-retry? x-error x-values))))))
+
 
 
 (defun run-atomic (tx &key id)
@@ -128,8 +153,8 @@ until at least one of them changes."
 
      execute
      (multiple-value-bind (retry? err values) (run-once tx log)
-       (unless (valid? log)
-         (log:debug "Tlog ~A {~A} is invalid, retrying immediately" (~ log) (~ tx))
+       (when (invalid? log)
+         (log:debug "Tlog ~A {~A} is invalid, re-running it" (~ log) (~ tx))
          (go re-execute))
        (when retry?
          (log:debug "Tlog ~A {~A} will sleep, then retry" (~ log) (~ tx))
@@ -150,7 +175,7 @@ until at least one of them changes."
      (if (commit log)
          (go done)
          (progn
-           (log:debug "Tlog ~A {~A} could not commit, retrying immediately"
+           (log:debug "Tlog ~A {~A} could not commit, re-running it"
                       (~ log) (~ tx))
            (go re-execute)))
      
@@ -170,7 +195,78 @@ until at least one of them changes."
 
 
 (defun run-orelse (tx1 tx2 &key id1 id2)
+  "Function variant of `orelse'. Execute first function TX1, then function TX2
+in separate, nested transactions until one succeeds (i.e. commits) or signals
+an error.
+
+Returns the value of the transaction that succeeded,
+or signals the error raised by the transaction that failed.
+
+Can only be used inside an ATOMIC block."
   (declare (type function tx1 tx2))
+
+  ;; binary implementation, two transactions tx1 and tx2: run tx1, then:
+  ;;
+  ;; a) if tx1 is executed:
+  ;;    1. if tx1 is invalid, run tx2. reason: more possibilities to get a valid run of tx1 or tx2
+  ;;    2. if tx1 wants to retry, run tx2. reason: orelse exists exactly to implement this behaviour
+  ;;    3. if tx1 wants to commit (returns normally), merge to parent log and return
+  ;;    4. if tx1 wants to rollback (signals an error), rollback and signal the error
+  ;; 
+  ;; b) if tx2 is executed:
+  ;;    1. if tx2 is invalid:
+  ;;       1.1 if parent-tx is invalid, tell it to re-execute with (rerun)
+  ;;           this is necessary to break infinite loops alternating
+  ;;           between tx1 and tx2, caused by the parent-tx being invalid
+  ;;       1.2 if tx1 is invalid, run tx1. reason: it means some TVARs
+  ;;           relevant for tx1 have changed
+  ;;       1.3 run tx2 again
+  ;;    2. if tx2 wants to retry, sleep on tx1+tx2
+  ;;    3. if tx2 wants to commit (returns normally), merge to parent log and return
+  ;;    4. if tx2 wants to rollback (signals an error), rollback and signal the error
+  ;; 
+  ;; c) if sleeping on tx1+tx2:
+  ;;    1. if tx1 and tx2 are incompatible => at least one of them is invalid
+  ;;       1.1 if parent-tx is invalid, tell it to re-execute with (rerun)
+  ;;       1.2 otherwise, run the first invalid one between tx1 and tx2
+  ;;    2. merge tx1 and tx2 logs into log1+2, and sleep on it. when waking up:
+  ;;       2.1 if log1+2 is valid, sleep again on it
+  ;;       2.2 if parent-tx is invalid, tell it to re-execute with (rerun)
+  ;;       2.3 run tx1 (we could check which tx is invalid to run it instead,
+  ;;           but we lost tx1 log when merging tx1 and tx2)
+
+
+
+  ;; n-ary implementation, n transactions tx[0...n-1]: set i=0, run tx[i], then:
+  ;;
+  ;; a) if tx[i] is executed:
+  ;;    1. if tx[i] is invalid:
+  ;;       1.1 if tx[i+1] exists, run it. reason: more possibilities
+  ;;           to get a valid run of one of tx[]
+  ;;       1.2 if parent-tx is invalid, tell it to re-execute with (rerun)
+  ;;           this is necessary to break infinite loops cycling
+  ;;           on some of the tx[i], caused by the parent-tx being invalid
+  ;;       1.3 if i<>0 and tx[0] is invalid, run it. reason: it means some TVARs
+  ;;           relevant for tx[0] have changed, and there is no reason
+  ;;           to re-execute parent-tx
+  ;;       1.4 run tx[i] again
+  ;;    2. if tx[i] wants to retry:
+  ;;       2.1. if tx[i+1] exists, run it. reason: orelse exists exactly
+  ;;            to implement this behaviour
+  ;;       2.2. otherwise, sleep on tx[0]+ ... + tx[n-1]
+  ;;    3. if tx[i] wants to commit (returns normally), merge to parent log and return
+  ;;    4. if tx[i] wants to rollback (signals an error), rollback and signal the error
+  ;; 
+  ;; c) if sleeping on tx[0]+ ... + tx[n-1]:
+  ;;    1. if tx[0] ... tx[n-1] are incompatible => at least one of them is invalid
+  ;;       1.1 if parent-tx is invalid, tell it to re-execute with (rerun)
+  ;;       1.2 otherwise, run the first invalid one among tx[0] ... tx[n-1]
+  ;;    2. merge tx[0] ... tx[n-1] logs into logN, and sleep on it. when waking up:
+  ;;       2.1 if logN is valid, sleep again on it
+  ;;       2.2 if parent-tx is invalid, tell it to re-execute with (rerun)
+  ;;       2.3 run tx[0] (we could check which tx is invalid to run it instead,
+  ;;           but we lost some logs when merging them)
+
 
   (let1 parent-log (current-tlog)
     (unless parent-log
@@ -191,7 +287,7 @@ until at least one of them changes."
          (log:debug "Tlog ~A {~A} wants to retry, trying {~A}"
                     (~ log1) (~ tx1) (~ tx2))
          (go execute-tx2))
-       (unless (valid? log1)
+       (when (invalid? log1)
          (log:debug "Tlog ~A {~A} is invalid, trying {~A}"
                     (~ log1) (~ tx1) (~ tx2))
          (go execute-tx2))
@@ -213,14 +309,28 @@ until at least one of them changes."
      (setf log2 (make-or-clear-tlog log2 :parent parent-log))
 
      (multiple-value-bind (retry? err values) (run-once tx2 log2)
+       (when (invalid? log2)
+         (log:debug "Tlog ~A {~A} is invalid, checking what to do..."
+                    (~ log2) (~ tx2))
+         (when (invalid? parent-log)
+           (log:debug "Parent tlog ~A is invalid, re-running the parent transaction"
+                      (~ parent-log))
+           (rerun))
+
+         (when (invalid? log1)
+           (log:debug "Tlog ~A {~A} is invalid, re-running it"
+                      (~ log1) (~ tx1))
+           (go execute-tx1))
+
+         (log:debug "Tlog ~A {~A} was found invalid, re-running it"
+                    (~ log2) (~ tx2))
+         (go execute-tx2))
+
        (when retry?
          (log:trace "Tlog ~A {~A} wants to retry, sleeping then retrying both {~A} and {~A}"
                     (~ log2) (~ tx2) (~ tx1) (~ tx2))
          (go wait-reexecute))
-       (unless (valid? log2)
-         (log:debug "Tlog ~A {~A} is invalid, trying {~A}"
-                    (~ log2) (~ tx2) (~ tx1))
-         (go execute-tx1))
+
        (when err
          (log:debug "Tlog ~A {~A} will rollback and signal"
                     (~ log2) (~ tx2))
@@ -236,18 +346,23 @@ until at least one of them changes."
      (go done)
 
      wait-reexecute
-     (unless (or (null log2) (compatible-tlogs log1 log2))
+     (unless (compatible-tlogs log1 log2)
        (log:debug "Tlog ~A {~A} and tlog ~A {~A} are incompatible, not going to sleep"
                   (~ log1) (~ tx1) (~ log2) (~ tx2))
-       (if (valid? log1)
-           (progn
-             (log:debug "Tlog ~A {~A} is invalid, retrying it"
-                        (~ log1) (~ tx1))
-             (go execute-tx1))
-           (progn
-             (log:debug "Tlog ~A {~A} deduced to be invalid, retrying it"
-                        (~ log2) (~ tx2))
-             (go execute-tx2))))
+       (when (invalid? parent-log)
+         (log:debug "Parent tlog ~A is invalid, re-running it"
+                        (~ parent-log))
+         (rerun))
+
+       (when (invalid? log1)
+         (log:debug "Tlog ~A {~A} is invalid, re-running it"
+                    (~ log1) (~ tx1))
+         (go execute-tx1))
+
+       (progn
+         (log:debug "Tlog ~A {~A} deduced to be invalid, re-running it"
+                    (~ log2) (~ tx2))
+         (go execute-tx2)))
 
      (log:debug "Sleeping for both tlog ~A {~A} and tlog ~A {~A}"
                 (~ log1) (~ tx1) (~ log2) (~ tx2))

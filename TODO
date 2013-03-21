@@ -10,8 +10,10 @@ TO DO:
 
 4ter) optimize nested transaction: copying all the parent TLOG reads and writes is slow.
 
-4bit) also allow try/orelse/nonblocking to work even without a parent transaction,
+4bis) also allow try/orelse/nonblocking to work even without a parent transaction,
       i.e. outside (atomic ...) ?
+
+4) test orelse and nested transactions!
 
 DONE:
 4) orelse and nested transactions

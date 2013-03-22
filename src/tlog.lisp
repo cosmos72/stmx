@@ -191,7 +191,7 @@ the same values for the TVARs present in both their (reads-of)."
 
     (dohash reads1 var val1
       (multiple-value-bind (val2 present2?) (gethash var reads2)
-        (when (and (present2? (not (eq val1 val2))))
+        (when (and present2? (not (eq val1 val2)))
           (return-from compatible-tlogs nil))))
     t))
 

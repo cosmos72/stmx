@@ -36,10 +36,9 @@
    (values)))
 
 ;; no need to specialize (full?) on CELLs: the method in cell.lisp is enough
-#|
-(defmethod full? ((var tvar))
-  (not (empty? var)))
-|#
+;;
+;; (defmethod full? ((cell cell))
+;;   (not (empty? cell)))
 
 (transaction
  (defmethod take ((cell cell))
@@ -57,8 +56,9 @@
 (transaction
  (defmethod try-take ((cell cell))
    "hand-made, nonblocking version of (take place) for cells.
-less general but probably faster than the unspecialized (try-take place)
-which calls (atomic (nonblocking (take place)))"
+less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
+Linux amd64) than the unspecialized (try-take place) which calls
+\(atomic (nonblocking (take place)))"
    (if (empty? cell)
        nil
        (let1 value (value-of cell)
@@ -68,10 +68,22 @@ which calls (atomic (nonblocking (take place)))"
 (transaction
  (defmethod try-put ((cell cell) value)
    "hand-made, nonblocking version of (put place) for cells.
-less general but probably faster than the unspecialized (try-put place)
-which calls (atomic (nonblocking (put place value)))"
+less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
+Linux amd64) than the unspecialized (try-put place) which calls
+\(atomic (nonblocking (put place value)))"
    (if (empty? cell)
        (progn
          (setf (value-of cell) value)
          (values t value))
        nil)))
+
+
+;;;; ** Printing
+
+(defprint-object (obj cell)
+  ;; do NOT use (empty? obj) here, it would start a transaction!
+  ;; (value-of obj) is much better: it works both inside and outside transactions.
+  (let1 value (value-of obj)
+    (if (eq value *empty-cell*)
+        (format t "<empty>")
+        (format t "[~A]" value))))

@@ -17,59 +17,61 @@
 
 ;;;; ** Concurrent cell implemented with a TVAR
 
-;;; Max: here we could use the same trick as cell-tobj.lisp:
+;;; Max: here we could use the same trick as in cell-tobj.lisp:
 ;;; a special *empty-tvar* value to mean "cell is empty".
 ;;; Anyway, using tvar functions bound-$? and unbind-$ is less verbose
+;;; and feels more "natural".
 ;;;
-;;; Max: for illustration purposes, here we use (defmethod ... (atomic ... ))
+;;; Max: for illustration purposes, we could also use (defmethod ... (atomic ... ))
 ;;; instead of (transaction (defmethod ...)) - they are equivalent.
 
-(defmethod empty? ((var tvar))
-  (atomic
-    (bound-$? var)))
+(transaction
+ (defmethod empty? ((var tvar))
+   (not (bound-$? var))))
 
-(defmethod empty! ((var tvar))
-  "Remove value from tvar."
-  (atomic
-    (unbind-$ var)))
+(transaction
+ (defmethod empty! ((var tvar))
+   "Remove value from tvar."
+   (unbind-$ var)))
 
 ;; no need to specialize (full?) on TVARs: the method in cell.lisp is enough
-#|
-(defmethod full? ((var tvar))
-  (not (empty? var)))
-|#
+;;
+;; (defmethod full? ((var tvar))
+;;   (not (empty? var)))
 
-(defmethod take ((var tvar))
-  (atomic
-    (if (empty? var)
-        (retry)
-        (prog1 ($ var)
-          (empty! var)))))
+(transaction
+ (defmethod take ((var tvar))
+   (if (empty? var)
+       (retry)
+       (prog1 ($ var)
+         (empty! var)))))
 
-(defmethod put ((var tvar) value)
-  (atomic
-    (if (empty? var)
-        (setf ($ var) value)
-        (retry))))
+(transaction
+ (defmethod put ((var tvar) value)
+   (if (empty? var)
+       (setf ($ var) value)
+       (retry))))
 
-(defmethod try-take ((var tvar))
+(transaction
+ (defmethod try-take ((var tvar))
    "hand-made, nonblocking version of (take place) for TVARs.
-less general but probably faster than the unspecialized (try-take place)
-which calls (atomic (nonblocking (take place)))"
-   (atomic
-    (if (empty? var)
-        nil
-        (let1 value ($ var)
-          (empty! var)
-          (values t value)))))
+Less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
+Linux amd64) than the unspecialized (try-take place) which calls
+\(atomic (nonblocking (take place)))"
+   (if (empty? var)
+       nil
+       (let1 value ($ var)
+         (empty! var)
+         (values t value)))))
 
-(defmethod try-put ((var tvar) value)
+(transaction
+ (defmethod try-put ((var tvar) value)
    "hand-made, nonblocking version of (put place) for TVARs.
-less general but probably faster than the unspecialized (try-put place)
-which calls (atomic (nonblocking (put place value)))"
-   (atomic
-    (if (empty? var)
-        (progn
-          (setf ($ var) value)
-          (values t value))
-        nil)))
+Less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
+Linux amd64) than the unspecialized (try-put place) which calls
+\(atomic (nonblocking (put place value)))"
+   (if (empty? var)
+       (progn
+         (setf ($ var) value)
+         (values t value))
+       nil)))

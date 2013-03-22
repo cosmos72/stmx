@@ -34,7 +34,8 @@
                              (:file "tlog"      :depends-on ("classes"))
                              (:file "tvar"      :depends-on ("tlog"))
                              (:file "tclass"    :depends-on ("tvar"))
-                             (:file "atomic"    :depends-on ("tclass"))))
+                             (:file "atomic"    :depends-on ("tclass"))
+                             (:file "orelse"    :depends-on ("atomic"))))
 
                (:module :util
                 :components ((:file "package")
@@ -59,6 +60,8 @@
 
   :components ((:module :test
                 :components ((:file "package")
-                             (:file "suite"     :depends-on ("package"))))))
+                             (:file "atomic"   :depends-on ("package"))
+                             (:file "retry"    :depends-on ("package"))
+                             (:file "orelse"   :depends-on ("package"))))))
 
 

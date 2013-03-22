@@ -173,7 +173,6 @@ if VAR changes."
 ;;;; ** Printing
 
 (defprint-object (obj tvar)
-  (format t "~A"
-          (if (bound-$? obj)
-              ($ obj)
-              "<unbound>")))
+  (if (bound-$? obj)
+      (format t "[~A]" ($ obj))
+      (format t "<unbound>")))

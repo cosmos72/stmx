@@ -18,13 +18,10 @@
 (defpackage :stmx.test
   (:use :cl
         :arnesi
+        :bordeaux-threads
         :fiveam
         :stmx
         :stmx.util)
-
-  (:import-from :bordeaux-threads
-                :make-thread
-                :join-thread)
 
   (:import-from :stmx
                 :lock-of
@@ -43,3 +40,6 @@
 (in-package :stmx.test)
 
 (fiveam:def-suite suite)
+
+(defun configure-log4cl ()
+  (log:config :debug :sane :this-console :pattern "[%D{%H:%M:%S}] [%-5P] {%t} <%c{}{}{:downcase}> %m%n"))

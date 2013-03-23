@@ -49,10 +49,9 @@ then it will load STMX and be ready to use.
 
 In case you get errors:
 
-- check that quicklisp is installed correctly, for example by executing at
-  REPL:
+- check that quicklisp is installed correctly, for example by executing at REPL
 
-    CL-USER> (ql:quickload "arnesi")
+        CL-USER> (ql:quickload "arnesi")
 
 - check that you downloaded STMX creating an `stmx/` folder inside
   your Quicklisp local-projects folder, usually `~/quicklisp/local-projects`

@@ -91,7 +91,7 @@ examples and utilities build with STMX, and should be quite easy to
 understand.
 
 For the *very* impatient, STMX offers the following Lisp macros and functions,
-also heavily documented in the sources - use (describe 'some-symbol) at REPL.
+also heavily documented in the sources - remember `(describe 'some-symbol)` at REPL.
 
 - `TRANSACTIONAL` declares that a class is transactional, i.e. that its
   slots contain transactional data. Use it to wrap a class definition:

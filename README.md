@@ -52,7 +52,7 @@ In case you get errors:
 - check that quicklisp is installed correctly, for example by executing at
   REPL:
 
-       CL-USER> (ql:quickload "arnesi")
+    CL-USER> (ql:quickload "arnesi")
 
 - check that you downloaded STMX creating an `stmx/` folder inside
   your Quicklisp local-projects folder, usually `~/quicklisp/local-projects`
@@ -64,7 +64,7 @@ After loading STMX, the test suite can be executed with:
     CL-USER> (fiveam:run! 'stmx.test:suite)
 
 Note: `(ql:quickload "stmx.test")` intentionally works only *after*
-`(ql:quickload "stmx")` completes successfuly.
+`(ql:quickload "stmx")` has completed successfuly.
 
 You are welcome to report any failure you get while running the test suite,
 please include in the report:
@@ -72,6 +72,7 @@ please include in the report:
 - Common Lisp implementation and version (example: SBCL 1.0.57.0.debian, 64bit)
 - EXACT output produced by the test suite
 - any other relevant information
+
 See "Contacts, help, discussion" below for the preferred method to send the report.
 
 

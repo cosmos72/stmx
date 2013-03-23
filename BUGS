@@ -1,15 +1,18 @@
 KNOWN BUGS
 
-3) when a transaction signals an error, (run-atomic) calls (valid? log) without locking,
-   so it may get spurious "invalid" answers and unnecessarily re-run the transaction
-   (not a bug, only a waste of resources)
-   but it may also get spurious "valid" answers where read TVARs match the current values
-   partially before another thread commits, and partially after.
-   In the latter case, (run-atomic) will propagate the error to the caller
-   => BUG, it must instead re-run the transaction.
-   How to fix: when a transaction signals an error, also validate the log WITH locking.
+4) (retry) calls (valid? log) without locking, so in theory it may get spurious
+   "valid" answers exactly like in bug 3 below. Is it a bug or not?
 
 FIXED BUGS:
+
+3) when a transaction signals an error, (run-atomic) was calling (valid? log) without locking,
+   so it could get spurious "invalid" answers and unnecessarily re-run the transaction
+   (only a waste of resources, not a bug)
+   but it could even get spurious "valid" answers in case read TVARs match the current values
+   partially before another thread commits, and partially after.
+   In the latter case, (run-atomic) would propagate the error to the caller
+   => BUG, it must instead re-run the transaction.
+   How to fix: when a transaction signals an error, also validate the log WITH locking.
 
 2) (wait-once) was returning without removing the log from tvars
    waiting list. Each tvar would remove all the waiting logs when it

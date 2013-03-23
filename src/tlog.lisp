@@ -77,19 +77,54 @@ of TVARs that were read during the transaction."
   (declare (type tlog log))
   (not (valid? log)))
 
-(defun lock-tvar-nonblock (var log)
-  "Try to acquire VAR lock non-blocking. Return t if acquired, else return nil."
 
+
+(defun try-lock-tvar (var log txt)
+  "Try to acquire VAR lock non-blocking. Return t if acquired, else return nil."
   (declare (type tvar var)
-	   (type tlog log))
+	   (type tlog log)
+           (type string txt))
   (if (acquire-lock (lock-of var) nil)
       (progn
 	(log:trace "Tlog ~A locked tvar ~A" (~ log) (~ var))
 	t)
       (progn
-	(log:debug "Tlog ~A not committed: could not lock tvar ~A"
-		   (~ log) (~ var))
+	(log:debug "Tlog ~A not ~A: could not lock tvar ~A"
+		   (~ log) txt (~ var))
 	nil)))
+
+
+(defun unlock-tvars (vars log)
+  (declare (type list vars)
+	   (type tlog log))
+  (dolist (var vars)
+    (release-lock (lock-of var))
+    (log:trace "Tlog ~A unlocked tvar ~A" (~ log) (~ var))))
+
+
+
+(defun locked-valid? (log)
+  "Return T if LOG is valid and NIL if it's invalid.
+Return :UNKNOWN if relevant locks could not be acquired."
+
+  (declare (type tlog log))
+  (let ((reads (reads-of log))
+	acquired)
+
+    (unwind-protect
+         (progn
+	   ;; we must lock TVARs that have been read: expensive,
+	   ;; but needed to ensure this threads sees other commits as atomic
+           (dohash (var val) reads
+             (if (try-lock-tvar var log "rolled back")
+	       (push var acquired)
+	       (return-from locked-valid? :unknown)))
+           (let1 valid (valid? log)
+             (log:debug "Tlog ~A is ~A, verified with locks"
+                        (~ log) (if valid "valid" "invalid"))
+             (return-from locked-valid? valid)))
+
+      (unlock-tvars acquired log))))
 
 
 
@@ -121,7 +156,7 @@ b) another TLOG is writing the same TVARs being committed
 	   ;; we must lock TVARs that have been read: expensive,
 	   ;; but needed to ensure this threads sees other commits as atomic
            (dohash (var val) reads
-             (if (lock-tvar-nonblock var log)
+             (if (try-lock-tvar var log "committed")
 	       (push var acquired)
 	       (return-from commit nil)))
            (when (invalid? log)
@@ -135,7 +170,7 @@ b) another TLOG is writing the same TVARs being committed
 	     (multiple-value-bind (dummy read?) (gethash var reads)
 	       (declare (ignore dummy))
 	       (when (not read?)
-		 (if (lock-tvar-nonblock var log)
+		 (if (try-lock-tvar var log "committed")
 		     (push var acquired)
 		     (return-from commit nil)))))
 
@@ -151,9 +186,8 @@ b) another TLOG is writing the same TVARs being committed
            (log:debug "Tlog ~A committed" (~ log))
            (return-from commit t))
 
-      (dolist (var acquired)
-        (release-lock (lock-of var))
-        (log:trace "Tlog ~A unlocked tvar ~A" (~ log) (~ var)))
+      (unlock-tvars acquired log)
+
       (dolist (var changed)
         (log:trace "Tlog ~A notifying threads waiting on tvar ~A"
                    (~ log) (~ var))

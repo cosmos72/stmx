@@ -193,22 +193,23 @@ transactional memory it read has changed."
 
    run
    (multiple-value-bind (retry? err vals) (run-once tx log)
-     (when (invalid? log)
-       (log:debug "Tlog ~A {~A} is invalid, re-running it" (~ log) (~ tx))
-       (go re-run))
      (when retry?
        (log:debug "Tlog ~A {~A} will sleep, then retry" (~ log) (~ tx))
+        ;; wait-tlog also checks if log is valid
        (wait-tlog log)
        (go re-run))
      (when err
-       (log:debug "Tlog ~A {~A} will rollback and signal ~A"
-                  (~ log) (~ tx) (type-of err))
-       (error err))
+       (when (eq t (locked-valid? log))
+         (log:debug "Tlog ~A {~A} will rollback and signal ~A"
+                    (~ log) (~ tx) (type-of err))
+         (error err))
+       (log:debug "Tlog ~A {~A} *could* be invalid, re-running it" (~ log) (~ tx))
+       (go re-run))
+     ;; commit also checks if log is valid
      (when (commit log)
        (return (values-list vals)))
 
-     (log:debug "Tlog ~A {~A} could not commit, re-running it"
-                (~ log) (~ tx))
+     (log:debug "Tlog ~A {~A} could not commit, re-running it" (~ log) (~ tx))
      (go re-run))
    
    re-run

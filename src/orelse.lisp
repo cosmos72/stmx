@@ -17,17 +17,17 @@
 
 ;;;; ** Composing
 
-(define-condition orelse-error (error)
+(define-condition orelse-error (control-error)
   ()
   (:report (lambda (err stream)
              (declare (ignore err))
              (format stream "Attempt to use ~A or ~A outside an ~A block" 'try 'orelse 'atomic))))
 
 
-(defun run-orelse (tx1 tx2 &key id1 id2)
-  "Function variant of `orelse'. Execute function TX1 first, then function TX2
-in separate, nested transactions until one succeeds (i.e. commits) or signals
-an error.
+(defun run-orelse2 (tx1 tx2 &key id1 id2)
+  "Function variant of `orelse2'. Execute function TX1 first,
+then function TX2 in separate, nested transactions until one succeeds
+\(i.e. commits) or signals an error.
 
 Returns the value of the transaction that succeeded,
 or signals the error raised by the transaction that failed.
@@ -200,10 +200,10 @@ Can only be used inside an ATOMIC block."
      (go execute-tx1)
 
      done
-     (return-from run-orelse (values-list x-values)))))
+     (return-from run-orelse2 (values-list x-values)))))
 
 
-(defmacro orelse (form1 form2 &key id1 id2)
+(defmacro orelse2 (form1 form2 &key id1 id2)
   "Execute first FORM1, then FORM2 in separate, nested transactions
 until one succeeds (i.e. commits) or signals an error.
 
@@ -217,7 +217,7 @@ Can only be used inside an ATOMIC block."
                :id2 ,id2))
   
 
-(defmacro try (&body body)
+(defmacro orelse (&body body)
   "Execute each form in BODY from left to right in separate, nested transactions
 until one succeeds (i.e. commits) or signals an error.
 
@@ -226,7 +226,7 @@ or signals the error raised by the transaction that failed.
 
 Can only be used inside an ATOMIC block."
 
-  (reduce (lambda (x y) (list 'orelse x y)) body :from-end t))
+  (reduce (lambda (x y) (list 'orelse2 x y)) body :from-end t))
 
 
 
@@ -241,10 +241,10 @@ c) if the nested transaction attempts to retry,
 Can only be used inside an ATOMIC block."
 
   (declare (type function tx))
-  (orelse (multiple-value-call #'values t (funcall tx))
-          nil
-          :id1 (if id id 'nonblocking)
-          :id2 'nonblocking-nil))
+  (orelse2 (multiple-value-call #'values t (funcall tx))
+           nil
+           :id1 (if id id 'nonblocking)
+           :id2 'nonblocking-nil))
 
 
 (defmacro nonblocking (&body body)

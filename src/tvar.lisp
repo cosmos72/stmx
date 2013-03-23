@@ -45,17 +45,17 @@
 READ-TVAR is an internal function called by ($ VAR) and by reading TOBJs slots."
   (declare (type tvar var)
            (type tlog log))
-  (multiple-value-bind (value value?)
+  (multiple-value-bind (value present?)
       (gethash var (writes-of log))
-    (when value?
+    (when present?
       (return-from read-tvar value)))
 
-  (multiple-value-bind (value value?)
+  (multiple-value-bind (value present?)
       (gethash var (reads-of log))
-    (when value?
+    (when present?
       (return-from read-tvar value)))
 
-  (setf (gethash var (reads-of log)) (raw-value-of var)))
+  (set-hash (reads-of log) var (raw-value-of var)))
 
 
 (defun write-tvar (var value &optional (log (current-tlog)))
@@ -64,7 +64,7 @@ WRITE-TVAR is an internal function called by (setf ($ VAR) VALUE)
 and by writing TOBJs slots."
   (declare (type tvar var)
            (type tlog log))
-  (setf (gethash var (writes-of log)) value))
+  (set-hash (writes-of log) var value))
 
 
 
@@ -166,7 +166,7 @@ if VAR changes."
 
   (declare (type tvar var))
   (with-lock-held ((waiting-lock-of var))
-    (dohash (waiting-for var) log dummy
+    (dohash (log) (waiting-for var)
       (notify-tlog log var))))
 
 

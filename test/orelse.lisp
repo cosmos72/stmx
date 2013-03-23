@@ -15,7 +15,8 @@
 
 (in-package :stmx.test)
 
-(in-suite suite)
+(def-suite orelse-suite :in suite)
+(in-suite orelse-suite)
 
 (defmacro are-true (&body body)
   `(progn

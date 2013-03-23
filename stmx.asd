@@ -13,6 +13,8 @@
 ;; See the Lisp Lesser General Public License for more details.
 
 
+(in-package :cl-user)
+
 (asdf:defsystem :stmx
   :name "STMX"
   :version "0.5"
@@ -40,16 +42,17 @@
                (:module :util
                 :components ((:file "package")
                              (:file "cell"      :depends-on ("package"))
-                             (:file "cell-tobj" :depends-on ("cell"))
-                             (:file "cell-tvar" :depends-on ("cell")))
+                             (:file "cell-obj"  :depends-on ("cell"))
+                             (:file "cell-var"  :depends-on ("cell")))
                 :depends-on (:src))))
 
 
 
 (asdf:defsystem :stmx.test
+  :name "STMX.TEST"
+  :version "0.5"
   :author "Massimiliano Ghilardi"
   :license "LLGPL"
-  :author "Massimiliano Ghilardi"
   :description "test suite for STMX"
 
   :depends-on (:arnesi

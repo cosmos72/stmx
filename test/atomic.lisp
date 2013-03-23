@@ -15,7 +15,8 @@
 
 (in-package :stmx.test)
 
-(in-suite suite)
+(def-suite atomic-suite :in suite)
+(in-suite atomic-suite)
 
 (test read-tvar
   (let ((log (new 'tlog))
@@ -71,16 +72,19 @@
       (is-true (valid? (current-tlog))))
     (is-true (= ($ var) 2))))
 
-(test rollback
-  (let1 var  (new 'tvar :value 1)
-    (handler-case
-        (atomic :id 'test-rollback
-          (setf ($ var) 2)
-          (error "simple-error signalled to cause rollback"))
-      (simple-error ()
-        (is-true (= (raw-value-of var) 1))
-        (is-true (= ($ var) 1)))
-      (t (err)
-        (fail "unexpected ~A: ~A, expecting ~A" (type-of err) err 'simple-error)))))
-        
+(define-condition test-error (simple-error)
+  ())
 
+(test rollback
+  (prog ((var (new 'tvar :value 1)))
+    (handler-case
+        (progn
+          (atomic :id 'test-rollback
+                  (setf ($ var) 2)
+                  (error 'test-error :format-arguments "test-error signalled to cause rollback"))
+
+          (fail "error signaled inside ATOMIC was not propagated to caller"))
+
+      (test-error ()
+        (is-true (= (raw-value-of var) 1))
+        (is-true (= ($ var) 1))))))

@@ -17,11 +17,11 @@
 
 ;;;; * Hash-table utilities
 
-(defmacro dohash (hash key value &body body)
+(defmacro dohash ((key &optional value) hash &body body)
   "Execute body on each key/value pair contained in hash table"
   `(loop for ,key being each hash-key in ,hash
-        using (hash-value ,value)
-        do (progn ,@body)))
+      ,@(when value `(using (hash-value ,value)))
+      do (progn ,@body)))
         
 (declaim (inline get-hash set-hash))
 
@@ -36,28 +36,36 @@
   (setf (gethash key hash) value))
 
 
-(defun reset-hash-table (hash &key defaults)
-  "Clear HASH hash table. If DEFAULTS is not nil, copy it into HASH.
+(defun copy-hash-table (dst src)
+  "Copy all key/value pairs from hash-table SRC into hash-table DST.
+Other keys (and their values) present in DST but not in SRC
+are not modified. Return DST."
 
-In both cases, return HASH."
+  (declare (type hash-table dst src))
+  (dohash (key value) src
+    (set-hash dst key value))
+  dst)
+
+
+(defun reset-hash-table (hash &key defaults)
+  "Clear hash-table HASH. If DEFAULTS is not nil, copy it into HASH.
+Return HASH."
 
   (declare (type hash-table hash)
            (type (or null hash-table) defaults))
   (clrhash hash)
   (when defaults
-    (dohash defaults key value
-      (set-hash hash key value)))
+    (copy-hash-table hash defaults))
   hash)
 
 
-(defun copy-hash-table (hash)
-  "Create and return a new hash-table containing the same keys and values as HASH."
+(defun clone-hash-table (hash)
+  "Create and return a new hash-table containing the same keys and values as HASH.
+The new hash-table inherits :test from HASH."
   (declare (type hash-table hash))
   (let1 copy (make-hash-table :test (hash-table-test hash)
                               :size (hash-table-size hash))
-    (dohash hash key value
-      (set-hash copy key value))
-    copy))
+    (copy-hash-table copy hash)))
 
 
 

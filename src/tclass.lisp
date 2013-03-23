@@ -28,7 +28,7 @@ see the class TRANSACTIONAL-DIRECT-SLOT for details."))
 
 
 (defclass transactional-direct-slot (standard-direct-slot-definition)
-  ((transactional :accessor slot-transactional
+  ((transactional :accessor transactional-slot?
                   :initarg :transactional
                   :initform t
                   :type boolean))
@@ -44,7 +44,7 @@ options can be passed to component slots:
 
 
 (defclass transactional-effective-slot (standard-effective-slot-definition)
-  ((transactional :accessor slot-transactional
+  ((transactional :accessor transactional-slot?
                   :initarg :transactional
                   :type boolean))
   (:documentation "The class for effective slots of transactional classes.
@@ -78,21 +78,23 @@ Exactly analogous to TRANSACTIONAL-DIRECT-SLOT."))
 (let1 lambda-new-tvar (lambda () (new 'tvar))
   (defmethod compute-effective-slot-definition ((class transactional-class)
                                                 slot-name direct-slots)
-    (declare (ignore slot-name))
+    ;;(declare (ignore slot-name))
+    (log:info "class ~A slot ~A: direct slots ~{~A ~}~%"
+              class slot-name direct-slots)
     (let ((effective-slot (call-next-method))
-          (direct-slots (remove-if-not
-			 (lambda (x) (typep x 'transactional-direct-slot))
-			 direct-slots)))
+          (direct-slots (loop for s in direct-slots
+                           when (typep s 'transactional-direct-slot)
+                           collect s)))
       (unless (null (cdr direct-slots))
         (error "More than one :transactional specifier"))
 
       (let* ((direct-slot (car direct-slots))
-             (is-transactional-slot (slot-transactional direct-slot)))
-        (setf (slot-transactional effective-slot) is-transactional-slot)
+             (is-tslot? (transactional-slot? direct-slot)))
+        (setf (transactional-slot? effective-slot) is-tslot?)
 
         ;; if slot is transactional, replace its :type <x> with :type tvar
         ;; and set its initfunction to (lambda () (new 'tvar ...))
-        (when is-transactional-slot
+        (when is-tslot?
           (setf (slot-definition-type effective-slot) 'tvar)
           (let* ((direct-initfunction (slot-definition-initfunction direct-slot))
                  (effective-initfunction
@@ -114,7 +116,7 @@ Exactly analogous to TRANSACTIONAL-DIRECT-SLOT."))
   ;; Get the TVAR from the slot
   (let1 obj (call-next-method)
     (cond
-      ((not (slot-transactional slot))
+      ((not (transactional-slot? slot))
        obj)
     
       ;; Return the value inside the TVAR.
@@ -136,7 +138,7 @@ Exactly analogous to TRANSACTIONAL-DIRECT-SLOT."))
 (defmethod (setf slot-value-using-class) (value    (class transactional-class)
                                           instance (slot transactional-effective-slot))
   (cond
-    ((not (slot-transactional slot))
+    ((not (transactional-slot? slot))
      (call-next-method))
     
     ((or (recording?) (hide-tvars?))
@@ -154,7 +156,7 @@ Exactly analogous to TRANSACTIONAL-DIRECT-SLOT."))
 (defmethod slot-boundp-using-class ((class transactional-class) instance
                                     (slot transactional-effective-slot))
   (cond
-    ((not (slot-transactional slot))
+    ((not (transactional-slot? slot))
      (call-next-method))
     
     ((or (recording?) (hide-tvars?))
@@ -171,7 +173,7 @@ Exactly analogous to TRANSACTIONAL-DIRECT-SLOT."))
 (defmethod slot-makunbound-using-class ((class transactional-class) instance
                                         (slot transactional-effective-slot))
   (cond
-    ((not (slot-transactional slot))
+    ((not (transactional-slot? slot))
      (call-next-method))
     
     ((or (recording?) (hide-tvars?))
@@ -212,9 +214,9 @@ if not already present in the superclass list."
   "For every transactional slot, turn its initarg into a tvar."
   (let1 initargs (copy-list initargs)
     (dolist (slot (class-slots (class-of instance)))
-      ;; Only check those where `slot-transactional' is true.
+      ;; Only check those where `transactional-slot?' is true.
       (when (and (typep slot 'transactional-effective-slot)
-                 (slot-transactional slot))
+                 (transactional-slot? slot))
         (dolist (initarg-name (slot-definition-initargs slot))
           (let1 fragment (rest (member initarg-name initargs))
             (when fragment

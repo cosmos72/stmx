@@ -25,8 +25,8 @@ If PARENT is not nil, it will be the parent of returned tlog"
   (declare (type (or null tlog) parent))
   (if parent
       (new 'tlog :parent parent
-           :reads (copy-hash-table (reads-of parent))
-           :writes (copy-hash-table (writes-of parent)))
+           :reads (clone-hash-table (reads-of parent))
+           :writes (clone-hash-table (writes-of parent)))
       (new 'tlog)))
 
                                             
@@ -59,7 +59,7 @@ of TVARs that were read during the transaction."
 
   (declare (type tlog log))
   (log:trace "Tlog ~A valid?.." (~ log))
-  (dohash (reads-of log) var val
+  (dohash (var val) (reads-of log)
     (let1 actual-val (raw-value-of var)
       (if (eq val actual-val)
           (log:trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
@@ -73,6 +73,7 @@ of TVARs that were read during the transaction."
 
 (declaim (inline invalid?))
 (defun invalid? (log)
+  "Return (not (valid? LOG))."
   (declare (type tlog log))
   (not (valid? log)))
 
@@ -86,7 +87,7 @@ of TVARs that were read during the transaction."
 	(log:trace "Tlog ~A locked tvar ~A" (~ log) (~ var))
 	t)
       (progn
-	(log:debug "Tlog ~A ...not committed: could not lock tvar ~A"
+	(log:debug "Tlog ~A not committed: could not lock tvar ~A"
 		   (~ log) (~ var))
 	nil)))
 
@@ -107,53 +108,55 @@ b) another TLOG is writing the same TVARs being committed
   (declare (type tlog log))
   (let ((reads (reads-of log))
 	(writes (writes-of log))
-	(acquired nil)
-	(changed nil))
+	acquired
+        changed)
 
     (when (zerop (hash-table-count writes))
-      (log:debug "Tlog ~A ...committed (nothing to write)" (~ log))
+      (log:debug "Tlog ~A committed (nothing to write)" (~ log))
       (return-from commit t))
 
     (log:trace "Tlog ~A committing..." (~ log))
     (unwind-protect
          (progn
-           (dohash reads var val
+	   ;; we must lock TVARs that have been read: expensive,
+	   ;; but needed to ensure this threads sees other commits as atomic
+           (dohash (var val) reads
              (if (lock-tvar-nonblock var log)
 	       (push var acquired)
 	       (return-from commit nil)))
            (when (invalid? log)
-             (log:debug "Tlog ~A ...not committed: log is invalid" (~ log))
+             (log:debug "Tlog ~A not committed: log is invalid" (~ log))
              (return-from commit nil))
 
-	   ;; we must lock also TVARs that will be written: expensive,
-	   ;; but needed to ensure other threads see the writes as atomic
-           (dohash writes var val
+	   ;; we must also lock TVARs that will be written: expensive,
+	   ;; but needed to ensure other threads see this commit as atomic
+           (dohash (var val) writes
+	       ;; skip locking TVARs present in (reads-of log), we already locked them
 	     (multiple-value-bind (dummy read?) (gethash var reads)
 	       (declare (ignore dummy))
-	       ;; skip locking TVARs present in (reads-of log), we already locked them
 	       (when (not read?)
 		 (if (lock-tvar-nonblock var log)
 		     (push var acquired)
 		     (return-from commit nil)))))
 
 	   ;; actually write new values into TVARs
-           (dohash writes var val
-	     (let1 actual-val (raw-value-of var)
-	       (when (not (eq val actual-val))
-		 (setf (raw-value-of var) val)
-		 (push var changed)
-		 (log:trace "Tlog ~A tvar ~A value changed from ~A to ~A"
-			    (~ log) (~ var) actual-val val))))
+           (dohash (var val) writes
+             (let1 actual-val (raw-value-of var)
+               (when (not (eq val actual-val))
+                 (setf (raw-value-of var) val)
+                 (push var changed)
+                 (log:trace "Tlog ~A tvar ~A value changed from ~A to ~A"
+                            (~ log) (~ var) actual-val var))))
 
-           (log:debug "Tlog ~A ...committed" (~ log))
+           (log:debug "Tlog ~A committed" (~ log))
            (return-from commit t))
 
       (dolist (var acquired)
         (release-lock (lock-of var))
         (log:trace "Tlog ~A unlocked tvar ~A" (~ log) (~ var)))
       (dolist (var changed)
-	(log:trace "Tlog ~A notifying threads waiting on tvar ~A"
-		   (~ log) (~ var))
+        (log:trace "Tlog ~A notifying threads waiting on tvar ~A"
+                   (~ log) (~ var))
         (notify-tvar var)))))
 
 
@@ -165,16 +168,8 @@ b) another TLOG is writing the same TVARs being committed
 
   (declare (type tlog log1 log2))
 
-  (let ((h1 (writes-of log1))
-        (h2 (writes-of log2)))
-    (dohash h2 var val
-      (set-hash h1 var val)))
-
-  (let ((h1 (reads-of log1))
-        (h2 (reads-of log2)))
-    (dohash h2 var val
-      (set-hash h1 var val)))
-
+  (copy-hash-table (reads-of  log1) (reads-of  log2))
+  (copy-hash-table (writes-of log1) (writes-of log2))
   log1)
 
 (defun compatible-tlogs (log1 log2)
@@ -189,7 +184,7 @@ the same values for the TVARs present in both their (reads-of)."
     (when (> (hash-table-count reads1) (hash-table-count reads2))
       (rotatef reads1 reads2))
 
-    (dohash reads1 var val1
+    (dohash (var val1) reads1
       (multiple-value-bind (val2 present2?) (gethash var reads2)
         (when (and present2? (not (eq val1 val2)))
           (return-from compatible-tlogs nil))))
@@ -210,7 +205,7 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
     (when (zerop (hash-table-count reads))
       (error "BUG! Tried to wait on TLOG ~A, but no TVARs to wait on.~%  This is a bug either in the STMX library or in the application code.~%  Possible reason: some code analogous to (atomic (retry)) was executed.~%  Such code is not allowed, because at least one TVAR or one TOBJ slot~%  must be read before retrying an ATOMIC block." (~ log)))
 
-    (dohash reads var val
+    (dohash (var val) reads
       (listen-tvar var log)
       ;; to avoid deadlocks, check raw-value AFTER listening on tvar.
       ;; otherwise if we naively
@@ -236,7 +231,7 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   (declare (type tlog log))
   (let1 reads (reads-of log)
 
-    (dohash reads var val
+    (dohash (var val) reads
       (unlisten-tvar var log)))
   (values))
 
@@ -247,7 +242,6 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   "Sleep, i.e. wait for relevat TVARs to change.
 After sleeping, return t if log is valid, otherwise return nil."
 
- 
   (declare (type tlog log))
   (log:debug "Tlog ~A sleeping now" (~ log))
   (let ((lock (lock-of log))
@@ -302,8 +296,8 @@ did not change, but the transaction is waiting for them to change"
   (declare (type tlog log)
 	   (type tvar var))
   (log:debug "Waking up tlog ~A listening on tvar ~A" (~ log) (~ var))
-  ;; Question: do we also need to acquire (lock-of log)?
-  ;; Answer: YES! otherwise we can deadlock (tested, it happens)
+  ;; Max, question: do we also need to acquire (lock-of log)?
+  ;; Answering myself: YES! otherwise we can deadlock (tested, it happens)
   (with-lock-held ((lock-of log))
     (setf (prevent-sleep-of log) t)
     (condition-notify (semaphore-of log))))

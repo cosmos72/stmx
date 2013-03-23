@@ -15,7 +15,8 @@
 
 (in-package :stmx.test)
 
-(in-suite suite)
+(def-suite retry-suite :in suite)
+(in-suite retry-suite)
 
 (defun cell-test ()
   (let1 c (new 'cell :value 1)

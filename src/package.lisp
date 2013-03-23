@@ -31,17 +31,16 @@
   (:export :atomic
            :retry
            :orelse
-           :try
 
            :transactional
            :transaction
 
            ;; utilities
            :nonblocking
-           ;; #:blocking ;; implement?
 
            ;; metaclasses
            :transactional-object
+           :transactional-class
 
            ;; low-level API to use TVARs directly
            :tvar

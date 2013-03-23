@@ -31,12 +31,19 @@ If PARENT is not nil, it will be the parent of returned tlog"
 
                                             
 (defun clear-tlog (log &key parent)
-  "Remove all transactional reads and writes stored in LOG; return LOG itself.
+  "Remove all transactional reads and writes stored in LOG,
+as well as functions registered with BEFORE-COMMIT and AFTER-COMMIT;
+return LOG itself.
+
 If PARENT is not nil, it will be set as the parent of LOG."
   (declare (type tlog log)
            (type (or null tlog) parent))
   (reset-hash-table (reads-of log)  :defaults (when parent (reads-of parent)))
   (reset-hash-table (writes-of log) :defaults (when parent (writes-of parent)))
+  (awhen (before-commit-of log)
+    (setf (fill-pointer it) 0))
+  (awhen (after-commit-of log)
+    (setf (fill-pointer it) 0))
   log)
 
 
@@ -48,6 +55,72 @@ and its parent is set to PARENT."
   (if log
       (clear-tlog log :parent parent)
       (make-tlog :parent parent)))
+
+
+(defun ensure-before-commit-of (log)
+  "Create before-commit-of log if nil, and return it."
+  (aif (before-commit-of log)
+       it
+       (setf (before-commit-of log)
+             (make-array '(0) :element-type 'function :adjustable t :fill-pointer t))))
+
+(defun ensure-after-commit-of (log)
+  "Create after-commit-of log if nil, and return it."
+  (aif (after-commit-of log)
+       it
+       (setf (after-commit-of log)
+             (make-array '(0) :element-type 'function :adjustable t :fill-pointer t))))
+
+
+
+
+(defun call-before-commit (func &optional (log (current-tlog)))
+  "Register FUNC function to be invoked immediately before the current transaction commits.
+
+IMPORTANT: See BEFORE-COMMIT for what FUNC must not do."
+  (declare (type function func)
+           (type tlog log))
+  (vector-push-extend func (ensure-before-commit-of log))
+  func)
+
+(defun call-after-commit (func &optional (log (current-tlog)))
+  "Register FUNC function to be invoked after the current transaction commits.
+
+IMPORTANT: See AFTER-COMMIT for what FUNC must not do."
+  (declare (type function func)
+           (type tlog log))
+  (vector-push-extend func (ensure-after-commit-of log))
+  func)
+
+
+
+(defmacro before-commit (&body body)
+  "Register BODY to be invoked immediately before the current transaction commits.
+If BODY signals an error when executed, the error is propagated
+to the caller and the transaction rollbacks.
+
+WARNING: unlike AFTER-COMMIT, here BODY will be executed while holding locks
+on all transactional memory read or written by the transaction. You have been warned.
+
+WARNING: BODY can only write to transactional memory already written to during
+the transaction - writing to other transactional memory has undefined consequences.
+
+Instead, reading from transactional memory is fine, but consistent values are guaranteed
+only for the memory already read or written during the transaction."
+  `(call-before-commit (lambda () ,@body)))
+
+
+(defmacro after-commit (&body body)
+  "Register BODY to be invoked after the current transaction commits.
+If BODY signals an error when executed, the error is propagated
+to the caller but the transaction remains committed.
+
+WARNING: BODY must not write to *any* transactional memory - the consequences are undefined.
+
+Instead, reading from transactional memory is fine, but consistent values are guaranteed
+only for the memory already read or written during the transaction."
+  `(call-after-commit (lambda () ,@body)))
+
 
 
 
@@ -127,6 +200,35 @@ Return :UNKNOWN if relevant locks could not be acquired."
       (unlock-tvars acquired log))))
 
 
+(defun invoke-before-commit-of (log)
+  "Before committing, call in *reverse* order all functions registered
+with (before-commit)
+If any of them signals an error, the transaction will *rollback*
+and the error will be propagated to the caller"
+  (declare (type tlog log))
+  (when-bind funcs (before-commit-of log)
+    ;; restore recording and log as the current tlog,
+    ;; on-commit functions may need them to read transactional memory
+    (with-recording-to-tlog log
+      (loop for i from (1- (length funcs)) downto 0
+         for func = (aref funcs i) do
+           (funcall func))))
+  t)
+
+
+(defun invoke-after-commit-of (log)
+  "After committing, call in order all functions registered with (after-commit)
+If any of them signals an error, it will be propagated to the caller
+but the TLOG will remain committed."
+  (declare (type tlog log))
+  (when-bind funcs (after-commit-of log)
+    ;; restore recording and log as the current tlog,
+    ;; on-commit functions may need them to read transactional memory
+    (with-recording-to-tlog log
+      (loop for func across funcs do
+           (funcall func))))
+  t)
+
 
 (defun commit (log)
   "Commit a TLOG to memory.
@@ -144,10 +246,13 @@ b) another TLOG is writing the same TVARs being committed
   (let ((reads (reads-of log))
 	(writes (writes-of log))
 	acquired
-        changed)
+        changed
+        success)
 
     (when (zerop (hash-table-count writes))
+      (invoke-before-commit-of log)
       (log:debug "Tlog ~A committed (nothing to write)" (~ log))
+      (invoke-after-commit-of log)
       (return-from commit t))
 
     (log:trace "Tlog ~A committing..." (~ log))
@@ -174,7 +279,9 @@ b) another TLOG is writing the same TVARs being committed
 		     (push var acquired)
 		     (return-from commit nil)))))
 
-	   ;; actually write new values into TVARs
+           (invoke-before-commit-of log)
+
+	   ;; COMMIT, i.e. actually write new values into TVARs
            (dohash (var val) writes
              (let1 actual-val (raw-value-of var)
                (when (not (eq val actual-val))
@@ -182,16 +289,22 @@ b) another TLOG is writing the same TVARs being committed
                  (push var changed)
                  (log:trace "Tlog ~A tvar ~A value changed from ~A to ~A"
                             (~ log) (~ var) actual-val var))))
+           (log:debug "Tlog ~A committed." (~ log))
 
-           (log:debug "Tlog ~A committed" (~ log))
-           (return-from commit t))
+           (return-from commit (setf success t)))
 
       (unlock-tvars acquired log)
 
       (dolist (var changed)
         (log:trace "Tlog ~A notifying threads waiting on tvar ~A"
                    (~ log) (~ var))
-        (notify-tvar var)))))
+        (notify-tvar var))
+
+      (when success
+        ;; after-commit functions run without locks
+        (invoke-after-commit-of log)))))
+                   
+
 
 
 ;;;; ** Merging
@@ -212,12 +325,25 @@ in order to wait on their union."
 (defun commit-nested (log)
   "Commit LOG into its parent log; return LOG.
 
-Unlike (commit log), this function is guaranteed to always succeed."
+Unlike (commit log), this function is guaranteed to always succeed.
+
+Implementation note: copy reads-of, writes-of, before-commit-of
+and after-commit-of"
 
   (declare (type tlog log))
   (let1 parent (the tlog (parent-of log))
     (setf (reads-of parent) (reads-of log))
-    (setf (writes-of parent) (writes-of log)))
+    (setf (writes-of parent) (writes-of log))
+
+    (when-bind funcs (before-commit-of log)
+      (let1 parent-funcs (ensure-before-commit-of parent)
+        (loop for func across funcs do
+             (vector-push-extend func parent-funcs))))
+
+    (when-bind funcs (after-commit-of log)
+      (let1 parent-funcs (ensure-after-commit-of parent)
+        (loop for func across funcs do
+             (vector-push-extend func parent-funcs)))))
   log)
 
 (defun compatible-tlogs (log1 log2)

@@ -112,22 +112,32 @@ Can only be used inside an ATOMIC block."
      execute-tx1
      (setf log1 (make-or-clear-tlog log1 :parent parent-log))
 
-     (multiple-value-bind (retry? err values) (run-once tx1 log1)
-       (when retry?
-         (log:debug "Tlog ~A {~A} wants to retry, trying {~A}"
-                    (~ log1) (~ tx1) (~ tx2))
-         (go execute-tx2))
-       (when (invalid? log1)
-         (log:debug "Tlog ~A {~A} is invalid, trying {~A}"
-                    (~ log1) (~ tx1) (~ tx2))
-         (go execute-tx2))
-       (when err
-         (log:debug "Tlog ~A {~A} will rollback and signal"
-                    (~ log1) (~ tx1))
-         (error err))
+     (handler-bind ((condition
+                     (lambda (err)
+                       (log:trace "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
+                                  (~ log1) (~ tx1) (type-of err) (~ err))
+                       (if (eq t (locked-valid? log1))
+                           ;; return normally from lambda to propagate the error
+                           (log:debug "Tlog ~A {~A} will rollback and signal ~A"
+                                      (~ log1) (~ tx1) (type-of err))
+                           (progn
+                             (log:debug "Tlog ~A {~A} is invalid or unknown, masking the ~A it signalled and trying ~A"
+                                        (~ log1) (~ tx1) (type-of err) (~ tx2))
+                             (go execute-tx2))))))
 
-       (setf x-values values)
-       (go commit-tx1))
+       (multiple-value-bind (retry? values) (run-once tx1 log1)
+         (when retry?
+           (log:debug "Tlog ~A {~A} wants to retry, trying {~A}"
+                      (~ log1) (~ tx1) (~ tx2))
+           (go execute-tx2))
+
+         (when (invalid? log1)
+           (log:debug "Tlog ~A {~A} is invalid, trying {~A}"
+                      (~ log1) (~ tx1) (~ tx2))
+           (go execute-tx2))
+
+         (setf x-values values)
+         (go commit-tx1))))
    
      commit-tx1
      (commit-nested log1)
@@ -138,50 +148,50 @@ Can only be used inside an ATOMIC block."
      execute-tx2
      (setf log2 (make-or-clear-tlog log2 :parent parent-log))
 
-     (multiple-value-bind (retry? err values) (run-once tx2 log2)
-       (when (invalid? log2)
-         (log:debug "Tlog ~A {~A} is invalid, checking what to do..."
-                    (~ log2) (~ tx2))
-         (when (invalid? parent-log)
-           (log:debug "Parent tlog ~A is invalid, re-running the parent transaction"
-                      (~ parent-log))
-           (rerun))
+     (handler-bind ((condition
+                     (lambda (err)
+                       (log:trace "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
+                                  (~ log2) (~ tx2) (type-of err) (~ err))
+                       (if (eq t (locked-valid? log1))
+                           ;; return normally from lambda to propagate the error
+                           (log:debug "Tlog ~A {~A} will rollback and signal ~A"
+                                      (~ log2) (~ tx2) (type-of err))
+                           (progn
+                             (log:debug "Tlog ~A {~A} is invalid or unknown, masking the ~A it signalled and trying ~A"
+                                        (~ log2) (~ tx2) (type-of err) (~ tx1))
+                             (go execute-tx1))))))
 
-         (when (invalid? log1)
-           (log:debug "Tlog ~A {~A} is invalid, re-running it"
-                      (~ log1) (~ tx1))
-           (go execute-tx1))
+       (multiple-value-bind (retry? values) (run-once tx2 log2)
+         (when (invalid? log2)
+           (log:debug "Tlog ~A {~A} is invalid, checking what to do..."
+                      (~ log2) (~ tx2))
+           (when (invalid? parent-log)
+             (log:debug "Parent tlog ~A is invalid, re-running the parent transaction"
+                        (~ parent-log))
+             (rerun))
 
-         (log:debug "Tlog ~A {~A} was found invalid, re-running it"
-                    (~ log2) (~ tx2))
-         (go execute-tx2))
+           (when (invalid? log1)
+             (log:debug "Tlog ~A {~A} is invalid, re-running it" (~ log1) (~ tx1))
+             (go execute-tx1))
 
-       (when retry?
-         (log:trace "Tlog ~A {~A} wants to retry, sleeping then retrying both {~A} and {~A}"
-                    (~ log2) (~ tx2) (~ tx1) (~ tx2))
-         (go wait-reexecute))
+           (log:debug "Tlog ~A {~A} was found invalid, re-running it" (~ log2) (~ tx2))
+           (go execute-tx2))
 
-       (when err
-         (log:debug "Tlog ~A {~A} will rollback and signal"
-                    (~ log2) (~ tx2))
-         (error err))
-       
-       (setf x-values values)
-       (go commit-tx2))
+         (when retry?
+           (log:trace "Tlog ~A {~A} wants to retry, sleeping then retrying both {~A} and {~A}"
+                      (~ log2) (~ tx2) (~ tx1) (~ tx2))
+           (go wait-reexecute))
 
-     commit-tx2
-     (commit-nested log2)
-     (log:debug "Tlog ~A {~A} merged with parent tlog ~A"
-                (~ log2) (~ tx2) (~ parent-log))
-     (go done)
-
+         (setf x-values values)
+         (go commit-tx2)))
+     
      wait-reexecute
      (unless (compatible-tlogs log1 log2)
        (log:debug "Tlog ~A {~A} and tlog ~A {~A} are incompatible, not going to sleep"
                   (~ log1) (~ tx1) (~ log2) (~ tx2))
        (when (invalid? parent-log)
          (log:debug "Parent tlog ~A is invalid, re-running it"
-                        (~ parent-log))
+                    (~ parent-log))
          (rerun))
 
        (when (invalid? log1)
@@ -198,6 +208,14 @@ Can only be used inside an ATOMIC block."
                 (~ log1) (~ tx1) (~ log2) (~ tx2))
      (wait-tlog (merge-reads-of log1 log2))
      (go execute-tx1)
+
+
+     commit-tx2
+     (commit-nested log2)
+     (log:debug "Tlog ~A {~A} merged with parent tlog ~A"
+                (~ log2) (~ tx2) (~ parent-log))
+     (go done)
+
 
      done
      (return-from run-orelse2 (values-list x-values)))))

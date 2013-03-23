@@ -96,7 +96,8 @@ beginning without waiting. Used by ORELSE."
 
 Run BODY in a memory transaction. All changes to transactional memory
 will be visible to other threads only after BODY returns normally (commits).
-If BODY signals an error, its effects on transactional memory are rolled back.
+If BODY signals an error, its effects on transactional memory are rolled back
+and the error is propagated normally.
 Also, no work-in-progress transactional memory will ever be visible to other
 threads.
 
@@ -106,9 +107,10 @@ then re-run the transaction from the beginning.
 
 Since STMX transactions do not lock memory, it is possible for different
 transactions to try to update the same memory (almost) simultaneously.
-In such case, the conflict is detected when they try to commit,
+In such case, the conflict is detected when they try to commit or rollback,
 and only one conflicting transaction is allowed to commit:
-all others are immediately re-rund again from the beginning.
+all others are immediately re-run again from the beginning,
+also ignoring any error they may have signalled.
 
 For this reason, a transaction ABSOLUTELY MUST NOT perform any irreversible
 operation such as INPUT/OUTPUT: the result would be that I/O is executed
@@ -131,7 +133,7 @@ For pre-defined transactional classes, see the package STMX.UTIL"
 
 
 (defun run-once (tx log)
-  "Internal function invoked by RUN-ATOMIC and RUN-ORELSE.
+  "Internal function invoked by RUN-ATOMIC and RUN-ORELSE2.
 
 Run once the function TX inside a transaction,
 using LOG as its transaction log."
@@ -139,7 +141,7 @@ using LOG as its transaction log."
            (type tlog log))
 
   (with-recording-to-tlog log
-    (prog (retry? err vals (parent (parent-of log)))
+    (prog (retry? vals (parent (parent-of log)))
 
      run
      (log:debug "Tlog ~A {~A} starting~A" (~ log) (~ tx)
@@ -160,25 +162,21 @@ using LOG as its transaction log."
          
        (retry-error ()
          (setf retry? t)
-         (log:trace "Tlog ~A {~A} wants to retry" (~ log) (~ tx)))
+         (log:trace "Tlog ~A {~A} wants to retry" (~ log) (~ tx))))
 
-       (t (cond)
-         (log:trace "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
-                    (~ log) (~ tx) (type-of cond) (~ cond))
-         (setf err cond)))
-
-     (return-from run-once (values retry? err vals)))))
-
+     (return-from run-once (values retry? vals)))))
 
 
 (defun run-atomic (tx &key id)
   "Function equivalent of the ATOMIC macro.
 
 Run the function TX inside a transaction.
-Commit if it returns normally, rollback if it signals an error.
+If the transaction is invalid (conflicts) re-run TX immediately, ignoring
+any error it may signal.
 
-If the transaction is invalid (conflicts), re-run it immediately.
-If the transaction retries, re-run it after at least some of the
+Otherwise, commit if TX returns normally, or rollback if it signals an error.
+
+Finally, if TX called (retry), re-run it after at least some of the
 transactional memory it read has changed."
 
   (declare (type function tx))
@@ -192,28 +190,35 @@ transactional memory it read has changed."
   (prog ((log (new 'tlog)))
 
    run
-   (multiple-value-bind (retry? err vals) (run-once tx log)
-     (when retry?
-       (log:debug "Tlog ~A {~A} will sleep, then retry" (~ log) (~ tx))
-        ;; wait-tlog also checks if log is valid
-       (wait-tlog log)
-       (go re-run))
-     (when err
-       (when (eq t (locked-valid? log))
-         (log:debug "Tlog ~A {~A} will rollback and signal ~A"
-                    (~ log) (~ tx) (type-of err))
-         (error err))
-       (log:debug "Tlog ~A {~A} *could* be invalid, re-running it" (~ log) (~ tx))
-       (go re-run))
-     ;; commit also checks if log is valid
-     (when (commit log)
-       (return (values-list vals)))
+   (handler-bind ((condition
+                   (lambda (err)
+                     (log:trace "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
+                                (~ log) (~ tx) (type-of err) (~ err))
+                     (if (eq t (locked-valid? log))
+                         ;; return normally from lambda to propagate the error
+                         (log:debug "Tlog ~A {~A} will rollback and signal ~A"
+                                    (~ log) (~ tx) (type-of err))
+                         (progn
+                           (log:debug "Tlog ~A {~A} is invalid or unknown, masking the ~A it signalled and re-running it"
+                                      (~ log) (~ tx) (type-of err))
+                           (go re-run))))))
+         
+     (multiple-value-bind (retry? vals) (run-once tx log)
+       (when retry?
+         (log:debug "Tlog ~A {~A} will sleep, then retry" (~ log) (~ tx))
+         ;; wait-tlog also checks if log is valid
+         (wait-tlog log)
+         (go re-run))
 
-     (log:debug "Tlog ~A {~A} could not commit, re-running it" (~ log) (~ tx))
-     (go re-run))
-   
+       ;; commit also checks if log is valid
+       (when (commit log)
+         (return (values-list vals)))
+
+       (log:debug "Tlog ~A {~A} could not commit, re-running it" (~ log) (~ tx))
+       (go re-run)))
+
    re-run
-   (clear-tlog log)
+   (clear-tlog log :parent (parent-of log))
    (go run)))
 
 

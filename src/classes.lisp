@@ -45,6 +45,14 @@
                   :type boolean
                   :documentation "Flag to prevent TLOGs from sleeping.
 Set by TVARs when they change")
+   (before-commit :accessor before-commit-of
+                  :initform nil
+                  :type (or null vector)
+                  :documentation "functions to call immediately before committing TLOG.")
+   (after-commit :accessor after-commit-of
+                 :initform nil
+                 :type (or null vector)
+                 :documentation "functions to call immediately after committing TLOG.")
    (id :reader id-of
        :initform (incf *tlog-id-counter*)
        :type integer))
@@ -143,9 +151,14 @@ inside TOBJs slots while executing BODY."
   "Return the current transaction log"
   *tlog*)
 
+(defmacro with-tlog (log &body body)
+  "Use LOG as the current transaction log while executing BODY."
+  `(let1 *tlog* ,log
+     ,@body))
+
 (defmacro with-recording-to-tlog (log &body body)
   "Use LOG as the current transaction log and enable recording of transactions
 to TLOGs while executing BODY."
-  `(let1 *tlog* ,log
+  `(with-tlog ,log
      (with-recording
        ,@body)))

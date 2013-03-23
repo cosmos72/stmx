@@ -9,20 +9,17 @@ TO DO:
    but hash tables would be nice - they likely require (on-commit).
    Transactional arrays are a pain to implement efficiently.
 
-5) implement on-commit and on-rollback (idea from SW-STM)
-   what if functions registered with on-commit fail?
-   Isn't it too late to rollback?
+DONE:
 
+5) implemented before-commit and after-commit (idea from SW-STM on-commit)
 
 4.2) optimize nested transaction. Copying all the parent TLOG reads and writes is slow,
-     so at least merge only reads-of log1 log2 when retrying a nested transaction
+     so merge only reads-of log1 log2 when retrying a nested transaction
      and simply replace reads and writes of parent tlog when committing a nested transaction
 
-4.1) test that errors signaled by an invalid transaction are *not* propagated to the caller
+4.1) test that errors signalled by an invalid transaction are *not* propagated to the caller
      and the transaction is re-executed
 
-
-DONE:
 4) orelse and nested transactions, including tests
 3) (error 'retry-error ...) shows message "attempt to RETRY outside ATOMIC block"
    when printed
@@ -34,7 +31,7 @@ DONE:
 
 
 WON'T DO:
-4.3) also allow orelse/nonblocking to work even without a parent transaction,
+4.3) allow orelse/nonblocking to work even without a parent transaction,
      i.e. outside (atomic ...) ?
      NO. the overhead of (atomic (orelse ...)) is minimal with respect to
      bare (orelse ...), and the former is clearer to understand.

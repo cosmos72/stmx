@@ -63,8 +63,9 @@
 
   :components ((:module :test
                 :components ((:file "package")
-                             (:file "atomic"   :depends-on ("package"))
-                             (:file "retry"    :depends-on ("package"))
-                             (:file "orelse"   :depends-on ("package"))))))
+                             (:file "atomic"    :depends-on ("package"))
+                             (:file "on-commit" :depends-on ("package" "atomic"))
+                             (:file "retry"     :depends-on ("package"))
+                             (:file "orelse"    :depends-on ("package"))))))
 
 

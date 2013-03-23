@@ -21,11 +21,11 @@
 (test read-tvar
   (let ((log (new 'tlog))
         (var (new 'tvar :value 1)))
-    (is-true (= 1 (raw-value-of var)))
-    (is-true (= 1 (read-tvar var log)))
+    (is (= 1 (raw-value-of var)))
+    (is (= 1 (read-tvar var log)))
     (write-tvar var 2 log)
-    (is-true (= 1 (raw-value-of var)))
-    (is-true (= 2 (read-tvar var log)))))
+    (is (= 1 (raw-value-of var)))
+    (is (= 2 (read-tvar var log)))))
 
 (test valid?
   (let ((log (new 'tlog))
@@ -45,38 +45,59 @@
 	(var (new 'tvar :value 1)))
     (write-tvar var 2 log)
     (is-true (valid? log))
-    (commit log)
-    (is-true (= (raw-value-of var) 2))))
+    (is-true (commit log))
+    (is (= 2 (raw-value-of var)))))
 
 (test $
   (let ((log (new 'tlog))
         (var (new 'tvar :value 1)))
-    (is-true (= ($ var) 1))
+    (is (= 1 ($ var)))
     (with-recording-to-tlog log
-      (is-true (= ($ var) 1))
+      (is (= 1 ($ var)))
       (setf ($ var) 2)
-      (is-true (= ($ var) 2))
-      (is-true (= (raw-value-of var) 1))
+      (is (= 2 ($ var)))
+      (is (= 1 (raw-value-of var)))
       (is-true (valid? log))
       (is-true (commit log))
-      (is-true (= (raw-value-of var) 2)))
-    (is-true (= ($ var) 2))))
+      (is (= 2 (raw-value-of var))))
+    (is (= 2 ($ var)))))
 
 (test atomic
-  (let1 var (new 'tvar :value 1)
+  (let1 var (new 'tvar :value 0)
+
     (atomic :id 'test-atomic
-      (is-true (= ($ var) 1))
-      (setf ($ var) 2)
-      (is-true (= ($ var) 2))
-      (is-true (= (raw-value-of var) 1))
-      (is-true (valid? (current-tlog))))
-    (is-true (= ($ var) 2))))
+      (is (= 0 ($ var)0))
+      (setf ($ var) 1)
+      (is (= 0 (raw-value-of var)))
+      (is-true (valid? (current-tlog)))
+
+      ;; simulate another thread committing tvar:
+      ;; the current transaction log must become invalid
+      (setf (raw-value-of var) -1)
+      (is (= 1 ($ var)))
+      (is-false (valid? (current-tlog)))
+      
+      ;; an invalid transaction cannot become valid again
+      ;; by writing into its vars. test it.
+      (setf ($ var) (raw-value-of var))
+      (is-false (valid? (current-tlog)))
+
+      ;; the only way for an invalid transaction to become valid again
+      ;; is for some other thread to commit and "by chance"
+      ;; restore the original value initially seen by the invalid one
+      (setf (raw-value-of var) 0)
+      (is-true (valid? (current-tlog)))
+      (setf ($ var) 2))
+
+    (is (= 2 ($ var)))))
 
 (define-condition test-error (simple-error)
   ())
 
 (test rollback
-  (prog ((var (new 'tvar :value 1)))
+  (let ((var (new 'tvar :value 1))
+        got-test-error?)
+    
     (handler-case
         (progn
           (atomic :id 'test-rollback
@@ -86,5 +107,43 @@
           (fail "error signaled inside ATOMIC was not propagated to caller"))
 
       (test-error ()
+        (setf got-test-error? t)
         (is-true (= (raw-value-of var) 1))
-        (is-true (= ($ var) 1))))))
+        (is-true (= ($ var) 1))))
+
+    (is-true got-test-error?)))
+
+
+(test invalid
+  (let ((var (new 'tvar :value 1))
+        (counter 0)
+        masked-test-error?)
+    
+    (handler-case
+        (progn
+          (atomic :id 'test-invalid
+                  (log:debug "($ var) is ~A" ($ var))
+                  (incf ($ var))
+                  (log:debug "($ var) set to ~A" ($ var))
+                  (when (= 1 (incf counter))
+                    ;; simulate another thread writing into VAR
+                    (setf (raw-value-of var) 10)
+                    (log:debug "simulated another thread setting (raw-value-of var) to ~A"
+                               (raw-value-of var))
+                    (is-false (valid? (current-tlog)))
+                    (error 'test-error :format-arguments
+                           "BUG! an error signalled from an invalid transaction
+was propagated outside (atomic)"))
+
+                  (is-true (valid? (current-tlog))))
+          
+          ;; the test error we signalled from an invalid transaction
+          ;; must not propagate outside (atomic), so this code must execute
+          (setf masked-test-error? t))
+
+      (test-error (err)
+        (fail "~A ~A" (type-of err) err)))
+
+    (is-true masked-test-error?)
+    (is (= 11 ($ var))))) ;; 10 for "(setf (raw-value-of var) 10)" plus 1 for "(incf ($ var))"
+          

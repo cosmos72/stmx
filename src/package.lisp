@@ -37,6 +37,8 @@
 
            ;; utilities
            :nonblocking
+           :before-commit  :call-before-commit
+           :after-commit   :call-after-commit
 
            ;; metaclasses
            :transactional-object

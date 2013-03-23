@@ -167,7 +167,7 @@ also heavily documented in the sources - use (describe 'some-symbol) at REPL.
   transactional objects) that was read since the beginning of the
   transaction and until `(retry)` was invoked. 
 
-  With RETRY, reliable communication among threads is (hopefully)
+  With `RETRY`, reliable communication among threads is (hopefully)
   extremely simple to implement: a thread can read one (or more)
   transactional data, checking for values that some other thread
   will write there, and just `(retry)` if no appropriate values are
@@ -188,7 +188,7 @@ also heavily documented in the sources - use (describe 'some-symbol) at REPL.
   
         (orelse (values t (progn (x) (y) (z))) nil)
         
-  with the difference that (nonblocking ...) actually captures all the values
+  with the difference that `(nonblocking ...)` actually captures all the values
   returned by the transaction, not just the first as in the example above.
 
 
@@ -197,6 +197,8 @@ Contacts, help, discussion
 
 As long as the traffic is low enough, [GitHub Issues](https://github.com/cosmos72/stmx/issues)
 can be used to report test suite failures, bugs, suggestions, general discussion etc.
+
+If the traffic becomes high, more appropriate discussion channels will be set-up.
 
 The author will also try to answer support requests, but gives no guarantees.
 

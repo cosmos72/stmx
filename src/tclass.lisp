@@ -74,34 +74,54 @@ Exactly analogous to TRANSACTIONAL-DIRECT-SLOT."))
     transactional-effective-slot-class))
 
 
+(defun list-classes-containing-direct-slots (direct-slots class)
+  (loop for superclass in (class-precedence-list class)
+     when (intersection direct-slots (class-direct-slots superclass))
+     collect (class-name superclass)))
 
 (let1 lambda-new-tvar (lambda () (new 'tvar))
   (defmethod compute-effective-slot-definition ((class transactional-class)
                                                 slot-name direct-slots)
-    ;;(declare (ignore slot-name))
-    (log:info "class ~A slot ~A: direct slots ~{~A ~}~%"
-              class slot-name direct-slots)
+    "If more than one transactional-direct-slot with the same name is present,
+ensure that all of them have the same :transactional flag value (all T or all NIL),
+otherwise signal an error.
+
+For transactional slots, replace :type ... with :type tvar
+and wrap :initform with (lambda () (new 'tvar ...)"
+
     (let ((effective-slot (call-next-method))
-          (direct-slots (loop for s in direct-slots
-                           when (typep s 'transactional-direct-slot)
-                           collect s)))
-      (unless (null (cdr direct-slots))
-        (error "More than one :transactional specifier"))
+          (direct-slots (loop for slot in direct-slots
+                           when (typep slot 'transactional-direct-slot)
+                           collect slot)))
 
-      (let* ((direct-slot (car direct-slots))
-             (is-tslot? (transactional-slot? direct-slot)))
-        (setf (transactional-slot? effective-slot) is-tslot?)
-
-        ;; if slot is transactional, replace its :type <x> with :type tvar
-        ;; and set its initfunction to (lambda () (new 'tvar ...))
-        (when is-tslot?
-          (setf (slot-definition-type effective-slot) 'tvar)
-          (let* ((direct-initfunction (slot-definition-initfunction direct-slot))
-                 (effective-initfunction
-                  (if direct-initfunction
-                      (lambda () (new 'tvar :value (funcall direct-initfunction)))
-                      lambda-new-tvar)))
-            (setf (slot-definition-initfunction effective-slot) effective-initfunction))))
+      (when direct-slots
+        (loop for tail on direct-slots
+           for slot1 = (first tail) 
+           for slot2 = (second tail)
+           while slot2 do
+             (unless (eq (transactional-slot? slot1)
+                         (transactional-slot? slot2))
+               (error "Transactional slot ~A in class ~A is inherited multiple times,
+some with :transactional T and some with :transactional NIL.
+This is not allowed, please set all the relevant :transactional flags
+to the same value. Problematic classes containing slot ~A: ~{~A ~}"
+                      slot-name (class-name class) slot-name
+                      (list-classes-containing-direct-slots direct-slots class))))
+        
+        (let* ((slot (first direct-slots))
+               (is-tslot? (transactional-slot? slot)))
+          (setf (transactional-slot? effective-slot) is-tslot?)
+          
+          ;; if slot is transactional, replace its :type <x> with :type tvar
+          ;; and set its initfunction to (lambda () (new 'tvar ...))
+          (when is-tslot?
+            (setf (slot-definition-type effective-slot) 'tvar)
+            (let* ((direct-initfunction (slot-definition-initfunction slot))
+                   (effective-initfunction
+                    (if direct-initfunction
+                        (lambda () (new 'tvar :value (funcall direct-initfunction)))
+                        lambda-new-tvar)))
+              (setf (slot-definition-initfunction effective-slot) effective-initfunction)))))
       effective-slot)))
 
 

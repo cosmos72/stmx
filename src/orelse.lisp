@@ -211,10 +211,10 @@ Returns the value of the transaction that succeeded,
 or signals the error raised by the transaction that failed.
 
 Can only be used inside an ATOMIC block."
-  `(run-orelse (lambda () ,form1)
-               (lambda () ,form2)
-               :id1 ,id1
-               :id2 ,id2))
+  `(run-orelse2 (lambda () ,form1)
+                (lambda () ,form2)
+                :id1 ,id1
+                :id2 ,id2))
   
 
 (defmacro orelse (&body body)
@@ -243,7 +243,7 @@ Can only be used inside an ATOMIC block."
   (declare (type function tx))
   (orelse2 (multiple-value-call #'values t (funcall tx))
            nil
-           :id1 (if id id 'nonblocking)
+           :id1 (or id 'nonblocking)
            :id2 'nonblocking-nil))
 
 
@@ -260,4 +260,7 @@ Can only be used inside an ATOMIC block."
   (let1 id (when (eq :id (first body))
              (pop body)
              (pop body))
-    `(run-nonblocking (lambda () ,@body) :id ,id)))
+    `(orelse2 (multiple-value-call #'values t (progn ,@body))
+              nil
+              :id1 ,(or id ''nonblocking)
+              :id2 'nonblocking-nil)))

@@ -1,26 +1,43 @@
 TO DO:
-6) implement on-commit and on-rollback (idea from SW-STM)
-   what if functions registered with on-commit fail?
-   Isn't it too late to rollback?
 
-5) contact Lars Rune Nostdal <larsnostdal at gmail dot com>, author of SW-STM:
+7) contact Lars Rune Nostdal <larsnostdal at gmail dot com>, author of SW-STM:
    see http://blog.nostdal.org/
    "I have a very crude and quite horribly written one laying around for
     Common Lisp: https://github.com/lnostdal/SW-STM"
 
-4ter) optimize nested transaction: copying all the parent TLOG reads and writes is slow.
+6) implement transactional collections. Lists are not needed,
+   but hash tables would be nice - they likely require (on-commit).
+   Transactional arrays are a pain to implement efficiently.
 
-4bis) also allow try/orelse/nonblocking to work even without a parent transaction,
-      i.e. outside (atomic ...) ?
+5) implement on-commit and on-rollback (idea from SW-STM)
+   what if functions registered with on-commit fail?
+   Isn't it too late to rollback?
 
-4) test orelse and nested transactions. test try-take and try-put.
+
+4.2) optimize nested transaction. Copying all the parent TLOG reads and writes is slow,
+     so at least merge only reads-of log1 log2 when retrying a nested transaction
+     and simply replace reads and writes of parent tlog when committing a nested transaction
+
+4.1) test that errors signaled by an invalid transaction are *not* propagated to the caller
+     and the transaction is re-executed
+
 
 DONE:
-4) orelse and nested transactions
-3) (error 'retry-error ...) should show message "attempt to RETRY outside ATOMIC block"
+4) orelse and nested transactions, including tests
+3) (error 'retry-error ...) shows message "attempt to RETRY outside ATOMIC block"
    when printed
-2) in atomic.lisp (run-once) add handler-case to capture errors signaled by tx
-1) implement ($ tvar) and (setf ($ tvar) value)
+2) in atomic.lisp (run-once) added handler-case to capture errors signaled by tx
+1) implemented ($ tvar) and (setf ($ tvar) value)
    for transactional access to tvars.
    useful when dealing directly with tvars,
    for example in cases transactional objects are too heavyweight
+
+
+WON'T DO:
+4.3) also allow orelse/nonblocking to work even without a parent transaction,
+     i.e. outside (atomic ...) ?
+     NO. the overhead of (atomic (orelse ...)) is minimal with respect to
+     bare (orelse ...), and the former is clearer to understand.
+     Also, doing this would make orelse implementation slower and even more
+     complicated than what already is.
+

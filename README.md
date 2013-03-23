@@ -27,8 +27,8 @@ STMX is packaged with asdf. The simplest way to install it is to first
 install [Quicklisp](http://www.quicklisp.org), as it can automatically
 resolve and download STMX dependencies.
 
-Once quicklisp is installed, download STMX into your Quicklisp
-local-projects folder with the commands:
+Once quicklisp is installed, download STMX from GitHub and save it
+into your Quicklisp local-projects folder with the commands:
 
     $ cd ~/quicklisp/local-projects
     $ git clone git://github.com/cosmos72/stmx.git
@@ -56,6 +56,23 @@ In case you get errors:
 
 - check that you downloaded STMX creating an `stmx/` folder inside
   your Quicklisp local-projects folder, usually `~/quicklisp/local-projects`
+
+After loading STMX, the test suite can be executed with:
+
+    CL-USER> (ql:quickload "stmx.test")
+    ;; lots of output...
+    CL-USER> (fiveam:run! 'stmx.test:suite)
+
+Note: `(ql:quickload "stmx.test")` intentionally works only *after*
+`(ql:quickload "stmx")` completes successfuly.
+
+You are welcome to report any failure you get while running the test suite,
+please include in the report:
+- operating system name and version (example: Debian GNU/Linux x86_64 version 7.0)
+- Common Lisp implementation and version (example: SBCL 1.0.57.0.debian, 64bit)
+- EXACT output produced by the test suite
+- any other relevant information
+See "Contacts, help, discussion" below for the preferred method to send the report.
 
 
 Documentation
@@ -156,13 +173,10 @@ also heavily documented in the sources - use (describe 'some-symbol) at REPL.
   will write there, and just `(retry)` if no appropriate values are
   there yet.
 
-- `ORELSE` is a macro to combine two transactions as alternatives:
-  if the first retries, the second will be executed and so on, until one
-  transaction either commits (returns normally) or rollbacks (signals an error
-  or condition).
-
-- `TRY` is the n-ary version of `ORELSE`: it combines two *or more*
-  transactions as alternatives
+- `ORELSE` is a macro to combine two or more transactions as alternatives:
+  if the first retries or is invalid, the second will be executed and so on,
+  until one transaction either commits (returns normally) or rollbacks
+  (signals an error or condition).
 
 - `NONBLOCKING` is an utility macro based on `ORELSE` to convert a blocking
   transaction into another that returns NIL instead of blocking
@@ -178,11 +192,13 @@ also heavily documented in the sources - use (describe 'some-symbol) at REPL.
   returned by the transaction, not just the first as in the example above.
 
 
-Mailing List
-------------
+Contacts, help, discussion
+--------------------------
 
-The old [CL-STM mailing list](http://common-lisp.net/cgi-bin/mailman/listinfo/cl-stm-devel)
-seems to be abandoned since 2006. A new one will be created as soon as possible.
+As long as the traffic is low enough, [GitHub Issues](https://github.com/cosmos72/stmx/issues)
+can be used to report test suite failures, bugs, suggestions, general discussion etc.
+
+The author will also try to answer support requests, but gives no guarantees.
 
 Status
 ------

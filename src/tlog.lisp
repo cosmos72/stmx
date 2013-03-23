@@ -197,14 +197,28 @@ b) another TLOG is writing the same TVARs being committed
 ;;;; ** Merging
 
 
-(defun merge-tlogs (log1 log2)
-  "Merge LOG2 into LOG1; return LOG1."
+(declaim (inline merge-reads-of))
+(defun merge-reads-of (log1 log2)
+  "Copy reads of LOG2 into LOG1; return LOG1.
+
+Used to merge reads-of two different nested transactions
+in order to wait on their union."
 
   (declare (type tlog log1 log2))
-
   (copy-hash-table (reads-of  log1) (reads-of  log2))
-  (copy-hash-table (writes-of log1) (writes-of log2))
   log1)
+
+
+(defun commit-nested (log)
+  "Commit LOG into its parent log; return LOG.
+
+Unlike (commit log), this function is guaranteed to always succeed."
+
+  (declare (type tlog log))
+  (let1 parent (the tlog (parent-of log))
+    (setf (reads-of parent) (reads-of log))
+    (setf (writes-of parent) (writes-of log)))
+  log)
 
 (defun compatible-tlogs (log1 log2)
   "Return t if LOG1 and LOG2 are compatible, i.e. if they contain

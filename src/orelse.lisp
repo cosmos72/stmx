@@ -130,7 +130,7 @@ Can only be used inside an ATOMIC block."
        (go commit-tx1))
    
      commit-tx1
-     (merge-tlogs parent-log log1)
+     (commit-nested log1)
      (log:debug "Tlog ~A {~A} merged with parent tlog ~A"
                 (~ log1) (~ tx1) (~ parent-log))
      (go done)
@@ -170,7 +170,7 @@ Can only be used inside an ATOMIC block."
        (go commit-tx2))
 
      commit-tx2
-     (merge-tlogs parent-log log2)
+     (commit-nested log2)
      (log:debug "Tlog ~A {~A} merged with parent tlog ~A"
                 (~ log2) (~ tx2) (~ parent-log))
      (go done)
@@ -196,7 +196,7 @@ Can only be used inside an ATOMIC block."
 
      (log:debug "Sleeping for both tlog ~A {~A} and tlog ~A {~A}"
                 (~ log1) (~ tx1) (~ log2) (~ tx2))
-     (wait-tlog (merge-tlogs log1 log2))
+     (wait-tlog (merge-reads-of log1 log2))
      (go execute-tx1)
 
      done

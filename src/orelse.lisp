@@ -130,12 +130,12 @@ Can only be used inside an ATOMIC block."
            (log:debug "Tlog ~A {~A} wants to retry, trying {~A}"
                       (~ log1) (~ tx1) (~ tx2))
            (go execute-tx2))
-	 
+         
          (when (invalid? log1)
            (log:debug "Tlog ~A {~A} is invalid, trying {~A}"
                       (~ log1) (~ tx1) (~ tx2))
            (go execute-tx2))
-	 
+         
          (setf x-values values)
          (go commit-tx1)))
    

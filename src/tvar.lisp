@@ -146,7 +146,7 @@ During transactions, it uses transaction log to record the 'unbound' value."
   "Add LOG to VAR's waiting list, so that LOG will be notified if VAR changes."
 
   (declare (type tvar var)
-	   (type tlog log))
+           (type tlog log))
   (with-lock-held ((waiting-lock-of var))
     (setf (gethash log (waiting-for var)) t)))
 
@@ -156,7 +156,7 @@ During transactions, it uses transaction log to record the 'unbound' value."
 if VAR changes."
 
   (declare (type tvar var)
-	   (type tlog log))
+           (type tlog log))
   (with-lock-held ((waiting-lock-of var))
     (remhash log (waiting-for var))))
 

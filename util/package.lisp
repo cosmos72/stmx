@@ -24,6 +24,7 @@
         :stmx)
 
   (:export :cell
+           :value-of
            :empty?
            :empty!
            :full?

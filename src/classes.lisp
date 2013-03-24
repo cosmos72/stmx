@@ -39,7 +39,7 @@
    (lock   :accessor lock-of
            :initform nil)
    (semaphore :accessor semaphore-of
-	      :initform nil)
+              :initform nil)
    (prevent-sleep :accessor prevent-sleep-of
                   :initform nil
                   :type boolean

@@ -222,10 +222,10 @@ to the same value. Problematic classes containing slot ~A: ~{~A ~}"
 if not already present in the superclass list."
     (let1 superclasses (call-next-method)
       (if (member transactional-object-class superclasses)
-	  superclasses
-	  `(,(first superclasses) ;; this is the class itself being defined
-	     ,transactional-object-class
-	     ,@(rest superclasses))))))
+          superclasses
+          `(,(first superclasses) ;; this is the class itself being defined
+             ,transactional-object-class
+             ,@(rest superclasses))))))
 
 
 

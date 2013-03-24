@@ -29,7 +29,7 @@
 
 (test valid?
   (let ((log (new 'tlog))
-	(var  (new 'tvar :value 1)))
+        (var  (new 'tvar :value 1)))
     (is-true (valid? log))
     (read-tvar var log)
     (is-true (valid? log))
@@ -42,7 +42,7 @@
     
 (test commit
   (let ((log (new 'tlog))
-	(var (new 'tvar :value 1)))
+        (var (new 'tvar :value 1)))
     (write-tvar var 2 log)
     (is-true (valid? log))
     (is-true (commit log))

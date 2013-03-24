@@ -90,7 +90,7 @@
 
 (defun orelse-func (iterations cells names)
   (declare (type fixnum iterations)
-	   (type vector cells names))
+           (type vector cells names))
 
   (let ((x nil)
         (name nil))
@@ -206,7 +206,7 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
 (test orelse-thread4
   (let1 iterations 1000
     (multiple-value-bind (values empty-cells?)
-	(orelse-thread4-test iterations)
+        (orelse-thread4-test iterations)
 
       (loop for e in empty-cells?
          do (is-true e))

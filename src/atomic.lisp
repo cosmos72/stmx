@@ -59,15 +59,25 @@ The effect is the same as DEFUN - or DEFMETHOD - plus:
   ()
   (:report (lambda (err stream)
              (declare (ignore err))
-             (format stream "Attempt to ~A outside an ~A block" 'retry 'atomic))))
+             (format stream "Attempt to ~A outside an ~A block" 'retry 'atomic)))
+
+  (:documentation "Signalled by RETRY. It is captured by ATOMIC and ORELSE,
+so it is visible to application code only in case of bugs"))
+
 
 
 (define-condition rerun-error (control-error)
   ()
   (:report (lambda (err stream)
              (declare (ignore err))
-             (format stream "Attempt to ~A outside an ~A block" 'rerun 'orelse)))
-  (:documentation "Signalled by ORELSE to force re-running the parent transaction."))
+             (format stream "Transactional memory conflict detected inside ~A.
+If you see this error, there is a bug either in STMX or in application code.
+Possible reason: code registered with ~A attempted to read transactional memory
+not already read or written during the transaction" 'orelse 'after-commit)))
+
+  (:documentation "Signalled by ORELSE to force re-running the parent transaction
+in case of conflicts. It is captured by ATOMIC, so it is visible
+to application code only in case of bugs"))
 
 
 

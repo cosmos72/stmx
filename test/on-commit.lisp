@@ -37,17 +37,16 @@
         (atomic
          (setf ($ var) 'changed)
          (is (eq 'changed ($ var)))
-         ;; before-commit blocks are executed in reverse order
          (before-commit
-           (fail "before-commit function unexpectedly invoked after another one signalled an error"))
+           (is (eq 'changed ($ var)))
+           (is (eq 'original (raw-value-of var)))
+           (setf ($ var) 'before-commit))
          (before-commit
            (is (eq 'before-commit ($ var)))
            (is (eq 'original (raw-value-of var)))
            (error 'test-error))
          (before-commit
-           (is (eq 'changed ($ var)))
-           (is (eq 'original (raw-value-of var)))
-           (setf ($ var) 'before-commit))
+           (fail "before-commit function unexpectedly invoked after another one signalled an error"))
          (after-commit
            (fail "after-commit function unexpectedly invoked after before-commit signalled an error")))
       (test-error ()

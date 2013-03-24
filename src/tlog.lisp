@@ -98,27 +98,36 @@ IMPORTANT: See AFTER-COMMIT for what FUNC must not do."
   "Register BODY to be invoked immediately before the current transaction commits.
 If BODY signals an error when executed, the error is propagated
 to the caller and the transaction rollbacks.
+Also, further code registered with before-commit is not executed.
 
-WARNING: unlike AFTER-COMMIT, here BODY will be executed while holding locks
-on all transactional memory read or written by the transaction. You have been warned.
+BODY can read and write normally to transactional memory, and in case of conflicts
+the whole transaction (not only the code registered with before-commit)
+is re-executed from the beginning.
 
-WARNING: BODY can only write to transactional memory already written to during
-the transaction - writing to other transactional memory has undefined consequences.
-
-Instead, reading from transactional memory is fine, but consistent values are guaranteed
-only for the memory already read or written during the transaction."
+WARNING: BODY cannot (retry) - attempts to do so will signal an error.
+Starting a nested transaction and retrying inside that is acceptable,
+as long as the (retry) does not propagate outside BODY."
   `(call-before-commit (lambda () ,@body)))
 
 
 (defmacro after-commit (&body body)
   "Register BODY to be invoked after the current transaction commits.
 If BODY signals an error when executed, the error is propagated
-to the caller but the transaction remains committed.
+to the caller and further code registered with after-commit is not executed,
+but the transaction remains committed.
 
-WARNING: BODY must not write to *any* transactional memory - the consequences are undefined.
+WARNING: Code registered with after-commit has a number or restrictions:
 
-Instead, reading from transactional memory is fine, but consistent values are guaranteed
-only for the memory already read or written during the transaction."
+1) BODY cannot (retry) - attempts to do so will signal an error.
+Starting a nested transaction and retrying inside that is acceptable
+as long as the (retry) does not propagate outside BODY.
+
+2) BODY must not write to *any* transactional memory: the consequences
+are undefined.
+
+3) BODY can only read from transactional memory already read or written
+during the transaction. Reading from other transactional memory
+has undefined consequences"
   `(call-after-commit (lambda () ,@body)))
 
 
@@ -201,18 +210,21 @@ Return :UNKNOWN if relevant locks could not be acquired."
 
 
 (defun invoke-before-commit-of (log)
-  "Before committing, call in *reverse* order all functions registered
+  "Before committing, call in order all functions registered
 with (before-commit)
-If any of them signals an error, the transaction will *rollback*
+If any of them signals an error, the transaction will rollback
 and the error will be propagated to the caller"
   (declare (type tlog log))
   (when-bind funcs (before-commit-of log)
     ;; restore recording and log as the current tlog,
     ;; on-commit functions may need them to read transactional memory
     (with-recording-to-tlog log
-      (loop for i from (1- (length funcs)) downto 0
-         for func = (aref funcs i) do
-           (funcall func))))
+      (handler-case
+	  (loop for func across funcs do
+	       (funcall func))
+	(rerun-error ()
+         (log:trace "Tlog ~A before-commit wants to rerun" (~ log))
+	 (return-from invoke-before-commit-of nil)))))
   t)
 
 
@@ -249,8 +261,11 @@ b) another TLOG is writing the same TVARs being committed
         changed
         success)
 
+    ;; before-commit functions run without locks
+    (unless (invoke-before-commit-of log)
+      (return-from commit nil))
+
     (when (zerop (hash-table-count writes))
-      (invoke-before-commit-of log)
       (log:debug "Tlog ~A committed (nothing to write)" (~ log))
       (invoke-after-commit-of log)
       (return-from commit t))
@@ -278,8 +293,6 @@ b) another TLOG is writing the same TVARs being committed
 		 (if (try-lock-tvar var log "committed")
 		     (push var acquired)
 		     (return-from commit nil)))))
-
-           (invoke-before-commit-of log)
 
 	   ;; COMMIT, i.e. actually write new values into TVARs
            (dohash (var val) writes

@@ -129,9 +129,10 @@ Irreversible operations MUST be performed OUTSIDE transactions,
 for example by queueing them into transactional memory that another thread
 will consume and then, OUTSIDE transactions, actually perform them.
 
-For how create transactional memory, see TRANSACTIONAL or TVAR.
+For how to create transactional memory, see TRANSACTIONAL or TVAR.
 For another way to run transactions, see also TRANSACTION.
-For advanced features inside transactions, see RETRY, ORELSE and NONBLOCKING.
+For advanced features inside transactions, see RETRY, ORELSE, NONBLOCKING,
+    BEFORE-COMMIT and AFTER-COMMIT.
 
 For pre-defined transactional classes, see the package STMX.UTIL"
 

@@ -77,15 +77,12 @@
                              (= value rand)
                              (empty? place)))))))
       
-(transaction
- (defun orelse-atomic-test ()
-   (orelse-test)))
-
 (test orelse
   (orelse-test))
 
 (test orelse-atomic
-  (orelse-atomic-test))
+  (atomic
+   (orelse-test)))
 
 
 (defun orelse-func (iterations cells names)

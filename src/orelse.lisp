@@ -247,37 +247,32 @@ Can only be used inside an ATOMIC block."
 
 
 
-(defun run-nonblocking (tx &key id)
-  "Function version of NONBLOCKING macro: execute the function tx in a nested transaction and:
-a) if the nested transaction succeeds (i.e. commits), return multiple values:
-   T followed by the values returned by the transaction.
-b) if the nested transaction signals an error, raise such error.
-c) if the nested transaction attempts to retry,
-   immediately return NIL without waiting/sleeping.
+(defun run-nonblocking (func)
+  "Function version of NONBLOCKING macro: execute the function FUNC
+in a nested transaction and:
+a) in case of transaction conflicts, re-execute FUNC
+b) if FUNC returns normally, commit and return multiple values:
+   T followed by the values returned by FUNC.
+b) if FUNC signals an error, rollback and raise such error.
+d) if FUNC attempts to retry, immediately return NIL without waiting/sleeping.
 
 Can only be used inside an ATOMIC block."
 
-  (declare (type function tx))
-  (orelse2 (multiple-value-call #'values t (funcall tx))
-           nil
-           :id1 (or id 'nonblocking)
-           :id2 'nonblocking-nil))
+  (declare (type function func))
+  (orelse (multiple-value-call #'values t (funcall func))
+          nil))
+
 
 
 (defmacro nonblocking (&body body)
   "Execute all the form in BODY in a single nested transaction and:
-a) if the nested transaction succeeds (i.e. commits), return multiple values:
-   T followed by the values returned by the transaction.
-b) if the nested transaction signals an error, raise such error.
-c) if the nested transaction attempts to retry,
-   immediately return NIL without waiting/sleeping.
+a) in case of transaction conflicts, re-execute BODY
+b) if BODY returns normally, commit and return multiple values:
+   T followed by the values returned by BODY.
+b) if BODY signals an error, rollback and raise such error.
+d) if BODY attempts to retry, immediately return NIL without waiting/sleeping.
 
 Can only be used inside an ATOMIC block."
 
-  (let1 id (when (eq :id (first body))
-             (pop body)
-             (pop body))
-    `(orelse2 (multiple-value-call #'values t (progn ,@body))
-              nil
-              :id1 ,(or id ''nonblocking)
-              :id2 'nonblocking-nil)))
+  `(orelse (multiple-value-call #'values t (progn ,@body))
+           nil))

@@ -68,6 +68,22 @@ The new hash-table inherits :test from HASH."
     (copy-hash-table copy hash)))
 
 
+(defun merge-hash-tables (dst src)
+  "Copy hash-table SRC into hash-table DST.
+
+Return T if SRC and DST are compatible, i.e. if they contain the same values
+for the keys common to both, otherwise return NIL
+\(in the latter case, the merge will not be completed)."
+
+  (declare (type hash-table src dst))
+  (dohash (var val1) src
+    (multiple-value-bind (val2 present2?) (gethash var dst)
+      (when (and present2? (not (eq val1 val2)))
+        (return-from merge-hash-tables nil))
+      (setf (gethash var dst) val1)))
+  t)
+
+
 
 
 ;;;; * Printing utilities

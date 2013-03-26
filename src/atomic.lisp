@@ -55,7 +55,12 @@ The effect is the same as DEFUN - or DEFMETHOD - plus:
 
 ;;;; ** Retrying
 
-(define-condition retry-error (control-error)
+(define-condition stmx-control-error (control-error)
+  ()
+  (:documentation "Parent class of all STMX errors"))
+
+
+(define-condition retry-error (stmx-control-error)
   ()
   (:report (lambda (err stream)
              (declare (ignore err))
@@ -66,7 +71,7 @@ so it is visible to application code only in case of bugs"))
 
 
 
-(define-condition rerun-error (control-error)
+(define-condition rerun-error (stmx-control-error)
   ()
   (:report (lambda (err stream)
              (declare (ignore err))
@@ -152,30 +157,20 @@ using LOG as its transaction log."
            (type tlog log))
 
   (with-recording-to-tlog log
-    (prog (retry? vals (parent (parent-of log)))
+    (prog ((parent (parent-of log)))
 
      run
      (log:debug "Tlog ~A {~A} starting~A" (~ log) (~ tx)
                 (if parent
                     (format nil ", parent is tlog ~A" (~ parent))
                     ""))
-     (handler-case
-         (progn
-           (setf vals (multiple-value-list (funcall tx)))
-           (log:trace "Tlog ~A {~A} wants to commit, returned: ~{~A ~}"
-                      (~ log) (~ tx) vals))
+     (restart-case
+         (return (funcall tx))
 
-       (rerun-error ()
-         (log:trace "Tlog ~A {~A} wants to rerun" (~ log) (~ tx))
+       (rerun-once ()
+         (log:trace "Tlog ~A {~A} will rerun" (~ log) (~ tx))
          (clear-tlog log :parent parent)
-         (setf vals nil) ;; paranoia
-         (go run))
-         
-       (retry-error ()
-         (setf retry? t)
-         (log:trace "Tlog ~A {~A} wants to retry" (~ log) (~ tx))))
-
-     (return-from run-once (values retry? vals)))))
+         (go run))))))
 
 
 (defun run-atomic (tx &key id)
@@ -201,7 +196,19 @@ transactional memory it read has changed."
   (prog ((log (new 'tlog)))
 
    run
-   (handler-bind ((condition
+   (handler-bind ((retry-error
+                   (lambda (err)
+                     (declare (ignore err))
+                     (log:trace "Tlog ~A {~A} wants to retry" (~ log) (~ tx))
+                     (go retry)))
+                  
+                  (rerun-error
+                   (lambda (err)
+                     (declare (ignore err))
+                     (log:trace "Tlog ~A {~A} wants to re-run" (~ log) (~ tx))
+                     (invoke-restart 'rerun-once)))
+
+                  (condition
                    (lambda (err)
                      (log:trace "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
                                 (~ log) (~ tx) (type-of err) (~ err))
@@ -212,23 +219,25 @@ transactional memory it read has changed."
                          (progn
                            (log:debug "Tlog ~A {~A} is invalid or unknown, masking the ~A it signalled and re-running it"
                                       (~ log) (~ tx) (type-of err))
-                           (go re-run))))))
+                           (invoke-restart 'rerun-once))))))
          
-     (multiple-value-bind (retry? vals) (run-once tx log)
-       (when retry?
-         (log:debug "Tlog ~A {~A} will sleep, then retry" (~ log) (~ tx))
-         ;; wait-tlog also checks if log is valid
-         (wait-tlog log)
-         (go re-run))
+     (return
+       (multiple-value-prog1
+           (run-once tx log)
+         (log:trace "Tlog ~A {~A} wants to commit" (~ log) (~ tx))
 
-       ;; commit also checks if log is valid
-       (when (commit log)
-         (return (values-list vals)))
+         ;; commit also checks if log is valid
+         (unless (commit log)
+           (log:debug "Tlog ~A {~A} could not commit, re-running it" (~ log) (~ tx))
+           (go rerun)))))
 
-       (log:debug "Tlog ~A {~A} could not commit, re-running it" (~ log) (~ tx))
-       (go re-run)))
+   retry
+   (log:debug "Tlog ~A {~A} will sleep, then retry" (~ log) (~ tx))
+   ;; wait-tlog sleeps only if log is valid
+   (wait-tlog log)
+   (go rerun)
 
-   re-run
+   rerun
    (clear-tlog log :parent (parent-of log))
    (go run)))
 

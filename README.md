@@ -127,7 +127,7 @@ also heavily documented in the sources - remember `(describe 'some-symbol)` at R
             ;; ...
           ))
 
-- `ATOMIC` is the main macro: it wraps Lisp forms into a transaction.
+- `ATOMIC` is the main macro: it wraps Lisp forms into a transaction then executes them.
   The above functions and methods could also be written as:
   
         (defun bar (obj)

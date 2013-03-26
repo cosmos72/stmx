@@ -21,51 +21,17 @@
   ()
   (:report (lambda (err stream)
              (declare (ignore err))
-             (format stream "Attempt to use ~A or ~A outside an ~A block" 'try 'orelse 'atomic))))
+             (format stream "Attempt to use ~A outside an ~A block" 'orelse 'atomic))))
+
+(defstruct orelse-tx
+  (func  nil :type function)
+  (log   nil :type (or null tlog))
+  (retry t   :type boolean))
 
 
-(defun run-orelse2 (tx1 tx2 &key id1 id2)
-  "Function variant of `orelse2'. Execute function TX1 first,
-then function TX2 in separate, nested transactions until one succeeds
-\(i.e. commits) or signals an error.
 
-Returns the value of the transaction that succeeded,
-or signals the error raised by the transaction that failed.
-
-Can only be used inside an ATOMIC block."
-  (declare (type function tx1 tx2))
-
-  ;; binary implementation, two transactions tx1 and tx2: run tx1, then:
-  ;;
-  ;; a) if tx1 is executed:
-  ;;    1. if tx1 is invalid, run tx2. reason: more possibilities to get a valid run of tx1 or tx2
-  ;;    2. if tx1 wants to retry, run tx2. reason: orelse exists exactly to implement this behaviour
-  ;;    3. if tx1 wants to commit (returns normally), merge to parent log and return
-  ;;    4. if tx1 wants to rollback (signals an error), rollback and signal the error
-  ;; 
-  ;; b) if tx2 is executed:
-  ;;    1. if tx2 is invalid:
-  ;;       1.1 if parent-tx is invalid, tell it to re-execute with (rerun)
-  ;;           this is necessary to break infinite loops alternating
-  ;;           between tx1 and tx2, caused by the parent-tx being invalid
-  ;;       1.2 if tx1 is invalid, run tx1. reason: it means some TVARs
-  ;;           relevant for tx1 have changed
-  ;;       1.3 run tx2 again
-  ;;    2. if tx2 wants to retry, sleep on tx1+tx2
-  ;;    3. if tx2 wants to commit (returns normally), merge to parent log and return
-  ;;    4. if tx2 wants to rollback (signals an error), rollback and signal the error
-  ;; 
-  ;; c) if sleeping on tx1+tx2:
-  ;;    1. if tx1 and tx2 are incompatible => at least one of them is invalid
-  ;;       1.1 if parent-tx is invalid, tell it to re-execute with (rerun)
-  ;;       1.2 otherwise, run the first invalid one between tx1 and tx2
-  ;;    2. merge tx1 and tx2 logs into log1+2, and sleep on it. when waking up:
-  ;;       2.1 if log1+2 is valid, sleep again on it
-  ;;       2.2 if parent-tx is invalid, tell it to re-execute with (rerun)
-  ;;       2.3 run tx1 (we could check which tx is invalid to run it instead,
-  ;;           but we lost tx1 log when merging tx1 and tx2)
-
-
+(defun run-orelse-tx (&rest txs)
+  (declare (type list txs))
 
   ;; n-ary implementation, n transactions tx[0...n-1]: set i=0, run tx[i], then:
   ;;
@@ -98,142 +64,169 @@ Can only be used inside an ATOMIC block."
   ;;           but we lost some logs when merging them)
 
 
-  (let1 parent-log (current-tlog)
+  (let ((parent-log (current-tlog))
+         txs-ref tx any-retry? any-rerun?)
+    
     (unless parent-log
       (error 'orelse-error))
 
-    (when id1
-      (setf (~ tx1) id1))
-    (when id2
-      (setf (~ tx2) id2))
+    (unless txs
+      (return-from run-orelse-tx (values)))
 
-    (prog (log1 log2 x-values)
+    (flet ((initialize ()
+             (setf txs-ref    txs
+                   tx         (first txs)
+                   any-retry? nil
+                   any-rerun? nil))
 
-     execute-tx1
-     (setf log1 (make-or-clear-tlog log1 :parent parent-log))
+           (wants-to-rerun ()
+             (setf (orelse-tx-retry tx) nil
+                   any-rerun? t))
+           
+           (wants-to-retry ()
+             (setf (orelse-tx-retry tx) t
+                   any-retry? t)))
 
-     (handler-bind ((condition
-                     (lambda (err)
-                       (log:trace "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
-                                  (~ log1) (~ tx1) (type-of err) (~ err))
-                       (if (eq t (locked-valid? log1))
-                           ;; return normally from lambda to propagate the error
-                           (log:debug "Tlog ~A {~A} will rollback and signal ~A"
-                                      (~ log1) (~ tx1) (type-of err))
-                           (progn
-                             (log:debug "Tlog ~A {~A} is invalid or unknown, masking the ~A it signalled and trying ~A"
-                                        (~ log1) (~ tx1) (type-of err) (~ tx2))
-                             (go execute-tx2))))))
+      (prog (vals func log (me (log:make-logger)))
+
+       start
+       (initialize)
+       (go run-tx)
+
+
+       run-next
+       (setf tx (pop txs-ref))
+       (if tx
+           (go run-tx)
+           (go retry-or-rerun))
+
+
+       run-tx
+       (setf func (orelse-tx-func tx)
+             log  (make-or-clear-tlog (orelse-tx-log tx) :parent parent-log)
+             (orelse-tx-log tx) log)
+
+       (handler-bind ((retry-error
+                       (lambda (err)
+                         (declare (ignore err))
+                         (log:debug me "Tlog ~A {~A} wants to retry, trying next one"
+                                    (~ log) (~ func))
+                         (wants-to-retry)
+                         (go run-next)))
+                    
+                      (rerun-error
+                       (lambda (err)
+                         (declare (ignore err))
+                         (log:debug me "Tlog ~A {~A} wants to re-run, trying next one"
+                                    (~ log) (~ func))
+                         (wants-to-rerun)
+                         (go run-next)))
+
+                      (condition
+                       (lambda (err)
+                         (log:trace me "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
+                                    (~ log) (~ func) (type-of err) (~ err))
+                         (if (eq t (locked-valid? log))
+                             ;; return normally from lambda to propagate the error
+                             (log:debug me "Tlog ~A {~A} will rollback and signal ~A"
+                                        (~ log) (~ func) (type-of err))
+                             (progn
+                               (log:debug me "Tlog ~A {~A} is invalid or unknown, masking the ~A it signalled and trying next one"
+                                          (~ log) (~ func) (type-of err))
+                               (wants-to-rerun)
+                               (go run-next))))))
        
-       (multiple-value-bind (retry? values) (run-once tx1 log1)
-         (when retry?
-           (log:debug "Tlog ~A {~A} wants to retry, trying {~A}"
-                      (~ log1) (~ tx1) (~ tx2))
-           (go execute-tx2))
-         
-         (when (invalid? log1)
-           (log:debug "Tlog ~A {~A} is invalid, trying {~A}"
-                      (~ log1) (~ tx1) (~ tx2))
-           (go execute-tx2))
-         
-         (setf x-values values)
-         (go commit-tx1)))
+         (setf vals (multiple-value-list (run-once func log)))
+
+         (when (invalid? log)
+           (log:debug me "Tlog ~A {~A} is invalid, trying next one"
+                      (~ log) (~ func))
+           (wants-to-rerun)
+           (go run-next))
+
+         (go commit))
    
-     commit-tx1
-     (commit-nested log1)
-     (log:debug "Tlog ~A {~A} merged with parent tlog ~A"
-                (~ log1) (~ tx1) (~ parent-log))
-     (go done)
+
+       commit
+       (commit-nested log)
+       (log:debug me "Tlog ~A {~A} committed: merged with parent tlog ~A"
+                  (~ log) (~ tx) (~ parent-log))
+       (go done)
    
-     execute-tx2
-     (setf log2 (make-or-clear-tlog log2 :parent parent-log))
 
-     (handler-bind ((condition
-                     (lambda (err)
-                       (log:trace "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
-                                  (~ log2) (~ tx2) (type-of err) (~ err))
-                       (if (eq t (locked-valid? log1))
-                           ;; return normally from lambda to propagate the error
-                           (log:debug "Tlog ~A {~A} will rollback and signal ~A"
-                                      (~ log2) (~ tx2) (type-of err))
-                           (progn
-                             (log:debug "Tlog ~A {~A} is invalid or unknown, masking the ~A it signalled and trying ~A"
-                                        (~ log2) (~ tx2) (type-of err) (~ tx1))
-                             (go execute-tx1))))))
+       done
+       (return-from run-orelse-tx (values-list vals))
 
-       (multiple-value-bind (retry? values) (run-once tx2 log2)
-         (when (invalid? log2)
-           (log:debug "Tlog ~A {~A} is invalid, checking what to do..."
-                      (~ log2) (~ tx2))
-           (when (invalid? parent-log)
-             (log:debug "Parent tlog ~A is invalid, re-running the parent transaction"
-                        (~ parent-log))
-             (rerun))
 
-           (when (invalid? log1)
-             (log:debug "Tlog ~A {~A} is invalid, re-running it" (~ log1) (~ tx1))
-             (go execute-tx1))
+       retry-or-rerun
+       (if any-rerun?
+           (go rerun)
+           (go retry))
 
-           (log:debug "Tlog ~A {~A} was found invalid, re-running it" (~ log2) (~ tx2))
-           (go execute-tx2))
 
-         (when retry?
-           (log:trace "Tlog ~A {~A} wants to retry, sleeping then retrying both {~A} and {~A}"
-                      (~ log2) (~ tx2) (~ tx1) (~ tx2))
-           (go wait-reexecute))
-
-         (setf x-values values)
-         (go commit-tx2)))
-     
-     wait-reexecute
-     (unless (compatible-tlogs log1 log2)
-       (log:debug "Tlog ~A {~A} and tlog ~A {~A} are incompatible, not going to sleep"
-                  (~ log1) (~ tx1) (~ log2) (~ tx2))
+       rerun
        (when (invalid? parent-log)
-         (log:debug "Parent tlog ~A is invalid, re-running it"
+         (log:debug me "Parent tlog ~A is invalid, re-running it"
                     (~ parent-log))
          (rerun))
 
-       (when (invalid? log1)
-         (log:debug "Tlog ~A {~A} is invalid, re-running it"
-                    (~ log1) (~ tx1))
-         (go execute-tx1))
-
-       (progn
-         (log:debug "Tlog ~A {~A} deduced to be invalid, re-running it"
-                    (~ log2) (~ tx2))
-         (go execute-tx2)))
-
-     (log:debug "Sleeping for both tlog ~A {~A} and tlog ~A {~A}"
-                (~ log1) (~ tx1) (~ log2) (~ tx2))
-     (wait-tlog (merge-reads-of log1 log2))
-     (go execute-tx1)
+       (initialize)
+       (loop for itx = (pop txs-ref)
+          while itx
+          for ilog = (orelse-tx-log itx)
+          when (invalid? ilog)
+          do
+            (log:debug me "Tlog ~A {~A} is invalid, re-running it"
+                       (~ ilog) (~ (orelse-tx-func itx)))
+            (setf tx itx)
+            (go run-tx))
+       (go retry)
 
 
-     commit-tx2
-     (commit-nested log2)
-     (log:debug "Tlog ~A {~A} merged with parent tlog ~A"
-                (~ log2) (~ tx2) (~ parent-log))
-     (go done)
+       retry
+       (initialize)
+       (setf tx (pop txs-ref))
+       (setf log (orelse-tx-log tx))
+       
+       (loop for itx in txs-ref
+          for ilog = (orelse-tx-log itx)
+          unless
+            (merge-reads-of log ilog)
+          do
+            (log:debug me "Tlog ~A {~A} is incompatible with the previous ones, re-running the whole ORELSE"
+                       (~ ilog) (~ (orelse-tx-func itx)))
+            (go start))
+
+       (log:debug me "Sleeping for tlogs ~{~A ~}"
+                  (loop for itx in txs
+                     for ilog = (orelse-tx-log itx)
+                     collect (~ ilog)))
+       ;; wait-tlog only sleeps if log is invalid
+       (wait-tlog log)
+       (go start)))))
 
 
-     done
-     (return-from run-orelse2 (values-list x-values)))))
 
 
-(defmacro orelse2 (form1 form2 &key id1 id2)
-  "Execute first FORM1, then FORM2 in separate, nested transactions
-until one succeeds (i.e. commits) or signals an error.
+
+(defun run-orelse (&rest funcs)
+  "Function variant of `orelse'. Execute the functions in FUNCS list one by one
+from left to right in separate, nested transactions until one succeeds
+\(i.e. commits) or signals an error.
+
+If a nested transaction is invalid or wants to retry, run the next one.
 
 Returns the value of the transaction that succeeded,
 or signals the error raised by the transaction that failed.
 
 Can only be used inside an ATOMIC block."
-  `(run-orelse2 (lambda () ,form1)
-                (lambda () ,form2)
-                :id1 ,id1
-                :id2 ,id2))
-  
+  (declare (type list funcs))
+
+  (apply #'run-orelse-tx
+         (loop for func in funcs collect
+              (make-orelse-tx :func func))))
+         
+
 
 (defmacro orelse (&body body)
   "Execute each form in BODY from left to right in separate, nested transactions
@@ -244,7 +237,13 @@ or signals the error raised by the transaction that failed.
 
 Can only be used inside an ATOMIC block."
 
-  (reduce (lambda (x y) (list 'orelse2 x y)) body :from-end t))
+  (if body
+      (let1 txs
+          (loop for form in body collect
+               `(make-orelse-tx :func (lambda () ,form)))
+        `(run-orelse-tx ,@txs))
+      `(values)))
+      
 
 
 

@@ -11,7 +11,7 @@ TO DO:
 
 DONE:
 
-5) implemented before-commit and after-commit (idea from SW-STM on-commit)
+5) implemented before-commit and after-commit (idea from SW-STM when-commit)
 
 4.2) optimize nested transaction. Copying all the parent TLOG reads and writes is slow,
      so merge only reads-of log1 log2 when retrying a nested transaction

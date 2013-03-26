@@ -59,17 +59,19 @@ and its parent is set to PARENT."
 
 (defun ensure-before-commit-of (log)
   "Create before-commit-of log if nil, and return it."
-  (aif (before-commit-of log)
-       it
-       (setf (before-commit-of log)
-             (make-array '(0) :element-type 'function :adjustable t :fill-pointer t))))
+  (declare (type tlog log))
+  (the vector
+    (or (before-commit-of log)
+        (setf (before-commit-of log)
+              (make-array '(0) :element-type 'function :adjustable t :fill-pointer t)))))
 
 (defun ensure-after-commit-of (log)
   "Create after-commit-of log if nil, and return it."
-  (aif (after-commit-of log)
-       it
-       (setf (after-commit-of log)
-             (make-array '(0) :element-type 'function :adjustable t :fill-pointer t))))
+  (declare (type tlog log))
+  (the vector
+    (or (after-commit-of log)
+        (setf (after-commit-of log)
+              (make-array '(0) :element-type 'function :adjustable t :fill-pointer t)))))
 
 
 
@@ -118,16 +120,16 @@ but the transaction remains committed.
 
 WARNING: Code registered with after-commit has a number or restrictions:
 
-1) BODY cannot (retry) - attempts to do so will signal an error.
-Starting a nested transaction and retrying inside that is acceptable
-as long as the (retry) does not propagate outside BODY.
-
-2) BODY must not write to *any* transactional memory: the consequences
+1) BODY must not write to *any* transactional memory: the consequences
 are undefined.
 
-3) BODY can only read from transactional memory already read or written
+2) BODY can only read from transactional memory already read or written
 during the transaction. Reading from other transactional memory
-has undefined consequences"
+has undefined consequences.
+
+3) BODY cannot (retry) - attempts to do so will signal an error.
+Starting a nested transaction and retrying inside that is acceptable
+as long as the (retry) does not propagate outside BODY."
   `(call-after-commit (lambda () ,@body)))
 
 
@@ -323,16 +325,24 @@ b) another TLOG is writing the same TVARs being committed
 ;;;; ** Merging
 
 
-(declaim (inline merge-reads-of))
 (defun merge-reads-of (log1 log2)
-  "Copy reads of LOG2 into LOG1; return LOG1.
+  "Copy (reads-of LOG2) into (reads-of LOG1).
 
-Used to merge reads-of two different nested transactions
-in order to wait on their union."
-
+Return T if reads-of LOG1 and LOG2 are compatible, i.e. if they contain
+the same values for the TVARs common to both, otherwise return NIL
+\(in the latter case, the merge will not be completed)."
   (declare (type tlog log1 log2))
-  (copy-hash-table (reads-of  log1) (reads-of  log2))
-  log1)
+  (let ((reads1 (reads-of log1))
+        (reads2 (reads-of log2)))
+    
+    (if reads1
+        (if reads2
+            (merge-hash-tables reads1 reads2)
+            t)
+        (progn
+          (setf (reads-of log1) reads2)
+          t))))
+  
 
 
 (defun commit-nested (log)
@@ -358,24 +368,6 @@ and after-commit-of"
         (loop for func across funcs do
              (vector-push-extend func parent-funcs)))))
   log)
-
-(defun compatible-tlogs (log1 log2)
-  "Return t if LOG1 and LOG2 are compatible, i.e. if they contain
-the same values for the TVARs present in both their (reads-of)."
-
-  (declare (type tlog log1 log2))
-  (let ((reads1 (reads-of log1))
-        (reads2 (reads-of log2)))
-        
-    ;; choose the smaller hash table for looping
-    (when (> (hash-table-count reads1) (hash-table-count reads2))
-      (rotatef reads1 reads2))
-
-    (dohash (var val1) reads1
-      (multiple-value-bind (val2 present2?) (gethash var reads2)
-        (when (and present2? (not (eq val1 val2)))
-          (return-from compatible-tlogs nil))))
-    t))
 
 
 

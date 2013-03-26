@@ -85,5 +85,5 @@ Linux amd64) than the unspecialized (try-put place) which calls
   ;; (value-of obj) is much better: it works both inside and outside transactions.
   (let1 value (value-of obj)
     (if (eq value *empty-cell*)
-        (format t "<empty>")
+        (format t "empty")
         (format t "[~A]" value))))

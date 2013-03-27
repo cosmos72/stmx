@@ -23,13 +23,13 @@
 (defclass tlog ()
   ((reads  :accessor reads-of
            :initarg :reads
-           :initform (make-hash-table :test 'eq)
-           :type hash-table
+           :initform nil ;; (make-hash-table :test 'eq)
+           :type (or null hash-table)
            :documentation "TVARs read during transaction, mapped to their read value")
    (writes :accessor writes-of
            :initarg :writes
-           :initform (make-hash-table :test 'eq)
-           :type hash-table
+           :initform nil ;; (make-hash-table :test 'eq)
+           :type (or null hash-table)
            :documentation "TVARs written during transaction, mapped to their new values")
    (parent :accessor parent-of
            :initarg :parent

@@ -86,19 +86,20 @@ to application code only in case of bugs"))
 
 
 
-
-(defun retry ()
-  "Abort the current transaction and re-run it again from the beginning.
+(let1 retry-error-obj (make-condition 'retry-error)
+  (defun retry ()
+    "Abort the current transaction and re-run it again from the beginning.
 
 Before re-executing, the transaction will wait on all variables that it read
 until at least one of them changes."
-  (error 'retry-error))
+    (error retry-error-obj)))
 
 
-(defun rerun ()
-  "Abort the current transaction and immediately re-run it from the
+(let1 rerun-error-obj (make-condition 'rerun-error)
+  (defun rerun ()
+    "Abort the current transaction and immediately re-run it from the
 beginning without waiting. Used by ORELSE."
-  (error 'rerun-error))
+    (error rerun-error-obj)))
 
   
 

@@ -40,34 +40,6 @@
   
 ;;;; ** Reading and writing
 
-(defun read-tvar (var &optional (log (current-tlog)))
-  "Record the reading of VAR to LOG and return VAR value.
-READ-TVAR is an internal function called by ($ VAR) and by reading TOBJs slots."
-  (declare (type tvar var)
-           (type tlog log))
-  (multiple-value-bind (value present?)
-      (gethash var (writes-of log))
-    (when present?
-      (return-from read-tvar value)))
-
-  (multiple-value-bind (value present?)
-      (gethash var (reads-of log))
-    (when present?
-      (return-from read-tvar value)))
-
-  (set-hash (reads-of log) var (raw-value-of var)))
-
-
-(defun write-tvar (var value &optional (log (current-tlog)))
-  "Record in LOG the writing of VALUE into VAR; return VALUE.
-WRITE-TVAR is an internal function called by (setf ($ VAR) VALUE)
-and by writing TOBJs slots."
-  (declare (type tvar var)
-           (type tlog log))
-  (set-hash (writes-of log) var value))
-
-
-
 (defun $ (var)
     "Get the value from the transactional variable VAR.
 Works both outside and inside transactions.
@@ -77,7 +49,7 @@ and to check for any value stored in the log."
   (declare (type tvar var))
 
   (let1 value (if (recording?)
-                  (read-tvar var)
+                  (tx-read-of var)
                   (raw-value-of var))
     (if (eq value +unbound+)
         (unbound-tvar-error var)
@@ -92,7 +64,7 @@ During transactions, it uses transaction log to record the value."
   (declare (type tvar var))
 
   (if (recording?)
-      (write-tvar var value)
+      (tx-write-of var value)
       (setf (raw-value-of var) value)))
                
             
@@ -107,7 +79,7 @@ and to check for any value stored in the log."
 
   (not (eq +unbound+
            (if (recording?)
-               (read-tvar var)
+               (tx-read-of var)
                (raw-value-of var)))))
 
 
@@ -119,7 +91,7 @@ During transactions, it uses transaction log to record the 'unbound' value."
   (declare (type tvar var))
 
   (if (recording?)
-      (write-tvar var +unbound+)
+      (tx-write-of var +unbound+)
       (setf (raw-value-of var) +unbound+))
   var)
 

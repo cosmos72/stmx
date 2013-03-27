@@ -26,8 +26,8 @@
   (:import-from :stmx
                 :lock-of
                 :raw-value-of
-                :read-tvar
-                :write-tvar
+                :tx-read-of
+                :tx-write-of
                 :tlog
                 :commit
                 :valid?

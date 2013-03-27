@@ -1,0 +1,60 @@
+STMX> (time (dotimes (i 100000) (atomic (orelse (retry) (retry) (retry) (retry) 1))))
+Evaluation took:
+  0.410 seconds of real time
+  0.410000 seconds of total run time (0.410000 user, 0.000000 system)
+  [ Run times consist of 0.060 seconds GC time, and 0.350 seconds non-GC time. ]
+  100.00% CPU
+  1,645,064,884 processor cycles
+  348,846,304 bytes consed
+  
+NIL
+STMX> (time (dotimes (i 100000) (atomic (orelse (retry) (retry) (retry) 1))))
+Evaluation took:
+  0.335 seconds of real time
+  0.336667 seconds of total run time (0.336667 user, 0.000000 system)
+  [ Run times consist of 0.050 seconds GC time, and 0.287 seconds non-GC time. ]
+  100.60% CPU
+  1,343,085,528 processor cycles
+  279,996,592 bytes consed
+  
+NIL
+STMX> (time (dotimes (i 100000) (atomic (orelse (retry) (retry) 1))))
+Evaluation took:
+  0.266 seconds of real time
+  0.266667 seconds of total run time (0.260000 user, 0.006667 system)
+  [ Run times consist of 0.037 seconds GC time, and 0.230 seconds non-GC time. ]
+  100.38% CPU
+  1,065,131,668 processor cycles
+  212,797,520 bytes consed
+  
+NIL
+STMX> (time (dotimes (i 100000) (atomic (orelse (retry) 1))))
+Evaluation took:
+  0.156 seconds of real time
+  0.156667 seconds of total run time (0.153334 user, 0.003333 system)
+  [ Run times consist of 0.020 seconds GC time, and 0.137 seconds non-GC time. ]
+  100.64% CPU
+  625,282,500 processor cycles
+  128,018,448 bytes consed
+  
+NIL
+STMX> (time (dotimes (i 100000) (atomic (orelse 1))))
+Evaluation took:
+  0.100 seconds of real time
+  0.100000 seconds of total run time (0.100000 user, 0.000000 system)
+  [ Run times consist of 0.020 seconds GC time, and 0.080 seconds non-GC time. ]
+  100.00% CPU
+  403,116,916 processor cycles
+  67,190,752 bytes consed
+  
+NIL
+STMX> (time (dotimes (i 100000) (atomic 1)))
+Evaluation took:
+  0.044 seconds of real time
+  0.043333 seconds of total run time (0.040000 user, 0.003333 system)
+  [ Run times consist of 0.013 seconds GC time, and 0.031 seconds non-GC time. ]
+  97.73% CPU
+  177,870,476 processor cycles
+  31,975,184 bytes consed
+  
+NIL

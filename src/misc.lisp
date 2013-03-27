@@ -15,6 +15,11 @@
 
 (in-package :stmx)
 
+;;;; * New
+
+(defmacro new (class &rest initargs &key &allow-other-keys)
+  `(make-instance ,class ,@initargs))
+
 ;;;; * Hash-table utilities
 
 (defmacro dohash ((key &optional value) hash &body body)

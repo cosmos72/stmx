@@ -24,6 +24,7 @@
         :stmx.util)
 
   (:import-from :stmx
+                :new
                 :lock-of
                 :raw-value-of
                 :tx-read-of

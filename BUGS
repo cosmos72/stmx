@@ -1,7 +1,6 @@
 KNOWN BUGS
 
-4) (retry) calls (valid? log) without locking, so in theory it may get spurious
-   "valid" answers exactly like in bug 3 below. Is it a bug or not?
+none :)
 
 FIXED BUGS:
 
@@ -46,3 +45,10 @@ FIXED BUGS:
       (unless (prevent-sleep-of log)
          (condition-wait log (lock-of log))))
 
+NOT BUGS
+
+4) (retry) triggers a call to (valid? log) without locking, so in theory it may
+   get spurious "valid" answers exactly like in bug 3. Is it a bug or not?
+   Not a bug.
+   Reason: if tlog appears valid, (wait-tlog) will repeat validity check
+   with locking before actually sleeping.

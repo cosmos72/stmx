@@ -36,7 +36,8 @@
                              (:file "tlog"        :depends-on ("classes"))
                              (:file "tvar"        :depends-on ("tlog"))
                              (:file "tclass"      :depends-on ("tvar"))
-                             (:file "atomic"      :depends-on ("tclass"))
+                             (:file "commit"      :depends-on ("tlog"))
+                             (:file "atomic"      :depends-on ("tclass" "commit"))
                              (:file "orelse"      :depends-on ("atomic"))))
 
                (:module :util

@@ -13,32 +13,20 @@
 ;; See the Lisp Lesser General Public License for more details.
 
 
-;;;; * STMX.UTIL
+(in-package :stmx.util)
 
-(in-package :cl-user)
+;;;; ** Printing utilities
 
-(defpackage #:stmx.util
-  
-  (:use #:cl
-        #:arnesi
-        #:stmx)
+(defgeneric print-object-contents (stream hash))
 
-  (:import-from #:stmx
-                #:with-gensyms
-                #:with-ro-slots
-                #:dohash)
+(defmethod print-object-contents ((stream (eql 'nil)) obj)
+  (with-output-to-string (s)
+    (print-object-contents s obj)))
 
-  (:export #:cell
-           #:value-of
-           #:empty?
-           #:empty!
-           #:full?
-           #:take
-           #:put
-           #:try-put
-           #:try-take
-
-           #:thash-table
-           #:get-thash ;; includes (setf (get-thash ...) ...)
-           #:rem-thash
-           #:do-thash))
+(defmethod print-object-contents (stream (obj hash-table))
+  (format stream "{")
+  (let1 first t
+    (dohash (key value) obj
+      (format stream "~A~S=~S" (if first "" ", ") key value)
+      (setf first nil)))
+  (format stream "}"))

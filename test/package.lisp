@@ -15,27 +15,27 @@
 
 (in-package :cl-user)
 
-(defpackage :stmx.test
-  (:use :cl
-        :arnesi
-        :bordeaux-threads
-        :fiveam
-        :stmx
-        :stmx.util)
+(defpackage #:stmx.test
+  (:use #:cl
+        #:arnesi
+        #:bordeaux-threads
+        #:fiveam
+        #:stmx
+        #:stmx.util)
 
-  (:import-from :stmx
-                :new
-                :lock-of
-                :raw-value-of
-                :tx-read-of
-                :tx-write-of
-                :tlog
-                :commit
-                :valid?
-                :current-tlog
-                :with-recording-to-tlog)
+  (:import-from #:stmx
+                #:new
+                #:lock-of
+                #:raw-value-of
+                #:tx-read-of
+                #:tx-write-of
+                #:tlog
+                #:commit
+                #:valid?
+                #:current-tlog
+                #:with-recording-to-tlog)
 
-  (:export :suite))
+  (:export #:suite))
 
 
 (in-package :stmx.test)

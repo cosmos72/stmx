@@ -31,19 +31,21 @@
 
                (:module :src
                 :components ((:file "package")
-                             (:file "misc"      :depends-on ("package"))
-                             (:file "classes"   :depends-on ("misc"))
-                             (:file "tlog"      :depends-on ("classes"))
-                             (:file "tvar"      :depends-on ("tlog"))
-                             (:file "tclass"    :depends-on ("tvar"))
-                             (:file "atomic"    :depends-on ("tclass"))
-                             (:file "orelse"    :depends-on ("atomic"))))
+                             (:file "misc"        :depends-on ("package"))
+                             (:file "classes"     :depends-on ("misc"))
+                             (:file "tlog"        :depends-on ("classes"))
+                             (:file "tvar"        :depends-on ("tlog"))
+                             (:file "tclass"      :depends-on ("tvar"))
+                             (:file "atomic"      :depends-on ("tclass"))
+                             (:file "orelse"      :depends-on ("atomic"))))
 
                (:module :util
                 :components ((:file "package")
-                             (:file "cell"      :depends-on ("package"))
-                             (:file "cell-obj"  :depends-on ("cell"))
-                             (:file "cell-var"  :depends-on ("cell")))
+                             (:file "cell"        :depends-on ("package"))
+                             (:file "cell-tobj"   :depends-on ("cell"))
+                             (:file "cell-tvar"   :depends-on ("cell"))
+                             (:file "print"       :depends-on ("package"))
+                             (:file "thash-table" :depends-on ("print")))
                 :depends-on (:src))))
 
 

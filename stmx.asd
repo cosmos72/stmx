@@ -42,11 +42,12 @@
 
                (:module :util
                 :components ((:file "package")
+                             (:file "print"       :depends-on ("package"))
+                             (:file "bmap"        :depends-on ("print"))
+                             (:file "thash-table" :depends-on ("print"))
                              (:file "cell"        :depends-on ("package"))
                              (:file "cell-tobj"   :depends-on ("cell"))
-                             (:file "cell-tvar"   :depends-on ("cell"))
-                             (:file "print"       :depends-on ("package"))
-                             (:file "thash-table" :depends-on ("print")))
+                             (:file "cell-tvar"   :depends-on ("cell")))
                 :depends-on (:src))))
 
 

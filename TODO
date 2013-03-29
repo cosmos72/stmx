@@ -5,11 +5,13 @@ TO DO:
    "I have a very crude and quite horribly written one laying around for
     Common Lisp: https://github.com/lnostdal/SW-STM"
 
-6) implement transactional collections. Lists are not needed,
-   but hash tables would be nice - they likely require (on-commit).
-   Transactional arrays are a pain to implement efficiently.
+6ter) implement transactional red-black trees
+
+6bis) implement (thash-count)
 
 DONE:
+
+6) implemented transactional hash tables
 
 5) implemented before-commit and after-commit (idea from SW-STM when-commit)
 

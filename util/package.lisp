@@ -28,7 +28,15 @@
                 #:with-ro-slots
                 #:dohash)
 
-  (:export #:cell
+  (:export #:bmap
+           #:get-bmap  #:set-bmap  #:rem-bmap  ;; also (setf (get-bmap ...) ...)
+           #:bmap-count
+
+           #:thash-table
+           #:get-thash #:set-thash #:rem-thash ;; also (setf (get-thash ... ) ... )
+           #:do-thash
+
+           #:cell
            #:value-of
            #:empty?
            #:empty!
@@ -36,9 +44,5 @@
            #:take
            #:put
            #:try-put
-           #:try-take
+           #:try-take))
 
-           #:thash-table
-           #:get-thash ;; includes (setf (get-thash ...) ...)
-           #:rem-thash
-           #:do-thash))

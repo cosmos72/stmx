@@ -28,13 +28,18 @@
                 #:with-ro-slots
                 #:do-hash)
 
-  (:export #:bmap
-           #:get-bmap  #:set-bmap  #:rem-bmap  ;; also (setf (get-bmap ...) ...)
-           #:bmap-count
+  (:export #:bmap  ;; sorted map, implemented with left-leaning red-black trees
+           #:bmap-pred   #:bmap-count  #:bmap-empty?
+           #:clear-bmap 
+           #:get-bmap    #:set-bmap    #:rem-bmap  ;; also (setf (get-bmap ...) ...)
+           #:min-bmap    #:max-bmap         ;; get smallest and largest key/value
+           #:map-bmap    #:do-bmap          ;; iterate on bmap
+           #:bmap-keys   #:bmap-values #:bmap-pairs ;; list all keys, values, or pairs
+           #:add-to-bmap #:remove-from-bmap ;; add or remove multiple keys
 
-           #:thash-table
+           #:thash-table ;; transactional hash table
            #:get-thash #:set-thash #:rem-thash ;; also (setf (get-thash ... ) ... )
-           #:do-thash
+           #:map-thash #:do-thash           ;; iterate on thash-table
 
            #:cell
            #:value-of

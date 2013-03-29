@@ -33,7 +33,12 @@
                 #:commit
                 #:valid?
                 #:current-tlog
-                #:with-recording-to-tlog)
+                #:with-recording-to-tlog
+
+                #:get-hash #:set-hash #:rem-hash)
+
+  (:shadowing-import-from #:stmx
+                          #:hash-table-keys #:hash-table-values #:hash-table-pairs)
 
   (:export #:suite))
 

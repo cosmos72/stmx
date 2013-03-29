@@ -45,7 +45,7 @@
       ,@(when value `(using (hash-value ,value)))
       do (progn ,@body)))
         
-(declaim (inline get-hash set-hash))
+(declaim (inline get-hash set-hash rem-hash))
 
 (defun get-hash (hash key)
   "Same as (gethash key hash), only with reversed arguments."
@@ -57,9 +57,14 @@
   (declare (type hash-table hash))
   (setf (gethash key hash) value))
 
+(defun rem-hash (hash key)
+  "Same as (remhash key hash), only with reversed arguments."
+  (declare (type hash-table hash))
+  (remhash key hash))
+
 
 (defun hash-table-keys (src &optional to-list)
-  "Return a list containing keys in hash-table SRC and return it.
+  "Return a list containing the keys in hash-table SRC.
 If TO-LIST is not nil, it will be appended to the returned list.
 TO-LIST contents is not destructively modified."
   (declare (type hash-table src)
@@ -67,6 +72,29 @@ TO-LIST contents is not destructively modified."
   (do-hash (key) src
     (push key to-list))
   to-list)
+
+
+(defun hash-table-values (src &optional to-list)
+  "Return a list containing the values in hash-table SRC.
+If TO-LIST is not nil, it will be appended to the returned list.
+TO-LIST contents is not destructively modified."
+  (declare (type hash-table src)
+           (type list to-list))
+  (do-hash (key value) src
+    (push value to-list))
+  to-list)
+
+
+(defun hash-table-pairs (src &optional to-alist)
+  "Return an alist containing a (key . value) pair for each entry
+in hash-table SRC.
+If TO-ALIST is not nil, it will be appended to the returned alist.
+TO-ALIST contents is not destructively modified."
+  (declare (type hash-table src)
+           (type list to-alist))
+  (do-hash (key value) src
+    (push (cons key value) to-alist))
+  to-alist)
   
   
 

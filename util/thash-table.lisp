@@ -86,7 +86,7 @@ Return T if KEY was found in THASH, otherwise return NIL."
 
 
 (defun map-thash (thash func)
-  "Execute FUNC on each key/value pair contained in transactional hash table THASH.
+  "Invoke FUNC on each key/value pair contained in transactional hash table THASH.
 FUNC must be a function accepting two arguments: key and value."
   (with-ro-slots (original delta) thash
     (if delta
@@ -107,8 +107,11 @@ FUNC must be a function accepting two arguments: key and value."
 
 (defmacro do-thash ((key &optional value) thash &body body)
   "Execute body on each key/value pair contained in transactional hash table THASH"
-  (let1 value-name (if value value (gensym))
-    `(map-thash ,thash (lambda (,key ,value-name) ,@body))))
+  (let* ((dummy (gensym))
+         (func-body `(lambda (,key ,(or value dummy))
+                       ,@(unless value `((declare (ignore ,dummy))))
+                       ,@body)))
+    `(map-thash ,thash ,func-body)))
         
 
 

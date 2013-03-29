@@ -18,15 +18,18 @@
 ;;;; ** Balanced sorted map, implemented with left-leaning red-black trees.
 ;;;; For a transactional version, see tmap.lisp
 
-(defconstant +red+   (the bit 0))
-(defconstant +black+ (the bit 1))
+(declaim (type bit +red+ +black+))
+(defconstant +red+   0)
+(defconstant +black+ 1)
 
 (defclass bnode ()
   ((left  :initform nil   :type (or null bnode))
    (right :initform nil   :type (or null bnode))
    (key   :initarg :key)
    (value :initarg :value)
-   (color :initform +red+ :type bit)))
+   (color :initform +red+ :type bit))
+
+  (:documentation "Node of left-leaning red-black tree"))
 
 
 (defclass bmap ()
@@ -68,31 +71,45 @@
 
 
 
+(defun clear-bmap (m)
+  "Remove all keys and values from M. Return M."
+  (declare (type bmap m))
+  (with-slots (root count) m
+    (setf root nil)
+    (setf count 0)
+    m))
 
-(declaim (inline bmap-count red? black? invert-color invert-colors compare-keys))
+
+(declaim (inline bmap-empty? red? black? flip-color))
+
+(defun bmap-empty? (m)
+  "Return t if M is empty, otherwise return nil."
+  (declare (type bmap m))
+  (= 0 (_ m count)))
 
 (defun red? (node)
-  "NIL nodes are assumed to be black"
+  "Return t if NODE is red. Nil nodes are assumed to be black"
   (declare (type (or null bnode) node))
   (and node (eq +red+ (_ node color))))
 
 (defun black? (node)
-  "NIL nodes are assumed to be black"
+  "Return t if NODE is black. Nil nodes are assumed to be black"
   (declare (type (or null bnode) node))
   (not (red? node)))
 
-(defun invert-color (node)
-  "Invert the color of node"
+(defun flip-color (node)
+  "Flip NODE color. Return the new color."
   (declare (type bnode node))
   (with-slots (color) node
     (setf color (the bit (- 1 color)))))
 
-(defun invert-colors (node)
-  "Invert the colors of node and its left and right children, if any"
+(defun flip-colors (node)
+  "Flip the colors of NODE and its left and right children, if any"
   (declare (type bnode node))
-  (invert-color (_ node left))
-  (invert-color (_ node right))
-  (invert-color node))
+  (flip-color (_ node left))
+  (flip-color (_ node right))
+  (flip-color node))
+
 
 (defun compare-keys (pred key1 key2)
   "Compare KEY1 agains KEY2 using the comparison function PRED.
@@ -107,7 +124,7 @@ return  0 if KEY1 and KEY2 compare as equal."
       (t 0))))
 
   
-(defun find-bmap (m key &optional default)
+(defun get-bmap (m key &optional default)
    "Find KEY in M and return its value and T as multiple values.
 If M does not contain KEY, return (values DEFAULT NIL)."
    (declare (type bmap m))
@@ -119,7 +136,7 @@ If M does not contain KEY, return (values DEFAULT NIL)."
           (case (compare-keys pred key xkey)
             (-1 (setf node (_ node left)))
             ( 1 (setf node (_ node right)))
-            (t  (return-from find-bmap (values (_ node value) t)))))
+            (t  (return-from get-bmap (values (_ node value) t)))))
      (values default nil)))
 
 
@@ -158,7 +175,7 @@ If M does not contain KEY, return (values DEFAULT NIL)."
     (setf node (rotate-right node)))
 
   (when (and (red? (_ node left)) (red? (_ node right)))
-    (invert-colors node))
+    (flip-colors node))
 
   node)
 
@@ -186,7 +203,7 @@ If M does not contain KEY, return (values DEFAULT NIL)."
    
 
 (defun set-bmap (m key value)
-  "Add KEY to M if not present, and associate VALUE to KEY in M.
+  "Add KEY to M if not present, and associate KEY to VALUE in M.
 Return VALUE."
    (declare (type bmap m))
 
@@ -194,12 +211,6 @@ Return VALUE."
      (setf root (set-bmap-at m root key value))
      (setf (_ root color) +black+))
    value)
-
-(declaim (inline get-bmap (setf get-bmap)))
-(defun get-bmap (key m &optional default)
-   "Find KEY in M and return its value and T as multiple values.
-If M does not contain KEY, return (values DEFAULT NIL)."
-   (find-bmap m key default))
 
 (defun (setf get-bmap) (value m key)
   "Add KEY to M if not present, and associate VALUE to KEY in M.
@@ -211,36 +222,36 @@ Return VALUE."
 
 (defun move-red-left (node)
    (declare (type bnode node))
-   (invert-colors node)
+   (flip-colors node)
    (with-slots (right) node
      (when (red? (_ right left))
        (setf right (rotate-right right))
        (setf node  (rotate-left  node))
-       (invert-colors node)))
+       (flip-colors node)))
    node)
 
 
 (defun move-red-right (node)
    (declare (type bnode node))
-   (invert-colors node)
+   (flip-colors node)
    (when (red? (_ (_ node left) left))
        (setf node (rotate-right node))
-       (invert-colors node))
+       (flip-colors node))
    node)
 
 
-(defun remove-min-at (node key-value-cons)
+(defun remove-min-at (node store-key-value-here)
   (declare (type bnode node)
-           (type cons key-value-cons))
+           (type bnode store-key-value-here))
   (with-ro-slots (left) node
     (unless left
-      (setf (first key-value-cons) (_ node key))
-      (setf (rest  key-value-cons) (_ node value))
+      (setf (_ store-key-value-here key)   (_ node key))
+      (setf (_ store-key-value-here value) (_ node value))
       (return-from remove-min-at nil))
-    (when (and (black? left) (black? (_ left left)))
+    (when (and left (black? left) (black? (_ left left)))
       (setf node (move-red-left node))))
     
-  (setf (_ node left) (remove-min-at (_ node left) key-value-cons))
+  (setf (_ node left) (remove-min-at (_ node left) store-key-value-here))
   (fix-up node))
   
 
@@ -269,19 +280,177 @@ Return VALUE."
             (when (and right (black? right) (black? (_ right left)))
               (setf node (move-red-right node))))
           (if (zerop (compare-keys pred key (_ node key)))
-              (let1 key-value-cons (cons nil nil)
-                (setf (_ node right) (remove-min-at (_ node right) key-value-cons))
-                (setf (_ node key)   (first key-value-cons))
-                (setf (_ node value) (rest key-value-cons))
+              (progn
+                (setf (_ node right) (remove-min-at (_ node right) node))
                 (decf (_ m count)))
               (setf (_ node right) (remove-at m (_ node right) key)))))
     (fix-up node)))
 
-    
+
 (defun rem-bmap (m key)
-  (let1 orig-count (_ m count)
-    (with-slots (root) m
-      (setf root (remove-at m root key))
-      (when root
-        (setf (_ root color) +black+))
-      (< (_ m count) orig-count))))
+  "Find and remove KEY and its associated value from M.
+Return t if KEY was removed, nil if not found."
+  (declare (type bmap m))
+  (with-slots (root) m
+    (if root
+        (let1 orig-count (_ m count)
+          (when (setf root (remove-at m root key))
+            (setf (_ root color) +black+))
+          (< (_ m count) orig-count))
+        nil)))
+
+
+(defun min-bmap (m)
+  "Return the smallest key in M, its value, and t as multiple values,
+or (values nil nil nil) if M is empty."
+  (declare (type bmap m))
+  (with-ro-slots (root) m
+    (if root
+        (loop for node = root then child
+           for child = (_ node left)
+           while child
+           finally (return (values (_ node key) (_ node value) t)))
+        (values nil nil nil))))
+           
+
+(defun max-bmap (m)
+  "Return the largest key in M, its value, and t as multiple values,
+or (values nil nil nil) if M is empty"
+  (declare (type bmap m))
+  (with-ro-slots (root) m
+    (if root
+        (loop for node = root then child
+           for child = (_ node right)
+           while child
+           finally (return (values (_ node key) (_ node value) t)))
+        (values nil nil nil))))
+           
+
+
+(defun fwd-traverse-bmap-at (m node func)
+  (declare (type bmap m)
+           (type (or null bnode) node)
+           (type function func))
+  (when node
+    (fwd-traverse-bmap-at m (_ node left) func)
+    (funcall func (_ node key) (_ node value))
+    (fwd-traverse-bmap-at m (_ node right) func))
+  nil)
+
+
+(defun rev-traverse-bmap-at (m node func)
+  (declare (type bmap m)
+           (type (or null bnode) node)
+           (type function func))
+  (when node
+    (rev-traverse-bmap-at m (_ node right) func)
+    (funcall func (_ node key) (_ node value))
+    (rev-traverse-bmap-at m (_ node left) func))
+  nil)
+
+
+(declaim (inline map-bmap map-bmap-from-end))
+(defun map-bmap (m func)
+  "Invoke FUNC in order on each key/value pair contained in M:
+first invoke it on the smallest key, then the second smallest...
+finally invoke FUNC on the largest key. Return nil.
+
+FUNC must be a function accepting two arguments: key and value.
+
+Adding or removing keys from M during this call (even from other threads)
+has undefined consequences. Not even the current key can be removed."
+  (declare (type bmap m)
+           (type function func))
+  (fwd-traverse-bmap-at m (_ m root) func))
+
+
+(defun map-bmap-from-end (m func)
+  "Invoke FUNC in reverse order on each key/value pair contained in M:
+first invoke it on the largest key, then the second largest...
+finally invoke FUNC on the smallest key. Return nil.
+
+FUNC must be a function accepting two arguments: key and value.
+
+Adding or removing keys from M during this call (even from other threads)
+has undefined consequences. Not even the current key can be removed."
+  (declare (type bmap m)
+           (type function func))
+  (rev-traverse-bmap-at m (_ m root) func))
+
+
+
+
+(defmacro do-bmap ((key &optional value &key from-end) m &body body)
+  "Execute BODY in order on each key/value pair contained in M:
+first execute it on the smallest key, then the second smallest...
+finally execute BODY on the largest key. Return nil.
+
+If :FROM-END is true, BODY will be executed first on the largest key,
+then on the second largest key... and finally on the smallest key.
+
+Adding or removing keys from M during this call (even from other threads)
+has undefined consequences. Not even the current key can be removed."
+
+  (let* ((dummy (gensym))
+         (func-body `(lambda (,key ,(or value dummy))
+                       ,@(unless value `((declare (ignore ,dummy))))
+                       ,@body)))
+    (if from-end
+        `(map-bmap-from-end ,m ,func-body)
+        `(map-bmap          ,m ,func-body))))
+
+
+(defun bmap-keys (m &optional to-list)
+  "Return an ordered list of all keys contained in M."
+  (declare (type bmap m)
+           (type list to-list))
+  (do-bmap (key value :from-end t) m
+    (declare (ignore value))
+    (push key to-list))
+  to-list)
+
+(defun bmap-values (m &optional to-list)
+  "Return a list of all values contained in M.
+The values are returned in the order given by their keys:
+first the value associated to the smallest key, and so on."
+  (declare (type bmap m)
+           (type list to-list))
+  (do-bmap (key value :from-end t) m
+    (declare (ignore key))
+    (push value to-list))
+  to-list)
+
+
+(defun bmap-pairs (m &optional to-alist)
+  "Return an ordered list of pairs (key . value) containing
+all entries in M."
+  (declare (type bmap m)
+           (type list to-alist))
+  (do-bmap (key value :from-end t) m
+    (push (cons key value) to-alist))
+  to-alist)
+
+
+(defun add-to-bmap (m &rest keys-and-values)
+  "N-ary version of SET-BMAP and (SETF (GET-BMAP ...) ...):
+Given a list of alternating keys and values,
+add or replace each of them into M. Return M."
+  (declare (type bmap m)
+           (type list keys-and-values))
+  (loop while keys-and-values
+     for key = (pop keys-and-values)
+     for value = (pop keys-and-values) do
+       (set-bmap m key value))
+  m)
+
+
+(defun remove-from-bmap (m &rest keys)
+  "N-ary version of REM-BMAP:
+remove a list of keys from M. Return M."
+  (declare (type bmap m)
+           (type list keys))
+  (loop for key in keys do
+       (rem-bmap m key))
+  m)
+
+    

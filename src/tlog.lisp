@@ -133,7 +133,7 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   Such code is not allowed, because at least one TVAR or one TOBJ slot
   must be read before retrying an ATOMIC block." (~ log)))
 
-    (dohash (var val) reads
+    (do-hash (var val) reads
       (listen-tvar var log)
       ;; to avoid deadlocks, check raw-value AFTER listening on tvar.
       ;; otherwise if we naively
@@ -158,7 +158,7 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
 
   (declare (type tlog log))
   (when-bind reads (reads-of log)
-    (dohash (var val) reads
+    (do-hash (var val) reads
       (unlisten-tvar var log)))
   (values))
 

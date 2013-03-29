@@ -85,30 +85,30 @@ Return T if KEY was found in THASH, otherwise return NIL."
          nil)))) ;; key not present in ORIGINAL
 
 
+(defun map-thash (thash func)
+  "Execute FUNC on each key/value pair contained in transactional hash table THASH.
+FUNC must be a function accepting two arguments: key and value."
+  (with-ro-slots (original delta) thash
+    (if delta
+        (progn
+          (do-hash (key value) delta
+            (unless (eq *thash-removed-entry* value)
+              (funcall func key value)))
+          (do-hash (key value) original
+            (multiple-value-bind (delta-value? delta-present?) (gethash key delta)
+              (declare (ignore delta-value?))
+              ;; skip keys present in delta, especially removed keys
+              (unless delta-present?
+                (funcall func key value)))))
+        ;; easy, delta is nil
+        (do-hash (key value) original
+          (funcall func key value)))))
+
 
 (defmacro do-thash ((key &optional value) thash &body body)
-  "Execute body on each key/value pair contained in transactional hash table"
-  (with-gensyms (func-body thash-once orig-table delta-table delta-value? delta-present?)
-    `(let* ((,func-body (lambda (,key ,value) ,@body))
-            (,thash-once ,thash)
-            (,orig-table  (slot-value ,thash-once 'original))
-            (,delta-table (slot-value ,thash-once 'delta)))
-       (if ,delta-table
-           (progn
-             (dohash (,key ,value) ,delta-table
-               (unless (eq *thash-removed-entry* ,value)
-                 (funcall ,func-body ,key ,value)))
-             (dohash (,key ,value) ,orig-table
-               (multiple-value-bind (,delta-value? ,delta-present?)
-                   (gethash ,key ,delta-table)
-                 (declare (ignore ,delta-value?))
-                 ;; skip keys present in delta, especially removed keys
-                 (unless ,delta-present?
-                   (funcall ,func-body ,key ,value)))))
-           ;; easy, delta is nil
-           (dohash (,key ,value) ,orig-table
-                   (funcall ,func-body ,key ,value))))))
-             
+  "Execute body on each key/value pair contained in transactional hash table THASH"
+  (let1 value-name (if value value (gensym))
+    `(map-thash ,thash (lambda (,key ,value-name) ,@body))))
         
 
 
@@ -143,7 +143,7 @@ Implementation notes:
   (with-ro-slots (original delta) thash
     (when delta
       (log:trace "before: ~A" (print-object-contents nil thash))
-      (dohash (key orig-value) original
+      (do-hash (key orig-value) original
         (multiple-value-bind (delta-value delta-present?) (gethash key delta)
           (if delta-present?
               ;; remove DELTA entries marked *thash-removed-entry*,

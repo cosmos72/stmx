@@ -26,7 +26,7 @@
   (:import-from #:stmx
                 #:with-gensyms
                 #:with-ro-slots
-                #:dohash)
+                #:do-hash)
 
   (:export #:bmap
            #:get-bmap  #:set-bmap  #:rem-bmap  ;; also (setf (get-bmap ...) ...)

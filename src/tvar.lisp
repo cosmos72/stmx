@@ -138,7 +138,7 @@ if VAR changes."
 
   (declare (type tvar var))
   (with-lock-held ((waiting-lock-of var))
-    (dohash (log) (waiting-for var)
+    (do-hash (log) (waiting-for var)
       (notify-tlog log var))))
 
 

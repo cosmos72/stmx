@@ -25,7 +25,7 @@ of TVARs that were read during the transaction."
   (declare (type tlog log))
   (log:trace "Tlog ~A valid?.." (~ log))
   (awhen (reads-of log)
-    (dohash (var val) it
+    (do-hash (var val) it
       (let1 actual-val (raw-value-of var)
         (if (eq val actual-val)
             (log:trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
@@ -86,7 +86,9 @@ then non-blocking acquire their locks in such order.
 Reason: acquiring in unspecified order may cause livelock, as two transactions
 may repeatedly try acquiring the same two TVARs in opposite order.
 
-Return t if all tvars were locked successfully, otherwise return nil.
+Destructively modifies VARS.
+
+Return t if all VARS were locked successfully, otherwise return nil.
 In both cases, after return LOCKED-VARS will contain the locked tvars, listed
 in reverse order: from last acquired to first acquired."
   (declare (type list vars)
@@ -97,7 +99,7 @@ in reverse order: from last acquired to first acquired."
   (setf vars (sort vars #'sxhash<))
   ;;(log:user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
 
-  (let1 acquired ()
+  (let1 acquired nil
     (unwind-protect
          (loop for cell = vars then tail
             while cell
@@ -131,15 +133,14 @@ Return :UNKNOWN if relevant locks could not be acquired."
         (acquiring nil)
         (acquired (list nil)))
 
-    (unless reads
+    (when (empty-hash-table-or-nil reads)
       (return-from locked-valid? t))
 
     (unwind-protect
          (progn
            ;; we must lock TVARs that have been read: expensive,
            ;; but needed to ensure this threads sees other commits as atomic
-           (dohash (var val) reads
-             (push var acquiring))
+           (setf acquiring (hash-table-keys reads))
 
            (unless (try-lock-tvars acquiring acquired log "rolled back")
              (return-from locked-valid? :unknown))
@@ -312,31 +313,25 @@ b) another TLOG is writing the same TVARs being committed
          (progn
            ;; we must lock TVARs that have been read or written: expensive,
            ;; but needed to ensure this threads sees other commits as atomic
-           (if reads
-               (progn
-                 (dohash (var val) reads
-                   (push var acquiring))
-
-                 (dohash (var val) writes
-                   (multiple-value-bind (read-val read?) (gethash var reads)
-                     (declare (ignore read-val))
-                     ;; do not put duplicates in ACQUIRING list
-                     (when (not read?)
-                       (push var acquiring)))))
-               ;; no reads, only copy writes in ACQUIRING list
-               (dohash (var val) writes
-                 (push var acquiring)))
+           (setf acquiring (hash-table-keys (if reads reads writes)))
+           (when reads
+               (do-hash (var val) writes
+                 (multiple-value-bind (read-val read?) (gethash var reads)
+                   (declare (ignore read-val))
+                   ;; do not put duplicates in ACQUIRING list
+                   (when (not read?)
+                     (push var acquiring)))))
 
            (unless (try-lock-tvars acquiring acquired log "committed")
              (return-from commit nil))
 
            ;; check for log validity one last time, with locks held.
            (when (invalid? log)
-             (log:debug "Tlog ~A not committed: log is invalid" (~ log))
+             (log:debug "Tlog ~A is invalid, not committed (checked with locks)" (~ log))
              (return-from commit nil))
 
            ;; COMMIT, i.e. actually write new values into TVARs
-           (dohash (var val) writes
+           (do-hash (var val) writes
              (let1 current-val (raw-value-of var)
                (when (not (eq val current-val))
                  (setf (raw-value-of var) val)

@@ -36,9 +36,10 @@
        (let ,(loop for slot in slots collect `(,slot (slot-value ,var ',slot)))
          ,@body))))
 
+
 ;;;; * Hash-table utilities
 
-(defmacro dohash ((key &optional value) hash &body body)
+(defmacro do-hash ((key &optional value) hash &body body)
   "Execute body on each key/value pair contained in hash table"
   `(loop for ,key being each hash-key in ,hash
       ,@(when value `(using (hash-value ,value)))
@@ -57,13 +58,24 @@
   (setf (gethash key hash) value))
 
 
+(defun hash-table-keys (src &optional to-list)
+  "Return a list containing keys in hash-table SRC and return it.
+If TO-LIST is not nil, it will be appended to the returned list.
+TO-LIST contents is not destructively modified."
+  (declare (type hash-table src)
+           (type list to-list))
+  (do-hash (key) src
+    (push key to-list))
+  to-list)
+  
+  
+
 (defun copy-hash-table (dst src)
   "Copy all key/value pairs from hash-table SRC into hash-table DST.
 Other keys (and their values) present in DST but not in SRC
 are not modified. Return DST."
-
   (declare (type hash-table dst src))
-  (dohash (key value) src
+  (do-hash (key value) src
     (set-hash dst key value))
   dst)
 
@@ -118,12 +130,12 @@ Return HASH."
   "Copy hash-table SRC into hash-table DST.
 
 Return t if SRC and DST are compatible,
-i.e. if they contain the same values for the keys common to both,
-otherwise return nil
+i.e. if they contain the eq values for the keys common to both,
+otherwise return nil.
 \(in the latter case, the merge will not be completed)."
 
   (declare (type hash-table src dst))
-  (dohash (var val1) src
+  (do-hash (var val1) src
     (multiple-value-bind (val2 present2?) (gethash var dst)
       (when (and present2? (not (eq val1 val2)))
         (return-from merge-hash-tables nil))

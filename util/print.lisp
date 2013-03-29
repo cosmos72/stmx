@@ -26,7 +26,7 @@
 (defmethod print-object-contents (stream (obj hash-table))
   (format stream "{")
   (let1 first t
-    (dohash (key value) obj
+    (do-hash (key value) obj
       (format stream "~A~S=~S" (if first "" ", ") key value)
       (setf first nil)))
   (format stream "}"))

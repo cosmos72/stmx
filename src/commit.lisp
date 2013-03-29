@@ -93,9 +93,9 @@ in reverse order: from last acquired to first acquired."
            (type cons locked-vars)
            (type tlog log))
 
-  (log:user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
+  ;;(log:user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
   (setf vars (sort vars #'sxhash<))
-  (log:user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
+  ;;(log:user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
 
   (let1 acquired ()
     (unwind-protect
@@ -105,8 +105,8 @@ in reverse order: from last acquired to first acquired."
             for var = (first cell)
             always (try-lock-tvar var log txt)
             do (setf (rest cell) acquired)
-              (setf acquired cell)
-              (log:user5 "locked TVARs: (~{~A~^ ~})" acquired))
+              (setf acquired cell))
+              ;; (log:user5 "locked TVARs: (~{~A~^ ~})" acquired)
       (setf (first locked-vars) (first acquired))
       (setf (rest locked-vars) (rest acquired)))))
 

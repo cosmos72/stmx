@@ -15,21 +15,21 @@
 
 (in-package :stmx.util)
 
-;;;; ** Balanced sorted map, implemented with left-leaning red-black trees.
+;;;; ** Sorted map, implemented with red-black trees.
 ;;;; For a transactional version, see tmap.lisp
 
 (declaim (type bit +red+ +black+))
 (defconstant +red+   0)
 (defconstant +black+ 1)
 
-(defclass bnode ()
+(defstruct bnode
   ((left  :initform nil   :type (or null bnode))
    (right :initform nil   :type (or null bnode))
    (key   :initarg :key)
    (value :initarg :value)
    (color :initform +red+ :type bit))
 
-  (:documentation "Node of left-leaning red-black tree"))
+  (:documentation "Node of red-black tree"))
 
 
 (defclass bmap ()
@@ -42,7 +42,7 @@
           :type fixnum
           :reader bmap-count))
 
-  (:documentation "Left-leaning red-black tree"))
+  (:documentation "Sorted map, implemented with red-black tree"))
 
 
 (defmacro _ (obj slot-name)
@@ -74,10 +74,9 @@
 (defun clear-bmap (m)
   "Remove all keys and values from M. Return M."
   (declare (type bmap m))
-  (with-slots (root count) m
-    (setf root nil)
-    (setf count 0)
-    m))
+  (setf (_ m root) nil)
+  (setf (_ m count) 0)
+  m)
 
 
 (declaim (inline bmap-empty? red? black? flip-color))
@@ -103,25 +102,20 @@
   (with-slots (color) node
     (setf color (the bit (- 1 color)))))
 
-(defun flip-colors (node)
-  "Flip the colors of NODE and its left and right children, if any"
-  (declare (type bnode node))
-  (flip-color (_ node left))
-  (flip-color (_ node right))
-  (flip-color node))
 
+(deftype comp-keyword () '(member :< :> :=))
 
 (defun compare-keys (pred key1 key2)
   "Compare KEY1 agains KEY2 using the comparison function PRED.
-Return -1 if KEY1 compares as lesser than KEY2,
-return  1 if KEY1 compares as greater than KEY2,
-return  0 if KEY1 and KEY2 compare as equal."
+Return :< if KEY1 compares as lesser than KEY2,
+return :> if KEY1 compares as greater than KEY2,
+return := if KEY1 and KEY2 compare as equal."
   (declare (type function pred))
-  (the fixnum
+  (the comp-keyword
     (cond
-      ((funcall pred key1 key2) -1)
-      ((funcall pred key2 key1)  1)
-      (t 0))))
+      ((funcall pred key1 key2) :<)
+      ((funcall pred key2 key1) :>)
+      (t :=))))
 
   
 (defun get-bmap (m key &optional default)
@@ -134,84 +128,225 @@ If M does not contain KEY, return (values DEFAULT NIL)."
      (loop while node 
           for xkey = (_ node key) do
           (case (compare-keys pred key xkey)
-            (-1 (setf node (_ node left)))
-            ( 1 (setf node (_ node right)))
-            (t  (return-from get-bmap (values (_ node value) t)))))
+            (:< (setf node (_ node left)))
+            (:> (setf node (_ node right)))
+            (:= (return-from get-bmap (values (_ node value) t)))))
      (values default nil)))
 
 
 
 (defun rotate-left (node)
-   (declare (type bnode node))
-   (log:debug "before:~%~A" (print-object-contents nil node))
-   (let1 x (_ node right)
-     (setf (_ node right) (_ x left))
-     (setf (_ x left)     node)
-     (setf (_ x color)    (_ node color))
-     (setf (_ node color) +red+)
-     (log:debug "after:~%~A" (print-object-contents nil x))
-     x))
+  "Rotate left the subtree around node. Return new subtree root."
+  (declare (type bnode node))
+  (log:debug "before:~%~A" (print-object-contents nil node))
+  (let1 x (_ node right)
+    (setf (_ node right) (_ x left))
+    (setf (_ x left)     node)
+    (log:debug "after:~%~A" (print-object-contents nil x))
+    x))
 
 
 (defun rotate-right (node)
-   (declare (type bnode node))
-   (log:debug "before:~%~A" (print-object-contents nil node))
-   (let1 x (_ node left)
-     (setf (_ node left)  (_ x right))
-     (setf (_ x right)    node)
-     (setf (_ x color)    (_ node color))
-     (setf (_ node color) +red+)
-     (log:debug "after:~%~A" (print-object-contents nil x))
-     x))
-
-
-(defun fix-up (node)
+  "Rotate right the subtree around node. Return new subtree root."
   (declare (type bnode node))
-
-  (when (and (black? (_ node left)) (red? (_ node right)))
-    (setf node (rotate-left node)))
-
-  (when (and (red? (_ node left)) (red? (_ (_ node left) left)))
-    (setf node (rotate-right node)))
-
-  (when (and (red? (_ node left)) (red? (_ node right)))
-    (flip-colors node))
-
-  node)
+  (log:debug "before:~%~A" (print-object-contents nil node))
+  (let1 x (_ node left)
+    (setf (_ node left)  (_ x right))
+    (setf (_ x right)    node)
+    (log:debug "after:~%~A" (print-object-contents nil x))
+    x))
 
 
-(defun set-bmap-at (m node key value)
-   (declare (type bmap m)
-            (type (or null bnode) node))
+(defun find-insertion-point (m key)
+  "Return stack of visited nodes from root to insertion point for KEY,
+and comparison between the KEY to insert and last visited node's key,
+as multiple values"
+   (declare (type bmap m))
+   (let ((node (_ m root))
+         (pred (_ m pred))
+         (stack nil)
+         (comp nil))
+     (loop while node
+        for xkey = (_ node key) do
+          (push node stack)
+          (case (setf comp (compare-keys pred key xkey))
+            (:< (setf node (_ node left)))
+            (:> (setf node (_ node right)))
+            (:= (return))))
+     (values (the list stack)
+             (the (or null comp-keyword) comp))))
+     
+(defun show-insertion-point (m key)
+  (multiple-value-bind (stack comp)
+      (find-insertion-point m key)
+    (values
+     (loop for node in stack collect (_ node key))
+     comp)))
 
-   (log:debug "m = ~A, node = ~A, key = ~A, value = ~A" m node key value)
-
-   (unless node
-     (incf (_ m count))
-     (return-from set-bmap-at (new 'bnode :key key :value value)))
-
-   (with-slots (left right) node
-
-     (let ((xkey (_ node key))
-           (pred (_ m pred)))
-       (case (compare-keys pred key xkey)
-         (-1 (setf left  (set-bmap-at m left  key value)))
-         ( 1 (setf right (set-bmap-at m right key value)))
-         (t  (setf (_ node value) value))))
-
-     (fix-up node)))
-   
+(defun new-bnode (m key value)
+   (declare (type bmap m))
+   (incf (_ m count))
+   (new 'bnode :key key :value value))
 
 (defun set-bmap (m key value)
   "Add KEY to M if not present, and associate KEY to VALUE in M.
 Return VALUE."
    (declare (type bmap m))
 
-   (with-slots (root) m
-     (setf root (set-bmap-at m root key value))
-     (setf (_ root color) +black+))
+   (multiple-value-bind (stack comp) (find-insertion-point m key)
+     (let1 node (first stack)
+       
+       (when (eq := comp)
+         ;; key already present
+         (setf (_ node value) value)
+         (return-from set-bmap value))
+
+       ;; no such key, create node for it
+       (let1 child (new-bnode m key value)
+         (unless node
+           ;; bmap is empty
+           (with-slots (root) m
+             (setf root child)
+             (setf (_ root color) +black+))
+           (return-from set-bmap value))
+
+         ;; key not present, insert it
+         (if (eq :< comp)
+             (setf (_ node left) child)
+             (setf (_ node right) child)))
+
+       (when (red? node)
+         (rebalance-after-insert m stack))))
    value)
 
+(declaim (inline is-left-child?))
+(defun is-left-child? (node parent)
+  (declare (type bnode node parent))
+  (eq node (_ parent left)))
+
+
+(declaim (inline is-left-child-red?))
+(defun is-left-child-red? (node)
+  (declare (type bnode node))
+  (red? (_ node left)))
+
+(defun show-bmap (m node txt)
+  (declare (type bmap m)
+           (type bnode node)
+           (type string txt))
+  (log:debug "~A, node is ~A~%~A" txt (_ node key) (print-bmap nil m)))
+
+(defun rebalance-after-insert (m stack)
+  (declare (type bmap m)
+           (type list stack))
+
+  (prog ((node (pop stack))
+         node-is-left
+         parent)
+     (declare (type (or null bnode) node parent))
+     (declare (type boolean node-is-left))
+           
+     ;; 0) if A is black, we're DONE.
+     rule-0
+     (show-bmap m node "rule-0")
+     (when (black? node)
+       (return))
+
+     ;;    Otherwise, red node A* must have a red child B*: double-red violation
+     ;;      A*
+     ;;      |      note: | means either left child / or right child \
+     ;;      B*
+     (setf parent (pop stack))
+
+     ;; 1) if node A* has a red sibling C*, then A* parent's X must be black
+     ;;         X                     X*
+     ;;        / \                   / \   then move up to X and:
+     ;;       A*  C*  flip colors   A   C  if X is root, set it to black -> DONE.
+     ;;       |       of X, A, C    |      otherwise move up to X's parent -> call it A and:
+     ;;       B*                    B*     if A is root -> DONE
+     ;;                                    otherwise, go to 0)
+     (show-bmap m node "rule-1")
+     (unless parent
+       (setf (_ node color) +black+)
+       (return))
+
+     (with-ro-slots (left right) parent
+       (when (and (red? left) (red? right))
+         (flip-color parent) (flip-color left) (flip-color right)
+         (setf node (pop stack))
+         (when node
+           (if stack
+               (go rule-0)
+               ;; node is root
+               (return)))
+         ;; parent is root
+         (setf (_ parent color) +black+)
+         (return)))
+
+
+     ;; 2) otherwise, A* must have a black sibling C (possibly nil).
+     ;;    Remember A* has a red child B*. If B* and C are on the same side of A*
+     ;;         X                             X
+     ;;        / \   rotate around A:        / \   now move to B*               
+     ;;       A*  C  rotate-left if         B*  C       v
+     ;;        \     A* is left child, ->  /       call it A* and go to 3)
+     ;;         B*   rotate-right if      A*    
+     ;;              A* is right child
+     (show-bmap m node "rule-2")
+     (setf node-is-left (is-left-child? node parent))
+     (unless (eq node-is-left (is-left-child-red? node))
+       (if node-is-left
+           (progn
+             (setf node (rotate-left node))
+             (setf (_ parent left) node)
+             (show-bmap m node "rule-2, after rotate-left"))
+           (progn
+             (setf node (rotate-right node))
+             (setf (_ parent right) node)))
+             (show-bmap m node "rule-2, after rotate-right"))
+
+     ;; 3) A* must have a black sibling C and a red child B*,
+     ;;    both must be on the same side of A*
+     ;;         X                             A*                       A
+     ;;        / \   rotate around X:        / \                      / \
+     ;;       A*  C  rotate-right if        B*  X    swap colors     B*  X*
+     ;;      /       A* is left child, ->        \   of A* and X ->       \  DONE.
+     ;;     B*       rotate-left if               C                        C
+     ;;              A* is right child
+     (show-bmap m node "rule-3")
+     (if node-is-left 
+         (rotate-right parent)
+         (rotate-left parent))
+     (log:debug "before rotatef, node color = ~A, parent color = ~A" (_ node color) (_ parent color))
+     (rotatef (_ node color) (_ parent color))
+     (log:debug "after  rotatef, node color = ~A, parent color = ~A" (_ node color) (_ parent color))
+
+     ;;   we just need to attach node to its new parent
+     (if-bind pparent (first stack)
+       (if (is-left-child? parent pparent)
+           (setf (_ pparent left) node)
+           (setf (_ pparent right) node))
+       (setf (_ m root) node))
+     (show-bmap m node
+                (format nil "rule-3, after (rotate-~A parent)"
+                        (if node-is-left "right" "left")))
+     (return)))
+           
+
+           
+       
+          
+
+
+  
+     
+     
+
+
+     
+         
+
+(declaim (inline (setf get-bmap)))
 (defun (setf get-bmap) (value m key)
   "Add KEY to M if not present, and associate VALUE to KEY in M.
 Return VALUE."
@@ -222,37 +357,41 @@ Return VALUE."
 
 (defun move-red-left (node)
    (declare (type bnode node))
+   (log:debug "before:~%~A" (print-object-contents nil node))
    (flip-colors node)
    (with-slots (right) node
      (when (red? (_ right left))
        (setf right (rotate-right right))
        (setf node  (rotate-left  node))
        (flip-colors node)))
+   (log:debug "after:~%~A" (print-object-contents nil node))
    node)
 
 
 (defun move-red-right (node)
    (declare (type bnode node))
+   (log:debug "before:~%~A" (print-object-contents nil node))
    (flip-colors node)
    (when (red? (_ (_ node left) left))
        (setf node (rotate-right node))
        (flip-colors node))
+   (log:debug "after:~%~A" (print-object-contents nil node))
    node)
 
 
-(defun remove-min-at (node store-key-value-here)
-  (declare (type bnode node)
-           (type bnode store-key-value-here))
+(defun remove-min-at (node)
+  "Remove node with smallest key in subtree starting at node.
+Return new subtree root and removed node as multiple values."
+  (declare (type bnode node))
   (with-ro-slots (left) node
     (unless left
-      (setf (_ store-key-value-here key)   (_ node key))
-      (setf (_ store-key-value-here value) (_ node value))
-      (return-from remove-min-at nil))
+      (return-from remove-min-at (values nil node)))
     (when (and left (black? left) (black? (_ left left)))
       (setf node (move-red-left node))))
-    
-  (setf (_ node left) (remove-min-at (_ node left) store-key-value-here))
-  (fix-up node))
+
+  (multiple-value-bind (new-left removed-node) (remove-min-at (_ node left))
+    (setf (_ node left) new-left)
+    (values (fix-up node) removed-node)))
   
 
 
@@ -269,28 +408,44 @@ Return VALUE."
           (with-ro-slots (left) node
             (when (and left (black? left) (black? (_  left left)))
               (setf node (move-red-left node))))
+          ;; keep searching in left subtree
           (setf (_ node left) (remove-at m (_ node left) key)))
         (progn
           (when (red? (_ node left))
             (setf node (rotate-right node)))
-          (when (and (zerop (compare-keys pred key (_ node key))) (null (_ node right)))
+          (when (and (eq := (compare-keys pred key (_ node key))) (null (_ node right)))
             (decf (_ m count))
             (return-from remove-at nil))
           (with-ro-slots (right) node
             (when (and right (black? right) (black? (_ right left)))
               (setf node (move-red-right node))))
-          (if (zerop (compare-keys pred key (_ node key)))
-              (progn
-                (setf (_ node right) (remove-min-at (_ node right) node))
-                (decf (_ m count)))
-              (setf (_ node right) (remove-at m (_ node right) key)))))
-    (fix-up node)))
+          (if (eq := (compare-keys pred key (_ node key)))
+              ;; must remove current node.
+              ;; find node with smallest key in right subtree,
+              ;; remove it, and insert it back in place of current node
+              (multiple-value-bind (new-right reuse-node)
+                  (remove-min-at (_ node right))
+                (log:debug "removing node (~A ~A), replacing with (~A ~A)"
+                           (_ node key) (_ node value)
+                           (_ reuse-node key) (_ reuse-node value))
+                (with-slots (left right color) reuse-node
+                  (setf left  (_ node left))
+                  (setf right new-right)
+                  (setf color (_ node color))
+                  (decf (_ m count))
+                  (setf node reuse-node)))
+              ;; keep searching in right subtree
+              (setf (_ node right) (remove-at m (_ node right) key))))))
+  (fix-up node))
 
 
 (defun rem-bmap (m key)
   "Find and remove KEY and its associated value from M.
 Return t if KEY was removed, nil if not found."
   (declare (type bmap m))
+
+  (error "rem-bmap must be rewritten! it assumes left-leaning red-black tree")
+
   (with-slots (root) m
     (if root
         (let1 orig-count (_ m count)

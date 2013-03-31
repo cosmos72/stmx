@@ -35,10 +35,16 @@
                 #:current-tlog
                 #:with-recording-to-tlog
 
+                #:with-ro-slots
+
                 #:get-hash #:set-hash #:rem-hash)
 
   (:shadowing-import-from #:stmx
                           #:hash-table-keys #:hash-table-values #:hash-table-pairs)
+
+  (:import-from #:stmx.util
+                #:bnode
+                #:red? #:black?)
 
   (:export #:suite))
 

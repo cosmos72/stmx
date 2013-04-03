@@ -24,13 +24,22 @@
     `(slot-value ,obj ',actual-slot-name)))
 
 
-(defun fsck-bmap-at (node)
+
+(defun fail-at (obj ref txt &rest args)
+  (declare (type string txt))
+  (fail "~A~%~A~%______reference______~%~A"
+        (apply #'format nil txt args)
+        (print-object-contents nil obj)
+        (print-object-contents nil ref)))
+  
+(defun fsck-bmap-at (m ref node)
   "Check bmap invariants: no consecutive red nodes and
 all paths to leaves must have the same number of black nodes.
 
 Return two values: the total number of nodes in subtree starting at node,
 and the number of black nodes in all paths from node to leaves"
-  (declare (type (or null bnode) node))
+  (declare (type bmap m)
+           (type (or null bnode) node))
   (unless node
     (return-from fsck-bmap-at (values 0 0)))
 
@@ -38,34 +47,36 @@ and the number of black nodes in all paths from node to leaves"
         (right (_ node right)))
     (when (red? node)
       (when (red? left)
-        (fail "node ~A and its left child ~A are both red"
-                   (_ node key) (_ left key)))
+        (fail-at m ref "node ~A and its left child ~A are both red~%~A"
+                 (_ node key) (_ left key)))
       (when (red? right)
-        (fail "node ~A and its right child ~A are both red"
-                   (_ node key) (_ right key))))
+        (fail-at m ref "node ~A and its right child ~A are both red"
+                 (_ node key) (_ right key))))
 
-    (multiple-value-bind (nodes-left blacks-left) (fsck-bmap-at left)
-      (multiple-value-bind (nodes-right blacks-right) (fsck-bmap-at right)
+    (multiple-value-bind (nodes-left blacks-left) (fsck-bmap-at m ref left)
+      (multiple-value-bind (nodes-right blacks-right) (fsck-bmap-at m ref right)
         (unless (= blacks-left blacks-right)
-          (fail "node ~A has ~A black nodes in left subtree, but ~A in right subtree"
-                     (_ node key) blacks-left blacks-right))
+          (fail-at m ref "node ~A has ~A black nodes in left subtree, but ~A in right subtree"
+                   (_ node key) blacks-left blacks-right))
         (values (+ 1 nodes-left nodes-right)
                 (if (black? node) (1+ blacks-left) blacks-left))))))
             
 
-(defun fsck-bmap (m)
+(defun fsck-bmap (m &optional ref)
   "Check all bmap invariants: no consecutive red nodes,
 all paths to leaves must have the same number of black nodes,
 bmap-count must be the actual nodes count, root must be black."
   (declare (type bmap m))
+
   (let* ((root (_ m root))
          (count (_ m count))
-         (nodes (fsck-bmap-at root)))
+         (nodes (fsck-bmap-at m ref root)))
     (unless (black? root)
-      (fail "bmap ~A root node ~A is red" m (_ root key)))
+      (fail-at m ref "bmap ~A root node ~A is red" m (_ root key)))
     (unless (= nodes count)
-      (fail "bmap ~A node count is ~A, but actually has ~A nodes"
-                 m count nodes))))
+      (fail-at m ref "bmap ~A node count is ~A, but actually has ~A nodes"
+               m ref count nodes))
+    nil))
 
 
 (test new-bmap
@@ -75,6 +86,35 @@ bmap-count must be the actual nodes count, root must be black."
     (do-bmap (key value) m
       (fail "unexpected entry ~A = ~A in empty bmap" key value))))
 
+
+(defun build-bmap (pred &optional list)
+  (declare (type function pred)
+           (type list list))
+
+  (let1 m (new 'bmap :pred pred)
+    (labels ((to-bnode (list)
+               (declare (type list list))
+               (let1 node (new-bnode m (first list) (second list))
+                 (setf (_ node color) (if (third list) +red+ +black+))
+                 node))
+             (list-children (list)
+               (declare (type list list))
+               (cdddr list))
+             (%build-bmap (list)
+               (declare (type list list))
+               (unless list
+                 (return-from %build-bmap nil))
+               (let* ((node (to-bnode list))
+                      (children (list-children list)))
+                 (setf (_ node left)  (%build-bmap (first children)))
+                 (setf (_ node right) (%build-bmap (second children)))
+                 node)))
+
+      (setf (_ m root) (%build-bmap list))
+      m)))
+    
+  
+           
 
 (defun hash-table-to-sorted-keys (hash pred)
   (declare (type hash-table hash)
@@ -110,37 +150,36 @@ bmap-count must be the actual nodes count, root must be black."
 
 
 (test fill-bmap
-  (let* ((bmap  (new 'bmap :pred #'<))
+  (let* ((m1    (new 'bmap :pred #'<))
+         (m2    (clone-bmap m1))
          (hash  (make-hash-table :test 'eql))
-         (count 20)
-         (fsck-interval (min (floor count 4) 100)))
+         (count 50))
     (dotimes (i count)
       (let* ((key (random count))
              (value (- key)))
-        (set-bmap bmap key value)
-        (set-hash hash key value))
-      (when (zerop (mod i fsck-interval))
-        (is-equal-bmap-and-hash-table bmap hash))
-      (fsck-bmap bmap))
+        (set-bmap m1 key value)
+        (set-hash hash key value)
+        (is-equal-bmap-and-hash-table m1 hash)
+        (fsck-bmap m1 m2)
+        (set-bmap m2 key value)))
+        
 
     (dotimes (i (* 2 count))
       (let1 key (random count)
-        (if (zerop (mod i fsck-interval))
-            (progn
-              (is (eql (hash-table-count hash) (bmap-count bmap)))
-              (is-equal-bmap-and-hash-table bmap hash)
-              (is (eql (rem-hash hash key) (rem-bmap bmap key))))
-            (progn
-              (rem-hash hash key)
-              (rem-bmap bmap key))))
-      (fsck-bmap bmap))
+        (is (eql (hash-table-count hash) (bmap-count m1)))
+        (is-equal-bmap-and-hash-table m1 hash)
+        (is (eql (rem-hash hash key) (rem-bmap m1 key)))
+        (fsck-bmap m1 m2)
+        (rem-bmap m2 key)))
 
     (let1 keys (hash-table-keys hash)
       (loop for key in keys do
-           (is-true (rem-bmap bmap key))
+           (is-true (rem-bmap m1 key))
            (is-true (rem-hash hash key))
-           (is-equal-bmap-and-hash-table bmap hash)
-           (fsck-bmap bmap)))))
+           (is-equal-bmap-and-hash-table m1 hash)
+           (fsck-bmap m1 m2)
+           (rem-bmap m2 key)))))
+           
 
 
 

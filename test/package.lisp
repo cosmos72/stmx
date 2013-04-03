@@ -43,7 +43,11 @@
                           #:hash-table-keys #:hash-table-values #:hash-table-pairs)
 
   (:import-from #:stmx.util
-                #:bnode
+                #:print-object-contents
+                #:print-bmap
+                #:clone-bmap
+                #:bnode #:new-bnode
+                #:+red+ #:+black+
                 #:red? #:black?)
 
   (:export #:suite))

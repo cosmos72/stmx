@@ -30,7 +30,7 @@
 
   (:export #:bmap  ;; sorted map, implemented with left-leaning red-black trees
            #:bmap-pred   #:bmap-count  #:bmap-empty?
-           #:clear-bmap 
+           #:clear-bmap  #:clone-bmap
            #:get-bmap    #:set-bmap    #:rem-bmap  ;; also (setf (get-bmap ...) ...)
            #:min-bmap    #:max-bmap         ;; get smallest and largest key/value
            #:map-bmap    #:do-bmap          ;; iterate on bmap

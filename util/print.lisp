@@ -17,11 +17,14 @@
 
 ;;;; ** Printing utilities
 
-(defgeneric print-object-contents (stream hash))
+(defgeneric print-object-contents (stream obj))
 
 (defmethod print-object-contents ((stream (eql 'nil)) obj)
   (with-output-to-string (s)
     (print-object-contents s obj)))
+
+(defmethod print-object-contents (stream obj)
+  (format stream "~A" obj))
 
 (defmethod print-object-contents (stream (obj hash-table))
   (format stream "{")

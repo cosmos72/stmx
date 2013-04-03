@@ -1,15 +1,17 @@
 TO DO:
 
-7) contact Lars Rune Nostdal <larsnostdal at gmail dot com>, author of SW-STM:
+8) contact Lars Rune Nostdal <larsnostdal at gmail dot com>, author of SW-STM:
    see http://blog.nostdal.org/
    "I have a very crude and quite horribly written one laying around for
     Common Lisp: https://github.com/lnostdal/SW-STM"
 
-6ter) implement transactional red-black trees
+7bis) implement transactional red-black trees
 
 6bis) implement (thash-count)
 
 DONE:
+
+7) implemented red-black trees (needed for transactional red-black trees)
 
 6) implemented transactional hash tables
 

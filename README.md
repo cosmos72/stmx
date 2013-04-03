@@ -86,11 +86,11 @@ deep detail on how to actually implement memory transactions.
 Basic usage
 -----------
 
-For the impatient, see the [util](util) folder, which contains several
+For the *very* impatient, see the [util](util) folder, which contains several
 examples and utilities build with STMX, and should be quite easy to
 understand.
 
-For the *very* impatient, STMX offers the following Lisp macros and functions,
+For the impatient, STMX offers the following Lisp macros and functions,
 also heavily documented in the sources - remember `(describe 'some-symbol)` at REPL.
 
 - `TRANSACTIONAL` declares that a class is transactional, i.e. that its
@@ -205,7 +205,7 @@ The author will also try to answer support requests, but gives no guarantees.
 Status
 ------
 
-As of March 2013, STMX is being written by Massimiliano Ghilardi
+As of April 2013, STMX is being written by Massimiliano Ghilardi
 and is considered by the author to be in BETA status.
 
 STMX is a full rewrite of CL-STM, which has been developed by Hoan Ton-That

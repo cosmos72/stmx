@@ -32,16 +32,23 @@
         (print-object-contents nil obj)
         (print-object-contents nil ref)))
   
-(defun fsck-bmap-at (m ref node)
+(defun fsck-bmap-at (m ref node seen)
   "Check bmap invariants: no consecutive red nodes and
 all paths to leaves must have the same number of black nodes.
 
 Return two values: the total number of nodes in subtree starting at node,
 and the number of black nodes in all paths from node to leaves"
   (declare (type bmap m)
-           (type (or null bnode) node))
+           (type (or null bnode) node)
+           (type hash-table seen))
+
   (unless node
     (return-from fsck-bmap-at (values 0 0)))
+
+  (when (gethash node seen)
+    (fail-at nil ref "duplicated node ~A" (_ node key)))
+
+  (setf (gethash node seen) t)
 
   (let ((left (_ node left))
         (right (_ node right)))
@@ -53,8 +60,8 @@ and the number of black nodes in all paths from node to leaves"
         (fail-at m ref "node ~A and its right child ~A are both red"
                  (_ node key) (_ right key))))
 
-    (multiple-value-bind (nodes-left blacks-left) (fsck-bmap-at m ref left)
-      (multiple-value-bind (nodes-right blacks-right) (fsck-bmap-at m ref right)
+    (multiple-value-bind (nodes-left blacks-left) (fsck-bmap-at m ref left seen)
+      (multiple-value-bind (nodes-right blacks-right) (fsck-bmap-at m ref right seen)
         (unless (= blacks-left blacks-right)
           (fail-at m ref "node ~A has ~A black nodes in left subtree, but ~A in right subtree"
                    (_ node key) blacks-left blacks-right))
@@ -68,12 +75,13 @@ all paths to leaves must have the same number of black nodes,
 bmap-count must be the actual nodes count, root must be black."
   (declare (type bmap m))
 
-  (let* ((root (_ m root))
+  (let* ((root  (_ m root))
          (count (_ m count))
-         (nodes (fsck-bmap-at m ref root)))
+         (seen  (make-hash-table :test 'eq :size count))
+         (nodes (fsck-bmap-at m ref root seen)))
     (unless (black? root)
       (fail-at m ref "bmap ~A root node ~A is red" m (_ root key)))
-    (unless (= nodes count)
+    (unless (eql nodes count)
       (fail-at m ref "bmap ~A node count is ~A, but actually has ~A nodes"
                m ref count nodes))
     nil))
@@ -131,9 +139,8 @@ bmap-count must be the actual nodes count, root must be black."
 (defun hash-table-to-sorted-values (hash pred)
   (declare (type hash-table hash)
            (type function pred))
-  (let1 pairs (hash-table-to-sorted-pairs hash pred)
-    (loop for (key . value) in pairs
-         collect value)))
+  (loop for (key . value) in (hash-table-to-sorted-pairs hash pred)
+     collect value))
          
 
 
@@ -149,11 +156,11 @@ bmap-count must be the actual nodes count, root must be black."
                (hash-table-to-sorted-pairs hash pred)))))
 
 
-(test fill-bmap
+(test bmap
   (let* ((m1    (new 'bmap :pred #'<))
          (m2    (clone-bmap m1))
          (hash  (make-hash-table :test 'eql))
-         (count 50))
+         (count 100))
     (dotimes (i count)
       (let* ((key (random count))
              (value (- key)))
@@ -182,11 +189,6 @@ bmap-count must be the actual nodes count, root must be black."
            
 
 
-
-
-
-
-           
 
            
     

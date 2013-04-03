@@ -77,7 +77,7 @@
   (let1 root (if stack
                  (first (last stack))
                  (or parent node))
-    (log-debug "~A, root ~A, parent ~A, node ~A ~{~A~^ ~}~%~A" txt
+    (log:debug "~A, root ~A, parent ~A, node ~A ~{~A~^ ~}~%~A" txt
                (if root   (_ root   key) nil)
                (if parent (_ parent key) nil)
                (if node   (_ node   key) nil)
@@ -88,13 +88,14 @@
   `(log:debug ,@args))
 |#
 
+(defmacro log-debug (&rest args)
+  (declare (ignore args))
+  nil)
+
 (defmacro log-debug-bmap (&rest args)
   (declare (ignore args))
   nil)
 
-(defmacro log-debug (&rest args)
-  (declare (ignore args))
-  nil)
 
 
 
@@ -120,12 +121,13 @@
   "Flip NODE color. Return the new color."
   (declare (type bnode node))
   (with-slots (color) node
-    (setf color (the bit (- 1 color)))))
+    (setf color (the bit (- (the bit 1) (the bit color))))))
 
 
 
 (deftype comp-keyword () '(member :< :> :=))
 
+(declaim (inline compare-keys))
 (defun compare-keys (pred key1 key2)
   "Compare KEY1 agains KEY2 using the comparison function PRED.
 Return :< if KEY1 compares as lesser than KEY2,
@@ -203,7 +205,7 @@ and comparison between the KEY to insert and last visited node's key,
 as multiple values"
    (declare (type bmap m))
    (let ((node (_ m root))
-         (pred (_ m pred))
+         (pred (the function (_ m pred)))
          (comp nil))
      (loop while node
         for xkey = (_ node key) do
@@ -211,7 +213,8 @@ as multiple values"
           (case (setf comp (compare-keys pred key xkey))
             (:< (setf node (_ node left)))
             (:> (setf node (_ node right)))
-            (:= (return))))
+            (t (return))))
+
      (values (the list stack)
              (the (or null comp-keyword) comp))))
      
@@ -494,6 +497,44 @@ Return some node in rebalanced tree and its stack as multiple values"
      (return (values parent stack)))))
 
 
+
+(defun swap-node-with-descendant (stack1 stack2 larger-node2?)
+  (declare (type list stack1 stack2)
+           (type boolean larger-node2?))
+           
+  (let ((node1   (first  stack1))
+        (parent1 (second stack1))
+        (node2   (first  stack2))
+        (parent2 (second stack2)))
+
+    (declare (type bnode node1 node2))
+           
+    (rotatef (_ node1 left)  (_ node2 left))
+    (rotatef (_ node1 right) (_ node2 right))
+    (rotatef (_ node1 color) (_ node2 color))
+
+    (rotatef (first stack1) (first stack2))
+
+    (when parent1
+      (if (is-left-child? node1 parent1)
+          (setf (_ parent1 left)  node2)
+          (setf (_ parent1 right) node2)))
+
+    (when (eq node1 parent2)
+      (if larger-node2?
+          (setf (_ node2 right) node1)
+          (setf (_ node2 left)  node1))
+      (return-from swap-node-with-descendant))
+
+    (when parent2
+      (if (is-left-child? node2 parent2)
+          (setf (_ parent2 left)  node1)
+          (setf (_ parent2 right) node1)))
+    nil))
+
+
+
+
        
             
 (defun remove-at (m stack)
@@ -510,7 +551,8 @@ from rebalanced tree. Some-node will be nil only if the tree is empty after remo
         ;; node with two children. implementation choice:
         ;; replace node with successor (min of right subtree) if successor is red or has 1 child,
         ;; otherwise replace node with predecessor (max of left subtree)
-        (let1 other-stack stack
+        (let ((other-stack stack)
+              (other-is-successor? t))
 
           (loop for left = right then (_ left left)
              while left do
@@ -518,27 +560,30 @@ from rebalanced tree. Some-node will be nil only if the tree is empty after remo
 
           (let1 other-node (first other-stack)
             (unless (or (red? other-node) (_ other-node left) (_ other-node right))
-              (setf other-stack stack)
+              (setf other-stack stack
+                    other-is-successor? nil)
               (loop for right = left then (_ right right)
                  while right do
                    (push right other-stack))))
 
-          (let1 other-node (first other-stack)
-            (setf (_ node key)   (_ other-node key)
-                  (_ node value) (_ other-node value)
-                  ;; we copied other-node contents.
-                  ;; proceed by removing other-node instead of original one
-                  node other-node
-                  parent (second other-stack)
-                  stack other-stack)))))
+          (log-debug-bmap node parent stack "before swap-with-descendant")
 
-    (log-debug-bmap node parent stack "after succ or pred")
+          (swap-node-with-descendant stack other-stack other-is-successor?)
+
+          ;; proceed by removing node - it was moved, reload it
+          (setf stack  other-stack
+                node   (first stack)
+                parent (second stack))
+
+          (log-debug-bmap node parent stack "after swap-with-descendant"))))
+
 
     (pop stack) ;; node will not be in tree anymore
 
     (when (red? node)
       ;; red node with < 2 children, must be a leaf (the only child would be black, impossible)
       (replace-child-node node nil parent)
+      (log-debug-bmap node parent stack "after delete red node")
       (return-from remove-at (values parent (rest stack))))
     
     ;; black node with < 2 children: either has no children, or one red leaf child
@@ -546,6 +591,7 @@ from rebalanced tree. Some-node will be nil only if the tree is empty after remo
       (when-bind child (or left right)
         (setf (_ child color) +black+)
         (replace-child-node node child parent)
+        (log-debug-bmap node parent stack "after replace black node")
         (return-from remove-at (values child stack))))
     
     ;; the hard case: black node with no children
@@ -570,15 +616,14 @@ Return t if KEY was removed, nil if not found."
 
       (multiple-value-bind (node stack) (remove-at m stack)
         ;; if root changed, stack will be at most 1 element
-        (unless (second stack)
-          (let1 new-root (or (first stack) node)
-            (when (not (eq root new-root))
-              (log-debug "root change ~A -> ~A with stack ~{~A~^ ~}"
-                        (if root (_ root key) nil)
-                        (if new-root (_ new-root key) nil)
-                        (loop for s in stack collect (_ s key)))
-              (when (setf root new-root)
-                (setf (_ new-root color) +black+))))))
+        (let1 new-root (or (first (last stack)) node)
+          (when (not (eq root new-root))
+            (log-debug "root change ~A -> ~A with stack ~{~A~^ ~}"
+                       (if root (_ root key) nil)
+                       (if new-root (_ new-root key) nil)
+                       (loop for s in stack collect (_ s key)))
+            (when (setf root new-root)
+              (setf (_ new-root color) +black+)))))
 
       (decf (_ m count))
       t)))

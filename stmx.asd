@@ -42,6 +42,7 @@
 
                (:module :util
                 :components ((:file "package")
+                             (:file "misc"        :depends-on ("package"))
                              (:file "print"       :depends-on ("package"))
                              (:file "bmap"        :depends-on ("print"))
                              (:file "thash-table" :depends-on ("print"))

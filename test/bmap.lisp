@@ -18,10 +18,10 @@
 (def-suite bmap-suite :in suite)
 (in-suite bmap-suite)
 
-(let1 pkg (find-package (symbol-name 'stmx.util))
-  (defmacro _ (obj slot-name)
-    (let1 actual-slot-name (find-symbol (symbol-name slot-name) pkg)
-      `(slot-value ,obj ',actual-slot-name))))
+(defmacro _ (obj slot-name)
+  (let* ((pkg (find-package (symbol-name 'stmx.util)))
+         (actual-slot-name (find-symbol (symbol-name slot-name) pkg)))
+    `(slot-value ,obj ',actual-slot-name)))
 
 
 (defun fsck-bmap-at (node)
@@ -112,19 +112,20 @@ bmap-count must be the actual nodes count, root must be black."
 (test fill-bmap
   (let* ((bmap  (new 'bmap :pred #'<))
          (hash  (make-hash-table :test 'eql))
-         (count 501))
+         (count 20)
+         (fsck-interval (min (floor count 4) 100)))
     (dotimes (i count)
       (let* ((key (random count))
              (value (- key)))
         (set-bmap bmap key value)
         (set-hash hash key value))
-      (when (zerop (mod i 100))
+      (when (zerop (mod i fsck-interval))
         (is-equal-bmap-and-hash-table bmap hash))
       (fsck-bmap bmap))
 
     (dotimes (i (* 2 count))
       (let1 key (random count)
-        (if (zerop (mod i 100))
+        (if (zerop (mod i fsck-interval))
             (progn
               (is (eql (hash-table-count hash) (bmap-count bmap)))
               (is-equal-bmap-and-hash-table bmap hash)

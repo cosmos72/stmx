@@ -31,9 +31,12 @@
   (:export #:fixnum< #:fixnum>   ;; optimized versions of < > = /= useful with BMAPs
            #:fixnum= #:fixnum/=
 
-           #:bmap  ;; sorted map, implemented with red-black trees
+           #:bmap  ;; generic binary tree
+           #:rbmap ;; sorted map, implemented with red-black trees
+           #:tmap  ;; transactional sorted map, implemented with red-black trees
+
            #:bmap-pred   #:bmap-count  #:bmap-empty?
-           #:clear-bmap  #:clone-bmap
+           #:clear-bmap  #:copy-bmap   #:copy-bmap-into
            #:get-bmap    #:set-bmap    #:rem-bmap  ;; also (setf (get-bmap ...) ...)
            #:min-bmap    #:max-bmap         ;; get smallest and largest key/value
            #:map-bmap    #:do-bmap          ;; iterate on bmap

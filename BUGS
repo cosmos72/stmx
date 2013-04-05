@@ -4,6 +4,9 @@ none :)
 
 FIXED BUGS:
 
+4) initargs of transactional classes were wrapped in TVARs multiple times,
+   depending on the length of list returned by (closer-mop:slot-definition-initargs slot)
+
 3) when a transaction signals an error, (run-atomic) was calling (valid? log) without locking,
    so it could get spurious "invalid" answers and unnecessarily re-run the transaction
    (only a waste of resources, not a bug)

@@ -45,8 +45,8 @@
   (:import-from #:stmx.util
                 #:print-object-contents
                 #:print-bmap
-                #:clone-bmap
-                #:bnode #:new-bnode
+                #:rbnode #:tnode
+                #:bmap/new-node
                 #:+red+ #:+black+
                 #:red? #:black?)
 

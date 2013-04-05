@@ -45,6 +45,8 @@
                              (:file "misc"        :depends-on ("package"))
                              (:file "print"       :depends-on ("package"))
                              (:file "bmap"        :depends-on ("print"))
+                             (:file "rbmap"       :depends-on ("bmap"))
+                             (:file "tmap"        :depends-on ("rbmap"))
                              (:file "thash-table" :depends-on ("print"))
                              (:file "cell"        :depends-on ("package"))
                              (:file "cell-tobj"   :depends-on ("cell"))
@@ -68,10 +70,11 @@
 
   :components ((:module :test
                 :components ((:file "package")
-                             (:file "bmap"      :depends-on ("package"))
+                             (:file "rbmap"     :depends-on ("package"))
                              (:file "atomic"    :depends-on ("package"))
-                             (:file "on-commit" :depends-on ("package" "atomic"))
+                             (:file "on-commit" :depends-on ("atomic"))
                              (:file "retry"     :depends-on ("package"))
-                             (:file "orelse"    :depends-on ("package"))))))
+                             (:file "orelse"    :depends-on ("package"))
+                             (:file "tmap"      :depends-on ("rbmap" "orelse"))))))
 
 

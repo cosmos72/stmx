@@ -46,6 +46,10 @@ options can be passed to component slots:
 (defclass transactional-effective-slot (standard-effective-slot-definition)
   ((transactional :accessor transactional-slot?
                   :initarg :transactional
+                  ;; if a transactional class inherits a slot
+                  ;; from a non-transactional parent class,
+                  ;; by default the slot will remain non-transactional
+                  :initform nil
                   :type boolean))
   (:documentation "The class for effective slots of transactional classes.
 Exactly analogous to TRANSACTIONAL-DIRECT-SLOT."))
@@ -240,8 +244,10 @@ if not already present in the superclass list."
         (dolist (initarg-name (slot-definition-initargs slot))
           (let1 fragment (rest (member initarg-name initargs))
             (when fragment
-              (setf (first fragment) (new 'tvar :value (first fragment))))))))
-
+              (setf (first fragment) (new 'tvar :value (first fragment)))
+              ;; wrap each initarg only once
+              (return))))))
+              
     ;; Disable recording so that slots initialization is NOT recorded to the log.
     ;; Show-tvars so that (setf slot-value) will set the tvar, not its contents
     (without-recording-with-show-tvars

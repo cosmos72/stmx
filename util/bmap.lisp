@@ -15,39 +15,50 @@
 
 (in-package :stmx.util)
 
-;;;; ** Sorted map, implemented with red-black trees.
+;;;; ** Generic sorted binary map
+;;;; For a red-black trees implementation, see rbmap.lisp
 ;;;; For a transactional version, see tmap.lisp
 
-(declaim (type bit +red+ +black+))
-(defconstant +red+   1)
-(defconstant +black+ 0)
-
 (defclass bnode ()
-  ((left  :initform nil   :type (or null bnode))
-   (right :initform nil   :type (or null bnode))
-   (key   :initarg :key)
-   (value :initarg :value)
-   (color :initform +red+ :type bit))
-
-  (:documentation "Node of red-black tree"))
+  ((left  :initform nil  :type (or null bnode)   :accessor left-of)
+   (right :initform nil  :type (or null bnode)   :accessor right-of)
+   (key   :initarg :key                          :accessor key-of)
+   (value :initarg :value                        :accessor value-of))
+  (:documentation "Generic binary tree node"))
 
 
 (defclass bmap ()
-  ((root  :initform nil :type (or null bnode))
-   (pred  :initarg :pred
-          :initform (error "missing :pred argument")
-          :type function
-          :reader bmap-pred)
-   (count :initform 0
-          :type fixnum
-          :reader bmap-count))
+  ((root  :initform nil  :type (or null bnode)   :accessor root-of)
+   (pred  :initarg :pred :type function          :accessor pred-of
+          :initform (error "missing :pred argument"))
+   (count :initform 0    :type fixnum            :accessor count-of))
+  (:documentation "Generic binary tree"))
 
-  (:documentation "Sorted map, implemented with red-black tree"))
 
+;; for some reason, SBCL invokes slot-value-using-class
+;; only from slot accessors, not from (slot-value ...)
 
 (defmacro _ (obj slot-name)
   `(slot-value ,obj ',slot-name))
 
+#|
+(eval-always
+  (let1 of (symbol-name '-of)
+    (defmacro _ (obj slot-name)
+      (let1 accessor (intern (concatenate 'string (symbol-name slot-name) of))
+      `(,accessor ,obj)))))
+|#
+
+
+(defun bmap-pred (m)
+  (declare (type bmap m))
+  (pred-of m))
+
+(defun bmap-count (m)
+  (declare (type bmap m))
+  (count-of m))
+
+  
 
 (defun print-bnode (stream node &optional (depth 0))
   (declare (type (or null bnode) node))
@@ -92,7 +103,7 @@
   (declare (ignore args))
   nil)
 
-(defmacro log-debug-bmap (&rest args)
+(defmacro log-debug-bmap (&rest args &key &allow-other-keys)
   (declare (ignore args))
   nil)
 
@@ -100,28 +111,46 @@
 
 
 
-(declaim (inline bmap-empty? red? black? flip-color))
-
+(declaim (inline bmap-empty?))
 (defun bmap-empty? (m)
   "Return t if M is empty, otherwise return nil."
   (declare (type bmap m))
   (= 0 (_ m count)))
 
-(defun red? (node)
-  "Return t if NODE is red. Nil nodes are assumed to be black"
-  (declare (type (or null bnode) node))
-  (and node (eq +red+ (_ node color))))
 
-(defun black? (node)
-  "Return t if NODE is black. Nil nodes are assumed to be black"
-  (declare (type (or null bnode) node))
-  (not (red? node)))
 
-(defun flip-color (node)
-  "Flip NODE color. Return the new color."
-  (declare (type bnode node))
-  (with-slots (color) node
-    (setf color (the bit (- (the bit 1) (the bit color))))))
+
+
+#|
+(defgeneric bmap/new-node (m key value)
+  (:documentation "Create and return a new node appropriate for binary tree M.
+Methods must NOT invoke (incf (_ m count))."))
+
+(defgeneric bmap/copy-node (m node)
+  (:documentation "Create and return a copy of NODE appropriate for binary tree M.
+Methods must NOT invoke (incf (_ m count))."))
+
+
+
+(defgeneric bmap/rebalance-after-insert (m child stack)
+  (:documentation "Rebalance binary tree M after inserting CHILD."))
+
+
+(defgeneric bmap/remove-at (m stack)
+  (:documentation "Remove (first STACK) from binary tree M and rebalance it.
+Methods are supposed to explicitly (setf (_ m root) ...) when needed,
+but must NOT invoke (decf (_ m count))."))
+|#
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -153,9 +182,20 @@ If M does not contain KEY, return (values DEFAULT NIL)."
           (case (compare-keys pred key xkey)
             (:< (setf node (_ node left)))
             (:> (setf node (_ node right)))
-            (:= (return-from get-bmap (values (_ node value) t)))))
+            (t (return-from get-bmap (values (_ node value) t)))))
      (values default nil)))
 
+
+(declaim (inline is-left-child?))
+(defun is-left-child? (node parent)
+  (declare (type bnode node parent))
+  (eq node (_ parent left)))
+
+
+(declaim (inline is-left-child-red?))
+(defun is-left-child-red? (node)
+  (declare (type bnode node))
+  (red? (_ node left)))
 
 
 (defun rotate-left (node)
@@ -178,6 +218,7 @@ If M does not contain KEY, return (values DEFAULT NIL)."
     (setf (_ x right)    node)
     (log-debug "after:~%~A" (print-object-contents nil x))
     x))
+
 
 
 (defun rotate-around (node parent &key left)
@@ -205,7 +246,7 @@ and comparison between the KEY to insert and last visited node's key,
 as multiple values"
    (declare (type bmap m))
    (let ((node (_ m root))
-         (pred (the function (_ m pred)))
+         (pred (_ m pred))
          (comp nil))
      (loop while node
         for xkey = (_ node key) do
@@ -218,11 +259,6 @@ as multiple values"
      (values (the list stack)
              (the (or null comp-keyword) comp))))
      
-
-(defun new-bnode (m key value)
-   (declare (type bmap m))
-   (incf (_ m count))
-   (new 'bnode :key key :value value))
 
 
 (defun set-bmap (m key value)
@@ -239,25 +275,16 @@ Return VALUE."
          (return-from set-bmap value))
 
        ;; no such key, create node for it
-       (let1 child (new-bnode m key value)
-         (unless node
-           ;; bmap is empty
-           (with-slots (root) m
-             (setf root child)
-             (setf (_ root color) +black+))
-           (return-from set-bmap value))
+       (let1 child (bmap/new-node m key value)
+         (incf (_ m count))
+         (if node
+             (if (eq :< comp)
+                 (setf (_ node left) child)
+                 (setf (_ node right) child))
+             ;; bmap is empty
+             (setf (_ m root) child))
 
-         ;; key not present, insert it
-         (if (eq :< comp)
-             (setf (_ node left) child)
-             (setf (_ node right) child)))
-
-       (when (red? node)
-         (multiple-value-bind (node stack) (rebalance-after-insert m stack)
-           (unless stack
-             (setf (_ m root) node)
-             (when node
-               (setf (_ node color) +black+)))))))
+         (bmap/rebalance-after-insert m child stack))))
    value)
 
 
@@ -265,107 +292,10 @@ Return VALUE."
 (defun (setf get-bmap) (value m key)
   "Add KEY to M if not present, and associate VALUE to KEY in M.
 Return VALUE."
+  (declare (type bmap m))
   (set-bmap m key value))
 
 
-
-(declaim (inline is-left-child?))
-(defun is-left-child? (node parent)
-  (declare (type bnode node parent))
-  (eq node (_ parent left)))
-
-
-(declaim (inline is-left-child-red?))
-(defun is-left-child-red? (node)
-  (declare (type bnode node))
-  (red? (_ node left)))
-
-(defun rebalance-after-insert (m stack)
-  "Rebalance tree after inserting (first stack).
-Return (values node stack) for some rebalanced node and its path from root.
-If stack is nil, returned node is the new root to set."
-  (declare (type bmap m)
-           (type list stack)
-           (ignore m))
-
-  (prog ((node (pop stack))
-         left-node?
-         parent)
-     (declare (type (or null bnode) node parent))
-     (declare (type boolean left-node?))
-           
-     ;; 0) if X is black, we're DONE.
-     rule-0
-     (log-debug-bmap node parent stack "rule-0")
-     (when (black? node)
-       (return (values node stack)))
-
-     ;;    Otherwise, red node X* must have a red child C*: double-red violation
-     ;;      X*
-     ;;      |      note: | means either left child / or right child \
-     ;;      C*
-     (setf parent (pop stack))
-
-     ;; 1) if node X* has a red brother B*, then X* parent's A must be black
-     ;;         A                     X*
-     ;;        / \                   / \   then move up to A and:
-     ;;       X*  B*  flip colors   X   B  if A is root, set it to black -> DONE.
-     ;;       |       of X, A, B    |      otherwise move up to A's parent -> call it X and:
-     ;;       C*                    C*     if X is root -> DONE
-     ;;                                    otherwise, go to 0)
-     (log-debug-bmap node parent stack "rule-1")
-     (unless parent
-       ;; node is root
-       (return (values node stack)))
-
-     (with-ro-slots (left right) parent
-       (when (and (red? left) (red? right))
-         (flip-color parent) (flip-color left) (flip-color right)
-         (setf node (pop stack))
-         (unless node
-           ;; no more nodes, parent is root
-           (return (values parent stack)))
-         (when stack
-           (go rule-0))
-         ;; node is root
-         (return (values node stack))))
-
-
-     ;; 2) otherwise, X* must have a black brother B (possibly nil).
-     ;;    Remember X* has a red child C*. If B and C* are on the same side of X*
-     ;;         A                             A
-     ;;        / \   rotate around X:        / \   now move to C*
-     ;;       X*  B  rotate-left if         C*  B       v
-     ;;        \     X* is left child, ->  /       call it X* and go to 3)
-     ;;         C*   rotate-right if      X*    
-     ;;              X* is right child
-     (log-debug-bmap node parent stack "rule-2")
-     (setf left-node? (is-left-child? node parent))
-     (unless (eq left-node? (is-left-child-red? node))
-       (setf node (rotate-around node parent :left left-node?))
-       (log-debug-bmap node parent stack "rule-2, after rotate-around"))
-
-     ;; 3) X* must have a black brother B and a red child C*,
-     ;;    both must be on the same side of X*
-     ;;         A                             X*                       X
-     ;;        / \   rotate around X:        / \                      / \
-     ;;       X*  B  rotate-right if        C*  A    swap colors     C*  A*
-     ;;      /       A* is left child, ->        \   of X* and A ->       \  DONE.
-     ;;     C*       rotate-left if               B                        B
-     ;;              A* is right child
-     (log-debug-bmap node parent stack "rule-3")
-     (rotate-around parent (first stack) :left (not left-node?))
-     (log-debug "before rotatef, node color = ~A, parent color = ~A"
-                (_ node color) (_ parent color))
-     (rotatef (_ node color) (_ parent color))
-     (log-debug "after  rotatef, node color = ~A, parent color = ~A"
-                (_ node color) (_ parent color))
-
-     (log-debug-bmap node parent stack
-                (format nil "rule-3, after (rotate-~A parent)"
-                        (if left-node? "right" "left")))
-     (return (values node stack))))
-           
 
 
 
@@ -386,219 +316,6 @@ Return t if left child was replaced, nil if right child was replaced"
 
 
 
-(defun remove-black-node-at (m node stack)
-  "Remove black leaf NODE, its path is STACK.
-Return some node in rebalanced tree and its stack as multiple values"
-  (declare (type bmap m)
-           (type bnode node)
-           (type list stack)
-           (ignore m))
-
-  (let1 parent (pop stack)
-    (unless parent
-      ;; 0) X was root, nothing to do
-      (return-from remove-black-node-at nil))
-
-    ;; being black, node X must be root or must have a brother. the brother must be:
-    ;; - either a black node (with 0, 1 or 2 red children leaves)
-    ;; - or a red node with two black children (and each of them with 0, 1 or 2 red children leaves)
-
-    ;; also, callers guarantee that black node X has at most one child.
-
-
-    (prog ;; replace black node X but remember his parent X and brother B.
-          ((left-node? (replace-child-node node
-                                           (or (_ node left) (_ node right))
-                                           parent))
-           brother)
-
-     rule-1
-     (setf brother (if left-node? (_ parent right) (_ parent left)))
-     (log-debug-bmap node parent stack "start" :left-node? left-node? :brother brother)
-          
-     ;; 1.1) if X has a red brother B, their parent A must be black and B must have
-     ;;      two black children C and D. flip colors of parent A and brother B.
-     ;;       A                      A*
-     ;;      / \     flip colors    / \
-     ;;    (X)  B*   of A and B:  (X)  B
-     ;;        / \                    / \
-     ;;       C   D                  C   D
-     (when (red? brother)             
-       (rotatef (_ parent color) (_ brother color))
-       ;; 1.2) if X is left child, rotate-left parent otherwise rotate-right parent
-       ;;       A*                     B
-       ;;      / \    rotate around   / \   there is still a missing black
-       ;;    (X)  B   parent A:      A*  D  in the hole left by removing X...
-       ;;        / \                / \     update the notion of X's brother
-       ;;       C   D             (X)  C    (it's now the black node C) and continue
-
-       (setf brother (if left-node? (_ brother left) (_ brother right)))
-       ;; rotate around parent. grandparent (if exists) must also be linked
-       ;; to former brother instead of former parent
-       (push (rotate-around parent (first stack) :left left-node?) stack))
-           
-     (log-debug-bmap node parent stack "rule-1" :brother brother)
-
-     ;; X must have a black brother B.
-     ;; 2) if both B's children are black (or nil), make the brother red.
-     ;;      this may cause double-red between brother B and parent A
-     ;; 2.1) if such double-red occurs, set parent's color to black -> DONE
-     (with-ro-slots (left right) brother
-       (when (and (black? left) (black? right))
-         (setf (_ brother color) +red+)
-         (when (red? parent)
-           (setf (_ parent color) +black+)
-           (log-debug-bmap node parent stack "rule-2.1 DONE" :brother brother)
-           (return (values parent stack)))
-         ;; 2.2) otherwise move to parent (update the notion of X: it's the former parent) and:
-         ;;        if we reached the root -> DONE
-         ;;        otherwise go to 0)
-         (setf node parent)
-         (unless (setf parent (pop stack))
-           (log-debug-bmap node parent stack "rule-2.2 DONE" :brother brother)
-           (return (values node stack)))
-         (setf left-node? (is-left-child? node parent))
-         (go rule-1))
-
-
-       (log-debug-bmap node parent stack "rule-2.2" :brother brother)
-
-       ;; B must have either two red children, or one black child (not nil) and one red.
-       ;; 3.1) if B's far child is black, rotate around B to replace it with its former red child:
-       ;;       A?                     A?
-       ;;      / \    rotate around   / \     there can still be a missing black
-       ;;    (X)  B   brother B:    (X)  C*   in the hole left by removing X...
-       ;;        / \                    / \   update the notion of X's brother
-       ;;       C*  D                      B  (it's now the black node C) and continue
-       ;;      / \ / \                    / \
-       ;;                                    D
-       ;;                                   / \
-       (when (black? (if left-node? right left))
-         (setf brother (rotate-around brother parent :left (not left-node?)))))
-
-     (log-debug-bmap node parent stack "rule-3.1" :brother brother)
-
-     ;; brother B may have changed, recompute its left and right children
-     (with-ro-slots (left right) brother
-       ;; 3.2) set B's far-child to black, copy parent color into B, set parent to black
-       (if left-node?
-            (setf (_ right color) +black+)
-            (setf (_ left color) +black+))
-       (with-slots (color) parent
-         (setf (_ brother color) color)
-         (setf color +black+))
-
-       (log-debug-bmap node parent stack "rule-3.2" :brother brother :left left :right right))
-
-     ;; 3.3) if node is left rotate-left around parent, otherwise rotate-right around parent
-     (setf parent
-           (rotate-around parent (first stack) :left left-node?))
-     (log-debug-bmap node parent stack "rule-3.3")
-     (return (values parent stack)))))
-
-
-
-(defun swap-node-with-descendant (stack1 stack2 larger-node2?)
-  (declare (type list stack1 stack2)
-           (type boolean larger-node2?))
-           
-  (let ((node1   (first  stack1))
-        (parent1 (second stack1))
-        (node2   (first  stack2))
-        (parent2 (second stack2)))
-
-    (declare (type bnode node1 node2))
-           
-    (rotatef (_ node1 left)  (_ node2 left))
-    (rotatef (_ node1 right) (_ node2 right))
-    (rotatef (_ node1 color) (_ node2 color))
-
-    (rotatef (first stack1) (first stack2))
-
-    (when parent1
-      (if (is-left-child? node1 parent1)
-          (setf (_ parent1 left)  node2)
-          (setf (_ parent1 right) node2)))
-
-    (when (eq node1 parent2)
-      (if larger-node2?
-          (setf (_ node2 right) node1)
-          (setf (_ node2 left)  node1))
-      (return-from swap-node-with-descendant))
-
-    (when parent2
-      (if (is-left-child? node2 parent2)
-          (setf (_ parent2 left)  node1)
-          (setf (_ parent2 right) node1)))
-    nil))
-
-
-
-
-       
-            
-(defun remove-at (m stack)
-  "Remove (first stack) from tree and return (values some-node that-node-stack)
-from rebalanced tree. Some-node will be nil only if the tree is empty after removal."
-  (declare (type bmap m)
-           (type list stack))
-
-  (let* ((node (first stack))
-         (parent (second stack)))
-
-    (with-ro-slots (left right) node
-      (when (and left right)
-        ;; node with two children. implementation choice:
-        ;; replace node with successor (min of right subtree) if successor is red or has 1 child,
-        ;; otherwise replace node with predecessor (max of left subtree)
-        (let ((other-stack stack)
-              (other-is-successor? t))
-
-          (loop for left = right then (_ left left)
-             while left do
-               (push left other-stack))
-
-          (let1 other-node (first other-stack)
-            (unless (or (red? other-node) (_ other-node left) (_ other-node right))
-              (setf other-stack stack
-                    other-is-successor? nil)
-              (loop for right = left then (_ right right)
-                 while right do
-                   (push right other-stack))))
-
-          (log-debug-bmap node parent stack "before swap-with-descendant")
-
-          (swap-node-with-descendant stack other-stack other-is-successor?)
-
-          ;; proceed by removing node - it was moved, reload it
-          (setf stack  other-stack
-                node   (first stack)
-                parent (second stack))
-
-          (log-debug-bmap node parent stack "after swap-with-descendant"))))
-
-
-    (pop stack) ;; node will not be in tree anymore
-
-    (when (red? node)
-      ;; red node with < 2 children, must be a leaf (the only child would be black, impossible)
-      (replace-child-node node nil parent)
-      (log-debug-bmap node parent stack "after delete red node")
-      (return-from remove-at (values parent (rest stack))))
-    
-    ;; black node with < 2 children: either has no children, or one red leaf child
-    (with-ro-slots (left right) node
-      (when-bind child (or left right)
-        (setf (_ child color) +black+)
-        (replace-child-node node child parent)
-        (log-debug-bmap node parent stack "after replace black node")
-        (return-from remove-at (values child stack))))
-    
-    ;; the hard case: black node with no children
-    (log-debug-bmap node parent stack "before remove-black-node-at")
-    (return-from remove-at (remove-black-node-at m node stack))))
-          
-
 
 (defun rem-bmap (m key)
   "Find and remove KEY and its associated value from M.
@@ -614,17 +331,7 @@ Return t if KEY was removed, nil if not found."
       (unless (eq := comp)
         (return-from rem-bmap nil))
 
-      (multiple-value-bind (node stack) (remove-at m stack)
-        ;; if root changed, stack will be at most 1 element
-        (let1 new-root (or (first (last stack)) node)
-          (when (not (eq root new-root))
-            (log-debug "root change ~A -> ~A with stack ~{~A~^ ~}"
-                       (if root (_ root key) nil)
-                       (if new-root (_ new-root key) nil)
-                       (loop for s in stack collect (_ s key)))
-            (when (setf root new-root)
-              (setf (_ new-root color) +black+)))))
-
+      (bmap/remove-at m stack)
       (decf (_ m count))
       t)))
 
@@ -661,27 +368,35 @@ or (values nil nil nil) if M is empty"
   (declare (type bmap m))
   (setf (_ m root) nil)
   (setf (_ m count) 0)
-  m)
+  (the bmap m))
 
 
-
-(defun clone-bmap (m)
-  "Create and return a copy of bmap M.
-Keys and values in M are copied, not cloned"
-  (declare (type bmap m))
-  (let1 mclone (new 'bmap :pred (_ m pred))
-    (labels ((clone-bnodes (node)
+(defun copy-bmap-into (m mcopy)
+  "Fill M2 with a copy of bmap M1.
+Copies all keys and values from M1 into M2
+and removes any other key/value already present in M2."
+  (declare (type bmap m mcopy))
+  (labels ((copy-nodes (node)
              (declare (type (or null bnode) node))
              (unless node
-               (return-from clone-bnodes nil))
-             (let1 clone (new-bnode m (_ node key) (_ node value))
-               (setf (_ clone color) (_ node color))
-               (setf (_ clone left)  (clone-bnodes (_ node left)))
-               (setf (_ clone right) (clone-bnodes (_ node right)))
-               clone)))
-      (setf (_ mclone root) (clone-bnodes (_ m root)))
-      (setf (_ mclone count) (_ m count))
-      mclone)))
+               (return-from copy-nodes nil))
+             (let1 copy (bmap/copy-node m node)
+               (setf (_ copy left)  (copy-nodes (_ node left)))
+               (setf (_ copy right) (copy-nodes (_ node right)))
+               copy)))
+    (setf (_ mcopy root) (copy-nodes (_ m root)))
+    (setf (_ mcopy count) (_ m count))
+    mcopy))
+
+
+(defun copy-bmap (m)
+  "Create and return a copy of binary tree M.
+Keys and values in M are shallow copied."
+  (declare (type bmap m))
+  (let1 mcopy (new (class-of m) :pred (_ m pred))
+    (copy-bmap-into m mcopy)
+    mcopy))
+
            
 
 

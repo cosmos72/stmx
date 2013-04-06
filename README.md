@@ -305,9 +305,8 @@ Utilities and examples
 
 See the [util](util) folder, which contains several examples and utilities
 built with STMX and should be relatively straightforward to understand.
-
 The folder contains the following classes with related methods and functions,
-contained in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` at REPL:
+all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` at REPL:
 
 - `CELL` is the simplest transactional class. It is created with
   `(make-instance 'cell &key value)` and it can be empty or hold a single value.
@@ -316,6 +315,7 @@ contained in the STMX.UTIL package - for more details, use `(describe 'some-symb
 
   When empty, taking a value will (retry) and wait until some other thread
   puts a value.
+  
   When full, putting a value will (retry) and wait until some other thread
   removes the previous value.
 
@@ -332,8 +332,8 @@ contained in the STMX.UTIL package - for more details, use `(describe 'some-symb
 
 - `TMAP` is a transactional sorted map, backed by a red-black tree.
   It is created with `(make-instance 'tmap :pred compare-function)`
-  where `compare-function` must be a function accepting two arguments, key1 and key2,
-  and returning t if key1 is smaller that key2. Typical values for `compare-function`
+  where COMPARE-FUNCTION must be a function accepting two arguments, KEY1 and KEY2,
+  and returning t if KEY1 is smaller that KEY2. Typical values for COMPARE-FUNCTION
   are `#'<` and the faster `#'fixnum<` or, for string keys, `#'string<`
 
   Methods: `BMAP-PRED` `BMAP-COUNT` `BMAP-EMPTY?` `CLEAR-BMAP`

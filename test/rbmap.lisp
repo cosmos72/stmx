@@ -32,6 +32,7 @@
         (print-object-contents nil obj)
         (print-object-contents nil ref)))
   
+
 (defun fsck-rbmap-at (m ref node seen)
   "Check rbmap invariants: no consecutive red nodes and
 all paths to leaves must have the same number of black nodes.
@@ -88,7 +89,7 @@ bmap-count must be the actual nodes count, root must be black."
 
 
 (test new-rbmap
-  (let1 m (new 'rbmap :pred #'<)
+  (let1 m (new 'rbmap :pred #'fixnum<)
     (is-true (bmap-empty? m))
     (is (= 0 (bmap-count m)))
     (do-bmap (key value) m
@@ -159,8 +160,13 @@ bmap-count must be the actual nodes count, root must be black."
                (hash-table-to-sorted-pairs hash pred)))))
 
 
+(defun is-equal-bmap (m1 m2)
+  (is (equal (bmap-pairs m1)
+             (bmap-pairs m2))))
+  
+
 (defun test-rbmap-class (class-name)
-  (let* ((m1    (new class-name :pred #'<))
+  (let* ((m1    (new class-name :pred #'fixnum<))
          (m2    (copy-bmap m1))
          (hash  (make-hash-table :test 'eql))
          (count 100))

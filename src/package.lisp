@@ -28,9 +28,9 @@
                           #:standard-generic-function
                           #:defmethod
                           #:defgeneric)
-  (:export #:atomic
+  (:export #:atomic    #:run-atomic
            #:retry
-           #:orelse
+           #:orelse    #:run-orelse
 
            #:transactional
            #:transaction

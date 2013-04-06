@@ -86,31 +86,35 @@ deep detail on how to actually implement memory transactions.
 Basic usage
 -----------
 
-For the *very* impatient, see the [util](util) folder, which contains several
-examples and utilities build with STMX, and should be quite easy to
-understand.
-
-For the impatient, STMX offers the following Lisp macros and functions,
-also heavily documented in the sources - remember `(describe 'some-symbol)` at REPL.
+STMX offers the following Lisp macros and functions, also heavily documented
+in the sources - remember `(describe 'some-symbol)` at REPL.
 
 - `TRANSACTIONAL` declares that a class is transactional, i.e. that its
   slots contain transactional data. Use it to wrap a class definition:
   
         (transactional
           (defclass foo ()
-            ((value1 :type integer :accessor :value1-of)
-             (value2 :type string  :accessor :value2-of)
+            ((value1 :type integer :initarg value1 :accessor :value1-of)
+             (value2 :type string  :initarg value2 :accessor :value2-of)
              ;; ...
             )))
+
+  Note: on some Common Lisp implementations, slot-value and (setf slot-value)
+  are known to ignore the transactional machinery (implemented with MOP
+  slot-value-using-class, if you wonder) causing all kinds of bugs
+  on transactional classes.
+  To avoid hard-to-debug problems, always use accessors to read and write
+  the slots of transactional classes.
+
 
 - `TRANSACTION` declares that a method or function is an atomic
   transaction, and is actually just a convenience macro for `ATOMIC`.
   Use it to wrap a function definition:
   
         (transaction
-          (defun bar (obj)
+          (defun show-foo (obj)
             (declare (type foo obj))
-            (format t "atomic function bar: foo is ~A ~A~%"
+            (format t "atomic function show-foo: foo is ~A ~A~%"
               (value1-of obj) (value2-of obj))
             ;; ...
           ))
@@ -118,33 +122,33 @@ also heavily documented in the sources - remember `(describe 'some-symbol)` at R
   or a method definition:
   
         (transaction
-          (defmethod baz ((obj foo) value1 value2)
+          (defmethod set-foo ((obj foo) value1 value2)
             (declare (type integer value1)
                      (type string value2))
             (setf (value1-of obj) value1)
             (setf (value2-of obj) value2)
-            (format t "atomic method baz: foo is now ~A ~A~%" value1 value2)
+            (format t "atomic method set-foo: foo is now ~A ~A~%" value1 value2)
             ;; ...
           ))
 
 - `ATOMIC` is the main macro: it wraps Lisp forms into a transaction then executes them.
   The above functions and methods could also be written as:
   
-        (defun bar (obj)
+        (defun show-foo (obj)
           (declare (type foo obj))
           (atomic
-            (format t "atomic function bar: foo is ~A ~A~%"
+            (format t "atomic function show-foo: foo is ~A ~A~%"
               (value1-of obj) (value2-of obj))
             ;; ...
           ))
       
-        (defmethod baz ((obj foo) value1 value2)
+        (defmethod set-foo ((obj foo) value1 value2)
           (declare (type integer value1)
                    (type string value2))
           (atomic
             (setf (value1-of obj) value1)
             (setf (value2-of obj) value2)
-            (format t "atomic method baz: foo is now ~A ~A~%" value1 value2)
+            (format t "atomic method set-foo: foo is now ~A ~A~%" value1 value2)
             ;; ...
           ))
       
@@ -190,6 +194,134 @@ also heavily documented in the sources - remember `(describe 'some-symbol)` at R
         
   with the difference that `(nonblocking ...)` actually captures all the values
   returned by the transaction, not just the first as in the example above.
+
+
+Advanced usage
+--------------
+
+For those cases where the basic features are not sufficient, or where more
+control is desired during the execution of transactional code, some advanced
+features are available:
+
+- `RUN-ATOMIC` is the function version of `ATOMIC`: takes a single function
+  argument and executes it in a transaction. This means the following two code
+  snippets are equivalent:
+
+        (defvar a (make-instance 'foo))
+        (defvar b (make-instance 'foo))
+        (atomic
+          (set-foo a 1 "abc")
+          (set-foo b 2 "def"))
+
+
+
+        (defvar a (make-instance 'foo))
+        (defvar b (make-instance 'foo))
+
+        (defun init-foo-a-and-b ()
+          (set-foo a 1 "abc")
+          (set-foo b 2 "def"))
+
+        (run-atomic #'init-foo-a-and-b)
+
+
+- `RUN-ORELSE` is the function version of `ORELSE`: it accepts any number
+  of functions and executes them as alternatives in separate nested transactions:
+  if the first retries or is invalid, the second will be executed and so on,
+  until one function either commits (returns normally) or rollbacks
+  (signals an error or condition).
+
+  If X, Y and Z are no-argument functions, the following two lines are equivalent:
+  
+        (orelse (x) (y) (z))
+
+        (run-orelse #'x #'y #'z)
+
+- `BEFORE-COMMIT` is a macro that registers Lisp forms to be executed later, just before
+  the transaction tries to commit.
+  It can be useful to normalize or simplify some transactional data, or perform any kind
+  of bookkeeping activity. 
+
+  Be aware that the transaction is not yet committed when the forms registered with
+  BEFORE-COMMIT run. This means in particular:
+
+  - If the forms signal an error when executed, the error is propagated to the caller,
+    forms registered later with BEFORE-COMMIT are not executed, and the transaction rollbacks.
+
+  - The forms can read and write normally to transactional memory,
+    and in case of conflicts the whole transaction, _including_ all forms
+    registered with BEFORE-COMMIT, is re-executed from the beginning.
+
+  - The forms cannot (retry) - attempts to do so will signal an error.
+    Starting a nested transaction and retrying inside that is acceptable,
+    as long as the (retry) does not propagate outside the forms themselves.
+    
+
+- `AFTER-COMMIT` is another macro that registers Lisp forms to be executed later,
+  but in this case they are executed immediately after the transaction has been
+  successfully committed.
+  It can be useful to notify some subsystem that for any reason cannot call (retry)
+  to be informed of changes in transactional memory - for example because
+  it is some existing code that one does not wish to modify.
+
+  In this case, the transaction is already committed when the forms registered with
+  AFTER-COMMIT run, and the forms are not allowed to change it further.
+  This means there are stricter limitations on what the forms can do:
+
+  - If the forms signal an error when executed, the error is propagated to the caller,
+    forms registered later with AFTER-COMMIT are not executed, but the transaction
+    stays committed.
+
+  - The forms must not write to _any_ transactional memory: the consequences
+    are undefined.
+
+  - The forms can _only_ read from transactional memory previously read or written
+    during the same transaction. Reading from other transactional memory
+    has undefined consequences.
+
+  - The forms cannot (retry) - attempts to do so will signal an error.
+    Starting a nested transaction and retrying inside that is acceptable
+    as long as the (retry) does not propagate outside the forms themselves
+    and the nested transaction respects the two previous limitations.
+
+- `CALL-BEFORE-COMMIT` is the function version of `BEFORE-COMMIT`: it accepts a single
+   function and registers it to be executed before the transaction tries to commit.
+
+- `CALL-AFTER-COMMIT` is the function version of `AFTER-COMMIT`: it accepts a single
+   function and registers it to be executed after the transaction has been
+   successfully committed.
+
+
+Utlities and examples
+---------------------
+
+See the [util](util) folder, which contains several examples and utilities
+built with STMX and should be relatively straightforward to understand.
+
+The folder contains the following classes with related methods and functions,
+contained in the STMX.UTIL package:
+
+- `CELL` is a simple transactional object. It can be empty or hold a single value.
+  Methods: `FULL?' `EMPTY?` `EMPTY!` `VALUE-OF` `TAKE` `PUT` `TRY-TAKE' `TRY-PUT`
+  When empty, taking a value will (retry) and wait until some other thread
+  puts a value.
+  When full, putting a value will (retry) and wait until some other thread
+  removes the previous value.
+
+- `THASH-TABLE` is a transactional hash table.
+  Methods: `THASH-COUNT` `THASH-EMPTY?` `CLEAR-THASH`
+           `GET-THASH` `SET-THASH` `(SETF GET-THASH)` `REM-THASH` 
+           `MAP-THASH` `DO-THASH`
+
+- `TMAP` is a transactional sorted map, backed by a red-black tree.
+  Methods: `BMAP-PRED` `BMAP-COUNT` `BMAP-EMPTY?` `CLEAR-BMAP`
+           `GET-BMAP` `SET-BMAP` `(SETF GET-BMAP)` `REM-BMAP` 
+           `MIN-BMAP` `MAX-BMAP' `MAP-BMAP` `DO-BMAP`
+           `BMAP-KEYS` `BMAP-VALUES` `BMAP-PAIRS`
+
+- `RBMAP` is the non-transactional version of `TMAP`. Not so interesting by itself,
+  a lot of other red-black trees implementations exist already on the net.
+  It supports exactly the same methods as `TMAP`.
 
 
 Contacts, help, discussion

@@ -24,8 +24,8 @@
         #:stmx)
 
   (:import-from #:stmx
+                #:with-gensym
                 #:with-gensyms
-                #:with-ro-slots
                 #:do-hash)
 
   (:export #:fixnum< #:fixnum>   ;; optimized versions of < > = /= useful with BMAPs
@@ -44,6 +44,7 @@
            #:add-to-bmap #:remove-from-bmap ;; add or remove multiple keys
 
            #:thash-table ;; transactional hash table
+           #:thash-count #:thash-empty? #:clear-thash
            #:get-thash #:set-thash #:rem-thash ;; also (setf (get-thash ... ) ... )
            #:map-thash #:do-thash           ;; iterate on thash-table
 

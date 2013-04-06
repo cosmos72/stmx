@@ -236,6 +236,9 @@ if not already present in the superclass list."
 (defmethod shared-initialize ((instance transactional-object)
                               slot-names &rest initargs)
   "For every transactional slot, turn its initarg into a tvar."
+
+  ;;(log:trace "transactional-object ~A, slot-names = ~A~%  initargs = ~{~A~^ ~}" instance slot-names initargs)
+
   (let1 initargs (copy-list initargs)
     (dolist (slot (class-slots (class-of instance)))
       ;; Only check those where `transactional-slot?' is true.
@@ -247,6 +250,8 @@ if not already present in the superclass list."
               (setf (first fragment) (new 'tvar :value (first fragment)))
               ;; wrap each initarg only once
               (return))))))
+
+    ;;(log:trace "updated initargs = ~{~A~^ ~}" initargs)
               
     ;; Disable recording so that slots initialization is NOT recorded to the log.
     ;; Show-tvars so that (setf slot-value) will set the tvar, not its contents

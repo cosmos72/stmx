@@ -198,9 +198,9 @@ IMPORTANT: See AFTER-COMMIT for what FUNC must not do."
 
 (defmacro before-commit (&body body)
   "Register BODY to be invoked immediately before the current transaction commits.
-If BODY signals an error when executed, the error is propagated
-to the caller and the transaction rollbacks.
-Also, further code registered with before-commit is not executed.
+If BODY signals an error when executed, the error is propagated to the caller,
+further code registered with BEFORE-COMMIT are not executed,
+and the transaction rollbacks.
 
 BODY can read and write normally to transactional memory, and in case of conflicts
 the whole transaction (not only the code registered with before-commit)
@@ -215,7 +215,7 @@ as long as the (retry) does not propagate outside BODY."
 (defmacro after-commit (&body body)
   "Register BODY to be invoked after the current transaction commits.
 If BODY signals an error when executed, the error is propagated
-to the caller and further code registered with after-commit is not executed,
+to the caller and further code registered with AFTER-COMMIT is not executed,
 but the transaction remains committed.
 
 WARNING: Code registered with after-commit has a number or restrictions:
@@ -224,7 +224,7 @@ WARNING: Code registered with after-commit has a number or restrictions:
 are undefined.
 
 2) BODY can only read from transactional memory already read or written
-during the transaction. Reading from other transactional memory
+during the same transaction. Reading from other transactional memory
 has undefined consequences.
 
 3) BODY cannot (retry) - attempts to do so will signal an error.

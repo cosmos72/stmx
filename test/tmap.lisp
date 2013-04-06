@@ -18,6 +18,33 @@
 (def-suite tmap-suite :in suite)
 (in-suite tmap-suite)
 
+(define-condition rollback-error (error)
+  ())
+
+(test tmap-rollback
+  (let* ((m1 (new 'tmap :pred #'fixnum<))
+         (m2 (copy-bmap m1)))
+
+    (add-to-bmap m1 1 "x" 2 "y")
+    (copy-bmap-into m1 m2)
+
+    (signals rollback-error
+      (atomic
+       (add-to-bmap m1 1 "z" 3 "w")
+       (rem-bmap m1 2)
+       (format t "~&-------------~%")
+       (print-bmap t m1)
+       (error 'rollback-error)))
+
+    (format t "~&-------------~%")
+    (print-bmap t m1)
+    (is-equal-bmap m1 m2)))
+
+      
+     
+      
 
 (test tmap
-  (test-rbmap-class 'tmap))
+  (test-rbmap-class 'tmap)
+  (atomic (test-rbmap-class 'tmap)))
+

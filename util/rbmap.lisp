@@ -15,7 +15,7 @@
 
 (in-package :stmx.util)
 
-;;;; ** Red-black trees implementation of sorted binary map.
+;;;; ** Red-black tree implementation of sorted binary map.
 ;;;; For a transactional version, see tmap.lisp
 
 (declaim (type bit +red+ +black+))
@@ -48,21 +48,19 @@
 (defun flip-color (node)
   "Flip NODE color. Return the new color."
   (declare (type rbnode node))
-  (with-slots (color) node
+  (with-rw-slots (color) node
     (setf color (the bit (- (the bit 1) (the bit color))))))
 
 
 
-;;(defmethod bmap/new-node ((m rbmap) key value)
-(defun bmap/new-node (m key value)
+(defmethod bmap/new-node ((m rbmap) key value)
   (declare (type rbmap m))
   (new 'rbnode :key key :value value))
 
 
-;;(defmethod bmap/copy-node ((m rbmap) node)
-(defun bmap/copy-node (m node)
+(defmethod bmap/copy-node ((m rbmap) node)
   (declare (type rbmap m))
-  (let1 copy (new 'rbnode :key (_ node key) :value (_ node value))
+  (let1 copy (bmap/new-node m (_ node key) (_ node value))
     (setf (_ copy color) (_ node color))
     copy))
   
@@ -154,10 +152,8 @@ If stack is nil, returned node is the new root to set."
 
 
 
-;;(defmethod bmap/rebalance-after-insert ((m rbmap) child stack)
-(defun bmap/rebalance-after-insert (m child stack)
-  (declare (type rbmap m)
-           (type rbnode child)
+(defmethod bmap/rebalance-after-insert ((m rbmap) child stack)
+  (declare (type rbnode child)
            (type list stack))
   "Rebalance red-black-tree M after inserting CHILD."
 
@@ -273,7 +269,7 @@ Return some node in rebalanced tree and its stack as multiple values"
        (if left-node?
             (setf (_ right color) +black+)
             (setf (_ left color) +black+))
-       (with-slots (color) parent
+       (with-rw-slots (color) parent
          (setf (_ brother color) color)
          (setf color +black+))
 
@@ -354,14 +350,12 @@ from rebalanced tree. Some-node will be nil only if the tree is empty after remo
           
 
 
-;;(defmethod bmap/remove-at ((m rbmap) stack)
-(defun bmap/remove-at (m stack)
+(defmethod bmap/remove-at ((m rbmap) stack)
   "Remove (first STACK) from red-black tree M and rebalance it."
-  (declare (type bmap m)
-           (type list stack))
+  (declare (type list stack))
 
   (multiple-value-bind (node stack) (%rbmap-remove-at m stack)
-    (with-slots (root) m
+    (with-rw-slots (root) m
       (let1 new-root (or (first (last stack)) node)
         (when (not (eq root new-root))
           (log-debug "root change ~A -> ~A with stack ~{~A~^ ~}"

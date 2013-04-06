@@ -417,7 +417,6 @@ Return nil if all tx are valid and want to retry."
 
 
 
-(declaim (inline run-orelse))
 (defun run-orelse (&rest funcs)
   "Function variant of `orelse'. Execute the functions in FUNCS list
 one by one from left to right in separate, nested transactions until one succeeds

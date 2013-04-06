@@ -30,12 +30,6 @@
   `(let ,(loop for name in names collect `(,name (gensym)))
      ,@body))
 
-(defmacro with-ro-slots ((&rest slots) instance &body body)
-  (with-gensym var
-    `(let ((,var ,instance))
-       (let ,(loop for slot in slots collect `(,slot (slot-value ,var ',slot)))
-         ,@body))))
-
 
 ;;;; * Hash-table utilities
 

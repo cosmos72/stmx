@@ -59,11 +59,12 @@
 less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
 Linux amd64) than the unspecialized (try-take place) which calls
 \(atomic (nonblocking (take place)))"
-   (if (empty? cell)
-       nil
-       (let1 value (value-of cell)
-         (empty! cell)
-         (values t value)))))
+   (let1 value (value-of cell)
+     (if (eq value *empty-cell*)
+         nil
+         (progn
+           (setf (value-of cell) *empty-cell*)
+           (values t value))))))
 
 (transaction
  (defmethod try-put ((cell cell) value)
@@ -71,7 +72,7 @@ Linux amd64) than the unspecialized (try-take place) which calls
 less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
 Linux amd64) than the unspecialized (try-put place) which calls
 \(atomic (nonblocking (put place value)))"
-   (if (empty? cell)
+   (if (eq (value-of cell) *empty-cell*)
        (progn
          (setf (value-of cell) value)
          (values t value))

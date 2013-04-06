@@ -21,8 +21,9 @@
 
 (transactional
  (defclass thash-table ()
-   ((original            :type hash-table           :accessor original-hash)
-    (delta :initform nil :type (or null hash-table) :accessor delta-hash))))
+   ((original            :type hash-table           :accessor original-of)
+    (delta :initform nil :type (or null hash-table) :accessor delta-of)
+    (count :initform 0   :type fixnum               :accessor count-of))))
 
 
 (defmethod initialize-instance :after
@@ -31,10 +32,14 @@
 including any non-standard arguments supported by MAKE-HASH-TABLE implementation."
 
   (log:trace "test = ~A other-keys = ( ~{~A ~})" test other-keys)
-  (setf (original-hash instance)
+  (setf (original-of instance)
         (apply #'make-hash-table :test test other-keys)))
 
 
+(defun thash-count (thash)
+  "Return the number of KEY/VALUE entries in THASH."
+  (declare (type thash-table thash))
+  (the fixnum (count-of thash)))
 
 
 (transaction
@@ -53,13 +58,18 @@ If THASH does not contain KEY, return (values DEFAULT NIL)."
                  (values value t))))))) ;; key was changed
                
    ;; forward to original hash table
-   (gethash key (original-hash thash) default)))
+   (gethash key (original-of thash) default)))
 
 
 (transaction
  (defun (setf get-thash) (value key thash)
    "Store the VALUE associated to KEY in THASH. Return VALUE."
    (declare (type thash-table thash))
+
+   (multiple-value-bind (old-value present?) (get-thash key thash)
+     (declare (ignore old-value))
+     (unless present?
+       (incf (the fixnum (count-of thash)))))
 
    (let1 delta (ensure-thash-delta thash)
      (setf (gethash key delta) value))))
@@ -71,18 +81,34 @@ If THASH does not contain KEY, return (values DEFAULT NIL)."
 Return T if KEY was found in THASH, otherwise return NIL."
    (declare (type thash-table thash))
 
-   (multiple-value-bind (orig-value present?) (gethash key (original-hash thash))
+   (multiple-value-bind (orig-value present?) (get-thash key thash)
      (declare (ignore orig-value))
      (if present?
-         (let* ((delta (ensure-thash-delta thash))
-                (delta-value (gethash key delta)))
+         (let ((delta (ensure-thash-delta thash)))
+           (decf (the fixnum (count-of thash)))
+           (setf (gethash key delta) *thash-removed-entry*)
+           t)
+         nil)))) ;; key not present in THASH
 
-           (if (eq delta-value *thash-removed-entry*)
-               nil ;; key was already removed
-               (progn ;; set key to removed in DELTA
-                 (setf (gethash key delta) *thash-removed-entry*)
-                 t)))
-         nil)))) ;; key not present in ORIGINAL
+
+(transaction
+ (defun clear-thash (thash)
+   "Remove all KEYS and VALUES in THASH. Return THASH."
+   (declare (type thash-table thash))
+
+   (setf (count-of thash) (the fixnum 0))
+
+   (with-ro-slots (original delta) thash
+     (when (zerop (hash-table-count original))
+       (when delta
+         (clrhash delta))
+       (return-from clear-thash thash))
+
+     (let ((delta (ensure-thash-delta thash)))
+       (clrhash delta)
+       (do-hash (key) original
+         (setf (gethash key delta) *thash-removed-entry*))))))
+
 
 
 (defun map-thash (thash func)
@@ -120,12 +146,12 @@ FUNC must be a function accepting two arguments: key and value."
   "Create and set slot DELTA if nil. Return slot value."
    (declare (type thash-table thash))
 
-   (with-slots (delta) thash
-     (if delta
-         delta
-         (progn
-           (before-commit (normalize-thash thash))
-           (setf delta (make-hash-table :test (hash-table-test (original-hash thash))))))))
+   (with-rw-slots (delta) thash
+     (aif delta
+          it
+          (progn
+            (before-commit (normalize-thash thash))
+            (setf delta (make-hash-table :test (hash-table-test (original-of thash))))))))
 
 
 
@@ -156,7 +182,7 @@ Implementation notes:
               ;; no entry in DELTA, copy it from ORIGINAL
               (setf (gethash key delta) orig-value))))
 
-      (with-slots (original delta) thash
+      (with-rw-slots (original delta) thash
         (setf original delta)
         (setf delta nil))
 

@@ -327,7 +327,7 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
   including any non-standard option supported by the underlying MAKE-HASH-TABLE implementation.
 
   Methods: `THASH-COUNT` `THASH-EMPTY?` `CLEAR-THASH`
-           `GET-THASH` `SET-THASH` `(SETF GET-THASH)` `REM-THASH` 
+           `GET-THASH` `(SETF GET-THASH)` `REM-THASH` 
            `MAP-THASH` `DO-THASH`.
 
 - `TMAP` is a transactional sorted map, backed by a red-black tree.
@@ -345,6 +345,72 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
   as many other red-black trees implementations exist already on the net.
   It supports exactly the same methods as `TMAP`.
 
+Performance
+-----------
+
+As for any software, the topic of performance is often sensitive and
+plagued with heated discussions. It is objectively difficult to come up with
+scientifically accurate figures as they depend on many factors, including at least
+hardware, operating system, common lisp implementation, optimization flags and usage pattern.
+
+What follows are some timings obtained on the authors's system, and by no means they
+claim to be exact, absolute or reproducible: your mileage may vary.
+
+Date: 6 April 2013
+
+Hardware: Intel Core-i5 750 @4.0 GHz, 16GB RAM
+
+Software: Debian GNU/Linux 7 (wheezy) x86_64, SBCL 1.0.57.0.debian x86_64, STMX 0.9.3
+
+Setup and optimization flags:
+    (declaim (optimize (compilation-speed 0) (space 0) (debug 0) (safety 0) (speed 3)))
+    (ql:quickload "stmx")
+    (in-package :stmx.util)
+    (defmacro one-million (&rest body)
+      `(time (dotimes (i 1000000)
+              ,@body)))
+    (defvar v (new 'tvar :value 0))
+    (defvar m  (new 'rbmap :pred #'fixnum<)) 
+    (defvar tm (new 'tmap  :pred #'fixnum<)) 
+    (defvar h  (make-hash-table))  
+    (defvar th (new 'thash-table)) 
+
+    ;; some initial values
+    (set-bmap m 1 0)
+    (set-bmap tm 1 0)
+    (setf (gethash   'x h)  0)
+    (setf (get-thash 'x th) 0)
+
+All benchmarks are loops running the code shown ONE MILLION times (see `one-million` macro above)
+in a single thread, and the best of three runs is reported.
+All times are in seconds of elapsed real time; to get the time per single loop
+you can interpret them as microseconds.
+
+<table>
+ <th><td><b>name</b>      </td><td><b>code run with `(one-million)`</b></td><td><b>elapsed time</b></td></th>
+ <tr><td>atomic empty     </td><td>`(atomic)`                    </td><td>0.264 seconds</td></tr>
+ <tr><td>atomic dummy     </td><td>`(atomic 1)`                  </td><td>0.264 seconds</td></tr>
+ <tr><td>atomic read-1    </td><td>`(atomic ($ v))`              </td><td>0.696 seconds</td></tr>
+ <tr><td>atomic write-1   </td><td>`(atomic (setf ($ v) i))`     </td><td>1.495 seconds</td></tr>
+ <tr><td>atomic read-write-1</td><td>`(atomic (incf ($ v)))`     </td><td>1.969 seconds</td></tr>
+ <tr><td>atomic read-write-10</td><td>`(atomic (dotimes (j 10) (incf ($ v))))`</td><td>2.851 seconds</td></tr>
+ <tr><td>atomic read-write-100</td><td>`(atomic (dotimes (j 100) (incf ($ v))))`</td><td>11.154 seconds</td></tr>
+ <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(1.900 + N*0.093) seconds</td></tr>
+ <tr><td>orelse empty     </td><td>`(atomic (orelse))`           </td><td>0.243 seconds</td></tr>
+ <tr><td>orelse unary     </td><td>`(atomic (orelse 1))`         </td><td>0.753 seconds</td></tr>
+ <tr><td>orelse binary    </td><td>`(atomic (orelse (retry) 1))` </td><td>1.433 seconds</td></tr>
+ <tr><td>orelse ternary   </td><td>`(atomic (orelse (retry) (retry) 1))` </td><td>2.446 seconds</td></tr>
+ <tr><td>orelse 5-ary     </td><td>`(atomic (orelse (retry) (retry) (retry) (retry) 1))` </td><td>3.717 seconds</td></tr>
+ <tr><td>orelse N-ary     </td><td>best fit of the 3 runs above` </td><td>(0.008 + n*0.749) seconds</td></tr>
+ <tr><td>tmap read-write-1</td><td>`(atomic (incf (get-bmap tm 1)))`</td><td>5.247 seconds</td></tr>
+ <tr><td>grow tmap from N to N+1 entries (up to 10)</td><td>`(atomic (when (zerop (mod i   10)) (clear-bmap tm)) (set-bmap tm i t)))`</td><td>18.885 seconds</td></tr>
+ <tr><td>grow tmap from N to N+1 entries (up to 100)</td><td>`(atomic (when (zerop (mod i  100)) (clear-bmap tm)) (set-bmap tm i t)))`</td><td>35.093 seconds</td></tr>
+ <tr><td>grow tmap from N to N+1 entries (up to 1000)</td><td>`(atomic (when (zerop (mod i 1000)) (clear-bmap tm)) (set-bmap tm i t)))`</td><td>49.399 seconds</td></tr>
+ <tr><td>thash read-write-1</td><td>`(atomic (incf (get-thash 'x th)))`</td><td>11.207 seconds</td></tr>
+ <tr><td>grow thash from N to N+1 entries (up to 10)</td><td>`(atomic (when (zerop (mod i   10)) (clear-thash tm)) (setf (get-thash tm i) t)))`</td><td>10.912 seconds</td></tr>
+ <tr><td>grow thash from N to N+1 entries (up to 100)</td><td>`(atomic (when (zerop (mod i  100)) (clear-thash tm)) (setf (get-thash tm i) t)))`</td><td>16.620 seconds</td></tr>
+ <tr><td>grow thash from N to N+1 entries (up to 1000)</td><td>`(atomic (when (zerop (mod i 100)) (clear-thash tm)) (setf (get-thash tm i) t)))`</td><td>68.615 seconds</td></tr>
+</table>
 
 Contacts, help, discussion
 --------------------------

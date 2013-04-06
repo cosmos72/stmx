@@ -21,8 +21,8 @@
 (transactional
  (defclass tnode (rbnode)
    ;; override all inherited slots to make them transactional
-   ((left  :initform nil   :type (or null tnode))
-    (right :initform nil   :type (or null tnode))
+   ((left  :initform nil) ;; :type (or null tnode))
+    (right :initform nil) ;;  :type (or null tnode))
     (key   :initarg :key)
     (value :initarg :value)
     (color :initform +red+ :type bit))

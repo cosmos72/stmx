@@ -297,8 +297,8 @@ features are available:
    - `(setf ($ var) value)` Store VALUE into VAR.
    - `(bound-$? var)` Return true if VAR is bound to some value.
    - `(unbind-$ var)` Unbind VAR from its value.
-   - `(value-of var)` method, equivalent to `($ var)`
-   - `(setf (value-of var) value)` method, equivalent to `(setf ($ var) value)`
+   - `(value-of var)` getter method, equivalent to `($ var)`
+   - `(setf (value-of var) value)` setter method, equivalent to `(setf ($ var) value)`
 
 Utilities and examples
 ---------------------
@@ -307,7 +307,7 @@ See the [util](util) folder, which contains several examples and utilities
 built with STMX and should be relatively straightforward to understand.
 
 The folder contains the following classes with related methods and functions,
-contained in the STMX.UTIL package - for more details, use `(describe '<some-symbol>)` at REPL:
+contained in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` at REPL:
 
 - `CELL` is the simplest transactional class. It is created with
   `(make-instance 'cell &key value)` and it can be empty or hold a single value.
@@ -322,7 +322,7 @@ contained in the STMX.UTIL package - for more details, use `(describe '<some-sym
   Note: raw TVARs support exactly the same methods.
 
 - `THASH-TABLE` is a transactional hash table.
-  It is created with `(make-instance 'thash-table &key (test 'eql) <other-options>)`.
+  It is created with `(make-instance 'thash-table &key (test 'eql) other-options)`.
   An interesting feature: it accepts exactly the same options as MAKE-HASH-TABLE,
   including any non-standard option supported by the underlying MAKE-HASH-TABLE implementation.
 
@@ -331,10 +331,10 @@ contained in the STMX.UTIL package - for more details, use `(describe '<some-sym
            `MAP-THASH` `DO-THASH`.
 
 - `TMAP` is a transactional sorted map, backed by a red-black tree.
-  It is created with `(make-instance 'tmap :pred <compare-function>)`
-  where <compare-function> must be a function accepting two arguments, key1 and key2,
-  and returning t if key1 is smaller that key2. Typical values for <compare-function>
-  are #'< and the faster #'fixnum< or, for string keys, #'string<
+  It is created with `(make-instance 'tmap :pred compare-function)`
+  where `compare-function` must be a function accepting two arguments, key1 and key2,
+  and returning t if key1 is smaller that key2. Typical values for `compare-function`
+  are `#'<` and the faster `#'fixnum<` or, for string keys, `#'string<`
 
   Methods: `BMAP-PRED` `BMAP-COUNT` `BMAP-EMPTY?` `CLEAR-BMAP`
            `GET-BMAP` `SET-BMAP` `(SETF GET-BMAP)` `REM-BMAP` 

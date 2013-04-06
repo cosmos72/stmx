@@ -5,13 +5,13 @@ TO DO:
    "I have a very crude and quite horribly written one laying around for
     Common Lisp: https://github.com/lnostdal/SW-STM"
 
-7bis) implement transactional red-black trees
-
-6bis) implement (thash-count)
-
 DONE:
 
+7bis) implement transactional red-black trees
+
 7) implemented red-black trees (needed for transactional red-black trees)
+
+6bis) implement (thash-count)
 
 6) implemented transactional hash tables
 
@@ -25,9 +25,12 @@ DONE:
      and the transaction is re-executed
 
 4) orelse and nested transactions, including tests
+
 3) (error 'retry-error ...) shows message "attempt to RETRY outside ATOMIC block"
    when printed
+
 2) in atomic.lisp (run-once) added handler-case to capture errors signaled by tx
+
 1) implemented ($ tvar) and (setf ($ tvar) value)
    for transactional access to tvars.
    useful when dealing directly with tvars,

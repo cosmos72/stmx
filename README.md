@@ -288,6 +288,16 @@ features are available:
    function and registers it to be executed after the transaction has been
    successfully committed.
 
+- `TVAR` is the class implementing transactional memory behind the scenes.
+   It is used internally by slots of transactional classes, but can also be used
+   directly. All its functions and methods work both inside and outside transactions:
+   - `(make-instance 'tvar &key value)` Create a new TVAR, optionally bound to a value.
+   - `($ var)` Get the value of VAR. Signals an error if VAR is not bound to any value.
+   - `(setf ($ var) value)` Store VALUE into VAR.
+   - `(bound-$? var)` Return true if VAR is bound to some value.
+   - `(unbind-$ var)` Unbind VAR from its value.
+   - `(value-of var)` method, equivalent to `($ var)`
+   - `(setf (value-of var) value)` method, equivalent to `(setf ($ var) value)`
 
 Utlities and examples
 ---------------------

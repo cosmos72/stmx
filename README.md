@@ -321,6 +321,54 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
 
   Note: raw TVARs support exactly the same methods.
 
+- `STACK` is a transactional first-in-last-out buffer. It is created with
+  `(make-instance 'stack)` and it can be empty or hold unlimited values.
+
+  Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
+
+  All methods append or remove values from the end.
+  For the rest, the methods behave as described for the `CELL` class.
+
+- `FIFO` is a transactional first-in-first-out buffer. It is created with
+  `(make-instance 'fifo)` and it can be empty or hold unlimited values.
+
+  Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
+
+  `PUT` and `TRY-PUT` append values at the end, `PEEK` `TAKE` and `TRY-TAKE` get or remove them from the beginning, shifting the remaining values.
+  For the rest, the methods behave as described for the `CELL` class.
+
+- `CHANNEL` is a transactional multicast channel. It is created with
+  `(make-instance 'channel)`, can contain unlimited values and it is write-only.
+  To read from it, create a `PORT` as described below.
+
+  Methods: `FULL?` `EMPTY?` `PUT` `TRY-PUT`.
+
+  `PUT` and `TRY-PUT` append values at the end, making them available to connected ports.
+  `FULL?` always returns nil, since a channel can contain unlimited values.
+  `EMPTY?' always returns t, since it is not possible to get values from a channel.
+
+  It is possible to write into the same channel from multiple threads: added elements
+  will be interleaved and made available to all connected ports.
+
+- `PORT` is a transactional reader for `CHANNEL`. It is created with
+  `(make-instance 'port :channel some-chanel)`.
+  Ports do not support putting values, they are used to retrieve values from the channel
+  they are connected to.
+
+  Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `TRY-TAKE`.
+
+  `PEEK` `TAKE` and `TRY-TAKE` get or consume values previously added to the connected channel.
+  All ports connected to the same channel receive all the values in the same order,
+  and they consume values independently: taking a value from a port does not consume it
+  in the other ports.
+
+  `FULL?` always returns t, since it is not possible to put values in a port.
+  `EMPTY?' returns t if some values are available to read or consume.
+  `EMPTY!' consumes all values currently available.
+
+  It is also possible to use the same port from multiple threads: elements consumed
+  by one thread will not be available to other threads using the same port.
+
 - `THASH-TABLE` is a transactional hash table.
   It is created with `(make-instance 'thash-table &key (test 'eql) other-options)`.
   An interesting feature: it accepts exactly the same options as MAKE-HASH-TABLE,
@@ -381,15 +429,15 @@ Setup and optimization flags:
     (setf (gethash   'x h)  0)
     (setf (get-thash 'x th) 0)
 
-For each benchmarks, a loop runs the code shown one million times (see `one-million` macro above)
-in a single thread and the best of three attempts is used.
+For each benchmark, a loop runs the code shown one million times (see `one-million` macro above)
+in a single thread and the best of three loops is used.
 All reported times are the average elapsed real time per iteration, i.e. the total elapsed time
 divided by the number of iterations (one million).
 
 <table>
  <tr><th><b>name</b>      </th>
-     <th><b>code run with <code>(one-million ...)</code></b></th>
-     <th><b>elapsed time</b></th></tr>
+     <th><b>executed code</b></th>
+     <th><b>average time</b></th></tr>
 
  <tr><td>atomic empty     </td><td><code>(atomic)</code>                    </td><td>0.264&nbsp;microseconds</td></tr>
  <tr><td>atomic dummy     </td><td><code>(atomic 1)</code>                  </td><td>0.264&nbsp;microseconds</td></tr>
@@ -434,22 +482,22 @@ divided by the number of iterations (one million).
      <td>49.399&nbsp;microseconds</td></tr>
 
  <tr><td>thash read-write-1</td>
-     <td><code>(atomic (incf (get-thash 'x th)))</code></td>
+     <td><code>(atomic (incf (get-thash th 'x)))</code></td>
      <td>11.207&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-thash tm))<br>
-              (setf (get-thash tm i) t)))</code></td>
+              (set-thash i tm t))</code></td>
      <td>10.912&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 100)</td>
      <td><code>(atomic (when (zerop (mod i  100)) (clear-thash tm))<br>
-              (setf (get-thash tm i) t)))</code></td>
+              (set-thash tm i t)))</code></td>
      <td>16.620&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 1000)</td>
      <td><code>(atomic (when (zerop (mod i 1000)) (clear-thash tm))<br>
-              (setf (get-thash tm i) t)))</code></td>
+              (set-thash tm i t)))</code></td>
      <td>68.615&nbsp;microseconds</td></tr>
 
 </table>

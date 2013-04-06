@@ -30,7 +30,7 @@
 (defclass bmap ()
   ((root  :initform nil  :type (or null bnode)   :accessor root-of)
    (pred  :initarg :pred :type function          :accessor pred-of
-          :initform (error "missing :pred argument"))
+          :initform (error "missing :pred argument instantiating ~A or a subclass" 'bmap))
    (count :initform 0    :type fixnum            :accessor count-of))
   (:documentation "Generic binary tree"))
 

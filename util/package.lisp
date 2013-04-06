@@ -28,9 +28,16 @@
                 #:with-gensyms
                 #:do-hash)
 
-  (:export #:fixnum< #:fixnum>   ;; optimized versions of < > = /= useful with BMAPs
-           #:fixnum= #:fixnum/=
+  (:export #:cell #:fifo #:stack #:channel #:port ;; transactional containers
 
+           #:full? #:empty? #:empty! ;; methods for transactional containers
+           #:peek   #:take   #:put
+           #:try-take    #:try-put
+
+           ;; optimized versions of < > = /= useful with sorted maps
+           #:fixnum< #:fixnum>
+           #:fixnum= #:fixnum/=
+           
            #:bmap  ;; generic binary tree
            #:rbmap ;; sorted map, implemented with red-black trees
            #:tmap  ;; transactional sorted map, implemented with red-black trees
@@ -48,13 +55,5 @@
            #:get-thash #:rem-thash ;; also (setf (get-thash ... ) ... )
            #:map-thash #:do-thash           ;; iterate on thash-table
 
-           #:cell
-           #:value-of
-           #:empty?
-           #:empty!
-           #:full?
-           #:take
-           #:put
-           #:try-put
-           #:try-take))
+
 

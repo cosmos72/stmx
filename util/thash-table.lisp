@@ -71,7 +71,7 @@ including any non-standard arguments supported by MAKE-HASH-TABLE implementation
 
 
 (transaction
- (defun get-thash (key thash &optional default)
+ (defun get-thash (thash key &optional default)
    "Find KEY in THASH and return its value and T as multiple values.
 If THASH does not contain KEY, return (values DEFAULT NIL)."
    (declare (type thash-table thash))
@@ -90,11 +90,11 @@ If THASH does not contain KEY, return (values DEFAULT NIL)."
 
 
 (transaction
- (defun (setf get-thash) (value key thash)
-   "Store the VALUE associated to KEY in THASH. Return VALUE."
+ (defun set-thash (thash key value)
+   "Associate KEY to VALUE in THASH. Return VALUE."
    (declare (type thash-table thash))
 
-   (multiple-value-bind (old-value present?) (get-thash key thash)
+   (multiple-value-bind (old-value present?) (get-thash thash key)
      (declare (ignore old-value))
      (unless present?
        (incf (the fixnum (count-of thash)))))
@@ -103,13 +103,21 @@ If THASH does not contain KEY, return (values DEFAULT NIL)."
      (setf (gethash key delta) value))))
      
 
+
+(declaim (inline (setf get-thash)))
+(defun (setf get-thash) (value thash key)
+  "Associate KEY to VALUE in THASH. Return VALUE."
+  (declare (type thash-table thash))
+  (set-thash thash key value))
+
+
 (transaction
  (defun rem-thash (key thash)
    "Remove the VALUE associated to KEY in THASH.
 Return T if KEY was found in THASH, otherwise return NIL."
    (declare (type thash-table thash))
 
-   (multiple-value-bind (orig-value present?) (get-thash key thash)
+   (multiple-value-bind (orig-value present?) (get-thash thash key)
      (declare (ignore orig-value))
      (if present?
          (let ((delta (ensure-thash-delta thash)))
@@ -142,6 +150,8 @@ Return T if KEY was found in THASH, otherwise return NIL."
 (defun map-thash (thash func)
   "Invoke FUNC on each key/value pair contained in transactional hash table THASH.
 FUNC must be a function accepting two arguments: key and value."
+  (declare (type thash-table thash)
+           (type function func))
   (with-ro-slots (original delta) thash
     (if delta
         (progn
@@ -186,6 +196,7 @@ Implementation notes:
   the slot ORIGINAL to point to the new hash-table, while keeping intact
   the old hash-table contents."
 
+  (declare (type thash-table thash))
   (with-ro-slots (original delta) thash
     (when delta
       (log:trace "before: ~A" (print-object-contents nil thash))

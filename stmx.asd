@@ -44,13 +44,18 @@
                 :components ((:file "package")
                              (:file "misc"        :depends-on ("package"))
                              (:file "print"       :depends-on ("package"))
+
+                             (:file "container"   :depends-on ("package"))
+                             (:file "cell-tobj"   :depends-on ("container"))
+                             (:file "cell-tvar"   :depends-on ("container"))
+                             (:file "fifo"        :depends-on ("container"))
+                             (:file "stack"       :depends-on ("container"))
+                             (:file "channel"     :depends-on ("container"))
+
                              (:file "bmap"        :depends-on ("print"))
                              (:file "rbmap"       :depends-on ("bmap"))
                              (:file "tmap"        :depends-on ("rbmap"))
-                             (:file "thash-table" :depends-on ("print"))
-                             (:file "cell"        :depends-on ("package"))
-                             (:file "cell-tobj"   :depends-on ("cell"))
-                             (:file "cell-tvar"   :depends-on ("cell")))
+                             (:file "thash-table" :depends-on ("print")))
                 :depends-on (:src))))
 
 

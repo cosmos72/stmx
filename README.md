@@ -99,7 +99,7 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
              ;; ...
             )))
 
-  Note: on some Common Lisp implementations, slot-value and (setf slot-value)
+  Note: on some Common Lisp implementations, `slot-value` and `(setf slot-value)`
   are known to ignore the transactional machinery (implemented with MOP
   slot-value-using-class, if you wonder) causing all kinds of bugs
   on transactional classes.
@@ -213,7 +213,7 @@ features are available:
           (set-foo a 1 "abc")
           (set-foo b 2 "def"))
 
-
+  and
 
         (defvar a (make-instance 'foo))
         (defvar b (make-instance 'foo))
@@ -224,7 +224,6 @@ features are available:
 
         (run-atomic #'init-foo-a-and-b)
 
-
 - `RUN-ORELSE` is the function version of `ORELSE`: it accepts any number
   of functions and executes them as alternatives in separate nested transactions:
   if the first retries or is invalid, the second will be executed and so on,
@@ -234,7 +233,6 @@ features are available:
   If X, Y and Z are no-argument functions, the following two lines are equivalent:
   
         (orelse (x) (y) (z))
-
         (run-orelse #'x #'y #'z)
 
 - `BEFORE-COMMIT` is a macro that registers Lisp forms to be executed later, just before
@@ -255,7 +253,6 @@ features are available:
   - The forms cannot (retry) - attempts to do so will signal an error.
     Starting a nested transaction and retrying inside that is acceptable,
     as long as the (retry) does not propagate outside the forms themselves.
-    
 
 - `AFTER-COMMIT` is another macro that registers Lisp forms to be executed later,
   but in this case they are executed immediately after the transaction has been
@@ -302,22 +299,24 @@ The folder contains the following classes with related methods and functions,
 contained in the STMX.UTIL package:
 
 - `CELL` is a simple transactional object. It can be empty or hold a single value.
-  Methods: `FULL?' `EMPTY?` `EMPTY!` `VALUE-OF` `TAKE` `PUT` `TRY-TAKE' `TRY-PUT`
+  Methods: `FULL?` `EMPTY?` `EMPTY!` `VALUE-OF` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
+
   When empty, taking a value will (retry) and wait until some other thread
   puts a value.
+
   When full, putting a value will (retry) and wait until some other thread
   removes the previous value.
 
 - `THASH-TABLE` is a transactional hash table.
   Methods: `THASH-COUNT` `THASH-EMPTY?` `CLEAR-THASH`
            `GET-THASH` `SET-THASH` `(SETF GET-THASH)` `REM-THASH` 
-           `MAP-THASH` `DO-THASH`
+           `MAP-THASH` `DO-THASH`.
 
 - `TMAP` is a transactional sorted map, backed by a red-black tree.
   Methods: `BMAP-PRED` `BMAP-COUNT` `BMAP-EMPTY?` `CLEAR-BMAP`
            `GET-BMAP` `SET-BMAP` `(SETF GET-BMAP)` `REM-BMAP` 
-           `MIN-BMAP` `MAX-BMAP' `MAP-BMAP` `DO-BMAP`
-           `BMAP-KEYS` `BMAP-VALUES` `BMAP-PAIRS`
+           `MIN-BMAP` `MAX-BMAP` `MAP-BMAP` `DO-BMAP`
+           `BMAP-KEYS` `BMAP-VALUES` `BMAP-PAIRS`.
 
 - `RBMAP` is the non-transactional version of `TMAP`. Not so interesting by itself,
   a lot of other red-black trees implementations exist already on the net.

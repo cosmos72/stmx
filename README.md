@@ -388,7 +388,7 @@ you can interpret them as microseconds.
 
 <table>
  <tr><th><b>name</b>      </th>
-     <th><b>code run with <code>(one-million)</code></b></th>
+     <th><b>code run with <code>(one-million ...)</code></b></th>
      <th><b>elapsed time</b></th></tr>
 
  <tr><td>atomic empty     </td><td><code>(atomic)</code>                    </td><td>0.264&nbsp;seconds</td></tr>
@@ -419,15 +419,18 @@ you can interpret them as microseconds.
      <td>5.247&nbsp;seconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
-     <td><code>(atomic (when (zerop (mod i   10)) (clear-bmap tm)) (set-bmap tm i t)))</code></td>
+     <td><code>(atomic (when (zerop (mod i   10)) (clear-bmap tm))
+              (set-bmap tm i t)))</code></td>
      <td>18.885&nbsp;seconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 100)</td>
-     <td><code>(atomic (when (zerop (mod i  100)) (clear-bmap tm)) (set-bmap tm i t)))</code></td>
+     <td><code>(atomic (when (zerop (mod i  100)) (clear-bmap tm))
+              (set-bmap tm i t)))</code></td>
      <td>35.093&nbsp;seconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 1000)</td>
-     <td><code>(atomic (when (zerop (mod i 1000)) (clear-bmap tm)) (set-bmap tm i t)))</code></td>
+     <td><code>(atomic (when (zerop (mod i 1000)) (clear-bmap tm))
+              (set-bmap tm i t)))</code></td>
      <td>49.399&nbsp;seconds</td></tr>
 
  <tr><td>thash read-write-1</td>
@@ -435,15 +438,18 @@ you can interpret them as microseconds.
      <td>11.207&nbsp;seconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 10)</td>
-     <td><code>(atomic (when (zerop (mod i   10)) (clear-thash tm)) (setf (get-thash tm i) t)))</code></td>
+     <td><code>(atomic (when (zerop (mod i   10)) (clear-thash tm))
+              (setf (get-thash tm i) t)))</code></td>
      <td>10.912&nbsp;seconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 100)</td>
-     <td><code>(atomic (when (zerop (mod i  100)) (clear-thash tm)) (setf (get-thash tm i) t)))</code></td>
+     <td><code>(atomic (when (zerop (mod i  100)) (clear-thash tm))
+              (setf (get-thash tm i) t)))</code></td>
      <td>16.620&nbsp;seconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 1000)</td>
-     <td><code>(atomic (when (zerop (mod i 100)) (clear-thash tm)) (setf (get-thash tm i) t)))</code></td>
+     <td><code>(atomic (when (zerop (mod i 100)) (clear-thash tm))
+              (setf (get-thash tm i) t)))</code></td>
      <td>68.615&nbsp;seconds</td></tr>
 
 </table>

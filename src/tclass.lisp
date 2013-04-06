@@ -78,10 +78,25 @@ Exactly analogous to TRANSACTIONAL-DIRECT-SLOT."))
     transactional-effective-slot-class))
 
 
+;; guard against recursive calls
+(defvar *recursive-call-list-classes-containing-direct-slots* nil)
+
 (defun list-classes-containing-direct-slots (direct-slots class)
-  (loop for superclass in (class-precedence-list class)
-     when (intersection direct-slots (class-direct-slots superclass))
-     collect (class-name superclass)))
+  (if *recursive-call-list-classes-containing-direct-slots*
+      "error listing superclasses, recursive call to listing superclasses"
+      (let1 *recursive-call-list-classes-containing-direct-slots* t
+        (handler-case
+            (loop for superclass in (class-precedence-list class)
+               when (intersection direct-slots (class-direct-slots superclass))
+               collect (class-name superclass))
+          (condition (err)
+            (handler-case
+                (format nil "error listing superclasses, ~A: ~A" (type-of err) err)
+              (condition ()
+                "error listing superclasses")))))))
+
+;; guard against recursive calls
+(defvar *recursive-call-compute-effective-slot-definition* nil)
 
 (let1 lambda-new-tvar (lambda () (new 'tvar))
   (defmethod compute-effective-slot-definition ((class transactional-class)
@@ -93,14 +108,21 @@ otherwise signal an error.
 For transactional slots, replace :type ... with :type tvar
 and wrap :initform with (lambda () (new 'tvar ...)"
 
-    (let ((effective-slot (call-next-method))
+    (when (member class *recursive-call-list-classes-containing-direct-slots*)
+      (log:warn "recursive call to (compute-effective-slot-definition ~A)" class)
+      (return-from compute-effective-slot-definition (call-next-method)))
+
+    (let ((*recursive-call-compute-effective-slot-definition*
+           (cons class *recursive-call-compute-effective-slot-definition*))
+
+          (effective-slot (call-next-method))
           (direct-slots (loop for slot in direct-slots
                            when (typep slot 'transactional-direct-slot)
                            collect slot)))
 
       (when direct-slots
         (loop for tail on direct-slots
-           for slot1 = (first tail) 
+           for slot1 = (first tail)
            for slot2 = (second tail)
            while slot2 do
              (unless (eq (transactional-slot? slot1)
@@ -112,15 +134,21 @@ to the same value. Problematic classes containing slot ~A: ~{~A ~}"
                       slot-name (class-name class) slot-name
                       (list-classes-containing-direct-slots direct-slots class))))
         
-        (let* ((slot (first direct-slots))
-               (is-tslot? (transactional-slot? slot)))
+        (let* ((direct-slot (first direct-slots))
+               (is-tslot? (transactional-slot? direct-slot)))
           (setf (transactional-slot? effective-slot) is-tslot?)
-          
-          ;; if slot is transactional, replace its :type <x> with :type tvar
-          ;; and set its initfunction to (lambda () (new 'tvar ...))
+
+          ;; if slot is transactional remove any type declaration :type <x> because,
+          ;; depending on transactional global flags, slot-value and accessors
+          ;; will accept/return either a TVAR or the actual type.
+          ;; Also set slot initfunction to (lambda () (new 'tvar ...))
           (when is-tslot?
-            (setf (slot-definition-type effective-slot) 'tvar)
-            (let* ((direct-initfunction (slot-definition-initfunction slot))
+            (setf (slot-definition-type effective-slot) t)
+
+            (log:trace "class = ~A~%  slot-name = ~A~%  transactional direct-slots = ~A~%  effective-slot = ~A"
+                       class slot-name direct-slots effective-slot)
+          
+            (let* ((direct-initfunction (slot-definition-initfunction direct-slot))
                    (effective-initfunction
                     (if direct-initfunction
                         (lambda () (new 'tvar :value (funcall direct-initfunction)))

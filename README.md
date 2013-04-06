@@ -162,9 +162,9 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
 
   The `(retry)` function call offers a third option: if invoked inside
   a transaction, it tells STMX that the transaction cannot complete
-  immediately, for example because some necessary data is not
-  currently available, and instructs STMX to re-execute the
-  transaction from scratch after the data has changed.
+  immediately, for example because some necessary data is not currently
+  available, and instructs STMX to wait until the data has changed,
+  then re-execute the transaction from scratch.
 
   How does `(retry)` know which data it should monitor for changes?
   Simple: it will monitor *all* transactional data (including slots of
@@ -177,13 +177,14 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   will write there, and just `(retry)` if no appropriate values are
   there yet.
 
-- `ORELSE` is a macro to combine two or more transactions as alternatives:
-  if the first retries or is invalid, the second will be executed and so on,
-  until one transaction either commits (returns normally) or rollbacks
-  (signals an error or condition).
+- `ORELSE` is a macro to execute two or more Lisp forms as alternatives
+  in separate, nested transactions: if the first retries or is invalid,
+  the second will be executed and so on, until one transaction either
+  commits (returns normally) or rollbacks (signals an error or condition).
+  It can only be used inside a transaction.
 
 - `NONBLOCKING` is an utility macro based on `ORELSE` to convert a blocking
-  transaction into another that returns NIL instead of blocking
+  transaction into another that returns NIL instead of waiting
   (and otherwise returns T followed by the values or the original transaction)
   
         (nonblocking (x) (y) (z))
@@ -299,37 +300,49 @@ features are available:
    - `(value-of var)` method, equivalent to `($ var)`
    - `(setf (value-of var) value)` method, equivalent to `(setf ($ var) value)`
 
-Utlities and examples
+Utilities and examples
 ---------------------
 
 See the [util](util) folder, which contains several examples and utilities
 built with STMX and should be relatively straightforward to understand.
 
 The folder contains the following classes with related methods and functions,
-contained in the STMX.UTIL package:
+contained in the STMX.UTIL package - for more details, use `(describe '<some-symbol>)` at REPL:
 
-- `CELL` is a simple transactional object. It can be empty or hold a single value.
-  Methods: `FULL?` `EMPTY?` `EMPTY!` `VALUE-OF` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
+- `CELL` is the simplest transactional class. It is created with
+  `(make-instance 'cell &key value)` and it can be empty or hold a single value.
+
+  Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
 
   When empty, taking a value will (retry) and wait until some other thread
   puts a value.
-
   When full, putting a value will (retry) and wait until some other thread
   removes the previous value.
 
+  Note: raw TVARs support exactly the same methods.
+
 - `THASH-TABLE` is a transactional hash table.
+  It is created with `(make-instance 'thash-table &key (test 'eql) <other-options>)`.
+  An interesting feature: it accepts exactly the same options as MAKE-HASH-TABLE,
+  including any non-standard option supported by the underlying MAKE-HASH-TABLE implementation.
+
   Methods: `THASH-COUNT` `THASH-EMPTY?` `CLEAR-THASH`
            `GET-THASH` `SET-THASH` `(SETF GET-THASH)` `REM-THASH` 
            `MAP-THASH` `DO-THASH`.
 
 - `TMAP` is a transactional sorted map, backed by a red-black tree.
+  It is created with `(make-instance 'tmap :pred <compare-function>)`
+  where <compare-function> must be a function accepting two arguments, key1 and key2,
+  and returning t if key1 is smaller that key2. Typical values for <compare-function>
+  are #'< and the faster #'fixnum< or, for string keys, #'string<
+
   Methods: `BMAP-PRED` `BMAP-COUNT` `BMAP-EMPTY?` `CLEAR-BMAP`
            `GET-BMAP` `SET-BMAP` `(SETF GET-BMAP)` `REM-BMAP` 
            `MIN-BMAP` `MAX-BMAP` `MAP-BMAP` `DO-BMAP`
            `BMAP-KEYS` `BMAP-VALUES` `BMAP-PAIRS`.
 
 - `RBMAP` is the non-transactional version of `TMAP`. Not so interesting by itself,
-  a lot of other red-black trees implementations exist already on the net.
+  as many other red-black trees implementations exist already on the net.
   It supports exactly the same methods as `TMAP`.
 
 

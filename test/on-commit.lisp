@@ -31,55 +31,48 @@
 
 
 (test before-commit-fails
-  (let ((var (new 'tvar :value 'original))
-        got-test-error?)
-    (handler-case
-        (atomic
-         (setf ($ var) 'changed)
-         (is (eq 'changed ($ var)))
-         (before-commit
-           (is (eq 'changed ($ var)))
-           (is (eq 'original (raw-value-of var)))
-           (setf ($ var) 'before-commit))
-         (before-commit
-           (is (eq 'before-commit ($ var)))
-           (is (eq 'original (raw-value-of var)))
-           (error 'test-error))
-         (before-commit
-           (fail "before-commit function unexpectedly invoked after another one signalled an error"))
-         (after-commit
-           (fail "after-commit function unexpectedly invoked after before-commit signalled an error")))
-      (test-error ()
-        (setf got-test-error? t)
-        (is (eq 'original ($ var)))
-        (is (eq 'original (raw-value-of var)))))
+  (let ((var (new 'tvar :value 'original)))
 
-    (is-true got-test-error?)))
+    (signals test-error
+      (atomic
+       (setf ($ var) 'changed)
+       (is (eq 'changed ($ var)))
+       (before-commit
+         (is (eq 'changed ($ var)))
+         (is (eq 'original (raw-value-of var)))
+         (setf ($ var) 'before-commit))
+       (before-commit
+         (is (eq 'before-commit ($ var)))
+         (is (eq 'original (raw-value-of var)))
+         (error 'test-error))
+       (before-commit
+         (fail "before-commit function unexpectedly invoked after another one signalled an error"))
+       (after-commit
+         (fail "after-commit function unexpectedly invoked after before-commit signalled an error"))))
+    (is (eq 'original ($ var)))
+    (is (eq 'original (raw-value-of var)))))
 
 
 (test after-commit-fails
-  (let ((var (new 'tvar :value 'original))
-        got-test-error?)
-    (handler-case
-        (atomic
-         (setf ($ var) 'changed)
-         (is (eq 'changed ($ var)))
-         (before-commit
-           (is (eq 'changed ($ var)))
-           (is (eq 'original (raw-value-of var)))
-           (setf ($ var) 'before-commit))
-         ;; after-commit blocks are executed in forward order
-         (after-commit
-           (is (eq 'before-commit ($ var)))
-           (is (eq 'before-commit (raw-value-of var)))
-           ;; after-commit functions MUST NOT write to transactional memory
-           ;; (setf ($ var) 'after-commit))
-           (error 'test-error))
-         (after-commit
-           (fail "after-commit function unexpectedly invoked after another one signalled an error")))
-      (test-error ()
-        (setf got-test-error? t)
-        (is (eq 'before-commit ($ var)))
-        (is (eq 'before-commit (raw-value-of var)))))
+  (let ((var (new 'tvar :value 'original)))
 
-    (is-true got-test-error?)))
+    (signals test-error
+      (atomic
+       (setf ($ var) 'changed)
+       (is (eq 'changed ($ var)))
+       (before-commit
+         (is (eq 'changed ($ var)))
+         (is (eq 'original (raw-value-of var)))
+         (setf ($ var) 'before-commit))
+       ;; after-commit blocks are executed in forward order
+       (after-commit
+         (is (eq 'before-commit ($ var)))
+         (is (eq 'before-commit (raw-value-of var)))
+         ;; after-commit functions MUST NOT write to transactional memory
+         ;; (setf ($ var) 'after-commit))
+         (error 'test-error))
+       (after-commit
+         (fail "after-commit function unexpectedly invoked after another one signalled an error"))))
+
+    (is (eq 'before-commit ($ var)))
+    (is (eq 'before-commit (raw-value-of var)))))

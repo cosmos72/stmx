@@ -17,14 +17,32 @@
 
 ;;;; ** Abstract functions for concurrent cells
 
-(defgeneric full?  (place))
-(defgeneric empty? (place))
-(defgeneric empty! (place))
+(defgeneric full?  (place)
+  (:documentation "Return t if PLACE contains a value, otherwise return nil."))
 
-(defgeneric take     (place))
-(defgeneric try-take (place))
-(defgeneric put      (place value))
-(defgeneric try-put  (place value))
+(defgeneric empty? (place)
+  (:documentation "Return nil if PLACE contains a value, otherwise return t."))
+
+(defgeneric empty! (place)
+  (:documentation "Remove any value contained in PLACE. Return PLACE."))
+
+(defgeneric peek   (place &optional default)
+  (:documentation "Return value stored in PLACE without removing it, and t as multiple values.
+Return (values DEFAULT nil) if PLACE contains no value."))
+
+(defgeneric take   (place)
+  (:documentation "Wait until PLACE contains a value, then remove and return it."))
+
+(defgeneric put    (place value)
+  (:documentation "Wait until PLACE contains no value, then store VALUE in it and return VALUE."))
+
+(defgeneric try-take (place)
+  (:documentation "If PLACE contains a value, remove it and return t and it as multiple values.
+Otherwise return (values nil nil)"))
+
+(defgeneric try-put  (place value)
+  (:documentation "If PLACE contains no value, store VALUE it and return t and VALUE
+as multiple values. Otherwise return (values nil nil)"))
 
 
 

@@ -44,65 +44,65 @@
 ;;;; ** Public API. Most methods simply wrap (call-next-method) in a transaction
 
 
-(transaction
- (defmethod get-bmap ((m tmap) key &optional default)
-   (call-next-method)))
+(defmethod get-bmap ((m tmap) key &optional default)
+  (declare (ignore m key default))
+  (run-atomic #'call-next-method))
 
-(transaction
- (defmethod set-bmap ((m tmap) key value)
-   (call-next-method)))
+(defmethod set-bmap ((m tmap) key value)
+  (declare (ignore m key value))
+  (run-atomic #'call-next-method))
 
-(transaction
- (defmethod rem-bmap ((m tmap) key)
-   (call-next-method)))
+(defmethod rem-bmap ((m tmap) key)
+  (declare (ignore m key))
+  (run-atomic #'call-next-method))
 
-(transaction
- (defmethod clear-bmap ((m tmap))
-   (call-next-method)))
+(defmethod clear-bmap ((m tmap))
+  (declare (ignore m))
+  (run-atomic #'call-next-method))
 
-(transaction
- (defmethod add-to-bmap ((m tmap) &rest keys-and-values)
-   (call-next-method)))
+(defmethod add-to-bmap ((m tmap) &rest keys-and-values)
+  (declare (ignore m keys-and-values))
+  (run-atomic #'call-next-method))
 
-(transaction
- (defmethod remove-from-bmap ((m tmap) &rest keys)
-   (call-next-method)))
+(defmethod remove-from-bmap ((m tmap) &rest keys)
+  (declare (ignore m keys))
+  (run-atomic #'call-next-method))
 
-(transaction
- (defmethod min-bmap ((m tmap))
-   (call-next-method)))
+(defmethod min-bmap ((m tmap))
+  (declare (ignore m))
+  (run-atomic #'call-next-method))
 
-(transaction
- (defmethod max-bmap ((m tmap))
-   (call-next-method)))
+(defmethod max-bmap ((m tmap))
+  (declare (ignore m))
+  (run-atomic #'call-next-method))
 
-(transaction
- (defmethod copy-bmap-into ((mcopy tmap) m)
-   (call-next-method)))
+(defmethod copy-bmap-into ((mcopy tmap) m)
+  (declare (ignore mcopy m))
+  (run-atomic #'call-next-method))
 
-(transaction
- (defmethod copy-bmap-into (mcopy (m tmap))
-   (call-next-method)))
+(defmethod copy-bmap-into (mcopy (m tmap))
+  (declare (ignore mcopy m))
+  (run-atomic #'call-next-method))
 
-(transaction
- (defmethod map-bmap ((m tmap) func)
-   (call-next-method)))
+(defmethod map-bmap ((m tmap) func)
+  (declare (ignore m func))
+  (run-atomic #'call-next-method))
 
-(transaction
- (defmethod map-bmap-from-end ((m tmap) func)
-   (call-next-method)))
+(defmethod map-bmap-from-end ((m tmap) func)
+  (declare (ignore m func))
+  (run-atomic #'call-next-method))
 
-(transaction
- (defmethod bmap-keys ((m tmap) &optional to-list)
-   (call-next-method)))
+(defmethod bmap-keys ((m tmap) &optional to-list)
+  (declare (ignore m to-list))
+  (run-atomic #'call-next-method))
 
-(transaction
- (defmethod bmap-values ((m tmap) &optional to-list)
-   (call-next-method)))
+(defmethod bmap-values ((m tmap) &optional to-list)
+  (declare (ignore m to-list))
+  (run-atomic #'call-next-method))
 
-(transaction
- (defmethod bmap-pairs ((m tmap) &optional to-alist)
-   (call-next-method)))
+(defmethod bmap-pairs ((m tmap) &optional to-alist)
+  (declare (ignore m to-alist))
+  (run-atomic #'call-next-method))
 
 
 

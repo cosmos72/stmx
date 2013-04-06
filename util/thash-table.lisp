@@ -21,9 +21,10 @@
 
 (transactional
  (defclass thash-table ()
-   ((original            :type hash-table           :accessor original-of)
-    (delta :initform nil :type (or null hash-table) :accessor delta-of)
-    (count :initform 0   :type fixnum               :accessor count-of))))
+   ((original              :type hash-table           :accessor original-of)
+    (delta   :initform nil :type (or null hash-table) :accessor delta-of)
+    (count   :initform 0   :type fixnum               :accessor count-of)
+    (options :initform nil :type list                 :accessor options-of))))
 
 
 (defmethod initialize-instance :after
@@ -31,9 +32,36 @@
   "Initialize a new transactional hash-table. Accepts the same arguments as MAKE-HASH-TABLE,
 including any non-standard arguments supported by MAKE-HASH-TABLE implementation."
 
-  (log:trace "test = ~A other-keys = ( ~{~A ~})" test other-keys)
-  (setf (original-of instance)
-        (apply #'make-hash-table :test test other-keys)))
+  ;;(log:trace "test = ~A other-keys = ~{~A~^ ~}" test other-keys)
+
+  (setf (options-of instance)  other-keys
+        (original-of instance) (apply #'make-hash-table :test test other-keys)))
+
+
+(defun copy-plist-except (key plist)
+  (declare (type symbol key)
+           (type list plist))
+  (loop while plist
+     for k = (pop plist)
+     for v = (pop plist)
+     unless (eq k key)
+     collect k
+     and collect v))
+           
+(defun ensure-thash-delta (thash)
+  "Create and set slot DELTA if nil. Return DELTA slot value."
+  (declare (type thash-table thash))
+
+  (with-rw-slots (delta) thash
+    (aif delta
+         it
+         (progn
+           (before-commit (normalize-thash thash))
+           ;; remove :weakness flag from the options used to create DELTA hash-table:
+           ;; a lot of bugs would happen if entries disappear from DELTA
+           ;; while still present in ORIGINAL.
+           (setf delta (apply #'make-hash-table :test (hash-table-test (original-of thash))
+                              (copy-plist-except :weakness (options-of thash))))))))
 
 
 (defun thash-count (thash)
@@ -141,17 +169,6 @@ FUNC must be a function accepting two arguments: key and value."
         
 
 
-
-(defun ensure-thash-delta (thash)
-  "Create and set slot DELTA if nil. Return slot value."
-   (declare (type thash-table thash))
-
-   (with-rw-slots (delta) thash
-     (aif delta
-          it
-          (progn
-            (before-commit (normalize-thash thash))
-            (setf delta (make-hash-table :test (hash-table-test (original-of thash))))))))
 
 
 

@@ -21,7 +21,7 @@
 (define-condition rollback-error (error)
   ())
 
-(test tmap-rollback
+(defun test-tmap-rollback ()
   (let* ((m1 (new 'tmap :pred #'fixnum<))
          (m2 (copy-bmap m1)))
 
@@ -32,17 +32,18 @@
       (atomic
        (add-to-bmap m1 1 "z" 3 "w")
        (rem-bmap m1 2)
-       (format t "~&-------------~%")
-       (print-bmap t m1)
+       ;;(format t "~&-------------~%")
+       ;;(print-bmap t m1)
        (error 'rollback-error)))
 
-    (format t "~&-------------~%")
-    (print-bmap t m1)
-    (is-equal-bmap m1 m2)))
+    ;;(format t "~&-------------~%")
+    ;;(print-bmap t m1)
+    (is-equal-bmap m1 m2)
+    t))
 
       
-     
-      
+(test tmap-rollback
+  (test-tmap-rollback))
 
 (test tmap
   (test-rbmap-class 'tmap)

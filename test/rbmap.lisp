@@ -18,11 +18,6 @@
 (def-suite rbmap-suite :in suite)
 (in-suite rbmap-suite)
 
-(defmacro _ (obj slot-name)
-  (let* ((pkg (find-package (symbol-name 'stmx.util)))
-         (actual-slot-name (find-symbol (symbol-name slot-name) pkg)))
-    `(slot-value ,obj ',actual-slot-name)))
-
 
 
 (defun fail-at (obj ref txt &rest args)
@@ -165,11 +160,12 @@ bmap-count must be the actual nodes count, root must be black."
              (bmap-pairs m2))))
   
 
-(defun test-rbmap-class (class-name)
+(defun test-rbmap-class (class-name &key (count 100))
+  (declare (type symbol class-name)
+           (type fixnum count))
   (let* ((m1    (new class-name :pred #'fixnum<))
          (m2    (copy-bmap m1))
-         (hash  (make-hash-table :test 'eql))
-         (count 100))
+         (hash  (make-hash-table :test 'eql)))
     (dotimes (i count)
       (let* ((key (random count))
              (value (- key)))

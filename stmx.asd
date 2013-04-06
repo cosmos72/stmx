@@ -70,7 +70,8 @@
 
   :components ((:module :test
                 :components ((:file "package")
-                             (:file "rbmap"     :depends-on ("package"))
+                             (:file "misc"      :depends-on ("package"))
+                             (:file "rbmap"     :depends-on ("misc"))
                              (:file "atomic"    :depends-on ("package"))
                              (:file "on-commit" :depends-on ("atomic"))
                              (:file "retry"     :depends-on ("package"))

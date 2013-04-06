@@ -59,7 +59,8 @@
 
 
 (defmethod bmap/copy-node ((m rbmap) node)
-  (declare (type rbmap m))
+  (declare (type rbmap m)
+           (type rbnode node))
   (let1 copy (bmap/new-node m (_ node key) (_ node value))
     (setf (_ copy color) (_ node color))
     copy))

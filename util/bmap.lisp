@@ -121,7 +121,7 @@ or (values nil nil nil) if M is empty."))
 Keys and values in M are shallow copied."))
 
 
-(defgeneric copy-bmap-into (m mcopy)
+(defgeneric copy-bmap-into (mcopy m)
   (:documentation "Fill MCOPY with a copy of bmap M and return MCOPY.
 Copies all keys and values from M into MCOPY
 and removes any other key/value already present in MCOPY."))
@@ -425,10 +425,10 @@ or (values nil nil nil) if M is empty"
 Keys and values in M are shallow copied."
   (declare (type bmap m))
   (let1 mcopy (new (class-of m) :pred (_ m pred))
-    (copy-bmap-into m mcopy)))
+    (copy-bmap-into mcopy m)))
 
 
-(defmethod copy-bmap-into ((m bmap) (mcopy bmap))
+(defmethod copy-bmap-into ((mcopy bmap) (m bmap))
   "Fill MCOPY with a copy of bmap M and return MCOPY.
 Copies all keys and values from M into MCOPY
 and removes any other key/value already present in MCOPY."
@@ -440,8 +440,8 @@ and removes any other key/value already present in MCOPY."
                (setf (_ copy left)  (copy-nodes (_ node left)))
                (setf (_ copy right) (copy-nodes (_ node right)))
                copy)))
-    (setf (_ mcopy root) (copy-nodes (_ m root)))
-    (setf (_ mcopy count) (_ m count))
+    (setf (_ mcopy root) (copy-nodes (_ m root))
+          (_ mcopy count) (_ m count))
     mcopy))
 
 

@@ -25,9 +25,10 @@
 ;;; Max: for illustration purposes, we could also use (defmethod ... (atomic ... ))
 ;;; instead of (transaction (defmethod ...)) - they are equivalent.
 
-(transaction
- (defmethod empty? ((var tvar))
-   (not (bound-$? var))))
+;; no need to wrap empty? in a transaction:
+;; bound-$? is atomic, transaction aware, and performs a single read
+(defmethod empty? ((var tvar))
+  (not (bound-$? var)))
 
 (transaction
  (defmethod empty! ((var tvar))
@@ -39,12 +40,20 @@
 ;; (defmethod full? ((var tvar))
 ;;   (not (empty? var)))
 
+
+(transaction
+ (defmethod peek ((var tvar) &optional default)
+   (if (bound-$? var)
+       (values ($ var) t)
+       (values default nil))))
+       
+
 (transaction
  (defmethod take ((var tvar))
    (if (empty? var)
        (retry)
        (prog1 ($ var)
-         (empty! var)))))
+         (unbind-$ var)))))
 
 (transaction
  (defmethod put ((var tvar) value)
@@ -61,7 +70,7 @@ Linux amd64) than the unspecialized (try-take place) which calls
    (if (empty? var)
        nil
        (let1 value ($ var)
-         (empty! var)
+         (unbind-$ var)
          (values t value)))))
 
 (transaction

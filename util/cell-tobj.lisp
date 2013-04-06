@@ -25,27 +25,40 @@
            :initarg :value
            :initform *empty-cell*))))
 
-(transaction
- (defmethod empty? ((cell cell))
-   (eq (value-of cell) *empty-cell*)))
+;; no need to wrap empty? in a transaction:
+;; value-of is atomic, transaction aware, and performs a single read
+(defmethod empty? ((cell cell))
+  (eq (value-of cell) *empty-cell*))
 
 (transaction
  (defmethod empty! ((cell cell))
-   "Remove value from CELL. does not return any value"
+   "Remove value from CELL. Return CELL."
    (setf (value-of cell) *empty-cell*)
-   (values)))
+   cell))
 
 ;; no need to specialize (full?) on CELLs: the method in cell.lisp is enough
 ;;
 ;; (defmethod full? ((cell cell))
 ;;   (not (empty? cell)))
 
+
+;; no need to wrap peek in a transaction:
+;; value-of is atomic, transaction aware, and performs a single read
+(defmethod peek ((cell cell) &optional default)
+  (let1 value (value-of cell)
+    (if (eq value *empty-cell*)
+        (values default nil)
+        (values value t))))
+
+
 (transaction
  (defmethod take ((cell cell))
-   (if (empty? cell)
-       (retry)
-       (prog1 (value-of cell)
-         (empty! cell)))))
+   (let1 value (value-of cell)
+     (if (eq value *empty-cell*)
+         (retry)
+         (progn
+           (setf (value-of cell) *empty-cell*)
+           value)))))
 
 (transaction
  (defmethod put ((cell cell) value)
@@ -72,10 +85,8 @@ Linux amd64) than the unspecialized (try-take place) which calls
 less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
 Linux amd64) than the unspecialized (try-put place) which calls
 \(atomic (nonblocking (put place value)))"
-   (if (eq (value-of cell) *empty-cell*)
-       (progn
-         (setf (value-of cell) value)
-         (values t value))
+   (if (empty? cell)
+       (values t (setf (value-of cell) value))
        nil)))
 
 

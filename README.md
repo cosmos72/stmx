@@ -309,7 +309,7 @@ The folder contains the following classes with related methods and functions,
 all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` at REPL:
 
 - `TCELL` is the simplest transactional class. It is created with
-  `(make-instance 'tcell &key value)` and it can be empty or hold a single value.
+  `(make-instance 'tcell [:value initial-value])` and it can be empty or hold a single value.
 
   Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
 
@@ -334,7 +334,8 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
 
   Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
 
-  `PUT` and `TRY-PUT` append values at the end, `PEEK` `TAKE` and `TRY-TAKE` get or remove them from the beginning, shifting the remaining values.
+  `PUT` and `TRY-PUT` append values at the end, `PEEK` `TAKE` and `TRY-TAKE`
+  get or remove them from the beginning, shifting the remaining values.
   For the rest, the methods behave as described for the `CELL` class.
 
 - `TCHANNEL` is a transactional multicast channel. It is created with
@@ -345,13 +346,13 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
 
   `PUT` and `TRY-PUT` append values at the end, making them available to connected ports.
   `FULL?` always returns nil, since a channel can contain unlimited values.
-  `EMPTY?' always returns t, since it is not possible to get values from a channel.
+  `EMPTY?` always returns t, since it is not possible to get values from a channel.
 
   It is possible to write into the same channel from multiple threads: added elements
   will be interleaved and made available to all connected ports.
 
 - `TPORT` is a transactional reader for `TCHANNEL`. It is created with
-  `(make-instance 'tport :channel some-chanel)`.
+  `(make-instance 'tport :channel some-channel)`.
   Ports do not support putting values, they are used to retrieve values from the channel
   they are connected to.
 
@@ -363,14 +364,14 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
   in the other ports.
 
   `FULL?` always returns t, since it is not possible to put values in a port.
-  `EMPTY?' returns t if some values are available to read or consume.
-  `EMPTY!' consumes all values currently available.
+  `EMPTY?` returns t if some values are available to read or consume.
+  `EMPTY!` consumes all values currently available.
 
   It is also possible to use the same port from multiple threads: elements consumed
   by one thread will not be available to other threads using the same port.
 
 - `THASH-TABLE` is a transactional hash table.
-  It is created with `(make-instance 'thash-table &key (test 'eql) other-options)`.
+  It is created with `(make-instance 'thash-table [:test test-function] [other-options])`.
   An interesting feature: it accepts exactly the same options as MAKE-HASH-TABLE,
   including any non-standard option supported by the underlying MAKE-HASH-TABLE implementation.
 

@@ -28,7 +28,7 @@
 (transaction
  (defmethod empty! ((s tstack))
    (setf (top-of s) nil)
-   f))
+   q))
 
 (defmethod full? ((s tstack))
   "A tstack is never full, so this method always returns nil."
@@ -38,7 +38,7 @@
 (transaction
  (defmethod peek ((s tstack) &optional default)
    "Return the first value in tstack S without removing it, and t as multiple values.
-Return (values DEFAULT nil) if F contains no value."
+Return (values DEFAULT nil) if S contains no value."
    (with-ro-slots (top) s
      (if (null top)
          (values default nil)
@@ -47,7 +47,8 @@ Return (values DEFAULT nil) if F contains no value."
 
 (transaction
  (defmethod take ((s tstack))
-   "Wait until tstack S contains at least one value, then remove and return the first value."
+   "Wait until tstack S contains at least one value, then remove
+and return the first value."
    (with-rw-slots (top) s
      (if (null top)
          (retry)

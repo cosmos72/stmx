@@ -361,7 +361,7 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
   `PEEK` `TAKE` and `TRY-TAKE` get or consume values previously added to the connected channel.
   All ports connected to the same channel receive all the values in the same order,
   and they consume values independently: taking a value from a port does not consume it
-  in the other ports.
+  from the other ports.
 
   `FULL?` always returns t, since it is not possible to put values in a port.
   `EMPTY?` returns t if some values are available to read or consume.

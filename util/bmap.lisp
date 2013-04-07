@@ -269,7 +269,7 @@ but must NOT invoke (decf (_ m count))."))
 (deftype comp-keyword () '(member :< :> :=))
 
 (declaim (inline compare-keys))
-(defun compare-keys (pred key1 key2)
+(defun bmap-compare-keys (pred key1 key2)
   "Compare KEY1 agains KEY2 using the comparison function PRED.
 Return :< if KEY1 compares as lesser than KEY2,
 return :> if KEY1 compares as greater than KEY2,
@@ -290,7 +290,7 @@ If M does not contain KEY, return (values DEFAULT NIL)."
          (pred (_ m pred)))
      (loop while node 
           for xkey = (_ node key) do
-          (case (compare-keys pred key xkey)
+          (case (bmap-compare-keys pred key xkey)
             (:< (setf node (_ node left)))
             (:> (setf node (_ node right)))
             (t (return-from get-bmap (values (_ node value) t)))))
@@ -310,7 +310,7 @@ as multiple values"
      (loop while node
         for xkey = (_ node key) do
           (push node stack)
-          (case (setf comp (compare-keys pred key xkey))
+          (case (setf comp (bmap-compare-keys pred key xkey))
             (:< (setf node (_ node left)))
             (:> (setf node (_ node right)))
             (t (return))))
@@ -516,19 +516,19 @@ all entries in M."
 ;;;; ** Helper functions used by subclasses
          
 
-(declaim (inline is-left-child?))
-(defun is-left-child? (node parent)
+(declaim (inline is-left-bnode-child?))
+(defun is-left-bnode-child? (node parent)
   (declare (type bnode node parent))
   (eq node (_ parent left)))
 
 
-(declaim (inline is-left-child-red?))
-(defun is-left-child-red? (node)
+(declaim (inline is-left-bnode-child-red?))
+(defun is-left-bnode-child-red? (node)
   (declare (type bnode node))
   (red? (_ node left)))
 
 
-(defun rotate-left (node)
+(defun rotate-bnode-left (node)
   "Rotate left the subtree around node. Return new subtree root."
   (declare (type bnode node))
   (log-debug "before:~%~A" (print-object-contents nil node))
@@ -539,7 +539,7 @@ all entries in M."
     x))
 
 
-(defun rotate-right (node)
+(defun rotate-bnode-right (node)
   "Rotate right the subtree around node. Return new subtree root."
   (declare (type bnode node))
   (log-debug "before:~%~A" (print-object-contents nil node))
@@ -551,7 +551,7 @@ all entries in M."
 
 
 
-(defun rotate-around (node parent &key left)
+(defun rotate-bnode-around (node parent &key left)
   "Rotate left or right the subtree around node. Return new subtree root
 and also update parent's link to subtree root."
   (declare (type bnode node)
@@ -560,23 +560,23 @@ and also update parent's link to subtree root."
   
   (let1 new-node
       (if left
-          (rotate-left node)
-          (rotate-right node))
+          (rotate-bnode-left node)
+          (rotate-bnode-right node))
 
     ;; connect parent to rotated node
     (when parent
-      (if (is-left-child? node parent)
+      (if (is-left-bnode-child? node parent)
           (setf (_ parent left) new-node)
           (setf (_ parent right) new-node)))
     new-node))
 
 
-(defun replace-child-node (old-node new-node parent)
+(defun replace-bnode (old-node new-node parent)
   "Unlink old-node from it parent and replace it with new-node.
 Return t if left child was replaced, nil if right child was replaced"
   (declare (type (or null bnode) old-node new-node parent))
   (when parent
-    (let1 left-child? (is-left-child? old-node parent)
+    (let1 left-child? (is-left-bnode-child? old-node parent)
       (if left-child?
           (setf (_ parent left) new-node)
           (setf (_ parent right) new-node))

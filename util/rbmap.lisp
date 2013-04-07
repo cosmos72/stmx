@@ -125,10 +125,10 @@ If stack is nil, returned node is the new root to set."
      ;;         C*   rotate-right if      X*    
      ;;              X* is right child
      (log-debug-bmap node parent stack "rule-2")
-     (setf left-node? (is-left-child? node parent))
-     (unless (eq left-node? (is-left-child-red? node))
-       (setf node (rotate-around node parent :left left-node?))
-       (log-debug-bmap node parent stack "rule-2, after rotate-around"))
+     (setf left-node? (is-left-bnode-child? node parent))
+     (unless (eq left-node? (is-left-bnode-child-red? node))
+       (setf node (rotate-bnode-around node parent :left left-node?))
+       (log-debug-bmap node parent stack "rule-2, after rotate-bnode-around"))
 
      ;; 3) X* must have a black brother B and a red child C*,
      ;;    both must be on the same side of X*
@@ -139,7 +139,7 @@ If stack is nil, returned node is the new root to set."
      ;;     C*       rotate-left if               B                        B
      ;;              A* is right child
      (log-debug-bmap node parent stack "rule-3")
-     (rotate-around parent (first stack) :left (not left-node?))
+     (rotate-bnode-around parent (first stack) :left (not left-node?))
      (log-debug "before rotatef, node color = ~A, parent color = ~A"
                 (_ node color) (_ parent color))
      (rotatef (_ node color) (_ parent color))
@@ -147,7 +147,7 @@ If stack is nil, returned node is the new root to set."
                 (_ node color) (_ parent color))
 
      (log-debug-bmap node parent stack
-                (format nil "rule-3, after (rotate-~A parent)"
+                (format nil "rule-3, after (rotate-bnode-~A parent)"
                         (if left-node? "right" "left")))
      (return (values node stack))))
 
@@ -193,9 +193,9 @@ Return some node in rebalanced tree and its stack as multiple values"
 
 
     (prog ;; replace black node X but remember his parent X and brother B.
-          ((left-node? (replace-child-node node
-                                           (or (_ node left) (_ node right))
-                                           parent))
+          ((left-node? (replace-bnode node
+				      (or (_ node left) (_ node right))
+				      parent))
            brother)
 
      rule-1
@@ -221,7 +221,7 @@ Return some node in rebalanced tree and its stack as multiple values"
        (setf brother (if left-node? (_ brother left) (_ brother right)))
        ;; rotate around parent. grandparent (if exists) must also be linked
        ;; to former brother instead of former parent
-       (push (rotate-around parent (first stack) :left left-node?) stack))
+       (push (rotate-bnode-around parent (first stack) :left left-node?) stack))
            
      (log-debug-bmap node parent stack "rule-1" :brother brother)
 
@@ -243,7 +243,7 @@ Return some node in rebalanced tree and its stack as multiple values"
          (unless (setf parent (pop stack))
            (log-debug-bmap node parent stack "rule-2.2 DONE" :brother brother)
            (return (values node stack)))
-         (setf left-node? (is-left-child? node parent))
+         (setf left-node? (is-left-bnode-child? node parent))
          (go rule-1))
 
 
@@ -260,7 +260,7 @@ Return some node in rebalanced tree and its stack as multiple values"
        ;;                                    D
        ;;                                   / \
        (when (black? (if left-node? right left))
-         (setf brother (rotate-around brother parent :left (not left-node?)))))
+         (setf brother (rotate-bnode-around brother parent :left (not left-node?)))))
 
      (log-debug-bmap node parent stack "rule-3.1" :brother brother)
 
@@ -278,7 +278,7 @@ Return some node in rebalanced tree and its stack as multiple values"
 
      ;; 3.3) if node is left rotate-left around parent, otherwise rotate-right around parent
      (setf parent
-           (rotate-around parent (first stack) :left left-node?))
+           (rotate-bnode-around parent (first stack) :left left-node?))
      (log-debug-bmap node parent stack "rule-3.3")
      (return (values parent stack)))))
 
@@ -333,7 +333,7 @@ from rebalanced tree. Some-node will be nil only if the tree is empty after remo
 
     (when (red? node)
       ;; red node with < 2 children, must be a leaf (the only child would be black, impossible)
-      (replace-child-node node nil parent)
+      (replace-bnode node nil parent)
       (log-debug-bmap node parent stack "after delete red node")
       (return-from %rbmap-remove-at (values parent (rest stack))))
     
@@ -341,7 +341,7 @@ from rebalanced tree. Some-node will be nil only if the tree is empty after remo
     (with-ro-slots (left right) node
       (when-bind child (or left right)
         (setf (_ child color) +black+)
-        (replace-child-node node child parent)
+        (replace-bnode node child parent)
         (log-debug-bmap node parent stack "after replace black node")
         (return-from %rbmap-remove-at (values child stack))))
     

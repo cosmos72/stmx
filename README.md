@@ -308,8 +308,8 @@ built with STMX and should be relatively straightforward to understand.
 The folder contains the following classes with related methods and functions,
 all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` at REPL:
 
-- `CELL` is the simplest transactional class. It is created with
-  `(make-instance 'cell &key value)` and it can be empty or hold a single value.
+- `TCELL` is the simplest transactional class. It is created with
+  `(make-instance 'tcell &key value)` and it can be empty or hold a single value.
 
   Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
 
@@ -321,25 +321,25 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
 
   Note: raw TVARs support exactly the same methods.
 
-- `STACK` is a transactional first-in-last-out buffer. It is created with
-  `(make-instance 'stack)` and it can be empty or hold unlimited values.
+- `TSTACK` is a transactional first-in-last-out buffer. It is created with
+  `(make-instance 'tstack)` and it can be empty or hold unlimited values.
 
   Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
 
   All methods append or remove values from the end.
   For the rest, the methods behave as described for the `CELL` class.
 
-- `FIFO` is a transactional first-in-first-out buffer. It is created with
-  `(make-instance 'fifo)` and it can be empty or hold unlimited values.
+- `TFIFO` is a transactional first-in-first-out buffer. It is created with
+  `(make-instance 'tfifo)` and it can be empty or hold unlimited values.
 
   Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
 
   `PUT` and `TRY-PUT` append values at the end, `PEEK` `TAKE` and `TRY-TAKE` get or remove them from the beginning, shifting the remaining values.
   For the rest, the methods behave as described for the `CELL` class.
 
-- `CHANNEL` is a transactional multicast channel. It is created with
-  `(make-instance 'channel)`, can contain unlimited values and it is write-only.
-  To read from it, create a `PORT` as described below.
+- `TCHANNEL` is a transactional multicast channel. It is created with
+  `(make-instance 'tchannel)`, can contain unlimited values and it is write-only.
+  To read from it, create a `TPORT` as described below.
 
   Methods: `FULL?` `EMPTY?` `PUT` `TRY-PUT`.
 
@@ -350,8 +350,8 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
   It is possible to write into the same channel from multiple threads: added elements
   will be interleaved and made available to all connected ports.
 
-- `PORT` is a transactional reader for `CHANNEL`. It is created with
-  `(make-instance 'port :channel some-chanel)`.
+- `TPORT` is a transactional reader for `TCHANNEL`. It is created with
+  `(make-instance 'tport :channel some-chanel)`.
   Ports do not support putting values, they are used to retrieve values from the channel
   they are connected to.
 

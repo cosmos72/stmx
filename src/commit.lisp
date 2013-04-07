@@ -311,8 +311,9 @@ b) another TLOG is writing the same TVARs being committed
 
     (unwind-protect
          (progn
-           ;; we must lock TVARs that have been read or written: expensive,
-           ;; but needed to ensure this threads sees other commits as atomic
+           ;; we must lock TVARs that have been read or written: expensive
+           ;; but needed to ensure this threads sees other commits as atomic,
+           ;; and other threads see this commit as atomic
            (setf acquiring (hash-table-keys (if reads reads writes)))
            (when reads
                (do-hash (var val) writes

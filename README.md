@@ -428,7 +428,7 @@ Setup and optimization flags:
     (set-bmap m 1 0)
     (set-bmap tm 1 0)
     (setf (gethash   'x h)  0)
-    (setf (get-thash 'x th) 0)
+    (setf (get-thash th 'x) 0)
 
 For each benchmark, a loop runs the code shown one million times (see `one-million` macro above)
 in a single thread and the best of three loops is used.
@@ -440,32 +440,33 @@ divided by the number of iterations (one million).
      <th><b>executed code</b></th>
      <th><b>average time</b></th></tr>
 
- <tr><td>atomic empty     </td><td><code>(atomic)</code>                    </td><td>0.264&nbsp;microseconds</td></tr>
- <tr><td>atomic dummy     </td><td><code>(atomic 1)</code>                  </td><td>0.264&nbsp;microseconds</td></tr>
- <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code>              </td><td>0.696&nbsp;microseconds</td></tr>
- <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) i))</code>     </td><td>1.495&nbsp;microseconds</td></tr>
- <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($ v)))</code>     </td><td>1.969&nbsp;microseconds</td></tr>
+ <tr><td>atomic empty     </td><td><code>(atomic)</code>                    </td><td>0.001&nbsp;microseconds</td></tr>
+ <tr><td>atomic nil       </td><td><code>(atomic nil)</code>                </td><td>0.207&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code>              </td><td>0.606&nbsp;microseconds</td></tr>
+ <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) i))</code>     </td><td>1.086&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($ v)))</code>     </td><td>1.533&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-10</td>
      <td><code>(atomic (dotimes (j 10) (incf ($ v))))</code></td>
-     <td>2.851&nbsp;microseconds</td></tr>
+     <td>1.950&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-100</td>
      <td><code>(atomic (dotimes (j 100) (incf ($ v))))</code></td>
-     <td>11.154&nbsp;microseconds</td></tr>
+     <td>5.930&nbsp;microseconds</td></tr>
 
- <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(1.900+N*0.093)&nbsp;microseconds</td></tr>
- <tr><td>orelse empty     </td><td><code>(atomic (orelse))</code>           </td><td>0.243&nbsp;microseconds</td></tr>
- <tr><td>orelse unary     </td><td><code>(atomic (orelse 1))</code>         </td><td>0.753&nbsp;microseconds</td></tr>
- <tr><td>orelse binary    </td><td><code>(atomic (orelse (retry) 1))</code> </td><td>1.433&nbsp;microseconds</td></tr>
- <tr><td>orelse ternary   </td><td><code>(atomic (orelse (retry) (retry) 1))</code> </td><td>2.446&nbsp;microseconds</td></tr>
- <tr><td>orelse 5-ary     </td><td><code>(atomic (orelse (retry) (retry) (retry) (retry) 1))</code></td><td>3.717&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(1.497+N*0.044)&nbsp;microseconds</td></tr>
 
- <tr><td>orelse N-ary     </td><td>best fit of the 3 runs above</td><td>(0.008+N*0.749)&nbsp;microseconds</td></tr>
+ <tr><td>orelse empty     </td><td><code>(atomic (orelse))</code>           </td><td>0.171&nbsp;microseconds</td></tr>
+ <tr><td>orelse unary     </td><td><code>(atomic (orelse 1))</code>         </td><td>0.528&nbsp;microseconds</td></tr>
+ <tr><td>orelse binary    </td><td><code>(atomic (orelse (retry) 1))</code> </td><td>1.059&nbsp;microseconds</td></tr>
+ <tr><td>orelse ternary   </td><td><code>(atomic (orelse (retry) (retry) 1))</code> </td><td>2.100&nbsp;microseconds</td></tr>
+ <tr><td>orelse 5-ary     </td><td><code>(atomic (orelse (retry) (retry) (retry) (retry) 1))</code></td><td>3.093&nbsp;microseconds</td></tr>
+
+ <tr><td>orelse N-ary     </td><td>best fit of the 3 runs above</td><td>(-0.008+N*0.652)&nbsp;microseconds</td></tr>
 
  <tr><td>tmap read-write-1</td>
      <td><code>(atomic (incf (get-bmap tm 1)))</code></td>
-     <td>5.247&nbsp;microseconds</td></tr>
+     <td>3.861&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-bmap tm))<br>

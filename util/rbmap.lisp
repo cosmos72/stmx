@@ -366,3 +366,16 @@ from rebalanced tree. Some-node will be nil only if the tree is empty after remo
           (when (setf root new-root)
             (setf (_ new-root color) +black+)))))))
 
+
+
+(defmethod print-bnode (stream (node rbnode) &optional (depth 0))
+  (declare (type (or null bnode) node)
+           (type fixnum depth))
+  (let1 depth+1 (the fixnum (1+ depth))
+    (print-bnode stream (_ node right) depth+1)
+    (dotimes (i depth) (format stream "  "))
+    (format stream "[~A] ~A = ~A~%"
+            (if (red? node) "R" "B")
+            (_ node key) (_ node value))
+    (print-bnode stream (_ node left) depth+1)))
+

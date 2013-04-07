@@ -151,16 +151,16 @@ Return (values DEFAULT nil) if Q contains no values."
 
 (defun rem-pqueue (q &optional default)
    "If pqueue Q contains at least one value, remove the first value
-and the first value and t as multiple values.
+and return it and t as multiple values.
 Otherwise return (values DEFAULT nil)"
   (declare (type pqueue q))
-   (with-rw-slots (vector length) q
-     (if (zerop (the fixnum length))
-	 (values default nil)
-	 (let1 value (aref vector 0)
-	   (setf (aref vector 0) (aref vector (decf length)))
-	   (sift-down-pqueue q 0 (1- length))
-	   (values value t)))))
+  (with-rw-slots (vector length) q
+    (if (zerop (the fixnum length))
+	(values default nil)
+	(let1 value (aref vector 0)
+	  (setf (aref vector 0) (aref vector (decf length)))
+	  (sift-down-pqueue q 0 (1- length))
+	  (values value t)))))
 
 
 (defun add-pqueue (q value)

@@ -278,7 +278,7 @@ Return nil if all tx are valid and want to retry."
     log))
         
 
-(defun run-orelse-n (funcs)
+(defun run-orelse-n (&rest funcs)
   "Implementation of RUN-ORELSE for N functions."
   (declare (type list funcs))
 
@@ -435,7 +435,7 @@ Can only be used inside an ATOMIC block."
       ((null f1)            (values))
       ((null f2)            (run-orelse-1 f1))
       ((null (third funcs)) (run-orelse-2 f1 f2))
-      (t                    (run-orelse-n funcs)))))
+      (t                    (apply #'run-orelse-n funcs)))))
          
 
 
@@ -456,7 +456,7 @@ Can only be used inside an ATOMIC block."
       ((null f1)            `(values))
       ((null f2)            `(run-orelse-1 ,f1))
       ((null (third funcs)) `(run-orelse-2 ,f1 ,f2))
-      (t                    `(run-orelse-n (list ,@funcs))))))
+      (t                    `(run-orelse-n ,@funcs)))))
          
       
 

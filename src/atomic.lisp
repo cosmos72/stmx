@@ -145,7 +145,9 @@ For pre-defined transactional classes, see the package STMX.UTIL"
   (let1 id (when (eq :id (first body))
              (pop body)
              (pop body))
-    `(run-atomic (lambda () ,@body) :id ,id)))
+    (if body
+        `(run-atomic (lambda () ,@body) :id ,id)
+        `(values))))
 
 
 

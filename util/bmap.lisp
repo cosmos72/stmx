@@ -241,15 +241,20 @@ but must NOT invoke (decf (_ m count))."))
   nil)
 
 
-(defun print-bnode (stream node &optional (depth 0))
-  (declare (type (or null bnode) node))
-  (when node
-    (print-bnode stream (_ node right) (1+ depth))
+(defgeneric print-bnode (stream node &optional depth))
+
+(defmethod print-bnode (stream (node null) &optional (depth 0))
+  nil)
+
+(defmethod print-bnode (stream (node bnode) &optional (depth 0))
+  (declare (type (or null bnode) node)
+           (type fixnum depth))
+  (let1 depth+1 (the fixnum (1+ depth))
+    (print-bnode stream (_ node right) depth+1)
     (dotimes (i depth) (format stream "  "))
-    (format stream "[~A] ~A = ~A~%"
-            (if (red? node) "R" "B")
-            (_ node key) (_ node value))
-    (print-bnode stream (_ node left)  (1+ depth))))
+    (format stream "~A = ~A~%" (_ node key) (_ node value))
+    (print-bnode stream (_ node left) depth+1)))
+
 
 (defmethod print-object-contents (stream (node bnode))
   (print-bnode stream node))

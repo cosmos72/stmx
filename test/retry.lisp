@@ -19,7 +19,7 @@
 (in-suite retry-suite)
 
 (defun cell-test ()
-  (let1 c (new 'cell :value 1)
+  (let1 c (new 'tcell :value 1)
     (is-true (full? c))
     (empty! c)
     (is-true (empty? c))
@@ -37,7 +37,7 @@
 
 (defun retry-funs (n c1 c2)
   (declare (type fixnum n)
-           (type cell c1 c2))
+           (type tcell c1 c2))
 
   (flet ((f1 ()
            (let1 x 0
@@ -67,8 +67,8 @@
 
 (defun retry-thread-test (&optional (n 1))
   (declare (type fixnum n))
-  (let ((c1 (new 'cell)) ;; cells have unbound value
-        (c2 (new 'cell)))
+  (let ((c1 (new 'tcell)) ;; cells have unbound value
+        (c2 (new 'tcell)))
 
     (multiple-value-bind (f1 f2) (retry-funs n c1 c2)
 

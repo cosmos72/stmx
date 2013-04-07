@@ -15,25 +15,25 @@
 
 (in-package :stmx.util)
 
-;;;; ** Concurrent cell implemented with a transactional object
+;;;; ** Transactional cell, it can be empty or hold a single value
 
-(defvar *empty-cell* (gensym "EMPTY"))
+(defvar *empty-tcell* (gensym "EMPTY"))
 
 (transactional
- (defclass cell ()
+ (defclass tcell ()
    ((value :accessor value-of
            :initarg :value
-           :initform *empty-cell*))))
+           :initform *empty-tcell*))))
 
 ;; no need to wrap empty? in a transaction:
 ;; value-of is atomic, transaction aware, and performs a single read
-(defmethod empty? ((cell cell))
-  (eq (value-of cell) *empty-cell*))
+(defmethod empty? ((cell tcell))
+  (eq (value-of cell) *empty-tcell*))
 
 (transaction
- (defmethod empty! ((cell cell))
+ (defmethod empty! ((cell tcell))
    "Remove value from CELL. Return CELL."
-   (setf (value-of cell) *empty-cell*)
+   (setf (value-of cell) *empty-tcell*)
    cell))
 
 ;; no need to specialize (full?) on CELLs: the method in cell.lisp is enough
@@ -44,44 +44,44 @@
 
 ;; no need to wrap peek in a transaction:
 ;; value-of is atomic, transaction aware, and performs a single read
-(defmethod peek ((cell cell) &optional default)
+(defmethod peek ((cell tcell) &optional default)
   (let1 value (value-of cell)
-    (if (eq value *empty-cell*)
+    (if (eq value *empty-tcell*)
         (values default nil)
         (values value t))))
 
 
 (transaction
- (defmethod take ((cell cell))
+ (defmethod take ((cell tcell))
    (let1 value (value-of cell)
-     (if (eq value *empty-cell*)
+     (if (eq value *empty-tcell*)
          (retry)
          (progn
-           (setf (value-of cell) *empty-cell*)
+           (setf (value-of cell) *empty-tcell*)
            value)))))
 
 (transaction
- (defmethod put ((cell cell) value)
+ (defmethod put ((cell tcell) value)
    (if (empty? cell)
        (setf (value-of cell) value)
        (retry))))
 
 (transaction
- (defmethod try-take ((cell cell))
+ (defmethod try-take ((cell tcell))
    "hand-made, nonblocking version of (take place) for cells.
 less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
 Linux amd64) than the unspecialized (try-take place) which calls
 \(atomic (nonblocking (take place)))"
    (let1 value (value-of cell)
-     (if (eq value *empty-cell*)
+     (if (eq value *empty-tcell*)
          nil
          (progn
-           (setf (value-of cell) *empty-cell*)
+           (setf (value-of cell) *empty-tcell*)
            (values t value))))))
 
 (transaction
- (defmethod try-put ((cell cell) value)
-   "hand-made, nonblocking version of (put place) for cells.
+ (defmethod try-put ((cell tcell) value)
+   "hand-made, nonblocking version of (put place) for tcells.
 less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
 Linux amd64) than the unspecialized (try-put place) which calls
 \(atomic (nonblocking (put place value)))"
@@ -92,10 +92,9 @@ Linux amd64) than the unspecialized (try-put place) which calls
 
 ;;;; ** Printing
 
-(defprint-object (obj cell)
-  ;; do NOT use (empty? obj) here, it would start a transaction!
-  ;; (value-of obj) is much better: it works both inside and outside transactions.
+(defprint-object (obj tcell)
+  ;; (value-of obj) works both inside and outside transactions.
   (let1 value (value-of obj)
-    (if (eq value *empty-cell*)
+    (if (eq value *empty-tcell*)
         (format t "empty")
         (format t "[~A]" value))))

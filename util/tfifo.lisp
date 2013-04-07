@@ -18,36 +18,36 @@
 ;;;; ** Transactional first-in-first-out (fifo) buffer
 
 (transactional
- (defclass fifo ()
+ (defclass tfifo ()
    ((front :type cons :accessor front-of)
     (back  :type cons :accessor back-of))))
 
 
-(defmethod initialize-instance :after ((f fifo) &key &allow-other-keys)
-  "Initialize a new transactional fifo."
+(defmethod initialize-instance :after ((f tfifo) &key &allow-other-keys)
+  "Initialize tfifo F."
   (let1 cell (cons nil nil)
     (setf (front-of f) cell
           (back-of  f) cell)))
 
 
-(defmethod full? ((f fifo))
-  "A fifo is never full, so this method always returns nil."
+(defmethod full? ((f tfifo))
+  "A tfifo is never full, so this method always returns nil."
   nil)
 
 (transaction
- (defmethod empty? ((f fifo))
+ (defmethod empty? ((f tfifo))
    (eq (front-of f) (back-of f))))
 
 (transaction
- (defmethod empty! ((f fifo))
+ (defmethod empty! ((f tfifo))
    (setf (front-of f) (back-of f))
    f))
 
                   
 
 (transaction
- (defmethod peek ((f fifo) &optional default)
-   "Return the first value in fifo F without removing it, and t as multiple values.
+ (defmethod peek ((f tfifo) &optional default)
+   "Return the first value in tfifo F without removing it, and t as multiple values.
 Return (values DEFAULT nil) if F contains no value."
    (with-ro-slots (front back) f
      (if (eq front back)
@@ -56,8 +56,9 @@ Return (values DEFAULT nil) if F contains no value."
 
 
 (transaction
- (defmethod take ((f fifo))
-   "Wait until fifo F contains at least one value, then remove and return the first value."
+ (defmethod take ((f tfifo))
+   "Wait until tfifo F contains at least one value,
+then remove and return the first value."
    (with-rw-slots (front back) f
      (if (eq front back)
          (retry)
@@ -65,9 +66,9 @@ Return (values DEFAULT nil) if F contains no value."
 
 
 (transaction
- (defmethod put ((f fifo) value)
-   "Append VALUE as last element in fifo F and return VALUE.
-Since fifo can contain unlimited values, this method never blocks."
+ (defmethod put ((f tfifo) value)
+   "Append VALUE as last element in tfifo F and return VALUE.
+Since tfifo can contain unlimited values, this method never blocks."
    (with-rw-slots (back) f
      (let1 cell (cons nil nil)
        (setf (first back) value
@@ -77,8 +78,8 @@ Since fifo can contain unlimited values, this method never blocks."
    
 
 (transaction
- (defmethod try-take ((f fifo))
-   "If fifo F contains at least one value, remove the first value
+ (defmethod try-take ((f tfifo))
+   "If tfifo F contains at least one value, remove the first value
 and return t and the first value as multiple values.
 Otherwise return (values nil nil)"
    (with-rw-slots (front back) f
@@ -87,9 +88,9 @@ Otherwise return (values nil nil)"
          (values t (pop front))))))
    
 
-(defmethod try-put  ((f fifo) value)
-  "Append VALUE to fifo F and return (values t VALUE).
-Since fifo can contain unlimited values, this method never fails."
+(defmethod try-put  ((f tfifo) value)
+  "Append VALUE as last element in tfifo F and return (values t VALUE).
+Since tfifo can contain unlimited values, this method never fails."
   (values t (put f value)))
 
 

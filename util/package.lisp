@@ -28,7 +28,7 @@
                 #:with-gensyms
                 #:do-hash)
 
-  (:export #:cell #:fifo #:stack #:channel #:port ;; transactional containers
+  (:export #:tcell #:tfifo #:tstack #:tchannel #:tport ;; transactional containers
 
            #:full? #:empty? #:empty! ;; methods for transactional containers
            #:peek   #:take   #:put
@@ -50,10 +50,11 @@
            #:bmap-keys   #:bmap-values #:bmap-pairs ;; list all keys, values, or pairs
            #:add-to-bmap #:remove-from-bmap ;; add or remove multiple keys
 
-           #:thash-table ;; transactional hash table
+	   ;; transactional hash table
+           #:thash-table 
            #:thash-count #:thash-empty? #:clear-thash
-           #:get-thash #:rem-thash ;; also (setf (get-thash ... ) ... )
-           #:map-thash #:do-thash           ;; iterate on thash-table
+           #:get-thash #:rem-thash   ;; also (setf (get-thash ... ) ... )
+           #:map-thash #:do-thash))  ;; iterate on thash-table
 
 
 

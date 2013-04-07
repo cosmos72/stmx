@@ -15,15 +15,13 @@
 
 (in-package :stmx.util)
 
-;;;; ** Concurrent cell implemented with a TVAR
+;;;; ** Transactional cell implemented with a TVAR
 
-;;; Max: here we could use the same trick as in cell-tobj.lisp:
+;;; Max: we could use the same trick as in tcell.lisp:
 ;;; a special *empty-tvar* value to mean "cell is empty".
 ;;; Anyway, using tvar functions bound-$? and unbind-$ is less verbose
 ;;; and feels more "natural".
-;;;
-;;; Max: for illustration purposes, we could also use (defmethod ... (atomic ... ))
-;;; instead of (transaction (defmethod ...)) - they are equivalent.
+
 
 ;; no need to wrap empty? in a transaction:
 ;; bound-$? is atomic, transaction aware, and performs a single read

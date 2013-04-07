@@ -52,7 +52,7 @@
    (try-put c val)))
 
 (defun orelse-test ()
-  (loop for place in (list (new 'cell) (new 'tvar)) do
+  (loop for place in (list (new 'tcell) (new 'tvar)) do
        (loop for takef in (list #'take1 #'take2 #'take3) do
             (loop for putf in (list #'put1 #'put2 #'put3)
                for rand = (random most-positive-fixnum) do
@@ -162,7 +162,7 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
 
   (declare (type fixnum iterations))
   (let* ((names '("A" "B" "C" "D"))
-         (cells (loop for n in names collect (new 'cell)))
+         (cells (loop for n in names collect (new 'tcell)))
          
          (cells1 (to-vector cells))
          (names1 (to-vector names))

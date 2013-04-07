@@ -46,11 +46,11 @@
                              (:file "print"       :depends-on ("package"))
 
                              (:file "container"   :depends-on ("package"))
-                             (:file "cell-tobj"   :depends-on ("container"))
-                             (:file "cell-tvar"   :depends-on ("container"))
-                             (:file "fifo"        :depends-on ("container"))
-                             (:file "stack"       :depends-on ("container"))
-                             (:file "channel"     :depends-on ("container"))
+                             (:file "tvar"        :depends-on ("container"))
+                             (:file "tcell"       :depends-on ("container"))
+                             (:file "tfifo"       :depends-on ("container"))
+                             (:file "tstack"      :depends-on ("container"))
+                             (:file "tchannel"    :depends-on ("container"))
 
                              (:file "bmap"        :depends-on ("print"))
                              (:file "rbmap"       :depends-on ("bmap"))

@@ -24,16 +24,15 @@ of TVARs that were read during the transaction."
 
   (declare (type tlog log))
   (log:trace "Tlog ~A valid?.." (~ log))
-  (awhen (reads-of log)
-    (do-hash (var val) it
-      (let1 actual-val (raw-value-of var)
-        (if (eq val actual-val)
-            (log:trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
-            (progn
-              (log:trace "Tlog ~A conflict for tvar ~A: expecting ~A, found ~A"
-                         (~ log) (~ var) (~ val) (~ actual-val))
-              (log:debug "Tlog ~A ..not valid" (~ log))
-              (return-from valid? nil))))))
+  (do-hash (var val) (reads-of log)
+    (let1 actual-val (raw-value-of var)
+      (if (eq val actual-val)
+          (log:trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
+          (progn
+            (log:trace "Tlog ~A conflict for tvar ~A: expecting ~A, found ~A"
+                       (~ log) (~ var) (~ val) (~ actual-val))
+            (log:debug "Tlog ~A ..not valid" (~ log))
+            (return-from valid? nil)))))
   (log:trace "Tlog ~A ..is valid" (~ log))
   (return-from valid? t))
 
@@ -133,7 +132,7 @@ Return :UNKNOWN if relevant locks could not be acquired."
         (acquiring nil)
         (acquired (list nil)))
 
-    (when (empty-hash-table-or-nil reads)
+    (when (zerop (hash-table-count reads))
       (return-from locked-valid? t))
 
     (unwind-protect
@@ -302,7 +301,7 @@ b) another TLOG is writing the same TVARs being committed
     (unless (invoke-before-commit-of log)
       (return-from commit nil))
 
-    (when (empty-hash-table-or-nil writes)
+    (when (zerop (hash-table-count writes))
       (log:debug "Tlog ~A committed (nothing to write)" (~ log))
       (invoke-after-commit-of log)
       (return-from commit t))
@@ -314,14 +313,13 @@ b) another TLOG is writing the same TVARs being committed
            ;; we must lock TVARs that have been read or written: expensive
            ;; but needed to ensure this threads sees other commits as atomic,
            ;; and other threads see this commit as atomic
-           (setf acquiring (hash-table-keys (if reads reads writes)))
-           (when reads
-               (do-hash (var val) writes
-                 (multiple-value-bind (read-val read?) (gethash var reads)
-                   (declare (ignore read-val))
-                   ;; do not put duplicates in ACQUIRING list
-                   (when (not read?)
-                     (push var acquiring)))))
+           (setf acquiring (hash-table-keys reads))
+           (do-hash (var val) writes
+             (multiple-value-bind (read-val read?) (gethash var reads)
+               (declare (ignore read-val))
+               ;; do not put duplicates in ACQUIRING list
+               (when (not read?)
+                 (push var acquiring))))
 
            (unless (try-lock-tvars acquiring acquired log "committed")
              (return-from commit nil))
@@ -362,22 +360,26 @@ b) another TLOG is writing the same TVARs being committed
 
 
 (defun merge-reads-of (log1 log2)
-  "Copy (reads-of LOG2) into (reads-of LOG1).
+  "Merge (reads-of LOG1) and (reads-of LOG2).
 
-Return T if reads-of LOG1 and LOG2 are compatible, i.e. if they contain
-the same values for the TVARs common to both, otherwise return NIL
+Return merged TLOG (either LOG1 or LOG2) if reads-of LOG1 and LOG2 are compatible,
+i.e. if they contain the same values for the TVARs common to both, otherwise return NIL
 \(in the latter case, the merge will not be completed)."
   (declare (type tlog log1 log2))
-  (let ((reads1 (reads-of log1))
-        (reads2 (reads-of log2)))
-    
-    (if reads1
-        (if reads2
-            (merge-hash-tables reads1 reads2)
-            t)
-        (progn
-          (setf (reads-of log1) reads2)
-          t))))
+  (let* ((reads1 (reads-of log1))
+         (reads2 (reads-of log2))
+         (n1 (hash-table-count reads1))
+         (n2 (hash-table-count reads2)))
+         
+    (when (< n1 n2)
+      (rotatef log1 log2)
+      (rotatef reads1 reads2)
+      (rotatef n1 n2)) ;; guarantees n1 >= n2
+
+    (if (zerop n2)
+        log1
+        (merge-hash-tables reads1 reads2))))
+
   
 
 
@@ -387,21 +389,25 @@ the same values for the TVARs common to both, otherwise return NIL
 Unlike (commit log), this function is guaranteed to always succeed.
 
 Implementation note: copy reads-of, writes-of, before-commit-of
-and after-commit-of"
+and after-commit-of into parent, or swap them with parent"
 
   (declare (type tlog log))
   (let1 parent (the tlog (parent-of log))
-    (setf (reads-of parent) (reads-of log))
-    (setf (writes-of parent) (writes-of log))
+
+    (rotatef (reads-of parent) (reads-of log))
+    (rotatef (writes-of parent) (writes-of log))
 
     (when-bind funcs (before-commit-of log)
-      (let1 parent-funcs (ensure-before-commit-of parent)
+      (if-bind parent-funcs (before-commit-of parent)
         (loop for func across funcs do
-             (vector-push-extend func parent-funcs))))
+             (vector-push-extend func parent-funcs))
+        (rotatef (before-commit-of log) (before-commit-of parent))))
 
     (when-bind funcs (after-commit-of log)
-      (let1 parent-funcs (ensure-after-commit-of parent)
+      (if-bind parent-funcs (after-commit-of parent)
         (loop for func across funcs do
-             (vector-push-extend func parent-funcs)))))
-  log)
+             (vector-push-extend func parent-funcs))
+        (rotatef (after-commit-of log) (after-commit-of parent))))
+
+    log))
 

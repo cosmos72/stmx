@@ -17,39 +17,56 @@
 
 ;;;; * Transaction logs
 
+;;;; ** thread-local TLOGs pool
+
+(declaim (type fixnum *tlog-pool-max-idle*))
+(defvar *tlog-pool-max-idle* 10)
+
+(defun make-tlog-pool (&optional (n *tlog-pool-max-idle*))
+  (declare (type fixnum n))
+  (make-array (list n) :element-type 'tlog :fill-pointer 0))
+
+
+(declaim (type (and (vector tlog) (not simple-array)) *tlog-pool*))
+(defvar *tlog-pool* (make-tlog-pool))
+
+(eval-always
+  (unless (assoc '*tlog-pool* bt:*default-special-bindings*)
+    (push (cons '*tlog-pool* '(make-tlog-pool)) bt:*default-special-bindings*)))
+
 ;;;; ** Creating, copying and clearing tlogs
 
-(defun make-tlog (&key parent)
-  "Create and return a tlog.
-If PARENT is not nil, it will be the parent of returned tlog"
-  (declare (type (or null tlog) parent))
-  (if parent
-      (new 'tlog :parent parent
-           :reads (clone-hash-table-or-nil (reads-of parent))
-           :writes (clone-hash-table-or-nil (writes-of parent)))
-      (new 'tlog)))
-
                                             
-(defun clear-tlog (log &key parent)
+(defun clear-tlog (log)
   "Remove all transactional reads and writes stored in LOG,
 as well as functions registered with BEFORE-COMMIT and AFTER-COMMIT;
-return LOG itself.
+return LOG itself."
+  (declare (type tlog log))
 
-If PARENT is not nil, it will be set as the parent of LOG."
-  (declare (type tlog log)
-           (type (or null tlog) parent))
+  (setf (parent-of log) nil)
 
-  (setf (reads-of log)
-        (inherit-hash-table (reads-of log)
-                            :defaults (when parent (reads-of parent))))
-  (setf (writes-of log)
-        (inherit-hash-table (writes-of log)
-                            :defaults (when parent (writes-of parent))))
-  (awhen (before-commit-of log)
-    (setf (fill-pointer it) 0))
-  (awhen (after-commit-of log)
-    (setf (fill-pointer it) 0))
+  (clrhash (reads-of log))
+  (clrhash (writes-of log))
+
+  (awhen (before-commit-of log) (setf (fill-pointer it) 0))
+  (awhen (after-commit-of log)  (setf (fill-pointer it) 0))
   log)
+
+
+(defun make-tlog ()
+  "Get a TLOG from pool or create one, and return it."
+  (if (zerop (length *tlog-pool*))
+      (new 'tlog)
+      (vector-pop *tlog-pool*)))
+
+
+(defun free-tlog (log)
+  "Return a no-longer-needed TLOG to the pool."
+  (declare (type tlog log))
+  (when (vector-push log *tlog-pool*)
+    (clear-tlog log))
+  nil)
+    
 
 
 (defun make-or-clear-tlog (log &key parent)
@@ -57,9 +74,16 @@ If PARENT is not nil, it will be set as the parent of LOG."
 a new tlog as per (make-tlog). In both cases the tlog is returned,
 and its parent is set to PARENT."
   (declare (type (or null tlog) log parent))
-  (if log
-      (clear-tlog log :parent parent)
-      (make-tlog :parent parent)))
+  (let1 log (if log
+                (clear-tlog log)
+                (make-tlog))
+
+    (when parent
+      (setf (parent-of log) parent)
+      (copy-hash-table (reads-of log)  (reads-of parent))
+      (copy-hash-table (writes-of log) (writes-of parent)))
+    log))
+
 
 
 ;;;; ** Reads and writes
@@ -74,26 +98,18 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
   (declare (type tvar var)
            (type tlog log))
 
-  (let ((reads  (reads-of log))
-        (writes (writes-of log)))
+  (multiple-value-bind (value present?)
+      (gethash var (writes-of log))
+    (when present?
+      (return-from tx-read-of value)))
 
-    (when writes
-      (multiple-value-bind (value present?)
-          (gethash var writes)
-        (when present?
-          (return-from tx-read-of value))))
+  (let1 reads (reads-of log)
+    (multiple-value-bind (value present?)
+        (gethash var reads)
+      (when present?
+        (return-from tx-read-of value)))
 
-    (when reads
-      (multiple-value-bind (value present?)
-          (gethash var reads)
-        (when present?
-          (return-from tx-read-of value))))
-
-    (unless reads
-      (setf reads (make-hash-table :test 'eq)
-            (reads-of log) reads))
-
-    (set-hash reads var (raw-value-of var))))
+    (setf (gethash var reads) (raw-value-of var))))
 
 
 (defun tx-write-of (var value &optional (log (current-tlog)))
@@ -104,10 +120,7 @@ and by writing TOBJs slots."
   (declare (type tvar var)
            (type tlog log))
 
-  (let1 writes (aif (writes-of log)
-                    it
-                    (setf (writes-of log) (make-hash-table :test 'eq)))
-    (set-hash writes var value)))
+  (setf (gethash var (writes-of log)) value))
 
 
 
@@ -126,7 +139,7 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   (declare (type tlog log))
   (let1 reads (reads-of log)
 
-    (when (empty-hash-table-or-nil reads)
+    (when (zerop (hash-table-count reads))
       (error "BUG! Transaction ~A called (retry), but no TVARs to wait for changes.
   This is a bug either in the STMX library or in the application code.
   Possible reason: some code analogous to (atomic (retry)) was executed.
@@ -157,9 +170,8 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   "Un-listen on tvars, i.e. deregister not to get notifications if they change."
 
   (declare (type tlog log))
-  (when-bind reads (reads-of log)
-    (do-hash (var val) reads
-      (unlisten-tvar var log)))
+  (do-hash (var val) (reads-of log)
+    (unlisten-tvar var log))
   (values))
 
 

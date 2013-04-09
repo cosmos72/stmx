@@ -102,57 +102,13 @@ are not modified. Return DST."
   dst)
 
 
-(defun clone-hash-table (hash)
-  "Create and return a new hash-table containing the same keys and values as HASH.
-The new hash-table inherits :test from HASH."
-  (declare (type hash-table hash))
-  (let1 copy (make-hash-table :test (hash-table-test hash)
-                              :size (hash-table-size hash))
-    (copy-hash-table copy hash)))
-
-
-(defun clone-hash-table-or-nil (hash)
-  "If HASH is nil, return nil.
-Otherwise create and return a new hash-table containing the same keys
-and values as HASH. The new hash-table inherits :test from HASH."
-  (declare (type (or null hash-table) hash))
-  (if hash
-      (let1 copy (make-hash-table :test (hash-table-test hash)
-                                  :size (hash-table-size hash))
-        (copy-hash-table copy hash))
-      nil))
-
-
-(defun reset-hash-table (hash &key defaults)
-  "Clear hash-table HASH. If DEFAULTS is not nil, copy it into HASH.
-Return HASH."
-
-  (declare (type hash-table hash)
-           (type (or null hash-table) defaults))
-  (clrhash hash)
-  (when defaults
-    (copy-hash-table hash defaults))
-  hash)
-
-(defun inherit-hash-table (hash &key defaults)
-  "If hash-table HASH is not nil, clear it. Then, if DEFAULTS is not nil:
-* if HASH is nil, clone DEFAULTS and return the clone
-* otherwise, copy DEFAULTS into HASH and return HASH."
-
-  (declare (type (or null hash-table) hash defaults))
-  (when hash
-    (clrhash hash))
-  (when defaults
-    (if hash
-        (copy-hash-table hash defaults)
-        (clone-hash-table defaults))))
 
 
 (defun merge-hash-tables (dst src)
   "Copy hash-table SRC into hash-table DST.
 
 Return t if SRC and DST are compatible,
-i.e. if they contain the eq values for the keys common to both,
+i.e. if they contain eq values for the keys common to both,
 otherwise return nil.
 \(in the latter case, the merge will not be completed)."
 
@@ -164,12 +120,6 @@ otherwise return nil.
       (setf (gethash var dst) val1)))
   t)
 
-
-(declaim (inline empty-hash-table-or-nil))
-(defun empty-hash-table-or-nil (hash)
-  "Return t if HASH is nil or an empty hash table"
-  (declare (type (or null hash-table) hash))
-  (or (null hash) (zerop (hash-table-count hash))))
 
 
 

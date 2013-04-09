@@ -20,10 +20,23 @@ of a transaction are not visible from other threads until it commits.
 STM gives freedom from deadlocks, automatic roll-back on failure,
 and it aims at resolving the tension between granularity and concurrency.
 
+
+Supported systems
+-----------------
+
+STMX is currently tested on the following Common Lisp implementations:
+
+* SBCL version 1.0.57.0.debian  64bit (x86_64) on Debian GNU/Linux 7.0 (wheezy)
+* SBCL version 1.0.55.0         32bit (x86)  on Ubuntu 12.04LTS (precise pangolin)
+
+It will probably work on most other Common Lisp implementations as long as
+they support closer-mop and bordeaux-threads, but the author gives no guarantees.
+
+
 Installation and loading
 ------------------------
 
-STMX is packaged with asdf. The simplest way to install it is to first
+STMX packaged with asdf. The simplest way to install it is to first
 install [Quicklisp](http://www.quicklisp.org), as it can automatically
 resolve and download STMX dependencies.
 
@@ -75,8 +88,8 @@ please include in the report:
 See "Contacts, help, discussion" below for the preferred method to send the report.
 
 
-Documentation
--------------
+General documentation on Software Transactional Memory
+------------------------------------------------------
 
 [Composable Memory Transactions](http://research.microsoft.com/~simonpj/papers/stm/stm.pdf)
 is a very good - though a bit technical - explanation of transactions and
@@ -376,7 +389,7 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
   including any non-standard option supported by the underlying MAKE-HASH-TABLE implementation.
 
   Methods: `THASH-COUNT` `THASH-EMPTY?` `CLEAR-THASH`
-           `GET-THASH` `(SETF GET-THASH)` `REM-THASH` 
+           `GET-THASH` `(SETF GET-THASH)` `SET-THASH` `REM-THASH` 
            `MAP-THASH` `DO-THASH`.
 
 - `TMAP` is a transactional sorted map, backed by a red-black tree.
@@ -386,7 +399,7 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
   are `#'<` and the faster `#'fixnum<` or, for string keys, `#'string<`
 
   Methods: `BMAP-PRED` `BMAP-COUNT` `BMAP-EMPTY?` `CLEAR-BMAP`
-           `GET-BMAP` `SET-BMAP` `(SETF GET-BMAP)` `REM-BMAP` 
+           `GET-BMAP` `(SETF GET-BMAP)` `SET-BMAP` `REM-BMAP` 
            `MIN-BMAP` `MAX-BMAP` `MAP-BMAP` `DO-BMAP`
            `BMAP-KEYS` `BMAP-VALUES` `BMAP-PAIRS`.
 
@@ -394,119 +407,15 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
   as many other red-black trees implementations exist already on the net.
   It supports exactly the same methods as `TMAP`.
 
+
 Performance
 -----------
+See the included file [doc/benchmark.md](doc/benchmark.md) for performance considerations
+and some raw numbers.
 
-As for any software, the topic of performance is often sensitive and
-plagued with heated discussions. It is objectively difficult to come up with
-scientifically accurate figures as they depend on many factors, including at least
-hardware, operating system, common lisp implementation, optimization flags and usage pattern.
-
-What follows are some timings obtained on the authors's system, and by no means they
-claim to be exact, absolute or reproducible: your mileage may vary.
-
-Date: 6 April 2013
-
-Hardware: Intel Core-i5 750 @4.0 GHz, 16GB RAM
-
-Software: Debian GNU/Linux 7 (wheezy) x86_64, SBCL 1.0.57.0.debian x86_64, STMX 0.9.3
-
-Setup and optimization flags:
-
-    (declaim (optimize (compilation-speed 0) (space 0) (debug 0) (safety 0) (speed 3)))
-    (ql:quickload "stmx")
-    (in-package :stmx.util)
-    (defmacro one-million (&rest body)
-      `(time (dotimes (i 1000000)
-              ,@body)))
-    (defvar v (new 'tvar :value 0))
-    (defvar m  (new 'rbmap :pred #'fixnum<)) 
-    (defvar tm (new 'tmap  :pred #'fixnum<)) 
-    (defvar h  (make-hash-table))  
-    (defvar th (new 'thash-table)) 
-    ;; some initial values
-    (set-bmap m 1 0)
-    (set-bmap tm 1 0)
-    (setf (gethash   'x h)  0)
-    (setf (get-thash th 'x) 0)
-
-For each benchmark, a loop runs the code shown one million times (see `one-million` macro above)
-in a single thread and the best of three loops is used.
-All reported times are the average elapsed real time per iteration, i.e. the total elapsed time
-divided by the number of iterations (one million).
-
-<table>
- <tr><th><b>name</b>      </th>
-     <th><b>executed code</b></th>
-     <th><b>average time</b></th></tr>
-
- <tr><td>atomic empty     </td><td><code>(atomic)</code>                    </td><td>0.001&nbsp;microseconds</td></tr>
- <tr><td>atomic nil       </td><td><code>(atomic nil)</code>                </td><td>0.207&nbsp;microseconds</td></tr>
- <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code>              </td><td>0.606&nbsp;microseconds</td></tr>
- <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) i))</code>     </td><td>1.086&nbsp;microseconds</td></tr>
- <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($ v)))</code>     </td><td>1.533&nbsp;microseconds</td></tr>
-
- <tr><td>atomic read-write-10</td>
-     <td><code>(atomic (dotimes (j 10) (incf ($ v))))</code></td>
-     <td>1.950&nbsp;microseconds</td></tr>
-
- <tr><td>atomic read-write-100</td>
-     <td><code>(atomic (dotimes (j 100) (incf ($ v))))</code></td>
-     <td>5.930&nbsp;microseconds</td></tr>
-
- <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(1.497+N*0.044)&nbsp;microseconds</td></tr>
-
- <tr><td>orelse empty     </td><td><code>(atomic (orelse))</code>           </td><td>0.171&nbsp;microseconds</td></tr>
- <tr><td>orelse unary     </td><td><code>(atomic (orelse 1))</code>         </td><td>0.528&nbsp;microseconds</td></tr>
- <tr><td>orelse binary    </td><td><code>(atomic (orelse (retry) 1))</code> </td><td>1.059&nbsp;microseconds</td></tr>
- <tr><td>orelse ternary   </td><td><code>(atomic (orelse (retry) (retry) 1))</code> </td><td>2.100&nbsp;microseconds</td></tr>
- <tr><td>orelse 5-ary     </td><td><code>(atomic (orelse (retry) (retry) (retry) (retry) 1))</code></td><td>3.093&nbsp;microseconds</td></tr>
-
- <tr><td>orelse N-ary     </td><td>best fit of the 3 runs above</td><td>(-0.008+N*0.652)&nbsp;microseconds</td></tr>
-
- <tr><td>tmap read-write-1</td>
-     <td><code>(atomic (incf (get-bmap tm 1)))</code></td>
-     <td>3.861&nbsp;microseconds</td></tr>
-
- <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
-     <td><code>(atomic (when (zerop (mod i   10)) (clear-bmap tm))<br>
-              (set-bmap tm i t)))</code></td>
-     <td>18.885&nbsp;microseconds</td></tr>
-
- <tr><td>grow tmap from N to N+1 entries (up to 100)</td>
-     <td><code>(atomic (when (zerop (mod i  100)) (clear-bmap tm))<br>
-              (set-bmap tm i t)))</code></td>
-     <td>35.093&nbsp;microseconds</td></tr>
-
- <tr><td>grow tmap from N to N+1 entries (up to 1000)</td>
-     <td><code>(atomic (when (zerop (mod i 1000)) (clear-bmap tm))<br>
-              (set-bmap tm i t)))</code></td>
-     <td>49.399&nbsp;microseconds</td></tr>
-
- <tr><td>thash read-write-1</td>
-     <td><code>(atomic (incf (get-thash th 'x)))</code></td>
-     <td>11.207&nbsp;microseconds</td></tr>
-
- <tr><td>grow thash from N to N+1 entries (up to 10)</td>
-     <td><code>(atomic (when (zerop (mod i   10)) (clear-thash tm))<br>
-              (set-thash i tm t))</code></td>
-     <td>10.912&nbsp;microseconds</td></tr>
-
- <tr><td>grow thash from N to N+1 entries (up to 100)</td>
-     <td><code>(atomic (when (zerop (mod i  100)) (clear-thash tm))<br>
-              (set-thash tm i t)))</code></td>
-     <td>16.620&nbsp;microseconds</td></tr>
-
- <tr><td>grow thash from N to N+1 entries (up to 1000)</td>
-     <td><code>(atomic (when (zerop (mod i 1000)) (clear-thash tm))<br>
-              (set-thash tm i t)))</code></td>
-     <td>68.615&nbsp;microseconds</td></tr>
-
-</table>
 
 Contacts, help, discussion
 --------------------------
-
 As long as the traffic is low enough, [GitHub Issues](https://github.com/cosmos72/stmx/issues)
 can be used to report test suite failures, bugs, suggestions, general discussion etc.
 

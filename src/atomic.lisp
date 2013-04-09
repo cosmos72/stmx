@@ -172,7 +172,7 @@ using LOG as its transaction log."
 
        (rerun-once ()
          (log:trace "Tlog ~A {~A} will rerun" (~ log) (~ tx))
-         (clear-tlog log :parent parent)
+         (make-or-clear-tlog log :parent parent)
          (go run))))))
 
 
@@ -196,7 +196,7 @@ transactional memory it read has changed."
   (when id
     (setf (~ tx) id))
 
-  (prog ((log (new 'tlog)))
+  (prog ((log (make-tlog)))
 
    run
    (handler-bind ((retry-error
@@ -230,9 +230,15 @@ transactional memory it read has changed."
          (log:trace "Tlog ~A {~A} wants to commit" (~ log) (~ tx))
 
          ;; commit also checks if log is valid
-         (unless (commit log)
-           (log:debug "Tlog ~A {~A} could not commit, re-running it" (~ log) (~ tx))
-           (go rerun)))))
+         (if (commit log)
+             ;; all done, prepare to return.
+             ;; we are not returning TLOGs to the pool in case tx signaled an error,
+             ;; but that's not a problem since the TLOG pool is just a speed optimization
+             (free-tlog log)
+
+             (progn
+               (log:debug "Tlog ~A {~A} could not commit, re-running it" (~ log) (~ tx))
+               (go rerun))))))
 
    retry
    (log:debug "Tlog ~A {~A} will sleep, then retry" (~ log) (~ tx))
@@ -241,7 +247,7 @@ transactional memory it read has changed."
    (go rerun)
 
    rerun
-   (clear-tlog log :parent (parent-of log))
+   (make-or-clear-tlog log :parent (parent-of log))
    (go run)))
 
 

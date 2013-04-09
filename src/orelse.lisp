@@ -111,6 +111,7 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
           (commit-nested log)
           (log:debug "Tlog ~A {~A} committed to parent tlog ~A"
                      (~ log) (~ func) (~ parent-log))
+          (free-tlog log)
           (return-from run-orelse-1 (values-list vals)))))
 
 
@@ -167,6 +168,8 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
           (commit-nested log1)
           (log:debug "Tlog ~A {~A} committed to parent tlog ~A"
                      (~ log1) (~ func1) (~ parent-log))
+          (free-tlog log1)
+          (when log2 (free-tlog log2))
           (return-from run-orelse-2 (values-list vals)))))
 
 
@@ -187,6 +190,8 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
           (commit-nested log2)
           (log:debug "Tlog ~A {~A} committed to parent tlog ~A"
                      (~ log2) (~ func2) (~ parent-log))
+          (free-tlog log1)
+          (free-tlog log2)
           (return-from run-orelse-2 (values-list vals)))))
 
      retry-or-rerun
@@ -239,6 +244,14 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
   (log   nil :type (or null tlog))
   (retry  nil :type boolean))
 
+
+(defun free-tx-logs (txs)
+  "Return to TLOG pool all logs contained in TXS"
+  (loop for tx across txs
+     while tx
+     for log = (orelse-tx-log tx)
+     while log do
+       (free-tlog log)))
 
 
 (defun find-first-rerun-or-invalid-tx (txs me)
@@ -371,6 +384,7 @@ Return nil if all tx are valid and want to retry."
             (commit-nested log)
             (log:debug me "Tlog ~A {~A} committed to parent tlog ~A"
                        (~ log) (~ func) (~ parent-log))
+            (free-tx-logs txs)
             (return-from run-orelse-n (values-list vals)))))
 
 

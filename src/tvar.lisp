@@ -120,7 +120,11 @@ During transactions, it uses transaction log to record the 'unbound' value."
   (declare (type tvar var)
            (type tlog log))
   (with-lock-held ((waiting-lock-of var))
-    (setf (gethash log (waiting-for var)) t)))
+    (let1 waiting (waiting-for var)
+      (unless waiting
+        (setf waiting (make-hash-table :test 'eq)
+              (waiting-for var) waiting))
+      (setf (gethash log waiting) t))))
 
 
 (defun unlisten-tvar (var log)
@@ -130,7 +134,8 @@ if VAR changes."
   (declare (type tvar var)
            (type tlog log))
   (with-lock-held ((waiting-lock-of var))
-    (remhash log (waiting-for var))))
+    (awhen (waiting-for var)
+      (remhash log it))))
 
 
 (defun notify-tvar (var)
@@ -138,8 +143,9 @@ if VAR changes."
 
   (declare (type tvar var))
   (with-lock-held ((waiting-lock-of var))
-    (do-hash (log) (waiting-for var)
-      (notify-tlog log var))))
+    (awhen (waiting-for var)
+      (do-hash (log) it
+        (notify-tlog log var)))))
 
 
 ;;;; ** Printing

@@ -23,13 +23,13 @@
 (defclass tlog ()
   ((reads  :accessor reads-of
            :initarg :reads
-           :initform nil ;; (make-hash-table :test 'eq)
-           :type (or null hash-table)
+           :initform (make-hash-table :test 'eq)
+           :type hash-table
            :documentation "TVARs read during transaction, mapped to their read value")
    (writes :accessor writes-of
            :initarg :writes
-           :initform nil ;; (make-hash-table :test 'eq)
-           :type (or null hash-table)
+           :initform (make-hash-table :test 'eq)
+           :type hash-table
            :documentation "TVARs written during transaction, mapped to their new values")
    (parent :accessor parent-of
            :initarg :parent
@@ -75,8 +75,8 @@ and are later committed to memory if the transaction completes successfully."))
    (lock :accessor lock-of
          :initform (make-lock "TVAR"))
    (waiting :accessor waiting-for
-            :initform (make-hash-table :test 'eq)
-            :type hash-table)
+            :initform nil
+            :type (or null hash-table))
    (waiting-lock :accessor waiting-lock-of
                  :initform (make-lock "WAITING-LOCK")))
 

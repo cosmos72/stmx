@@ -376,9 +376,9 @@ i.e. if they contain the same values for the TVARs common to both, otherwise ret
       (rotatef reads1 reads2)
       (rotatef n1 n2)) ;; guarantees n1 >= n2
 
-    (if (zerop n2)
+    (if (or (zerop n2) (merge-hash-tables reads1 reads2))
         log1
-        (merge-hash-tables reads1 reads2))))
+        nil)))
 
   
 

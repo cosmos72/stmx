@@ -55,6 +55,7 @@ then load a REPL and run:
 If all goes well, it will automatically download and install STMX dependencies:
 
 - `arnesi`
+- `log4cl`
 - `closer-mop`
 - `bordeaux-threads`
 
@@ -88,8 +89,8 @@ please include in the report:
 See "Contacts, help, discussion" below for the preferred method to send the report.
 
 
-General documentation on Software Transactional Memory
-------------------------------------------------------
+General documentation
+---------------------
 
 [Composable Memory Transactions](http://research.microsoft.com/~simonpj/papers/stm/stm.pdf)
 is a very good - though a bit technical - explanation of transactions and
@@ -107,8 +108,8 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   
         (transactional
           (defclass foo ()
-            ((value1 :type integer :initarg value1 :accessor :value1-of)
-             (value2 :type string  :initarg value2 :accessor :value2-of)
+            ((value1 :type integer :initarg :value1 :accessor value1-of)
+             (value2 :type string  :initarg :value2 :accessor value2-of)
              ;; ...
             )))
 
@@ -169,6 +170,77 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   methods: it can be used to wrap *any* list of forms (it contains an
   implicit `progn`).
 
+
+  A key feature of `atomic` and `transaction` is their composability:
+  smaller transactions can be composed to create larger transactions.
+
+  For example, the following three program fragments are perfectly equivalent:
+
+  1) use (atomic ...) to wrap in a single transaction many smaller (atomic ...) blocks
+
+        (defmethod swap-value1-of ((x foo) (y foo))
+          (atomic
+            (format t "swapping value1 of ~A and ~A~%" x y)
+            (rotatef (value1-of x) (value1-of y))))
+
+        (defmethod swap-value2-of ((x foo) (y foo))
+          (atomic
+            (format t "swapping value2 of ~A and ~A~%" x y)
+            (rotatef (value2-of x) (value2-of y))))
+
+        (defmethod swap-contents ((x foo) (y foo))
+          (atomic
+            (swap-value1-of x y)
+            (swap-value2-of x y)))
+
+  2) write redundant (atomic ...) blocks
+
+        (defmethod swap-contents ((x foo) (y foo))
+          (atomic
+            (atomic
+              (format t "swapping value1 of ~A and ~A~%" x y)
+              (rotatef (value1-of x) (value1-of y)))
+            (atomic
+              (format t "swapping value2 of ~A and ~A~%" x y)
+              (rotatef (value2-of x) (value2-of y)))))
+
+  3) write a single (atomic ...) block
+
+        (defmethod swap-contents ((x foo) (y foo))
+          (atomic
+            (format t "swapping value1 of ~A and ~A~%" x y)
+            (rotatef (value1-of x) (value1-of y))
+            (format t "swapping value2 of ~A and ~A~%" x y)
+            (rotatef (value2-of x) (value2-of y))))
+
+  This composability property has an important consequence: transactional code,
+  possibly written by different people for unrelated purposes, can be combined
+  into larger transactions without modifying it - actually, without looking at
+  the source code at all - as long as it all uses the same STM library.
+
+  The STM machinery will guarantee that transactions intermediate status, where
+  an atomic block is half-way through its job, will **never** be visible to other
+  (successful) transactions.
+
+  For example, it becomes trivial to write some code that atomically removes
+  an object from a transactional container and adds it to another one:
+  just write something like
+
+        (defmethod move-obj-from-a-to-b ((a some-container) (b another-container))
+          (atomic
+            (let ((obj (take-obj-from-some-container a)))
+               (put-obj-into-another-container obj b))))
+
+  and it will work as long as both container are transactional and use the same
+  transaction library (in this case, STMX).
+
+  A lot of facts that in other concurrent programming paradigms are great obstacles
+  to such a solution become completely irrelevant when using transactions:
+  it is irrelevant that the two containers may be unrelated classes,
+  that the respective authors may not have anticipated such need in the APIs,
+  that the internal details of the two implementations may be unknown
+  to the author of code that combines them atomically (the move-obj-from-a-to-b in the example).
+
 - `RETRY` is a function. It is more tricky to understand, but really powerful.
   As described in the summary, transactions will commit if they return normally,
   while they will rollback if they signal an error or condition.
@@ -208,6 +280,41 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
         
   with the difference that `(nonblocking ...)` actually captures all the values
   returned by the transaction, not just the first as in the example above.
+
+
+Input/Output during transactions
+--------------------------------
+
+**WARNING**
+Since transactions can be re-executed in case of conflicts with other ones
+and can also rollback or retry, all non-transactional code inside an atomic block
+may be executed more times than expected, or may be executed when **not** expected.
+
+Some STM implementations, especially for statically-typed languages,
+forbid performing input/output during a transaction on the ground that
+I/O is not transactional: if a transaction sends an irreversible command
+to the outside world, there is no way to undo it in case the transaction
+rolls back, retries or conflicts.
+
+STMX does not implement such restrictions, i.e. I/O and any other irreversible
+action can also be performed inside an atomic block.
+This means you are free to launch missiles during a transaction, and blow the world
+when you shouldn't have. **You have been warned.**
+
+Despite the risk, there are at least two reasons for such design choice:
+* Forbidding I/O operations inside transactions, if done at all, should be done
+  while compiling a program rather than while running it.
+  In Common Lisp, neither of the two seems easy to implement.
+* Common Lisp programs are often much more dynamic and flexible than programs
+  in other languages, and programmers are trusted to know what they are doing.
+  Such a prohibition does not seem to fit well with this spirit.
+
+The typical solution for the above risk is: during a transaction, perform I/O
+**only** for debugging purposes, for example using a logging library as log4cl
+(or whatever is appropriate for your program), and queue any I/O operation
+in a transactional buffer. Then, invoke a separate function that first runs
+a transaction to atomically consume the buffer and only later,
+**outside** any transaction, actually performs the actual I/O operation.
 
 
 Advanced usage
@@ -411,7 +518,11 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
 Performance
 -----------
 See the included file [doc/benchmark.md](doc/benchmark.md) for performance considerations
-and some raw numbers.
+and a lot of raw numbers.
+
+The short version is: as of April 2013, on a fast PC (Core i3 or better) with a fast
+Common Lisp (SBCL or better), STMX can execute slightly more than 1 million transactions
+per second per CPU core, even in case of a moderate rate of conflicts and retries (10-20%).
 
 
 Contacts, help, discussion

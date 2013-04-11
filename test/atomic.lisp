@@ -95,23 +95,17 @@
   ())
 
 (test rollback
-  (let ((var (new 'tvar :value 1))
-        got-test-error?)
+  (let1 var (new 'tvar :value 1)
     
-    (handler-case
-        (progn
-          (atomic :id 'test-rollback
-                  (setf ($ var) 2)
-                  (error 'test-error :format-arguments "test-error signalled to cause rollback"))
+    (signals test-error
+      (atomic :id 'test-rollback
+              (setf ($ var) 2)
+              (error 'test-error :format-arguments "test-error signalled to cause rollback"))
+      
+      (fail "error signaled inside ATOMIC was not propagated to caller"))
 
-          (fail "error signaled inside ATOMIC was not propagated to caller"))
-
-      (test-error ()
-        (setf got-test-error? t)
-        (is-true (= (raw-value-of var) 1))
-        (is-true (= ($ var) 1))))
-
-    (is-true got-test-error?)))
+    (is (= (raw-value-of var) 1))
+    (is (= ($ var) 1))))
 
 
 (test invalid
@@ -146,4 +140,5 @@ was propagated outside (atomic)"))
 
     (is-true masked-test-error?)
     (is (= 11 ($ var))))) ;; 10 for "(setf (raw-value-of var) 10)" plus 1 for "(incf ($ var))"
-          
+
+

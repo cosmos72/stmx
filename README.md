@@ -548,7 +548,7 @@ Status
 ------
 
 As of April 2013, STMX is being written by Massimiliano Ghilardi
-and is considered by the author to be in BETA status.
+and is considered by the author to be stable.
 
 STMX is a full rewrite of CL-STM, which has been developed by Hoan Ton-That
 for the Google Summer of Code 2006.

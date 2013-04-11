@@ -1,9 +1,12 @@
 TO DO:
 
-8) contact Lars Rune Nostdal <larsnostdal at gmail dot com>, author of SW-STM:
+9) contact Lars Rune Nostdal <larsnostdal at gmail dot com>, author of SW-STM:
    see http://blog.nostdal.org/
    "I have a very crude and quite horribly written one laying around for
     Common Lisp: https://github.com/lnostdal/SW-STM"
+
+8) optimize ORELSE. The current implementation is quite naive,
+   it makes a full copy of the current transaction log
 
 DONE:
 

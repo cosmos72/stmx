@@ -78,6 +78,11 @@ Exactly analogous to TRANSACTIONAL-DIRECT-SLOT."))
     transactional-effective-slot-class))
 
 
+#+ccl
+(defmethod slot-definition-type ((effective-slot transactional-effective-slot))
+  "Work around the lack of (setf slot-definition-type) in CCL"
+  t)
+
 ;; guard against recursive calls
 (defvar *recursive-call-list-classes-containing-direct-slots* nil)
 
@@ -143,7 +148,11 @@ to the same value. Problematic classes containing slot ~A: ~{~A ~}"
           ;; will accept/return either a TVAR or the actual type.
           ;; Also set slot initfunction to (lambda () (new 'tvar ...))
           (when is-tslot?
-            (setf (slot-definition-type effective-slot) t)
+            #-ccl
+            ;; in CCL, we specialize the method (slot-definition-type) instead - see above
+            (when-bind type (slot-definition-type effective-slot)
+              (unless (eq t type)
+                (setf (slot-definition-type effective-slot) t)))
 
             (log:trace "class = ~A~%  slot-name = ~A~%  transactional direct-slots = ~A~%  effective-slot = ~A"
                        class slot-name direct-slots effective-slot)
@@ -153,7 +162,10 @@ to the same value. Problematic classes containing slot ~A: ~{~A ~}"
                     (if direct-initfunction
                         (lambda () (new 'tvar :value (funcall direct-initfunction)))
                         lambda-new-tvar)))
-              (setf (slot-definition-initfunction effective-slot) effective-initfunction)))))
+
+              #+ccl (setf (slot-value effective-slot 'ccl::initfunction) effective-initfunction)
+              #-ccl (setf (slot-definition-initfunction effective-slot) effective-initfunction)))))
+
       effective-slot)))
 
 
@@ -248,16 +260,16 @@ to the same value. Problematic classes containing slot ~A: ~{~A ~}"
 
 
 
-(let1 transactional-object-class (find-class 'transactional-object)
-  (defmethod compute-class-precedence-list ((class transactional-class))
-    "Add transactional-object as the first superclass of a transactional object
+(defun ensure-transactional-object-among-superclasses (direct-superclasses)
+  (declare (type list direct-superclasses))
+  "Add transactional-object as the first superclass of a transactional class
 if not already present in the superclass list."
-    (let1 superclasses (call-next-method)
-      (if (member transactional-object-class superclasses)
-          superclasses
-          `(,(first superclasses) ;; this is the class itself being defined
-             ,transactional-object-class
-             ,@(rest superclasses))))))
+  (loop for direct-superclass in direct-superclasses do
+       (when (typep (find-class direct-superclass) 'transactional-class)
+         (return-from ensure-transactional-object-among-superclasses direct-superclasses)))
+  
+  (cons 'transactional-object
+        direct-superclasses))
 
 
 

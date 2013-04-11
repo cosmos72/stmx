@@ -147,15 +147,19 @@ otherwise return nil.
           (subseq str (1+ beg) end)
           str))))
 
-(let1 ids (make-hash-table :test 'eq :size 100 :weakness :key)
-  (defmethod id-of (obj)
-    (the string
-      (or
-       (get-hash ids obj)
-       (set-hash ids obj (compute-id-of obj)))))
+(eval-always
+  (let1 ids
+      #+sbcl (make-hash-table :test 'eq :size 100 :weakness :key)
+      #-sbcl (make-hash-table :test 'eq :size 100 :weak :key)
+      
+      (defmethod id-of (obj)
+        (the string
+          (or
+           (gethash obj ids)
+           (setf (gethash obj ids) (compute-id-of obj)))))
 
-  (defmethod (setf id-of) (value obj)
-    (set-hash ids obj (format nil "~A" value))))
+      (defmethod (setf id-of) (value obj)
+        (set-hash ids obj (format nil "~A" value)))))
 
 
 (declaim (inline ~ (setf ~)))

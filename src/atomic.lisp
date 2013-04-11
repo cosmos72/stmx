@@ -31,7 +31,7 @@ The effect is the same as DEFCLASS, plus:
 - it inherits also from TRANSACTIONAL-OBJECT
 - the metaclass is TRANSACTIONAL-CLASS"
     `(eval-always
-       (,defclass ,class-name ,direct-superclasses
+       (,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
          ,direct-slots
          ,@class-options
          (:metaclass transactional-class))))

@@ -26,6 +26,7 @@
                           #:defclass
                           #:standard-class
                           #:standard-generic-function
+                          #:standard-method
                           #:defmethod
                           #:defgeneric)
   (:export #:atomic    #:run-atomic

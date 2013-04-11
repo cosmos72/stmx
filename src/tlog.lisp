@@ -32,7 +32,8 @@
 
 (eval-always
   (unless (assoc '*tlog-pool* bt:*default-special-bindings*)
-    (push (cons '*tlog-pool* '(make-tlog-pool)) bt:*default-special-bindings*)))
+    (push '(*tlog-pool* . (make-tlog-pool)) bt:*default-special-bindings*)))
+
 
 ;;;; ** Creating, copying and clearing tlogs
 

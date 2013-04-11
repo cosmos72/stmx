@@ -162,3 +162,8 @@ to TLOGs while executing BODY."
   `(with-tlog ,log
      (with-recording
        ,@body)))
+
+
+(eval-always
+  (unless (assoc '*tlog* bt:*default-special-bindings*)
+    (push '(*tlog* . nil) bt:*default-special-bindings*)))

@@ -150,6 +150,8 @@ For pre-defined transactional classes, see the package STMX.UTIL"
         `(values))))
 
 
+(declaim (type boolean *yield-before-rerun*))
+(defvar *yield-before-rerun* nil)
 
 (defun run-once (tx log)
   "Internal function invoked by RUN-ATOMIC and RUN-ORELSE2.
@@ -173,6 +175,8 @@ using LOG as its transaction log."
        (rerun-once ()
          (log:trace "Tlog ~A {~A} will rerun" (~ log) (~ tx))
          (make-or-clear-tlog log :parent parent)
+         (when *yield-before-rerun*
+           (thread-yield))
          (go run))))))
 
 

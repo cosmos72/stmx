@@ -135,6 +135,8 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
        (go start))
          
      (log:debug "Tlog ~A {~A} was found invalid, re-running it" (~ log) (~ func))
+     (when *yield-before-rerun*
+       (thread-yield))
      (go start)))
 
      

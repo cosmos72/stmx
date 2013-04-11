@@ -36,7 +36,7 @@ they support closer-mop and bordeaux-threads, but the author gives no guarantees
 Installation and loading
 ------------------------
 
-STMX packaged with asdf. The simplest way to install it is to first
+STMX is packaged with asdf. The simplest way to install it is to first
 install [Quicklisp](http://www.quicklisp.org), as it can automatically
 resolve and download STMX dependencies.
 
@@ -145,8 +145,8 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
             ;; ...
           ))
 
-- `ATOMIC` is the main macro: it wraps Lisp forms into a transaction then executes them.
-  The above functions and methods could also be written as:
+- `ATOMIC` is the main macro: it wraps Lisp forms into an atomic transaction
+  then executes them. The above functions and methods could also be written as:
   
         (defun show-foo (obj)
           (declare (type foo obj))
@@ -173,10 +173,9 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
 
   A key feature of `atomic` and `transaction` is their composability:
   smaller transactions can be composed to create larger transactions.
-
   For example, the following three program fragments are perfectly equivalent:
 
-  1) use (atomic ...) to wrap in a single transaction many smaller (atomic ...) blocks
+  1) use `(atomic ...)` to wrap into a single transaction many smaller `(atomic ...)` blocks
 
         (defmethod swap-value1-of ((x foo) (y foo))
           (atomic
@@ -193,7 +192,7 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
             (swap-value1-of x y)
             (swap-value2-of x y)))
 
-  2) write redundant (atomic ...) blocks
+  2) write redundant `(atomic ...)` blocks
 
         (defmethod swap-contents ((x foo) (y foo))
           (atomic
@@ -234,12 +233,16 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   and it will work as long as both container are transactional and use the same
   transaction library (in this case, STMX).
 
-  A lot of facts that in other concurrent programming paradigms are great obstacles
-  to such a solution become completely irrelevant when using transactions:
+  A lot of facts that in other concurrent programming paradigms can be
+  great obstacles to such a solution become completely irrelevant
+  when using transactions:
   it is irrelevant that the two containers may be unrelated classes,
   that the respective authors may not have anticipated such need in the APIs,
-  that the internal details of the two implementations may be unknown
-  to the author of code that combines them atomically (the move-obj-from-a-to-b in the example).
+  that the internal details of the two implementations may be unknown to the
+  author of code that combines them atomically (the `move-obj-from-a-to-b`
+  in the example),
+  that other existing code in the program uses the same containers `a` and `b`
+  but does not cooperate with `move-obj-from-a-to-b`.
 
 - `RETRY` is a function. It is more tricky to understand, but really powerful.
   As described in the summary, transactions will commit if they return normally,
@@ -285,8 +288,7 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
 Input/Output during transactions
 --------------------------------
 
-**WARNING**
-Since transactions can be re-executed in case of conflicts with other ones
+**WARNING:** since transactions will be re-executed in case of conflicts with other ones
 and can also rollback or retry, all non-transactional code inside an atomic block
 may be executed more times than expected, or may be executed when **not** expected.
 
@@ -314,7 +316,7 @@ The typical solution for the above risk is: during a transaction, perform I/O
 (or whatever is appropriate for your program), and queue any I/O operation
 in a transactional buffer. Then, invoke a separate function that first runs
 a transaction to atomically consume the buffer and only later,
-**outside** any transaction, actually performs the actual I/O operation.
+**outside** any transaction, performs the actual I/O operation.
 
 
 Advanced usage
@@ -412,7 +414,7 @@ features are available:
 - `TVAR` is the class implementing transactional memory behind the scenes.
    It is used internally by slots of transactional classes, but can also be used
    directly. All its functions and methods work both inside and outside transactions:
-   - `(make-instance 'tvar &key value)` Create a new TVAR, optionally bound to a value.
+   - `(make-instance 'tvar [:value initial-value])` Create a new TVAR, optionally bound to a value.
    - `($ var)` Get the value of VAR. Signals an error if VAR is not bound to any value.
    - `(setf ($ var) value)` Store VALUE into VAR.
    - `(bound-$? var)` Return true if VAR is bound to some value.
@@ -423,9 +425,9 @@ features are available:
 Utilities and examples
 ---------------------
 
-See the [util](util) folder, which contains several examples and utilities
+See the [examples](examples) and [util](util) folder, which contains several examples and utilities
 built with STMX and should be relatively straightforward to understand.
-The folder contains the following classes with related methods and functions,
+The folder [util](util) contains the following classes with related methods and functions,
 all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` at REPL:
 
 - `TCELL` is the simplest transactional class. It is created with
@@ -446,8 +448,10 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
 
   Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
 
-  All methods append or remove values from the end.
-  For the rest, the methods behave as described for the `CELL` class.
+  All methods append or remove values from the end, and putting a value
+  always succeeds, even when other values are already present: the new
+  value is simple appended at the end.
+  For the rest, the methods behave as described for the `TCELL` class.
 
 - `TFIFO` is a transactional first-in-first-out buffer. It is created with
   `(make-instance 'tfifo)` and it can be empty or hold unlimited values.
@@ -456,7 +460,8 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
 
   `PUT` and `TRY-PUT` append values at the end, `PEEK` `TAKE` and `TRY-TAKE`
   get or remove them from the beginning, shifting the remaining values.
-  For the rest, the methods behave as described for the `CELL` class.
+  For the rest, the methods behave as described for the `TCELL` and `TSTACK`
+  classes.
 
 - `TCHANNEL` is a transactional multicast channel. It is created with
   `(make-instance 'tchannel)`, can contain unlimited values and it is write-only.

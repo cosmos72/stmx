@@ -19,7 +19,7 @@
 (in-suite atomic-suite)
 
 (test tx-read-of
-  (let ((log (new 'tlog))
+  (let ((log (make-tlog))
         (var (make-tvar :value 1)))
     (is (= 1 (raw-value-of var)))
     (is (= 1 (tx-read-of var log)))
@@ -28,7 +28,7 @@
     (is (= 2 (tx-read-of var log)))))
 
 (test valid?
-  (let ((log (new 'tlog))
+  (let ((log (make-tlog))
         (var  (make-tvar :value 1)))
     (is-true (valid? log))
     (tx-read-of var log)
@@ -41,7 +41,7 @@
     (is-true (valid? log))))
     
 (test commit
-  (let ((log (new 'tlog))
+  (let ((log (make-tlog))
         (var (make-tvar :value 1)))
     (tx-write-of var 2 log)
     (is-true (valid? log))
@@ -49,7 +49,7 @@
     (is (= 2 (raw-value-of var)))))
 
 (test $
-  (let ((log (new 'tlog))
+  (let ((log (make-tlog))
         (var (make-tvar :value 1)))
     (is (= 1 ($ var)))
     (with-recording-to-tlog log

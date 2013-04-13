@@ -57,7 +57,7 @@ return LOG itself."
 (defun new-tlog ()
   "Get a TLOG from pool or create one, and return it."
   (if (zerop (length *tlog-pool*))
-      (new 'tlog)
+      (make-tlog)
       (vector-pop *tlog-pool*)))
 
 

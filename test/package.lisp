@@ -25,10 +25,8 @@
 
   (:import-from #:stmx
                 #:new
-                #:raw-value-of
-                #:tx-read-of
-                #:tx-write-of
-                #:tlog
+                #:raw-value-of #:tx-read-of #:tx-write-of
+                #:tlog  #:make-tlog
                 #:commit
                 #:valid?
                 #:current-tlog

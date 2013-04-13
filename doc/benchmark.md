@@ -45,14 +45,14 @@ divided by the number of iterations (one million).
      <th><b>average time</b></th></tr>
 
  <tr><td>atomic           </td><td><code>(atomic)</code>                    </td><td>0.001&nbsp;microseconds</td></tr>
- <tr><td>atomic nil       </td><td><code>(atomic nil)</code>                </td><td>0.234&nbsp;microseconds</td></tr>
- <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code>              </td><td>0.404&nbsp;microseconds</td></tr>
- <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) i))</code>     </td><td>0.608&nbsp;microseconds</td></tr>
- <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($ v)))</code>     </td><td>0.888&nbsp;microseconds</td></tr>
+ <tr><td>atomic nil       </td><td><code>(atomic nil)</code>                </td><td>0.199&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code>              </td><td>0.335&nbsp;microseconds</td></tr>
+ <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) i))</code>     </td><td>0.544&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($ v)))</code>     </td><td>0.819&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-10</td>
      <td><code>(atomic (dotimes (j 10) (incf ($ v))))</code></td>
-     <td>1.256&nbsp;microseconds</td></tr>
+     <td>1.090&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-100</td>
      <td><code>(atomic (dotimes (j 100) (incf ($ v))))</code></td>

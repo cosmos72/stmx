@@ -162,7 +162,7 @@ using LOG as its transaction log."
            (type tlog log))
 
   (with-recording-to-tlog log
-    (prog ((parent (parent-of log)))
+    (prog ((parent (tlog-parent log)))
 
      run
      (log:debug "Tlog ~A {~A} starting~A" (~ log) (~ tx)
@@ -174,7 +174,7 @@ using LOG as its transaction log."
 
        (rerun-once ()
          (log:trace "Tlog ~A {~A} will rerun" (~ log) (~ tx))
-         (make-or-clear-tlog log :parent parent)
+         (new-or-clear-tlog log :parent parent)
          (when *yield-before-rerun*
            (thread-yield))
          (go run))))))
@@ -200,7 +200,7 @@ transactional memory it read has changed."
   (when id
     (setf (~ tx) id))
 
-  (prog ((log (make-tlog)))
+  (prog ((log (new-tlog)))
 
    run
    (handler-bind ((retry-error
@@ -251,7 +251,7 @@ transactional memory it read has changed."
    (go rerun)
 
    rerun
-   (make-or-clear-tlog log :parent (parent-of log))
+   (new-or-clear-tlog log :parent (tlog-parent log))
    (go run)))
 
 

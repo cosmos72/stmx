@@ -43,49 +43,37 @@
 
 ;;;; ** Implementation classes
 
-(defclass tlog ()
-  ((reads  :accessor reads-of
-           :initarg :reads
-           :initform (make-hash-table :test 'eq)
-           :type hash-table
-           :documentation "TVARs read during transaction, mapped to their read value")
-   (writes :accessor writes-of
-           :initarg :writes
-           :initform (make-hash-table :test 'eq)
-           :type hash-table
-           :documentation "TVARs written during transaction, mapped to their new values")
-   (parent :accessor parent-of
-           :initarg :parent
-           :initform nil
-           :type (or null tlog)
-           :documentation "Parent of this TLOG. Used for nested transactions")
-   (lock   :accessor lock-of
-           :initform nil)
-   (semaphore :accessor semaphore-of
-              :initform nil)
-   (prevent-sleep :accessor prevent-sleep-of
-                  :initform nil
-                  :type boolean
-                  :documentation "Flag to prevent TLOGs from sleeping.
-Set by TVARs when they change")
-   (before-commit :accessor before-commit-of
-                  :initform nil
-                  :type (or null vector)
-                  :documentation "functions to call immediately before committing TLOG.")
-   (after-commit :accessor after-commit-of
-                 :initform nil
-                 :type (or null vector)
-                 :documentation "functions to call immediately after committing TLOG.")
-   (id :reader id-of
-       :initform 0 ;;(next-id *tlog-id*)
-       :type integer))
-
-  (:documentation "A transaction log (TLOG) is a record of the reads and writes
+(defstruct tlog
+  "A transaction log (TLOG) is a record of the reads and writes
 to transactional memory performed during a transaction.
 
 Transaction logs are automatically populated by reading and writing
 transactional objects (TOBJs) or transactional variables (TVARs),
-and are later committed to memory if the transaction completes successfully."))
+and are later committed to memory if the transaction completes successfully."
+
+  ;; TVARs read during transaction, mapped to their read value
+  (reads (make-hash-table :test 'eq) :type hash-table) ;; tlog-reads
+  ;; TVARs written during transaction, mapped to their new values
+  (writes (make-hash-table :test 'eq) :type hash-table) ;; tlog-writes
+
+  ;; Parent of this TLOG. Used by ORELSE for nested transactions
+  (parent    nil :type (or null tlog)) ;; tlog-parent
+  (lock      nil) ;; tlog-lock
+  (semaphore nil) ;; tlog-semaphore
+
+  ;; Flag to prevent TLOGs from sleeping. Set by TVARs when they change.
+  (prevent-sleep nil :type boolean) ;; tlog-prevent-sleep
+  ;; Functions to call immediately before committing TLOG.
+  (before-commit nil :type (or null vector)) ;; tlog-before-commit
+  ;; Functions to call immediately after committing TLOG.
+  (after-commit  nil :type (or null vector)) ;; tlog-after-commit
+
+  (id (next-id *tlog-id*) :type fixnum)) ;; tlog-id
+
+
+(defmethod id-of ((log tlog))
+  (tlog-id log))
+
 
 
 (declaim (type symbol +unbound+))
@@ -103,11 +91,11 @@ with a more intuitive and powerful interface: you can read and write normally
 the slots of a transactional object (with slot-value, accessors ...),
 and behind the scenes the slots will be stored in transactional memory implemented by TVARs."
 
-  (value +unbound+)                             ;; raw-value-of
-  (lock (make-lock "TVAR") :read-only t)        ;; lock-of
-  (waiting-for nil :type (or null hash-table))  ;; waiting-for
-  (waiting-lock (make-lock "WAITING-FOR-LOCK") :read-only t) ;; waiting-lock-of
-  (id (next-id *tvar-id*)))
+  (value +unbound+)                             ;; tvar-value
+  (lock (make-lock "TVAR") :read-only t)        ;; tvar-lock
+  (waiting-for nil :type (or null hash-table))  ;; tvar-waiting-for
+  (waiting-lock (make-lock "WAITING-FOR-LOCK") :read-only t) ;; tvar-waiting-lock
+  (id (next-id *tvar-id*)))                     ;; tvar-id
 
 (declaim (inline raw-value-of (setf raw-value-of)))
 (defun raw-value-of (var)

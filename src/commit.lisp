@@ -24,7 +24,7 @@ of TVARs that were read during the transaction."
 
   (declare (type tlog log))
   (log:trace "Tlog ~A valid?.." (~ log))
-  (do-hash (var val) (reads-of log)
+  (do-hash (var val) (tlog-reads log)
     (let1 actual-val (raw-value-of var)
       (if (eq val actual-val)
           (log:trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
@@ -130,7 +130,7 @@ in reverse order: from last acquired to first acquired."
 Return :UNKNOWN if relevant locks could not be acquired."
 
   (declare (type tlog log))
-  (let ((reads (reads-of log))
+  (let ((reads (tlog-reads log))
         (acquiring nil)
         (acquired nil)) ;; (list nil)))
 
@@ -158,20 +158,20 @@ Return :UNKNOWN if relevant locks could not be acquired."
 ;;;; ** Committing
 
 
-(defun ensure-before-commit-of (log)
-  "Create before-commit-of log if nil, and return it."
+(defun ensure-tlog-before-commit (log)
+  "Create tlog-before-commit log if nil, and return it."
   (declare (type tlog log))
   (the vector
-    (or (before-commit-of log)
-        (setf (before-commit-of log)
+    (or (tlog-before-commit log)
+        (setf (tlog-before-commit log)
               (make-array '(1) :element-type 'function :fill-pointer 0 :adjustable t)))))
 
-(defun ensure-after-commit-of (log)
-  "Create after-commit-of log if nil, and return it."
+(defun ensure-tlog-after-commit (log)
+  "Create tlog-after-commit log if nil, and return it."
   (declare (type tlog log))
   (the vector
-    (or (after-commit-of log)
-        (setf (after-commit-of log)
+    (or (tlog-after-commit log)
+        (setf (tlog-after-commit log)
               (make-array '(1) :element-type 'function :fill-pointer 0 :adjustable t)))))
 
 
@@ -183,7 +183,7 @@ Return :UNKNOWN if relevant locks could not be acquired."
 IMPORTANT: See BEFORE-COMMIT for what FUNC must not do."
   (declare (type function func)
            (type tlog log))
-  (vector-push-extend func (ensure-before-commit-of log))
+  (vector-push-extend func (ensure-tlog-before-commit log))
   func)
 
 (defun call-after-commit (func &optional (log (current-tlog)))
@@ -192,7 +192,7 @@ IMPORTANT: See BEFORE-COMMIT for what FUNC must not do."
 IMPORTANT: See AFTER-COMMIT for what FUNC must not do."
   (declare (type function func)
            (type tlog log))
-  (vector-push-extend func (ensure-after-commit-of log))
+  (vector-push-extend func (ensure-tlog-after-commit log))
   func)
 
 
@@ -248,13 +248,13 @@ This means new elements can be appended to FUNCS vector during the loop
        (funcall (aref funcs i))))
 
 
-(defun invoke-before-commit-of (log)
+(defun invoke-before-commit (log)
   "Before committing, call in order all functions registered
 with (before-commit)
 If any of them signals an error, the transaction will rollback
 and the error will be propagated to the caller"
   (declare (type tlog log))
-  (when-bind funcs (before-commit-of log)
+  (when-bind funcs (tlog-before-commit log)
     ;; restore recording and log as the current tlog, functions may need them
     ;; to read and write transactional memory
     (with-recording-to-tlog log
@@ -262,16 +262,16 @@ and the error will be propagated to the caller"
           (loop-funcall-on-appendable-vector funcs)
         (rerun-error ()
          (log:trace "Tlog ~A before-commit wants to rerun" (~ log))
-         (return-from invoke-before-commit-of nil)))))
+         (return-from invoke-before-commit nil)))))
   t)
 
 
-(defun invoke-after-commit-of (log)
+(defun invoke-after-commit (log)
   "After committing, call in order all functions registered with (after-commit)
 If any of them signals an error, it will be propagated to the caller
 but the TLOG will remain committed."
   (declare (type tlog log))
-  (when-bind funcs (after-commit-of log)
+  (when-bind funcs (tlog-after-commit log)
     ;; restore recording and log as the current tlog, functions may need them
     ;; to read transactional memory
     (with-recording-to-tlog log
@@ -292,20 +292,20 @@ b) another TLOG is writing the same TVARs being committed
    that the TLOG will still be valid."
    
   (declare (type tlog log))
-  (let ((reads (reads-of log))
-        (writes (writes-of log))
+  (let ((reads (tlog-reads log))
+        (writes (tlog-writes log))
         (acquiring nil)
         (acquired nil) ;; (list nil))
         changed
         success)
 
     ;; before-commit functions run without locks
-    (unless (invoke-before-commit-of log)
+    (unless (invoke-before-commit log)
       (return-from commit nil))
 
     (when (zerop (hash-table-count writes))
       (log:debug "Tlog ~A committed (nothing to write)" (~ log))
-      (invoke-after-commit-of log)
+      (invoke-after-commit log)
       (return-from commit t))
 
     (log:trace "Tlog ~A committing..." (~ log))
@@ -351,7 +351,7 @@ b) another TLOG is writing the same TVARs being committed
 
       (when success
         ;; after-commit functions run without locks
-        (invoke-after-commit-of log)))))
+        (invoke-after-commit log)))))
                    
 
 
@@ -359,15 +359,15 @@ b) another TLOG is writing the same TVARs being committed
 ;;;; ** Merging
 
 
-(defun merge-reads-of (log1 log2)
-  "Merge (reads-of LOG1) and (reads-of LOG2).
+(defun merge-tlog-reads (log1 log2)
+  "Merge (tlog-reads LOG1) and (tlog-reads LOG2).
 
-Return merged TLOG (either LOG1 or LOG2) if reads-of LOG1 and LOG2 are compatible,
+Return merged TLOG (either LOG1 or LOG2) if tlog-reads LOG1 and LOG2 are compatible,
 i.e. if they contain the same values for the TVARs common to both, otherwise return NIL
 \(in the latter case, the merge will not be completed)."
   (declare (type tlog log1 log2))
-  (let* ((reads1 (reads-of log1))
-         (reads2 (reads-of log2))
+  (let* ((reads1 (tlog-reads log1))
+         (reads2 (tlog-reads log2))
          (n1 (hash-table-count reads1))
          (n2 (hash-table-count reads2)))
          
@@ -388,26 +388,26 @@ i.e. if they contain the same values for the TVARs common to both, otherwise ret
 
 Unlike (commit log), this function is guaranteed to always succeed.
 
-Implementation note: copy reads-of, writes-of, before-commit-of
-and after-commit-of into parent, or swap them with parent"
+Implementation note: copy tlog-reads, tlog-writes, tlog-before-commit
+and tlog-after-commit into parent, or swap them with parent"
 
   (declare (type tlog log))
-  (let1 parent (the tlog (parent-of log))
+  (let1 parent (the tlog (tlog-parent log))
 
-    (rotatef (reads-of parent) (reads-of log))
-    (rotatef (writes-of parent) (writes-of log))
+    (rotatef (tlog-reads parent) (tlog-reads log))
+    (rotatef (tlog-writes parent) (tlog-writes log))
 
-    (when-bind funcs (before-commit-of log)
-      (if-bind parent-funcs (before-commit-of parent)
+    (when-bind funcs (tlog-before-commit log)
+      (if-bind parent-funcs (tlog-before-commit parent)
         (loop for func across funcs do
              (vector-push-extend func parent-funcs))
-        (rotatef (before-commit-of log) (before-commit-of parent))))
+        (rotatef (tlog-before-commit log) (tlog-before-commit parent))))
 
-    (when-bind funcs (after-commit-of log)
-      (if-bind parent-funcs (after-commit-of parent)
+    (when-bind funcs (tlog-after-commit log)
+      (if-bind parent-funcs (tlog-after-commit parent)
         (loop for func across funcs do
              (vector-push-extend func parent-funcs))
-        (rotatef (after-commit-of log) (after-commit-of parent))))
+        (rotatef (tlog-after-commit log) (tlog-after-commit parent))))
 
     log))
 

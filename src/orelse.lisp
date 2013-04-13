@@ -62,7 +62,7 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
                              (go wants-to-rerun))))))
     
        (let ((vals (multiple-value-list (run-once func log)))
-             (parent-log (parent-of log)))
+             (parent-log (tlog-parent log)))
        
          (when (invalid? parent-log)
            (log:debug me "Parent tlog ~A is invalid, re-running it"
@@ -95,7 +95,7 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
        (error 'orelse-error))
 
      start
-     (setf log (make-or-clear-tlog log :parent parent-log))
+     (setf log (new-or-clear-tlog log :parent parent-log))
 
      (multiple-value-bind (flags vals) (run-orelse-once func log)
        (cond
@@ -154,7 +154,7 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
        (error 'orelse-error))
 
      run-tx1
-     (setf log1 (make-or-clear-tlog log1 :parent parent-log))
+     (setf log1 (new-or-clear-tlog log1 :parent parent-log))
 
      (multiple-value-bind (flags vals) (run-orelse-once func1 log1)
        (cond
@@ -176,7 +176,7 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
 
 
      run-tx2
-     (setf log2 (make-or-clear-tlog log2 :parent parent-log))
+     (setf log2 (new-or-clear-tlog log2 :parent parent-log))
 
      (multiple-value-bind (flags vals) (run-orelse-once func2 log2)
        (cond
@@ -215,7 +215,7 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
      ;; here all txs want to retry, and were valid when we checked.
      ;; Note: it does not mean they are compatible and still valid
 
-     (unless (merge-reads-of log1 log2)
+     (unless (merge-tlog-reads log1 log2)
        ;; some tlog was incompatible with previous ones
        (log:debug "Tlog ~A {~A} is incompatible with tlog ~A {~A}, rerunning ORELSE"
                       (~ log1) (~ func1) (~ log2) (~ func2))
@@ -275,7 +275,7 @@ Return nil if all tx are valid and want to retry."
   nil)
 
 
-(defun merge-reads-of-tx (txs me)
+(defun merge-tlog-reads-tx (txs me)
   "Return merged tlog of all tx, or nil if some tlog are mutually incompatible."
   (declare (type simple-vector txs))
 
@@ -286,10 +286,10 @@ Return nil if all tx are valid and want to retry."
        for ifunc  = (orelse-tx-func  itx)
        for ilog   = (orelse-tx-log   itx)
        do
-         (unless (merge-reads-of log ilog)
+         (unless (merge-tlog-reads log ilog)
            (log:debug me "Tlog ~A {~A} is incompatible with previous ones, rerunning ORELSE"
                       (~ ilog) (~ ifunc))
-           (return-from merge-reads-of-tx nil)))
+           (return-from merge-tlog-reads-tx nil)))
     log))
         
 
@@ -369,7 +369,7 @@ Return nil if all tx are valid and want to retry."
 
        run-tx
        (setf func (orelse-tx-func tx)
-             log  (make-or-clear-tlog (orelse-tx-log tx) :parent parent-log)
+             log  (new-or-clear-tlog (orelse-tx-log tx) :parent parent-log)
              (orelse-tx-log tx) log)
 
        (multiple-value-bind (flags vals) (run-orelse-once func log)
@@ -414,7 +414,7 @@ Return nil if all tx are valid and want to retry."
        ;; here all txs want to retry, and were valid when we checked.
        ;; Note: it does not mean they are compatible and still valid
 
-       (setf log (merge-reads-of-tx txs me))
+       (setf log (merge-tlog-reads-tx txs me))
        (unless log
          ;; some tlog was incompatible with previous ones
          (go start))

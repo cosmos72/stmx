@@ -44,17 +44,17 @@ as well as functions registered with BEFORE-COMMIT and AFTER-COMMIT;
 return LOG itself."
   (declare (type tlog log))
 
-  (setf (parent-of log) nil)
+  (setf (tlog-parent log) nil)
 
-  (clrhash (reads-of log))
-  (clrhash (writes-of log))
+  (clrhash (tlog-reads log))
+  (clrhash (tlog-writes log))
 
-  (awhen (before-commit-of log) (setf (fill-pointer it) 0))
-  (awhen (after-commit-of log)  (setf (fill-pointer it) 0))
+  (awhen (tlog-before-commit log) (setf (fill-pointer it) 0))
+  (awhen (tlog-after-commit log)  (setf (fill-pointer it) 0))
   log)
 
 
-(defun make-tlog ()
+(defun new-tlog ()
   "Get a TLOG from pool or create one, and return it."
   (if (zerop (length *tlog-pool*))
       (new 'tlog)
@@ -70,19 +70,19 @@ return LOG itself."
     
 
 
-(defun make-or-clear-tlog (log &key parent)
+(defun new-or-clear-tlog (log &key parent)
   "If LOG is not nil, clear it as per (clear-tlog), otherwise create
-a new tlog as per (make-tlog). In both cases the tlog is returned,
+a new tlog as per (new-tlog). In both cases the tlog is returned,
 and its parent is set to PARENT."
   (declare (type (or null tlog) log parent))
   (let1 log (if log
                 (clear-tlog log)
-                (make-tlog))
+                (new-tlog))
 
     (when parent
-      (setf (parent-of log) parent)
-      (copy-hash-table (reads-of log)  (reads-of parent))
-      (copy-hash-table (writes-of log) (writes-of parent)))
+      (setf (tlog-parent log) parent)
+      (copy-hash-table (tlog-reads log)  (tlog-reads parent))
+      (copy-hash-table (tlog-writes log) (tlog-writes parent)))
     log))
 
 
@@ -100,11 +100,11 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
            (type tlog log))
 
   (multiple-value-bind (value present?)
-      (gethash var (writes-of log))
+      (gethash var (tlog-writes log))
     (when present?
       (return-from tx-read-of value)))
 
-  (let1 reads (reads-of log)
+  (let1 reads (tlog-reads log)
     (multiple-value-bind (value present?)
         (gethash var reads)
       (when present?
@@ -121,7 +121,7 @@ and by writing TOBJs slots."
   (declare (type tvar var)
            (type tlog log))
 
-  (setf (gethash var (writes-of log)) value))
+  (setf (gethash var (tlog-writes log)) value))
 
 
 
@@ -138,7 +138,7 @@ and by writing TOBJs slots."
 Return t if log is valid and wait-tlog should sleep, otherwise return nil."
 
   (declare (type tlog log))
-  (let1 reads (reads-of log)
+  (let1 reads (tlog-reads log)
 
     (when (zerop (hash-table-count reads))
       (error "BUG! Transaction ~A called (retry), but no TVARs to wait for changes.
@@ -171,7 +171,7 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   "Un-listen on tvars, i.e. deregister not to get notifications if they change."
 
   (declare (type tlog log))
-  (do-hash (var val) (reads-of log)
+  (do-hash (var val) (tlog-reads log)
     (unlisten-tvar var log))
   (values))
 
@@ -184,12 +184,12 @@ After sleeping, return t if log is valid, otherwise return nil."
 
   (declare (type tlog log))
   (log:debug "Tlog ~A sleeping now" (~ log))
-  (let ((lock (lock-of log))
+  (let ((lock (tlog-lock log))
         (valid t))
 
     (with-lock-held (lock)
-      (when (setf valid (not (prevent-sleep-of log)))
-        (condition-wait (semaphore-of log) lock)))
+      (when (setf valid (not (tlog-prevent-sleep log)))
+        (condition-wait (tlog-semaphore log) lock)))
 
     (if valid
         (progn
@@ -212,15 +212,15 @@ did not change, but the transaction is waiting for them to change"
   (declare (type tlog log)
            (type boolean once))
 
-  ;; lazily initialize (lock-of log) and (semaphore-of log)
-  (when (null (lock-of log))
-    (setf (lock-of log) (make-lock (format nil "~A-~A" 'tlog (~ log))))
-    (setf (semaphore-of log) (make-condition-variable)))
+  ;; lazily initialize (tlog-lock log) and (tlog-semaphore log)
+  (when (null (tlog-lock log))
+    (setf (tlog-lock log) (make-lock (format nil "~A-~A" 'tlog (~ log))))
+    (setf (tlog-semaphore log) (make-condition-variable)))
 
   ;; we are going to sleep, unless some TVAR changes
   ;; and/or tells us not to.
-  (with-lock-held ((lock-of log))
-    (setf (prevent-sleep-of log) nil))
+  (with-lock-held ((tlog-lock log))
+    (setf (tlog-prevent-sleep log) nil))
 
   (prog1
       (and (listen-tvars-of log)
@@ -236,8 +236,15 @@ did not change, but the transaction is waiting for them to change"
   (declare (type tlog log)
            (type tvar var))
   (log:debug "Waking up tlog ~A listening on tvar ~A" (~ log) (~ var))
-  ;; Max, question: do we also need to acquire (lock-of log)?
+  ;; Max, question: do we also need to acquire (tlog-lock log)?
   ;; Answering myself: YES! otherwise we can deadlock (tested, it happens)
-  (with-lock-held ((lock-of log))
-    (setf (prevent-sleep-of log) t)
-    (condition-notify (semaphore-of log))))
+  (with-lock-held ((tlog-lock log))
+    (setf (tlog-prevent-sleep log) t)
+    (condition-notify (tlog-semaphore log))))
+
+
+
+;;;; ** Printing
+
+(defprint-object (obj tlog)
+  (format t "~A" (~ obj)))

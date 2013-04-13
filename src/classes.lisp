@@ -15,10 +15,33 @@
 
 (in-package :stmx)
 
-;;;; ** Implementation classes
+;;;; ** Counters
 
-(declaim (type integer *tlog-id-counter*))
-(defvar *tlog-id-counter* 0)
+(declaim (type fixnum *tlog-id*))
+(defvar *tlog-id* 0)
+
+(declaim (type fixnum *tvar-id*))
+(defvar *tvar-id* 0)
+
+(declaim (inline get-next-id))
+(eval-always
+  (if (zerop (logand most-positive-fixnum (1+ most-positive-fixnum)))
+    (defun get-next-id (id)
+      (declare (type fixnum id))
+      (the fixnum
+        (logand most-positive-fixnum (1+ id))))
+    (defun get-next-id (id)
+      (declare (type fixnum id))
+      (the fixnum
+        (if (= id most-positive-fixnum)
+            0
+            (1+ id))))))
+
+(defmacro next-id (place)
+  `(setf ,place (get-next-id ,place)))
+
+
+;;;; ** Implementation classes
 
 (defclass tlog ()
   ((reads  :accessor reads-of
@@ -54,7 +77,7 @@ Set by TVARs when they change")
                  :type (or null vector)
                  :documentation "functions to call immediately after committing TLOG.")
    (id :reader id-of
-       :initform 0 ;;(incf *tlog-id-counter*)
+       :initform 0 ;;(next-id *tlog-id*)
        :type integer))
 
   (:documentation "A transaction log (TLOG) is a record of the reads and writes
@@ -65,21 +88,12 @@ transactional objects (TOBJs) or transactional variables (TVARs),
 and are later committed to memory if the transaction completes successfully."))
 
 
+(declaim (type symbol +unbound+))
 (defvar +unbound+ (gensym "UNBOUND-"))
 
-(defclass tvar ()
-  ((value :accessor raw-value-of
-          :initarg :value
-          :initform +unbound+)
-   (lock  :accessor lock-of
-          :initform (make-lock "TVAR"))
-   (waiting :accessor waiting-for
-            :initform nil
-            :type (or null hash-table))
-   (waiting-lock :accessor waiting-lock-of
-                 :initform (make-lock "WAITING-LOCK")))
 
-  (:documentation "A transactional variable (TVAR) is the smallest unit
+(defstruct tvar
+  "A transactional variable (TVAR) is the smallest unit
 of transactional memory.
 It contains a single value that can be read or written during a transaction
 using ($ tvar) and (SETF ($ tvar) value).
@@ -87,7 +101,25 @@ using ($ tvar) and (SETF ($ tvar) value).
 TVARs are seldom used directly, since transactional objects (TOBJs) wrap them
 with a more intuitive and powerful interface: you can read and write normally
 the slots of a transactional object (with slot-value, accessors ...),
-and behind the scenes the slots will be stored in transactional memory implemented by TVARs."))
+and behind the scenes the slots will be stored in transactional memory implemented by TVARs."
+
+  (value +unbound+)                             ;; raw-value-of
+  (lock (make-lock "TVAR") :read-only t)        ;; lock-of
+  (waiting-for nil :type (or null hash-table))  ;; waiting-for
+  (waiting-lock (make-lock "WAITING-FOR-LOCK") :read-only t) ;; waiting-lock-of
+  (id (next-id *tvar-id*)))
+
+(declaim (inline raw-value-of (setf raw-value-of)))
+(defun raw-value-of (var)
+  (declare (type tvar var))
+  (tvar-value var))
+
+(defun (setf raw-value-of) (value var)
+  (declare (type tvar var))
+  (setf (tvar-value var) value))
+
+
+
 
 
 ;;;; ** Flags to control the behaviour of TLOGs and TOBJs

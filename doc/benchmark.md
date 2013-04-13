@@ -23,7 +23,7 @@ Optimization flags and setup:
     (defmacro one-million (&rest body)
       `(time (dotimes (i 1000000)
               ,@body)))
-    (defvar v (new 'tvar :value 0))
+    (defvar v (make-tvar :value 0))
     (defvar m  (new 'rbmap :pred #'fixnum<)) 
     (defvar tm (new 'tmap  :pred #'fixnum<)) 
     (defvar h  (make-hash-table))  
@@ -47,16 +47,16 @@ divided by the number of iterations (one million).
  <tr><td>atomic           </td><td><code>(atomic)</code>                    </td><td>0.001&nbsp;microseconds</td></tr>
  <tr><td>atomic nil       </td><td><code>(atomic nil)</code>                </td><td>0.234&nbsp;microseconds</td></tr>
  <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code>              </td><td>0.404&nbsp;microseconds</td></tr>
- <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) i))</code>     </td><td>0.696&nbsp;microseconds</td></tr>
- <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($ v)))</code>     </td><td>0.950&nbsp;microseconds</td></tr>
+ <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) i))</code>     </td><td>0.608&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($ v)))</code>     </td><td>0.888&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-10</td>
      <td><code>(atomic (dotimes (j 10) (incf ($ v))))</code></td>
-     <td>1.277&nbsp;microseconds</td></tr>
+     <td>1.256&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-100</td>
      <td><code>(atomic (dotimes (j 100) (incf ($ v))))</code></td>
-     <td>4.768&nbsp;microseconds</td></tr>
+     <td>4.964&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(0.890+N*0.039)&nbsp;microseconds</td></tr>
 
@@ -70,40 +70,40 @@ divided by the number of iterations (one million).
 
  <tr><td>tmap read-write-1</td>
      <td><code>(atomic (incf (get-bmap tm 1)))</code></td>
-     <td>2.539&nbsp;microseconds</td></tr>
+     <td>2.191&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-bmap tm))<br>
               (set-bmap tm i t))</code></td>
-     <td>11.197&nbsp;microseconds</td></tr>
+     <td>10.277&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 100)</td>
      <td><code>(atomic (when (zerop (mod i  100)) (clear-bmap tm))<br>
               (set-bmap tm i t))</code></td>
-     <td>17.284&nbsp;microseconds</td></tr>
+     <td>15.391&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 1000)</td>
      <td><code>(atomic (when (zerop (mod i 1000)) (clear-bmap tm))<br>
               (set-bmap tm i t))</code></td>
-     <td>22.407&nbsp;microseconds</td></tr>
+     <td>19.573&nbsp;microseconds</td></tr>
 
  <tr><td>thash read-write-1</td>
      <td><code>(atomic (incf (get-thash th 'x)))</code></td>
-     <td>4.693&nbsp;microseconds</td></tr>
+     <td>4.448&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-thash th))<br>
               (set-thash th i t))</code></td>
-     <td>5.057&nbsp;microseconds</td></tr>
+     <td>5.344&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 100)</td>
      <td><code>(atomic (when (zerop (mod i  100)) (clear-thash th))<br>
               (set-thash th i t))</code></td>
-     <td>10.613&nbsp;microseconds</td></tr>
+     <td>10.899&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 1000)</td>
      <td><code>(atomic (when (zerop (mod i  1000)) (clear-thash th))<br>
               (set-thash th i t))</code></td>
-     <td>61.901&nbsp;microseconds</td></tr>
+     <td>62.512&nbsp;microseconds</td></tr>
 
 </table>

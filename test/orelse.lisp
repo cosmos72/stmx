@@ -52,7 +52,7 @@
    (try-put c val)))
 
 (defun orelse-test ()
-  (loop for place in (list (new 'tcell) (new 'tvar)) do
+  (loop for place in (list (new 'tcell) (make-tvar)) do
        (loop for takef in (list #'take1 #'take2 #'take3) do
             (loop for putf in (list #'put1 #'put2 #'put3)
                for rand = (random most-positive-fixnum) do

@@ -103,7 +103,7 @@ Exactly analogous to TRANSACTIONAL-DIRECT-SLOT."))
 ;; guard against recursive calls
 (defvar *recursive-call-compute-effective-slot-definition* nil)
 
-(let1 lambda-new-tvar (lambda () (new 'tvar))
+(let1 lambda-new-tvar (lambda () (make-tvar))
   (defmethod compute-effective-slot-definition ((class transactional-class)
                                                 slot-name direct-slots)
     "If more than one transactional-direct-slot with the same name is present,
@@ -111,7 +111,7 @@ ensure that all of them have the same :transactional flag value (all T or all NI
 otherwise signal an error.
 
 For transactional slots, replace :type ... with :type tvar
-and wrap :initform with (lambda () (new 'tvar ...)"
+and wrap :initform with (lambda () (make-tvar ...)"
 
     (when (member class *recursive-call-list-classes-containing-direct-slots*)
       (log:warn "recursive call to (compute-effective-slot-definition ~A)" class)
@@ -146,7 +146,7 @@ to the same value. Problematic classes containing slot ~A: ~{~A ~}"
           ;; if slot is transactional remove any type declaration :type <x> because,
           ;; depending on transactional global flags, slot-value and accessors
           ;; will accept/return either a TVAR or the actual type.
-          ;; Also set slot initfunction to (lambda () (new 'tvar ...))
+          ;; Also set slot initfunction to (lambda () (make-tvar ...))
           (when is-tslot?
             #-ccl
             ;; in CCL, we specialize the method (slot-definition-type) instead - see above
@@ -160,7 +160,7 @@ to the same value. Problematic classes containing slot ~A: ~{~A ~}"
             (let* ((direct-initfunction (slot-definition-initfunction direct-slot))
                    (effective-initfunction
                     (if direct-initfunction
-                        (lambda () (new 'tvar :value (funcall direct-initfunction)))
+                        (lambda () (make-tvar :value (funcall direct-initfunction)))
                         lambda-new-tvar)))
 
               #+ccl (setf (slot-value effective-slot 'ccl::initfunction) effective-initfunction)
@@ -287,7 +287,7 @@ if not already present in the superclass list."
         (dolist (initarg-name (slot-definition-initargs slot))
           (let1 fragment (rest (member initarg-name initargs))
             (when fragment
-              (setf (first fragment) (new 'tvar :value (first fragment)))
+              (setf (first fragment) (make-tvar :value (first fragment)))
               ;; wrap each initarg only once
               (return))))))
 

@@ -72,9 +72,9 @@
     (error "philosophers-count is ~A, expecting at least 2" philosophers-count))
 
   (let* ((n philosophers-count)
-         (forks (loop for i from 1 to n collect (new 'tvar :value i)))
+         (forks (loop for i from 1 to n collect (make-tvar :value i)))
          (plates (loop for i from 1 to n collect
-                      (cons (new 'tvar :value philosophers-initial-hunger)
+                      (cons (make-tvar :value philosophers-initial-hunger)
                             philosophers-initial-hunger)))
          (philosophers
           (loop for i from 1 to n collect

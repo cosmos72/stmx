@@ -40,6 +40,7 @@
   
 ;;;; ** Reading and writing
 
+
 (defun $ (var)
     "Get the value from the transactional variable VAR.
 Works both outside and inside transactions.
@@ -51,9 +52,9 @@ and to check for any value stored in the log."
   (let1 value (if (recording?)
                   (tx-read-of var)
                   (raw-value-of var))
-    (if (eq value +unbound+)
-        (unbound-tvar-error var)
-        value)))
+    (unless (eq value +unbound+)
+      (return-from $ value))
+    (unbound-tvar-error var)))
 
 
 (defun (setf $) (value var)
@@ -119,11 +120,11 @@ During transactions, it uses transaction log to record the 'unbound' value."
 
   (declare (type tvar var)
            (type tlog log))
-  (with-lock-held ((waiting-lock-of var))
-    (let1 waiting (waiting-for var)
+  (with-lock-held ((tvar-waiting-lock var))
+    (let1 waiting (tvar-waiting-for var)
       (unless waiting
         (setf waiting (make-hash-table :test 'eq)
-              (waiting-for var) waiting))
+              (tvar-waiting-for var) waiting))
       (setf (gethash log waiting) t))))
 
 
@@ -133,8 +134,8 @@ if VAR changes."
 
   (declare (type tvar var)
            (type tlog log))
-  (with-lock-held ((waiting-lock-of var))
-    (awhen (waiting-for var)
+  (with-lock-held ((tvar-waiting-lock var))
+    (awhen (tvar-waiting-for var)
       (remhash log it))))
 
 
@@ -142,8 +143,8 @@ if VAR changes."
   "Wake up all threads waiting for VAR to change."
 
   (declare (type tvar var))
-  (with-lock-held ((waiting-lock-of var))
-    (awhen (waiting-for var)
+  (with-lock-held ((tvar-waiting-lock var))
+    (awhen (tvar-waiting-for var)
       (do-hash (log) it
         (notify-tlog log var)))))
 

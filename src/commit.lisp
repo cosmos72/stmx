@@ -60,19 +60,18 @@ but does *not* check log parents for validity."
   (not (shallow-valid? log)))
 
 
-(defun sxhash< (arg1 arg2)
-  (declare (type tvar arg1 arg2))
-  "Compare the hash codes obtained with SXHASH for arg1 and arg2.
-Return (< (sxhash arg1) (sxhash arg2))."
+(defun tvar< (var1 var2)
+  (declare (type tvar var1 var2))
+  "Compare the hash codes obtained with SXHASH for var1 and var2.
+Return (< (sxhash var1) (sxhash var2))."
+  (< (the fixnum (tvar-id var1))
+     (the fixnum (tvar-id var2)))
   #+never
-  (< (the fixnum (tvar-id arg1))
-     (the fixnum (tvar-id arg2)))
-  #+sbcl
-  (< (the fixnum (sb-impl::sxhash-instance arg1))
-     (the fixnum (sb-impl::sxhash-instance arg2)))
+  (< (the fixnum (sb-impl::sxhash-instance var1))
+     (the fixnum (sb-impl::sxhash-instance var2)))
   #-sbcl
-  (< (the fixnum (sxhash arg1))
-     (the fixnum (sxhash arg2))))
+  (< (the fixnum (sxhash var1))
+     (the fixnum (sxhash var2))))
 
 
 
@@ -83,7 +82,7 @@ Return (< (sxhash arg1) (sxhash arg2))."
   (declare (type tvar var)
            (type tlog log)
            (type string txt))
-  (let1 flag (acquire-lock (lock-of var) nil)
+  (let1 flag (acquire-lock (tvar-lock var) nil)
     (if flag
         (log:trace "Tlog ~A locked tvar ~A" (~ log) (~ var))
         (log:debug "Tlog ~A not ~A: could not lock tvar ~A"
@@ -106,7 +105,7 @@ in reverse order: from last acquired to first acquired."
   (with-gensym var
     `(progn
        ;;(log:user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
-       (setf ,vars (sort ,vars #'sxhash<))
+       (setf ,vars (sort ,vars #'tvar<))
        ;;(log:user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
 
        (loop for ,var in ,vars
@@ -121,7 +120,7 @@ in reverse order: from last acquired to first acquired."
   (declare (type list vars)
            (type tlog log))
   (loop for var in vars do
-       (release-lock (lock-of var))
+       (release-lock (tvar-lock var))
        (log:trace "Tlog ~A unlocked tvar ~A" (~ log) (~ var))))
 
 

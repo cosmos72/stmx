@@ -61,9 +61,21 @@ but does *not* check log parents for validity."
 
 
 (defun sxhash< (arg1 arg2)
+  (declare (type tvar arg1 arg2))
   "Compare the hash codes obtained with SXHASH for arg1 and arg2.
 Return (< (sxhash arg1) (sxhash arg2))."
-  (< (sxhash arg1) (sxhash arg2)))
+  #+never
+  (< (the fixnum (tvar-id arg1))
+     (the fixnum (tvar-id arg2)))
+  #+sbcl
+  (< (the fixnum (sb-impl::sxhash-instance arg1))
+     (the fixnum (sb-impl::sxhash-instance arg2)))
+  #-sbcl
+  (< (the fixnum (sxhash arg1))
+     (the fixnum (sxhash arg2))))
+
+
+
 
 
 (defun try-lock-tvar (var log txt)
@@ -79,7 +91,8 @@ Return (< (sxhash arg1) (sxhash arg2))."
     flag))
 
 
-(defun try-lock-tvars (vars locked-vars log txt)
+
+(defmacro try-lock-tvars (vars locked-vars log txt)
   "Sort VARS in \"address\" order - actually in (sxhash ...) order -
 then non-blocking acquire their locks in such order.
 Reason: acquiring in unspecified order may cause livelock, as two transactions
@@ -88,38 +101,28 @@ may repeatedly try acquiring the same two TVARs in opposite order.
 Destructively modifies VARS.
 
 Return t if all VARS were locked successfully, otherwise return nil.
-In both cases, after return LOCKED-VARS will contain the locked tvars, listed
+In both cases, after this macro LOCKED-VARS will point to the locked tvars, listed
 in reverse order: from last acquired to first acquired."
-  (declare (type list vars)
-           (type cons locked-vars)
-           (type tlog log))
+  (with-gensym var
+    `(progn
+       ;;(log:user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
+       (setf ,vars (sort ,vars #'sxhash<))
+       ;;(log:user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
 
-  ;;(log:user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
-  (setf vars (sort vars #'sxhash<))
-  ;;(log:user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
-
-  (let1 acquired nil
-    (unwind-protect
-         (loop for cell = vars then tail
-            while cell
-            for tail = (rest cell)
-            for var = (first cell)
-            always (try-lock-tvar var log txt)
-            do (setf (rest cell) acquired)
-              (setf acquired cell))
-              ;; (log:user5 "locked TVARs: (~{~A~^ ~})" acquired)
-      (setf (first locked-vars) (first acquired))
-      (setf (rest locked-vars) (rest acquired)))))
+       (loop for ,var in ,vars
+          always (try-lock-tvar ,var ,log ,txt)
+          do (push ,var ,locked-vars)
+          ;; (log:user5 "locked TVARs: (~{~A~^ ~})" acquired)
+          finally (return t)))))
 
 
 (defun unlock-tvars (vars log)
   "Release locked VARS in reverse order of acquisition."
   (declare (type list vars)
            (type tlog log))
-  (when (first vars) ;; vars may be (NIL), ugly but needed by (try-lock-tvars ...) above
-    (loop for var in vars do
-         (release-lock (lock-of var))
-         (log:trace "Tlog ~A unlocked tvar ~A" (~ log) (~ var)))))
+  (loop for var in vars do
+       (release-lock (lock-of var))
+       (log:trace "Tlog ~A unlocked tvar ~A" (~ log) (~ var))))
 
 
 
@@ -130,7 +133,7 @@ Return :UNKNOWN if relevant locks could not be acquired."
   (declare (type tlog log))
   (let ((reads (reads-of log))
         (acquiring nil)
-        (acquired (list nil)))
+        (acquired nil)) ;; (list nil)))
 
     (when (zerop (hash-table-count reads))
       (return-from locked-valid? t))
@@ -293,7 +296,7 @@ b) another TLOG is writing the same TVARs being committed
   (let ((reads (reads-of log))
         (writes (writes-of log))
         (acquiring nil)
-        (acquired (list nil))
+        (acquired nil) ;; (list nil))
         changed
         success)
 
@@ -315,11 +318,9 @@ b) another TLOG is writing the same TVARs being committed
            ;; and other threads see this commit as atomic
            (setf acquiring (hash-table-keys reads))
            (do-hash (var val) writes
-             (multiple-value-bind (read-val read?) (gethash var reads)
-               (declare (ignore read-val))
-               ;; do not put duplicates in ACQUIRING list
-               (when (not read?)
-                 (push var acquiring))))
+             ;; do not put duplicates in ACQUIRING list
+             (unless (nth-value 1 (gethash var reads))
+               (push var acquiring)))
 
            (unless (try-lock-tvars acquiring acquired log "committed")
              (return-from commit nil))

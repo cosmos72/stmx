@@ -50,14 +50,18 @@
        (put fork2 f2)))))
 
 
-(defun dining-philosopher (i fork1 fork2 plate)
-  "Eat until not hungry anymore."
-  (declare (type tvar fork1 fork2)
-           (type cons plate)
-           (type fixnum i))
-  (log:info "philosopher ~A: fork1=~A fork2=~A plate=~A~%"
-            i ($ fork1) ($ fork2) (car plate))
-  (loop while (plusp (philosopher-eats fork1 fork2 plate))))
+(let ((out *standard-output*))
+  (defun dining-philosopher (i fork1 fork2 plate)
+    "Eat until not hungry anymore."
+    (declare (type tvar fork1 fork2)
+             (type cons plate)
+             (type fixnum i))
+    (log:info "philosopher ~A: fork1=~A fork2=~A plate=~A~%"
+              i ($ fork1) ($ fork2) (car plate))
+    (let ((*standard-output* out))
+      ;;(sb-sprof:with-profiling
+      ;;(:max-samples 1000 :sample-interval 0.001 :report :graph :loop nil :show-progress t)
+        (loop while (plusp (philosopher-eats fork1 fork2 plate))))))
 
 
 (defun dining-philosophers (philosophers-count &optional (philosophers-initial-hunger 1000000))

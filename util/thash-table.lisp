@@ -32,22 +32,18 @@
   "Initialize a new transactional hash-table. Accepts the same arguments as MAKE-HASH-TABLE,
 including any non-standard arguments supported by MAKE-HASH-TABLE implementation."
 
-  ;;(log:trace "test = ~A other-keys = ~{~A~^ ~}" test other-keys)
+  ;; do not allow :weak and :weakness flag in the options used to create hash-tables:
+  ;; 1. a lot of bugs would happen if entries disappear from DELTA
+  ;;    while still present in ORIGINAL.
+  ;; 2. if ORIGINAL is weak but DELTA is not, replacing ORIGINAL with DELTA
+  ;;    would discard the :weak or :weakness flag
+  (when (or (getf other-keys :weak) (getf other-keys :weakness))
+    (error "~A does not support weak keys and/or values" 'thash-table))
 
   (setf (options-of instance)  other-keys
         (original-of instance) (apply #'make-hash-table :test test other-keys)))
 
 
-(defun copy-plist-except (key plist)
-  (declare (type symbol key)
-           (type list plist))
-  (loop while plist
-     for k = (pop plist)
-     for v = (pop plist)
-     unless (eq k key)
-     collect k
-     and collect v))
-           
 (defun ensure-thash-delta (thash)
   "Create and set slot DELTA if nil. Return DELTA slot value."
   (declare (type thash-table thash))
@@ -57,11 +53,8 @@ including any non-standard arguments supported by MAKE-HASH-TABLE implementation
          it
          (progn
            (before-commit (normalize-thash thash))
-           ;; remove :weakness flag from the options used to create DELTA hash-table:
-           ;; a lot of bugs would happen if entries disappear from DELTA
-           ;; while still present in ORIGINAL.
            (setf delta (apply #'make-hash-table :test (hash-table-test (original-of thash))
-                              (copy-plist-except :weakness (options-of thash))))))))
+                              (options-of thash)))))))
 
 
 (defun thash-count (thash)

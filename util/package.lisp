@@ -53,7 +53,7 @@
 	   ;; transactional hash table
            #:thash-table 
            #:thash-count #:thash-empty? #:clear-thash
-           #:get-thash #:rem-thash   ;; also (setf (get-thash ... ) ... )
+           #:get-thash #:set-thash #:rem-thash   ;; also (setf (get-thash ... ) ... )
            #:map-thash #:do-thash))  ;; iterate on thash-table
 
 

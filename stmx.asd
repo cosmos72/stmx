@@ -52,7 +52,7 @@
                              (:file "tstack"      :depends-on ("container"))
                              (:file "tchannel"    :depends-on ("container"))
 
-			     (:file "pqueue"      :depends-on ("container"))
+			     (:file "bheap"       :depends-on ("container"))
 
                              (:file "bmap"        :depends-on ("print"))
                              (:file "rbmap"       :depends-on ("bmap"))

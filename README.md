@@ -21,6 +21,18 @@ STM gives freedom from deadlocks, automatic roll-back on failure,
 and it aims at resolving the tension between granularity and concurrency.
 
 
+General documentation
+---------------------
+
+An [introduction](doc/introduction.md) is available to explain more in detail what STMX is - and what it is not.
+
+For background information,
+[Composable Memory Transactions](http://research.microsoft.com/~simonpj/papers/stm/stm.pdf)
+is a very good - though a bit technical - explanation of memory transactions and
+how they are used and combined. For the interested reader, it also goes in
+deep detail on how to actually implement them.
+
+
 Supported systems
 -----------------
 
@@ -88,14 +100,6 @@ please include in the report:
 
 See "Contacts, help, discussion" below for the preferred method to send the report.
 
-
-General documentation
----------------------
-
-[Composable Memory Transactions](http://research.microsoft.com/~simonpj/papers/stm/stm.pdf)
-is a very good - though a bit technical - explanation of transactions and
-how they are used and combined. For the interested reader, it also goes in
-deep detail on how to actually implement memory transactions.
 
 Basic usage
 -----------
@@ -497,8 +501,9 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
 
 - `THASH-TABLE` is a transactional hash table.
   It is created with `(make-instance 'thash-table [:test test-function] [other-options])`.
-  An interesting feature: it accepts exactly the same options as MAKE-HASH-TABLE,
-  including any non-standard option supported by the underlying MAKE-HASH-TABLE implementation.
+  An interesting feature: it accepts the same options as MAKE-HASH-TABLE
+  including any non-standard option supported by the underlying MAKE-HASH-TABLE
+  implementation, except :weak and :weakness.
 
   Methods: `THASH-COUNT` `THASH-EMPTY?` `CLEAR-THASH`
            `GET-THASH` `(SETF GET-THASH)` `SET-THASH` `REM-THASH` 

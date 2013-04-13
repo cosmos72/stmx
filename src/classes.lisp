@@ -54,7 +54,7 @@ Set by TVARs when they change")
                  :type (or null vector)
                  :documentation "functions to call immediately after committing TLOG.")
    (id :reader id-of
-       :initform (incf *tlog-id-counter*)
+       :initform 0 ;;(incf *tlog-id-counter*)
        :type integer))
 
   (:documentation "A transaction log (TLOG) is a record of the reads and writes
@@ -65,15 +65,14 @@ transactional objects (TOBJs) or transactional variables (TVARs),
 and are later committed to memory if the transaction completes successfully."))
 
 
-
 (defvar +unbound+ (gensym "UNBOUND-"))
 
 (defclass tvar ()
   ((value :accessor raw-value-of
           :initarg :value
           :initform +unbound+)
-   (lock :accessor lock-of
-         :initform (make-lock "TVAR"))
+   (lock  :accessor lock-of
+          :initform (make-lock "TVAR"))
    (waiting :accessor waiting-for
             :initform nil
             :type (or null hash-table))
@@ -89,7 +88,6 @@ TVARs are seldom used directly, since transactional objects (TOBJs) wrap them
 with a more intuitive and powerful interface: you can read and write normally
 the slots of a transactional object (with slot-value, accessors ...),
 and behind the scenes the slots will be stored in transactional memory implemented by TVARs."))
-
 
 
 ;;;; ** Flags to control the behaviour of TLOGs and TOBJs

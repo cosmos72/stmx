@@ -38,11 +38,13 @@ Supported systems
 
 STMX is currently tested on the following Common Lisp implementations:
 
-* SBCL version 1.0.57.0.debian  64bit (x86_64) on Debian GNU/Linux 7.0 (wheezy)
-* SBCL version 1.0.55.0         32bit (x86)  on Ubuntu 12.04LTS (precise pangolin)
+* SBCL version 1.0.57.0.debian  64bit (x86_64) on Debian GNU/Linux 7.0 (wheezy) 64bit
+* SBCL version 1.0.55.0         32bit (x86)    on Ubuntu 12.04LTS (precise pangolin) 32bit
+* CCL  version 1.9-r15769       64bit (x86_64) on Debian GNU/Linux 7.0 (wheezy) 64bit
+* CCL  version 1.9-r15769M      32bit (x86)    on Debian GNU/Linux 7.0 (wheezy) 64bit
 
-It will probably work on most other Common Lisp implementations as long as
-they support closer-mop and bordeaux-threads, but the author gives no guarantees.
+It will probably work on several other Common Lisp implementations as long as they support
+arnesi, log4cl, closer-mop and bordeaux-threads, but the author gives no guarantees.
 
 
 Installation and loading

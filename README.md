@@ -3,7 +3,6 @@ STMX
 
 Summary
 -------
-
 STMX is a high-performance implementation of composable Software Transactional
 Memory (STM) for Common Lisp. STM is a concurrency control mechanism aimed
 at making concurrent programming easier to write and understand. Instead of
@@ -23,7 +22,6 @@ and it aims at resolving the tension between granularity and concurrency.
 
 General documentation
 ---------------------
-
 An [introduction](doc/introduction.md) is available to explain more in detail what STMX is - and what it is not.
 
 For background information,
@@ -35,7 +33,6 @@ deep detail on how to actually implement them.
 
 Supported systems
 -----------------
-
 STMX is currently tested on the following Common Lisp implementations:
 
 * SBCL version 1.0.57.0.debian  64bit (x86_64) on Debian GNU/Linux 7.0 (wheezy) 64bit
@@ -49,7 +46,6 @@ arnesi, log4cl, closer-mop and bordeaux-threads, but the author gives no guarant
 
 Installation and loading
 ------------------------
-
 STMX is packaged with asdf. The simplest way to install it is to first
 install [Quicklisp](http://www.quicklisp.org), as it can automatically
 resolve and download STMX dependencies.
@@ -105,7 +101,6 @@ See "Contacts, help, discussion" below for the preferred method to send the repo
 
 Basic usage
 -----------
-
 STMX offers the following Lisp macros and functions, also heavily documented
 in the sources - remember `(describe 'some-symbol)` at REPL.
 
@@ -293,7 +288,6 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
 
 Input/Output during transactions
 --------------------------------
-
 **WARNING:** since transactions will be re-executed in case of conflicts with other ones
 and can also rollback or retry, all non-transactional code inside an atomic block
 may be executed more times than expected, or may be executed when **not** expected.
@@ -324,6 +318,11 @@ in a transactional buffer. Then, invoke a separate function that first runs
 a transaction to atomically consume the buffer and only later,
 **outside** any transaction, performs the actual I/O operation.
 
+An alternative solution is: during a transaction, instead of performing I/O
+pass to `AFTER-COMMIT` a function that will perform I/O when executed.
+Note: `AFTER-COMMIT` is described in Advanced usage below, read it carefully
+because functions executed by `AFTER-COMMIT` have several restrictions on what they
+are allowed to do.
 
 Advanced usage
 --------------

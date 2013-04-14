@@ -42,9 +42,10 @@
 
 
 (defun $ (var)
-    "Get the value from the transactional variable VAR.
-Works both outside and inside transactions.
+    "Get the value from the transactional variable VAR and return it.
+Signal an error if VAR is not bound to a value.
 
+Works both outside and inside transactions.
 During transactions, it uses transaction log to record the read
 and to check for any value stored in the log."
   (declare (type tvar var))
@@ -59,8 +60,8 @@ and to check for any value stored in the log."
 
 (defun (setf $) (value var)
     "Store VALUE inside transactional variable VAR.
-Works both outside and inside transactions.
 
+Works both outside and inside transactions.
 During transactions, it uses transaction log to record the value."
   (declare (type tvar var))
 
@@ -68,7 +69,6 @@ During transactions, it uses transaction log to record the value."
       (tx-write-of var value)
       (setf (raw-value-of var) value)))
                
-            
   
 (defun bound-$? (var)
     "Return true if transactional variable VAR is bound to a value.
@@ -98,6 +98,67 @@ During transactions, it uses transaction log to record the 'unbound' value."
 
 
 
+(defun peek-$ (var &optional default)
+    "Get the value from the transactional variable VAR
+and return it and t as multiple values.
+If VAR is not bound to a value, return (values default nil).
+
+Works both outside and inside transactions.
+During transactions, it uses transaction log to record the read
+and to check for any value stored in the log."
+  (declare (type tvar var))
+
+  (let1 value (if (recording?)
+                  (tx-read-of var)
+                  (raw-value-of var))
+    (if (eq value +unbound+)
+      (values default nil)
+      (values value t))))
+
+
+(defun try-take-$ (var &optional default)
+    "Get the value from the transactional variable VAR,
+unbind it and and return the original value and t as multiple values.
+If VAR is not bound to a value, return (values DEFAULT nil).
+
+Works both outside and inside transactions.
+During transactions, it uses transaction log to record the read and write
+and to check for any value stored in the log."
+  (declare (type tvar var))
+
+  (if (recording?)
+      (let1 value (tx-read-of var)
+        (if (eq value +unbound+)
+            (values default nil)
+            (progn
+              (tx-write-of var +unbound+)
+              (values value t))))
+      (let1 value (raw-value-of var)
+        (if (eq value +unbound+)
+            (values default nil)
+            (progn
+              (setf (raw-value-of var) +unbound+)
+              (values value t))))))
+
+
+(defun try-put-$ (var value &optional default)
+    "If VAR is not bound, bind it to VALUE and return (values VALUE t)
+If VAR is already bound to a value, return (values DEFAULT nil).
+
+Works both outside and inside transactions.
+During transactions, it uses transaction log to record the read and write
+and to check for any value stored in the log."
+  (declare (type tvar var))
+
+  (if (recording?)
+      (let1 old-value (tx-read-of var)
+        (if (eq old-value +unbound+)
+            (values (tx-write-of var value) t)
+            (values default nil)))
+      (let1 old-value (raw-value-of var)
+        (if (eq old-value +unbound+)
+            (values (setf (raw-value-of var) value) t)
+            (values default nil)))))
 
 ;;;; ** Accessors
 

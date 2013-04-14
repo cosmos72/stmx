@@ -318,7 +318,7 @@ b) another TLOG is writing the same TVARs being committed
            (setf acquiring (hash-table-keys reads))
            (do-hash (var val) writes
              ;; do not put duplicates in ACQUIRING list
-             (unless (nth-value 1 (gethash var reads))
+             (unless (nth-value 1 (get-hash reads var))
                (push var acquiring)))
 
            (unless (try-lock-tvars acquiring acquired log "committed")

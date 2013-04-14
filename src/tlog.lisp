@@ -100,17 +100,17 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
            (type tlog log))
 
   (multiple-value-bind (value present?)
-      (gethash var (tlog-writes log))
+      (get-hash (tlog-writes log) var)
     (when present?
       (return-from tx-read-of value)))
 
   (let1 reads (tlog-reads log)
     (multiple-value-bind (value present?)
-        (gethash var reads)
+        (get-hash reads var)
       (when present?
         (return-from tx-read-of value)))
 
-    (setf (gethash var reads) (raw-value-of var))))
+    (set-hash reads var (raw-value-of var))))
 
 
 (defun tx-write-of (var value &optional (log (current-tlog)))
@@ -121,7 +121,7 @@ and by writing TOBJs slots."
   (declare (type tvar var)
            (type tlog log))
 
-  (setf (gethash var (tlog-writes log)) value))
+  (set-hash (tlog-writes log) var value))
 
 
 

@@ -41,23 +41,21 @@
 
 (transaction
  (defmethod peek ((var tvar) &optional default)
-   (if (bound-$? var)
-       (values ($ var) t)
-       (values default nil))))
-       
+   (peek-$ var default)))
 
 (transaction
  (defmethod take ((var tvar))
-   (if (empty? var)
-       (retry)
-       (prog1 ($ var)
-         (unbind-$ var)))))
+   (multiple-value-bind (value took?) (try-take-$ var)
+     (unless took?
+       (retry))
+     value)))
+
 
 (transaction
  (defmethod put ((var tvar) value)
-   (if (empty? var)
-       (setf ($ var) value)
-       (retry))))
+   (unless (nth-value 1 (try-put-$ var value))
+     (retry))
+   value))
 
 (transaction
  (defmethod try-take ((var tvar))
@@ -65,11 +63,8 @@
 Less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
 Linux amd64) than the unspecialized (try-take place) which calls
 \(atomic (nonblocking (take place)))"
-   (if (empty? var)
-       nil
-       (let1 value ($ var)
-         (unbind-$ var)
-         (values t value)))))
+   (multiple-value-bind (value took?) (try-take-$ var)
+     (values took? value))))
 
 (transaction
  (defmethod try-put ((var tvar) value)
@@ -77,8 +72,5 @@ Linux amd64) than the unspecialized (try-take place) which calls
 Less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
 Linux amd64) than the unspecialized (try-put place) which calls
 \(atomic (nonblocking (put place value)))"
-   (if (empty? var)
-       (progn
-         (setf ($ var) value)
-         (values t value))
-       nil)))
+   (multiple-value-bind (value-or-nil put?) (try-put-$ var value)
+     (values put? value-or-nil))))

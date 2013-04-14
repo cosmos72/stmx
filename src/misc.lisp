@@ -33,27 +33,64 @@
 
 ;;;; * Hash-table utilities
 
+(defstruct hash-counter
+  "(stmx.example1::dining-philosophers 4 1000000) on average
+does 4.4 million iterations and causes the following
+hash table operations for EACH iteration:
+  15.0  get
+   8.0  set
+  11.4  iterations inside do-hash"
+
+  (get 0 :type sb-vm:word)
+  (set 0 :type sb-vm:word)
+  (rem 0 :type sb-vm:word)
+  (loop 0 :type sb-vm:word))
+
+
+(defvar *hash-counter* (make-hash-counter))
+
+(defmacro incf-hash-counter (which)
+  (let1 accessor (intern (concatenate 'string "HASH-COUNTER-" (symbol-name which)) 'stmx)
+    `(progn
+       ;;(sb-ext:atomic-incf (,accessor *hash-counter*))
+       nil)))
+
 (defmacro do-hash ((key &optional value) hash &body body)
   "Execute body on each key/value pair contained in hash table"
   `(loop for ,key being each hash-key in ,hash
       ,@(when value `(using (hash-value ,value)))
-      do (progn ,@body)))
+      do (progn
+           (incf-hash-counter loop)
+           ,@body)))
         
-(declaim (inline get-hash set-hash rem-hash))
-
+(declaim (inline get-hash))
 (defun get-hash (hash key)
   "Same as (gethash key hash), only with reversed arguments."
   (declare (type hash-table hash))
+  (incf-hash-counter get)
   (gethash key hash))
 
+
+(declaim (inline set-hash))
 (defun set-hash (hash key value)
   "Shortcut for (setf (gethash key hash) value)"
   (declare (type hash-table hash))
+  (incf-hash-counter set)
   (setf (gethash key hash) value))
 
+(declaim (inline (setf get-hash)))
+(defun (setf get-hash) (value hash key)
+  "Same as (setf (gethash key hash) value), only with reversed key and hash arguments."
+  (declare (type hash-table hash))
+  (setf (gethash key hash) value))
+
+
+
+(declaim (inline rem-hash))
 (defun rem-hash (hash key)
   "Same as (remhash key hash), only with reversed arguments."
   (declare (type hash-table hash))
+  (incf-hash-counter rem)
   (remhash key hash))
 
 

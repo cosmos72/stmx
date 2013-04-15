@@ -17,30 +17,24 @@
 
 (defpackage #:stmx.test
   (:use #:cl
-        #:arnesi
         #:bordeaux-threads
         #:fiveam
+        #:stmx.lang
         #:stmx
         #:stmx.util)
 
   (:import-from #:stmx
-                #:new
                 #:raw-value-of #:tx-read-of #:tx-write-of
                 #:tlog  #:make-tlog
                 #:commit
                 #:valid?
                 #:current-tlog
-                #:with-recording-to-tlog
-
-                #:get-hash #:set-hash #:rem-hash)
-
-  (:shadowing-import-from #:stmx
-                          #:hash-table-keys #:hash-table-values #:hash-table-pairs)
+                #:with-recording-to-tlog)
 
   (:import-from #:stmx.util
                 #:print-object-contents
                 #:print-bmap
-                #:rbnode #:tnode
+                #:rbnode #:tnode #:color-of
                 #:bmap/new-node
                 #:+red+ #:+black+
                 #:red? #:black?)

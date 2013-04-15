@@ -18,10 +18,12 @@
 (in-package :cl-user)
 
 (defpackage #:stmx
+
   (:use #:cl
-        #:arnesi
         #:bordeaux-threads
-        #:closer-mop)
+        #:closer-mop
+        #:stmx.lang)
+
   (:shadowing-import-from #:closer-mop
                           #:defclass
                           #:standard-class
@@ -29,6 +31,7 @@
                           #:standard-method
                           #:defmethod
                           #:defgeneric)
+
   (:export #:atomic    #:run-atomic
            #:retry
            #:orelse    #:run-orelse

@@ -13,23 +13,7 @@
 ;; See the Lisp Lesser General Public License for more details.
 
 
-(in-package :stmx)
-
-;;;; * New
-
-(defmacro new (class &rest initargs &key &allow-other-keys)
-  `(make-instance ,class ,@initargs))
-
-;;;; * Macros
-
-(defmacro with-gensym (name &body body)
-  `(let ((,name (gensym)))
-     ,@body))
-
-(defmacro with-gensyms ((&rest names) &body body)
-  `(let ,(loop for name in names collect `(,name (gensym)))
-     ,@body))
-
+(in-package :stmx.lang)
 
 ;;;; * Hash-table utilities
 
@@ -45,18 +29,23 @@ hash table operations for EACH iteration:
   (get 0 :type sb-vm:word)
   (set 0 :type sb-vm:word)
   (rem 0 :type sb-vm:word)
+  (clear 0 :type sb-vm:word)
   (loop 0 :type sb-vm:word))
 
 
 (defvar *hash-counter* (make-hash-counter))
-|#
-
 
 (defmacro incf-hash-counter (which)
   (let1 accessor (intern (concatenate 'string "HASH-COUNTER-" (symbol-name which)) 'stmx)
     `(progn
-       ;;(sb-ext:atomic-incf (,accessor *hash-counter*))
+       (sb-ext:atomic-incf (,accessor *hash-counter*))
        nil)))
+|#
+
+(defmacro incf-hash-counter (which)
+  (declare (ignore which))
+  nil)
+
 
 (defmacro do-hash ((key &optional value) hash &body body)
   "Execute body on each key/value pair contained in hash table"
@@ -97,6 +86,15 @@ hash table operations for EACH iteration:
   (remhash key hash))
 
 
+(declaim (inline clear-hash))
+(defun clear-hash (hash)
+  "Same as (clrhash hash)."
+  (declare (type hash-table hash))
+  (incf-hash-counter clear)
+  (clrhash hash))
+
+
+
 (defun hash-table-keys (src &optional to-list)
   "Return a list containing the keys in hash-table SRC.
 If TO-LIST is not nil, it will be appended to the returned list.
@@ -131,7 +129,6 @@ TO-ALIST contents is not destructively modified."
   to-alist)
   
   
-
 (defun copy-hash-table (dst src)
   "Copy all key/value pairs from hash-table SRC into hash-table DST.
 Other keys (and their values) present in DST but not in SRC
@@ -154,58 +151,8 @@ otherwise return nil.
 
   (declare (type hash-table src dst))
   (do-hash (var val1) src
-    (multiple-value-bind (val2 present2?) (gethash var dst)
+    (multiple-value-bind (val2 present2?) (get-hash dst var)
       (when (and present2? (not (eq val1 val2)))
         (return-from merge-hash-tables nil))
-      (setf (gethash var dst) val1)))
+      (set-hash dst var val1)))
   t)
-
-
-
-
-;;;; * Printing utilities
-
-(defgeneric id-of (obj))
-(defgeneric (setf id-of) (value obj))
-
-(defun compute-string-of (obj)
-  (handler-case
-      (format nil "~A" obj)
-    (t ()
-      (handler-case
-          (format nil "~S" obj)
-        (t ()
-          "<error printing object>")))))
-
-(defun compute-id-of (obj)
-  (declare (type t obj))
-  (let* ((str (the string (compute-string-of obj)))
-         (beg (position #\{ str))
-         (end (position #\} str)))
-    (the string
-      (if (and beg end)
-          (subseq str (1+ beg) end)
-          str))))
-
-(eval-always
-  (let1 ids
-      #+sbcl (make-hash-table :test 'eq :size 100 :weakness :key)
-      #-sbcl (make-hash-table :test 'eq :size 100 :weak :key)
-      
-      (defmethod id-of (obj)
-        (the string
-          (or
-           (gethash obj ids)
-           (setf (gethash obj ids) (compute-id-of obj)))))
-
-      (defmethod (setf id-of) (value obj)
-        (set-hash ids obj (format nil "~A" value)))))
-
-
-(declaim (inline ~ (setf ~)))
-
-(defun ~ (obj)
-  (id-of obj))
-
-(defun (setf ~) (value obj)
-  (setf (id-of obj) value))

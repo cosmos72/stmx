@@ -49,12 +49,12 @@ including any non-standard arguments supported by MAKE-HASH-TABLE implementation
   (declare (type thash-table thash))
 
   (with-rw-slots (delta) thash
-    (aif delta
-         it
-         (progn
-           (before-commit (normalize-thash thash))
-           (setf delta (apply #'make-hash-table :test (hash-table-test (original-of thash))
-                              (options-of thash)))))))
+    (if delta
+        delta
+        (progn
+          (before-commit (normalize-thash thash))
+          (setf delta (apply #'make-hash-table :test (hash-table-test (original-of thash))
+                             (options-of thash)))))))
 
 
 (defun thash-count (thash)

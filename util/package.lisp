@@ -20,13 +20,8 @@
 (defpackage #:stmx.util
   
   (:use #:cl
-        #:arnesi
+        #:stmx.lang
         #:stmx)
-
-  (:import-from #:stmx
-                #:with-gensym
-                #:with-gensyms
-                #:do-hash)
 
   (:export #:tcell #:tfifo #:tstack #:tchannel #:tport ;; transactional containers
 

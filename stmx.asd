@@ -17,22 +17,27 @@
 
 (asdf:defsystem :stmx
   :name "STMX"
-  :version "0.9.0"
+  :version "1.0.1"
   :license "LLGPL"
   :author "Massimiliano Ghilardi"
   :description "Composable Software Transactional Memory"
 
-  :depends-on (:arnesi
-               :bordeaux-threads
+  :depends-on (:log4cl
                :closer-mop
-               :log4cl)
+               :bordeaux-threads)
 
   :components ((:static-file "stmx.asd")
 
-               (:module :src
+               (:module :lang
                 :components ((:file "package")
-                             (:file "misc"        :depends-on ("package"))
-                             (:file "classes"     :depends-on ("misc"))
+                             (:file "macro"       :depends-on ("package"))
+                             (:file "hash-table"  :depends-on ("package"))
+                             (:file "print"       :depends-on ("package"))))
+
+               (:module :src
+                :depends-on (:lang)
+                :components ((:file "package")
+                             (:file "classes"     :depends-on ("package"))
                              (:file "tlog"        :depends-on ("classes"))
                              (:file "tvar"        :depends-on ("tlog"))
                              (:file "tclass"      :depends-on ("tvar"))
@@ -41,6 +46,7 @@
                              (:file "orelse"      :depends-on ("atomic"))))
 
                (:module :util
+                :depends-on (:lang :src)
                 :components ((:file "package")
                              (:file "misc"        :depends-on ("package"))
                              (:file "print"       :depends-on ("package"))
@@ -58,21 +64,19 @@
                              (:file "rbmap"       :depends-on ("bmap"))
                              (:file "tmap"        :depends-on ("rbmap"))
 
-                             (:file "thash-table" :depends-on ("print")))
-                :depends-on (:src))))
+                             (:file "thash-table" :depends-on ("print"))))))
 
 
 
 (asdf:defsystem :stmx.test
   :name "STMX.TEST"
-  :version "0.9.0"
+  :version "1.0.1"
   :author "Massimiliano Ghilardi"
   :license "LLGPL"
   :description "test suite for STMX"
 
-  :depends-on (:arnesi
+  :depends-on (:log4cl
                :bordeaux-threads
-               :log4cl
                :fiveam
                :stmx)
 

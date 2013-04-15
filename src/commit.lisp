@@ -62,14 +62,14 @@ but does *not* check log parents for validity."
 
 (defun tvar< (var1 var2)
   (declare (type tvar var1 var2))
-  "Compare the hash codes obtained with SXHASH for var1 and var2.
-Return (< (sxhash var1) (sxhash var2))."
+  "Compare var1 and var2 with respect to some ordering criteria.
+Currently returns (< (tvar-id var1) (tvar-id var2))."
   (< (the fixnum (tvar-id var1))
      (the fixnum (tvar-id var2)))
   #+never
-  (< (the fixnum (sb-impl::sxhash-instance var1))
-     (the fixnum (sb-impl::sxhash-instance var2)))
-  #-sbcl
+  (< (the fixnum (sb-impl::get-lisp-obj-address var1))
+     (the fixnum (sb-impl::get-lisp-obj-address var2)))
+  #+never
   (< (the fixnum (sxhash var1))
      (the fixnum (sxhash var2))))
 

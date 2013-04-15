@@ -33,6 +33,7 @@
 
 ;;;; * Hash-table utilities
 
+#|
 (defstruct hash-counter
   "(stmx.example1::dining-philosophers 4 1000000) on average
 does 4.4 million iterations and causes the following
@@ -48,6 +49,8 @@ hash table operations for EACH iteration:
 
 
 (defvar *hash-counter* (make-hash-counter))
+|#
+
 
 (defmacro incf-hash-counter (which)
   (let1 accessor (intern (concatenate 'string "HASH-COUNTER-" (symbol-name which)) 'stmx)

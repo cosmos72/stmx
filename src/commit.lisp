@@ -60,11 +60,11 @@ but does *not* check log parents for validity."
   (not (shallow-valid? log)))
 
 
-(defun tvar< (var1 var2)
+(defun tvar> (var1 var2)
   (declare (type tvar var1 var2))
-  "Compare var1 and var2 with respect to some ordering criteria.
-Currently returns (< (tvar-id var1) (tvar-id var2))."
-  (< (the fixnum (tvar-id var1))
+  "Compare var1 and var2 with respect to age: newer tvars usually have larger
+tvar-id and are considered \"larger\". Returns (> (tvar-id var1) (tvar-id var2))."
+  (> (the fixnum (tvar-id var1))
      (the fixnum (tvar-id var2)))
   #+never
   (< (the fixnum (sb-impl::get-lisp-obj-address var1))
@@ -76,13 +76,15 @@ Currently returns (< (tvar-id var1) (tvar-id var2))."
 
 
 
-
+(declaim (inline try-lock-tvar))
 (defun try-lock-tvar (var log txt)
   "Try to acquire VAR lock non-blocking. Return t if acquired, else return nil."
   (declare (type tvar var)
            (type tlog log)
-           (type string txt))
+           (type string txt)
+           (ignorable log txt))
   (let1 flag (acquire-lock (tvar-lock var) nil)
+    #+never
     (if flag
         (log:trace "Tlog ~A locked tvar ~A" (~ log) (~ var))
         (log:debug "Tlog ~A not ~A: could not lock tvar ~A"
@@ -91,37 +93,55 @@ Currently returns (< (tvar-id var1) (tvar-id var2))."
 
 
 
-(defmacro try-lock-tvars (vars locked-vars log txt)
-  "Sort VARS in \"address\" order - actually in (sxhash ...) order -
+(defun try-lock-tvars (vars locked-vars log txt)
+  "Sort VARS in order - actually in (tvar< ...) order -
 then non-blocking acquire their locks in such order.
 Reason: acquiring in unspecified order may cause livelock, as two transactions
 may repeatedly try acquiring the same two TVARs in opposite order.
 
-Destructively modifies VARS.
+LOCKED-VARS must be the one-element list '(nil).
+Destructively modifies VARS and LOCKED-VARS.
 
-Return t if all VARS were locked successfully, otherwise return nil.
-In both cases, after this macro LOCKED-VARS will point to the locked tvars, listed
-in reverse order: from last acquired to first acquired."
-  (with-gensym var
-    `(progn
-       ;;(log:user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
-       (setf ,vars (sort ,vars #'tvar<))
-       ;;(log:user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
+Return t if all VARS where locked successfully, otherwise return nil.
+In both cases, after this call (rest LOCKED-VARS) will be the list
+containing the locked tvars, sorted in order from first acquired
+to last acquired."
+  (declare (type list vars locked-vars)
+           (type tlog log)
+           (type string txt))
 
-       (loop for ,var in ,vars
-          always (try-lock-tvar ,var ,log ,txt)
-          do (push ,var ,locked-vars)
-          ;; (log:user5 "locked TVARs: (~{~A~^ ~})" acquired)
-          finally (return t)))))
+  #+never (log:user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
+
+  ;; if locking 20 TVARs or more, sort them to avoid livelock.
+  ;; with less than 20 TVARS, the probability of a context switch
+  ;; while locking is so low that sorting is not worth the cost
+  (when-bind tail (cddddr vars)
+    (when-bind tail (cddddr tail)
+      (when-bind tail (cddddr tail)
+        (when-bind tail (cddddr tail)
+          (when-bind tail (cddddr tail)
+            (setf vars (sort vars #'tvar>)))))))
+  #+never (log:user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
+
+  (loop for cell = vars then rest
+     while cell
+     for rest = (rest cell)
+     always (try-lock-tvar (first cell) log txt)
+     do (setf (rest locked-vars) cell)
+       (setf locked-vars cell)
+       (setf (rest cell) nil)
+     finally (return t)))
 
 
 (defun unlock-tvars (vars log)
-  "Release locked VARS in reverse order of acquisition."
+  "Release locked (rest VARS) in same order of acquisition."
   (declare (type list vars)
-           (type tlog log))
+           (type tlog log)
+           (ignorable log))
+  (setf vars (rest vars))
   (loop for var in vars do
        (release-lock (tvar-lock var))
-       (log:trace "Tlog ~A unlocked tvar ~A" (~ log) (~ var))))
+       #+never (log:trace "Tlog ~A unlocked tvar ~A" (~ log) (~ var))))
 
 
 
@@ -132,7 +152,7 @@ Return :UNKNOWN if relevant locks could not be acquired."
   (declare (type tlog log))
   (let ((reads (tlog-reads log))
         (acquiring nil)
-        (acquired nil)) ;; (list nil)))
+        (acquired (list nil)))
 
     (when (zerop (hash-table-count reads))
       (return-from locked-valid? t))
@@ -261,8 +281,8 @@ and the error will be propagated to the caller"
       (handler-case
           (loop-funcall-on-appendable-vector funcs)
         (rerun-error ()
-         (log:trace "Tlog ~A before-commit wants to rerun" (~ log))
-         (return-from invoke-before-commit nil)))))
+          (log:trace "Tlog ~A before-commit wants to rerun" (~ log))
+          (return-from invoke-before-commit nil)))))
   t)
 
 
@@ -295,7 +315,7 @@ b) another TLOG is writing the same TVARs being committed
   (let ((reads (tlog-reads log))
         (writes (tlog-writes log))
         (acquiring nil)
-        (acquired nil) ;; (list nil))
+        (acquired (list nil))
         changed
         success)
 
@@ -308,47 +328,50 @@ b) another TLOG is writing the same TVARs being committed
       (invoke-after-commit log)
       (return-from commit t))
 
-    (log:trace "Tlog ~A committing..." (~ log))
+    #+never (log:trace "Tlog ~A committing..." (~ log))
 
     (unwind-protect
-         (progn
+         (block nil
            ;; we must lock TVARs that have been read or written: expensive
            ;; but needed to ensure this threads sees other commits as atomic,
            ;; and other threads see this commit as atomic
-           (setf acquiring (hash-table-keys reads))
-           (do-hash (var val) writes
-             ;; do not put duplicates in ACQUIRING list
-             (unless (nth-value 1 (get-hash reads var))
-               (push var acquiring)))
-
+           (let ((big-hash   reads)
+                 (small-hash writes))
+             
+             (when (< (hash-table-count big-hash) (hash-table-count small-hash))
+               (rotatef big-hash small-hash))
+ 
+             (setf acquiring (hash-table-keys big-hash))
+             (do-hash (var val) small-hash
+               ;; do not put duplicates in ACQUIRING list
+               (unless (nth-value 1 (get-hash big-hash var))
+                 (push var acquiring))))
+           
            (unless (try-lock-tvars acquiring acquired log "committed")
-             (return-from commit nil))
-
+             (return))
+            
            ;; check for log validity one last time, with locks held.
            (when (invalid? log)
              (log:debug "Tlog ~A is invalid, not committed (checked with locks)" (~ log))
-             (return-from commit nil))
+             (return))
 
            ;; COMMIT, i.e. actually write new values into TVARs
            (do-hash (var val) writes
              (let1 current-val (raw-value-of var)
-               (when (not (eq val current-val))
-                 (setf (raw-value-of var) val)
-                 (push var changed)
-                 (log:trace "Tlog ~A tvar ~A changed value from ~A to ~A"
-                            (~ log) (~ var) current-val val))))
+                   (when (not (eq val current-val))
+                     (setf (raw-value-of var) val)
+                     (push var changed)
+                     #+never (log:trace "Tlog ~A tvar ~A changed value from ~A to ~A"
+                                        (~ log) (~ var) current-val val))))
 
            (log:debug "Tlog ~A committed." (~ log))
-
-           (return-from commit (setf success t)))
+           (setf success t))
 
       (unlock-tvars acquired log)
-
       (dolist (var changed)
-        (log:trace "Tlog ~A notifying threads waiting on tvar ~A"
-                   (~ log) (~ var))
+        #+never (log:trace "Tlog ~A notifying threads waiting on tvar ~A"
+                           (~ log) (~ var))
         (notify-tvar var))
-
       (when success
         ;; after-commit functions run without locks
         (invoke-after-commit log)))))

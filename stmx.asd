@@ -24,7 +24,8 @@
 
   :depends-on (:log4cl
                :closer-mop
-               :bordeaux-threads)
+               :bordeaux-threads
+               :trivial-garbage)
 
   :components ((:static-file "stmx.asd")
 

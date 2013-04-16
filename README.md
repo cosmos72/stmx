@@ -41,7 +41,7 @@ STMX is currently tested on the following Common Lisp implementations:
 * CCL  version 1.9-r15769M      32bit (x86)    on Debian GNU/Linux 7.0 (wheezy) 64bit
 
 It will probably work on several other Common Lisp implementations as long as they support
-arnesi, log4cl, closer-mop and bordeaux-threads, but the author gives no guarantees.
+log4cl, closer-mop, bordeaux-threads and trivial-garbage, but the author gives no guarantees.
 
 
 Installation and loading
@@ -64,10 +64,10 @@ then load a REPL and run:
      
 If all goes well, it will automatically download and install STMX dependencies:
 
-- `arnesi`
 - `log4cl`
 - `closer-mop`
 - `bordeaux-threads`
+- `trivial-garbage`
 
 then it will load STMX and be ready to use.
 
@@ -75,7 +75,7 @@ In case you get errors:
 
 - check that quicklisp is installed correctly, for example by executing at REPL
 
-        CL-USER> (ql:quickload "arnesi")
+        CL-USER> (ql:quickload "closer-mop")
 
 - check that you downloaded STMX creating an `stmx/` folder inside
   your Quicklisp local-projects folder, usually `~/quicklisp/local-projects`
@@ -528,17 +528,21 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
 
 Performance
 -----------
-See the included file [doc/benchmark.md](doc/benchmark.md) for performance considerations
-and a lot of raw numbers.
+See the included file [doc/benchmark.md](doc/benchmark.md) for performance
+considerations and a lot of raw numbers.
 
-The short version is: as of April 2013, on a fast PC (Core i5 @ 3GHz or better) with a fast
-Common Lisp (SBCL or better), STMX can execute slightly more than 1 million transactions
-per second per CPU core.
+The short version is: as of April 2013, on a fast PC (Core i5 @ 3GHz or better)
+with a fast Common Lisp (SBCL or better), STMX can execute slightly more than
+1 million transactions per second per CPU core.
 
-Taking as a small but somewhat realistic example the (dining philosophers)[example/dining-philosophers.lisp], with 5 reads and 5 writes to transactional memory per atomic block and a moderate rate of conflicts and retries (10-20%), each CPU core runs approximately 500000 transactions per second.
+Taking as a small but somewhat realistic example the (dining philosophers)[example/dining-philosophers.lisp],
+with 5 reads and 5 writes to transactional memory per atomic block and
+a moderate rate of conflicts and retries (10-20%), each CPU core runs
+approximately 600000 transactions per second.
 
-Obviously, performance in other cases will depend on the complexity of the code inside transactions,
-on the number of reads and writes to transactional memory, and the rate of conflicts and retries.
+Obviously, performance in other cases will depend on the complexity of the code
+inside transactions, on the number of reads and writes to transactional memory,
+and the rate of conflicts and retries.
 
 
 Contacts, help, discussion

@@ -248,9 +248,14 @@ transactional memory it read has changed."
    (log:debug "Tlog ~A {~A} will sleep, then retry" (~ log) (~ tx))
    ;; wait-tlog sleeps only if log is valid
    (wait-tlog log)
-   (go rerun)
+   (go rerun-noyield)
 
    rerun
+   (when *yield-before-rerun*
+     (thread-yield))
+   ;; fallthrough
+
+   rerun-noyield
    (new-or-clear-tlog log :parent (tlog-parent log))
    (go run)))
 

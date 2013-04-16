@@ -30,9 +30,8 @@
 (declaim (type (and (vector tlog) (not simple-array)) *tlog-pool*))
 (defvar *tlog-pool* (make-tlog-pool))
 
-(eval-always
-  (unless (assoc '*tlog-pool* bt:*default-special-bindings*)
-    (push '(*tlog-pool* . (make-tlog-pool)) bt:*default-special-bindings*)))
+(eval-when (:load-toplevel :execute)
+  (ensure-thread-initial-bindings '(*tlog-pool* . (make-tlog-pool))))
 
 
 ;;;; ** Creating, copying and clearing tlogs

@@ -213,6 +213,7 @@ if VAR changes."
 ;;;; ** Printing
 
 (defprint-object (obj tvar)
-  (if (bound-$? obj)
-      (format t "[~A]" ($ obj))
-      (format t "unbound")))
+  (multiple-value-bind (value present?) (peek-$ obj)
+    (if present?
+        (format t "~A [~A]" (~ obj) value)
+        (format t "~A unbound" (~ obj)))))

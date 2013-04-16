@@ -17,9 +17,11 @@
 
 ;;;; * Hash-table utilities
 
-#|
-(defstruct hash-counter
-  "(stmx.example1::dining-philosophers 4 1000000) on average
+
+#+never
+(eval-always
+ (defstruct hash-counter
+   "(stmx.example1::dining-philosophers 4 1000000) on average
 does 4.4 million iterations and causes the following
 hash table operations for EACH iteration:
   15.0  get
@@ -33,15 +35,15 @@ hash table operations for EACH iteration:
   (loop 0 :type sb-vm:word))
 
 
-(defvar *hash-counter* (make-hash-counter))
+ (defvar *hash-counter* (make-hash-counter))
 
-(defmacro incf-hash-counter (which)
-  (let1 accessor (intern (concatenate 'string "HASH-COUNTER-" (symbol-name which)) 'stmx)
-    `(progn
-       (sb-ext:atomic-incf (,accessor *hash-counter*))
-       nil)))
-|#
+ (defmacro incf-hash-counter (which)
+   (let1 accessor (intern (concatenate 'string "HASH-COUNTER-" (symbol-name which)) 'stmx.lang)
+     `(progn
+        (sb-ext:atomic-incf (,accessor *hash-counter*))
+        nil))))
 
+#-always
 (defmacro incf-hash-counter (which)
   (declare (ignore which))
   nil)

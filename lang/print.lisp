@@ -21,6 +21,7 @@
 (defgeneric id-of (obj))
 (defgeneric (setf id-of) (value obj))
 
+#-sbcl
 (defun compute-string-of (obj)
   (handler-case
       (format nil "~A" obj)
@@ -30,8 +31,12 @@
         (t ()
           "<error printing object>")))))
 
+
 (defun compute-id-of (obj)
   (declare (type t obj))
+  #+sbcl
+  (format nil "~X" (sb-impl::get-lisp-obj-address obj))
+  #-sbcl
   (let* ((str (the string (compute-string-of obj)))
          (beg (position #\{ str))
          (end (position #\} str)))
@@ -40,19 +45,19 @@
           (subseq str (1+ beg) end)
           str))))
 
-(eval-always
-  (let1 ids
-      #+sbcl (make-hash-table :test 'eq :size 100 :weakness :key)
-      #-sbcl (make-hash-table :test 'eq :size 100 :weak :key)
-      
-      (defmethod id-of (obj)
-        (the string
-          (or
-           (gethash obj ids)
-           (setf (gethash obj ids) (compute-id-of obj)))))
 
-      (defmethod (setf id-of) (value obj)
-        (set-hash ids obj (format nil "~A" value)))))
+
+(defvar *print-ids*
+  (trivial-garbage:make-weak-hash-table :test 'eq :size 100 :weakness :key :weakness-matters t))
+
+(defmethod id-of (obj)
+  (the string
+    (or
+     (get-hash *print-ids* obj)
+     (set-hash *print-ids* obj (compute-id-of obj)))))
+
+(defmethod (setf id-of) (value obj)
+  (set-hash *print-ids* obj (format nil "~A" value)))
 
 
 (declaim (inline ~ (setf ~)))
@@ -69,13 +74,10 @@
   (let1 stream (gensym "STREAM-")
     `(defmethod print-object ((,obj ,class) ,stream)
        (print-unreadable-object (,obj ,stream :type ,type :identity ,identity)
-         (prog ((*standard-output* ,stream))
-            (handler-bind ((error
-                            (lambda (err)
-                              (declare (ignore err))
-                              (write-string "<error printing object>")
-                              (go label-defprint-object-out))))
-              ,@body)
-            label-defprint-object-out)))))
-         
+         (let1 *standard-output* ,stream
+            (handler-case
+                (progn
+                  ,@body)
+              (t ()
+                (write-string "<error printing object>"))))))))
                               

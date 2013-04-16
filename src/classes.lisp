@@ -68,7 +68,7 @@ and are later committed to memory if the transaction completes successfully."
   ;; Functions to call immediately after committing TLOG.
   (after-commit  nil :type (or null vector)) ;; tlog-after-commit
 
-  (id (next-id *tlog-id*) :type fixnum)) ;; tlog-id
+  (id (next-id *tlog-id*) :type fixnum :read-only t)) ;; tlog-id
 
 
 (defmethod id-of ((log tlog))
@@ -95,7 +95,10 @@ and behind the scenes the slots will be stored in transactional memory implement
   (lock (make-lock "TVAR") :read-only t)        ;; tvar-lock
   (waiting-for nil :type (or null hash-table))  ;; tvar-waiting-for
   (waiting-lock (make-lock "WAITING-FOR-LOCK") :read-only t) ;; tvar-waiting-lock
-  (id (next-id *tvar-id*)))                     ;; tvar-id
+  (id (next-id *tvar-id*) :type fixnum :read-only t))       ;; tvar-id
+
+(defmethod id-of ((var tvar))
+  (tvar-id var))
 
 (declaim (inline raw-value-of (setf raw-value-of)))
 (defun raw-value-of (var)
@@ -182,6 +185,15 @@ to TLOGs while executing BODY."
        ,@body)))
 
 
-(eval-always
-  (unless (assoc '*tlog* bt:*default-special-bindings*)
-    (push '(*tlog* . nil) bt:*default-special-bindings*)))
+(defun ensure-thread-initial-bindings (&rest syms-and-forms)
+  (declare (type list syms-and-forms))
+  (loop for sym-and-form in syms-and-forms do
+       (unless (assoc (first sym-and-form) bt:*default-special-bindings* :test 'eq)
+         (push sym-and-form bt:*default-special-bindings*))))
+
+(defmacro save-thread-initial-bindings (&rest syms)
+  `(ensure-thread-initial-bindings
+    ,@(loop for sym in syms collect `(cons ',sym ,sym))))
+
+(eval-when (:load-toplevel :execute)
+  (save-thread-initial-bindings *tlog* *record-to-tlogs* *hide-tvars*))

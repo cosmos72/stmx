@@ -116,6 +116,9 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
 
 
      retry-or-rerun
+     (when *yield-before-rerun*
+       (thread-yield))
+
      (when (invalid? parent-log)
        (log:debug "Parent tlog ~A is invalid, re-running it"
                   (~ parent-log))
@@ -135,8 +138,6 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
        (go start))
          
      (log:debug "Tlog ~A {~A} was found invalid, re-running it" (~ log) (~ func))
-     (when *yield-before-rerun*
-       (thread-yield))
      (go start)))
 
      
@@ -197,6 +198,9 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
           (return-from run-orelse-2 (values-list vals)))))
 
      retry-or-rerun
+     (when *yield-before-rerun*
+       (thread-yield))
+
      (when (invalid? parent-log)
        (log:debug "Parent tlog ~A is invalid, re-running it"
                   (~ parent-log))
@@ -398,6 +402,9 @@ Return nil if all tx are valid and want to retry."
 
 
        retry-or-rerun
+       (when *yield-before-rerun*
+         (thread-yield))
+
        (when (invalid? parent-log)
          (log:debug me "Parent tlog ~A is invalid, re-running it"
                     (~ parent-log))

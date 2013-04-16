@@ -26,8 +26,8 @@
 
 (defpackage #:stmx.concurrent
   (:use #:cl
-        #:arnesi
         #:bordeaux-threads
+        #:stmx.lang
         #:stmx
         #:stmx.util)
 
@@ -232,3 +232,20 @@
     ;; 15.44 nanoseconds per (gethash i h)
     ;; 15.08 nanoseconds per (gethash 0 h)
     (1g (incf (the fixnum (gethash i h))))))
+
+
+(defun test-lock-unlock (&optional i)
+  (declare (ignore i))
+  (let ((lock (bt:make-lock)))
+    ;; 30.06 nanoseconds per acquire + release
+    (1g (bt:acquire-lock lock)
+        (bt:release-lock lock))))
+
+
+#+sbcl
+(defun test-sbcl-lock-unlock (&optional i)
+  (declare (ignore i))
+  (let ((lock (sb-thread:make-mutex)))
+    ;; 27.01 nanoseconds per get + release
+    (1g (sb-thread:get-mutex lock)
+        (sb-thread:release-mutex lock))))

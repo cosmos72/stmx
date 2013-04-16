@@ -17,6 +17,7 @@
 
 ;;;; * Transaction logs
 
+
 ;;;; ** thread-local TLOGs pool
 
 (declaim (type fixnum *tlog-pool-max-idle*))
@@ -24,7 +25,7 @@
 
 (defun make-tlog-pool (&optional (n *tlog-pool-max-idle*))
   (declare (type fixnum n))
-  (make-array (list n) :element-type 'tlog :fill-pointer 0))
+  (make-array n :element-type 'tlog :fill-pointer 0))
 
 
 (declaim (type (and (vector tlog) (not simple-array)) *tlog-pool*))
@@ -32,7 +33,6 @@
 
 (eval-when (:load-toplevel :execute)
   (ensure-thread-initial-bindings '(*tlog-pool* . (make-tlog-pool))))
-
 
 ;;;; ** Creating, copying and clearing tlogs
 
@@ -45,24 +45,33 @@ return LOG itself."
 
   (setf (tlog-parent log) nil)
 
+  #-tx-hash
+  (setf (tlog-reads log) nil
+        (tlog-writes log) nil)
+
+  #+tx-hash
   (clrhash (tlog-reads log))
+  #+tx-hash
   (clrhash (tlog-writes log))
 
   (awhen (tlog-before-commit log) (setf (fill-pointer it) 0))
   (awhen (tlog-after-commit log)  (setf (fill-pointer it) 0))
   log)
 
-
 (defun new-tlog ()
   "Get a TLOG from pool or create one, and return it."
+  #+tx-hash
   (if (zerop (length *tlog-pool*))
       (make-tlog)
-      (vector-pop *tlog-pool*)))
+      (vector-pop *tlog-pool*))
 
+  #-tx-hash
+  (make-tlog))
 
 (defun free-tlog (log)
   "Return a no-longer-needed TLOG to the pool."
   (declare (type tlog log))
+
   (when (vector-push log *tlog-pool*)
     (clear-tlog log))
   nil)
@@ -79,19 +88,61 @@ and its parent is set to PARENT."
                 (new-tlog))
 
     (when parent
-      (setf (tlog-parent log) parent)
+      #+tx-hash
       (copy-hash-table (tlog-reads log)  (tlog-reads parent))
-      (copy-hash-table (tlog-writes log) (tlog-writes parent)))
+      #+tx-hash
+      (copy-hash-table (tlog-writes log) (tlog-writes parent))
+      (setf (tlog-parent log) parent))
     log))
 
 
 
+;;;; ** Acquiring and releasing TLOG id, cleaning up TVAR transactional cache
+
+#-tx-hash
+(eval-always
+ (declaim (type list *tlog-id-list*))
+ (defvar *tlog-id-list* '(0 1 2 3 4 5 6 7 8 9))
+ (defvar *tlog-id-lock* (make-lock "TLOG-ID"))
+ (defvar *tlog-id-semaphore* (make-condition-variable :name "TLOG-ID"))
+
+ (defun acquire-tlog-id (log)
+   (declare (type tlog log))
+   (setf (tlog-id log)
+         (with-lock-held (*tlog-id-lock*)
+           (loop for id = (pop *tlog-id-list*)
+              until id do
+                (condition-wait *tlog-id-semaphore* *tlog-id-lock*)
+              finally (return id)))))
+
+         
+ (defun release-tlog-id (log)
+   (declare (type tlog log))
+
+   (with-lock-held (*tlog-id-lock*)
+     (push (tlog-id log) *tlog-id-list*)
+     (condition-notify *tlog-id-semaphore*))
+   t)
+
+
+ (defun clean-tvars (log)
+   "Remove any cached transactional value in all TVARs read or written
+while LOG was the current transaction log"
+   (declare (type tlog log))
+
+   (let1 subscript (the fixnum (tlog-id log))
+     (dolist (var (tlog-reads log))
+       (setf (aref (tvar-tx-reads var) subscript) +unbound-tx+))
+     (dolist (var (tlog-writes log))
+       (setf (aref (tvar-tx-writes var) subscript) +unbound-tx+)))))
+
+  
 
 
 
 ;;;; ** Reads and writes
 
-
+#+tx-hash
 (defun tx-read-of (var &optional (log (current-tlog)))
   "If VAR's value is stored in transaction LOG, return the stored value.
 Otherwise, add (raw-value-of VAR) as the read of VAR stored in transaction LOG
@@ -115,6 +166,7 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
     (set-hash reads var (raw-value-of var))))
 
 
+#+tx-hash
 (defun tx-write-of (var value &optional (log (current-tlog)))
   "Store in transaction LOG the writing of VALUE into VAR; return VALUE.
 
@@ -126,6 +178,49 @@ and by writing TOBJs slots."
   (set-hash (tlog-writes log) var value))
 
 
+#-tx-hash
+(defun tx-read-of (var &optional (log (current-tlog)))
+  "If VAR's value is stored in transaction LOG, return the stored value.
+Otherwise, add (raw-value-of VAR) as the read of VAR stored in transaction LOG
+and return (raw-value-of VAR).
+
+TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots."
+  (declare (type tvar var)
+           (type tlog log))
+
+  (let1 subscript (tlog-id log)
+
+    (let1 value (aref (tvar-tx-writes var) subscript)
+      (unless (eq +unbound-tx+ value)
+        (return-from tx-read-of value)))
+
+    (let1 reads-array (tvar-tx-reads var)
+
+      (let1 value (aref reads-array subscript)
+         (unless (eq +unbound-tx+ value)
+           (return-from tx-read-of value)))
+
+      (push var (tlog-reads log))
+      (setf (aref reads-array subscript) (raw-value-of var)))))
+
+
+#-tx-hash
+(defun tx-write-of (var value &optional (log (current-tlog)))
+  "Store in transaction LOG the writing of VALUE into VAR; return VALUE.
+
+TX-WRITE-OF is an internal function called by (setf ($ VAR) VALUE)
+and by writing TOBJs slots."
+  (declare (type tvar var)
+           (type tlog log))
+
+  (let ((writes-array (tvar-tx-writes var))
+        (subscript (tlog-id log)))
+
+    (let1 value (aref writes-array subscript)
+      (when (eq +unbound-tx+ value)
+        (push var (tlog-writes log))))
+
+    (setf (aref writes-array subscript) value)))
 
 
 
@@ -135,6 +230,7 @@ and by writing TOBJs slots."
 ;;;; ** Listening and waiting
 
 
+#+tx-hash
 (defun listen-tvars-of (log)
   "Listen on tvars recorded in LOG, i.e. register to get notified if they change.
 Return t if log is valid and wait-tlog should sleep, otherwise return nil."
@@ -168,24 +264,63 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   (return-from listen-tvars-of t))
 
 
+#-tx-hash
+(defun listen-tvars-of (log)
+  "Listen on tvars recorded in LOG, i.e. register to get notified if they change.
+Return t if log is valid and wait-tlog should sleep, otherwise return nil."
+
+  (declare (type tlog log))
+  (let1 reads (tlog-reads log)
+
+    (when (null reads)
+      (error "BUG! Transaction ~A called (retry), but no TVARs to wait for changes.
+  This is a bug either in the STMX library or in the application code.
+  Possible reason: some code analogous to (atomic (retry)) was executed.
+  Such code is not allowed, because at least one TVAR or one TOBJ slot
+  must be read before retrying an ATOMIC block." (~ log)))
+
+    (dolist (var reads)
+      (listen-tvar var log)
+      ;; to avoid deadlocks, check raw-value AFTER listening on tvar.
+      ;; otherwise if we naively
+      ;;   1) first, check raw-value and decide whether to listen
+      ;;   2) then, listen if we decided to
+      ;; the tvar could change BETWEEN 1) and 2) and we would miss it
+      ;; => DEADLOCK
+      (let1 val (aref (tvar-tx-reads var) (tlog-id log))
+        (if (eq val (raw-value-of var))
+            (log:trace "Tlog ~A listening for tvar ~A changes"
+                       (~ log) (~ var))
+            (progn
+              (unlisten-tvar var log)
+              (log:debug "Tlog ~A: tvar ~A changed, not going to sleep"
+                         (~ log) (~ var))
+              (return-from listen-tvars-of nil)))))
+    (return-from listen-tvars-of t)))
+
+
 
 (defun unlisten-tvars-of (log)
   "Un-listen on tvars, i.e. deregister not to get notifications if they change."
 
   (declare (type tlog log))
+  #+tx-hash
   (do-hash (var val) (tlog-reads log)
     (unlisten-tvar var log))
+  #-tx-hash
+  (dolist (var (tlog-reads log))
+     (unlisten-tvar var log))
   (values))
 
 
 
       
 (defun wait-once (log)
-  "Sleep, i.e. wait for relevat TVARs to change.
-After sleeping, return t if log is valid, otherwise return nil."
+  "sleep, i.e. wait for relevat tvars to change.
+after sleeping, return t if log is valid, otherwise return nil."
 
   (declare (type tlog log))
-  (log:debug "Tlog ~A sleeping now" (~ log))
+  (log:debug "tlog ~a sleeping now" (~ log))
   (let ((lock (tlog-lock log))
         (valid t))
 
@@ -195,20 +330,20 @@ After sleeping, return t if log is valid, otherwise return nil."
 
     (if valid
         (progn
-          (log:debug "Tlog ~A woke up" (~ log))
+          (log:debug "tlog ~a woke up" (~ log))
           (setf valid (valid? log)))
-        (log:debug "Tlog ~A prevented from sleeping, some TVAR must have changed" (~ log)))
+        (log:debug "tlog ~a prevented from sleeping, some tvar must have changed" (~ log)))
     valid))
 
 
 (defun wait-tlog (log &key once)
-  "Wait until the TVARs read during transaction have changed.
-Return t if log is valid after sleeping, otherwise return nil.
+  "wait until the tvars read during transaction have changed.
+return t if log is valid after sleeping, otherwise return nil.
 
-Note from (CMT paragraph 6.3):
-When some other threads notifies the one waiting in this function,
-check if the log is valid. In case it's valid, re-executing
-the last transaction is useless: it means the relevant TVARs
+note from (cmt paragraph 6.3):
+when some other threads notifies the one waiting in this function,
+check if the log is valid. in case it's valid, re-executing
+the last transaction is useless: it means the relevant tvars
 did not change, but the transaction is waiting for them to change"
 
   (declare (type tlog log)
@@ -216,10 +351,10 @@ did not change, but the transaction is waiting for them to change"
 
   ;; lazily initialize (tlog-lock log) and (tlog-semaphore log)
   (when (null (tlog-lock log))
-    (setf (tlog-lock log) (make-lock (format nil "~A-~A" 'tlog (~ log))))
+    (setf (tlog-lock log) (make-lock (format nil "~a-~a" 'tlog (~ log))))
     (setf (tlog-semaphore log) (make-condition-variable)))
 
-  ;; we are going to sleep, unless some TVAR changes
+  ;; we are going to sleep, unless some tvar changes
   ;; and/or tells us not to.
   (with-lock-held ((tlog-lock log))
     (setf (tlog-prevent-sleep log) nil))
@@ -249,4 +384,4 @@ did not change, but the transaction is waiting for them to change"
 ;;;; ** Printing
 
 (defprint-object (obj tlog)
-  (format t "~A" (~ obj)))
+  (format t "~A" (tlog-id obj)))

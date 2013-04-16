@@ -18,6 +18,8 @@
 ;;;; ** Validating
 
 
+
+#+tx-hash
 (defun valid? (log)
   "Return t if a TLOG is valid, i.e. it contains an up-to-date view
 of TVARs that were read during the transaction."
@@ -35,6 +37,29 @@ of TVARs that were read during the transaction."
             (return-from valid? nil)))))
   (log:trace "Tlog ~A ..is valid" (~ log))
   (return-from valid? t))
+
+#-tx-hash
+(defun valid? (log)
+  "Return t if a TLOG is valid, i.e. it contains an up-to-date view
+of TVARs that were read during the transaction."
+
+  (declare (type tlog log))
+  (log:trace "Tlog ~A valid?.." (~ log))
+
+  (let1 subscript (tlog-id log)
+    (dolist (var (tlog-reads log))
+      (let ((actual-val (raw-value-of var))
+            (val (aref (tvar-tx-reads var) subscript)))
+
+        (if (eq val actual-val)
+            (log:trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
+            (progn
+              (log:trace "Tlog ~A conflict for tvar ~A: expecting ~A, found ~A"
+                         (~ log) (~ var) val actual-val)
+              (log:debug "Tlog ~A ..not valid" (~ log))
+              (return-from valid? nil)))))
+    (log:trace "Tlog ~A ..is valid" (~ log))
+    (return-from valid? t)))
 
 
 (declaim (inline invalid? shallow-valid? shallow-invalid?))
@@ -145,6 +170,7 @@ to last acquired."
 
 
 
+#+tx-hash
 (defun locked-valid? (log)
   "Return T if LOG is valid and NIL if it's invalid.
 Return :UNKNOWN if relevant locks could not be acquired."
@@ -175,6 +201,55 @@ Return :UNKNOWN if relevant locks could not be acquired."
 
 
 
+#-tx-hash
+(defun locked-valid? (log)
+  "Return T if LOG is valid and NIL if it's invalid.
+Return :UNKNOWN if relevant locks could not be acquired."
+
+  (declare (type tlog log))
+  (let ((read-list (tlog-reads log))
+        (acquiring nil)
+        (acquired (list nil)))
+
+    (when (null read-list)
+      (return-from locked-valid? t))
+
+    (unwind-protect
+         (progn
+           ;; we must lock TVARs that have been read: expensive,
+           ;; but needed to ensure this threads sees other commits as atomic
+           (setf acquiring (copy-list read-list))
+
+           (unless (try-lock-tvars acquiring acquired log "rolled back")
+             (return-from locked-valid? :unknown))
+
+           (let1 valid (valid? log)
+             (log:debug "Tlog ~A is ~A, verified with locks"
+                        (~ log) (if valid "valid" "invalid"))
+             (return-from locked-valid? valid)))
+
+      (unlock-tvars acquired log))))
+
+
+;;;; ** Rolling back
+
+
+(defun cleanup-after-commit-or-rollback (log)
+  (declare (type tlog log))
+
+  #-tx-hash
+  (unwind-protect
+       (clean-tvars log)
+    (release-tlog-id log))
+
+  nil)
+
+
+(declaim (inline rollback))
+(defun rollback (log)
+  (cleanup-after-commit-or-rollback log))
+
+  
 ;;;; ** Committing
 
 
@@ -314,16 +389,20 @@ b) another TLOG is writing the same TVARs being committed
   (declare (type tlog log))
   (let ((reads (tlog-reads log))
         (writes (tlog-writes log))
+        (subscript (the fixnum (tlog-id log)))
         (acquiring nil)
         (acquired (list nil))
         changed
         success)
 
+    (declare (ignorable subscript))
+
     ;; before-commit functions run without locks
     (unless (invoke-before-commit log)
       (return-from commit nil))
 
-    (when (zerop (hash-table-count writes))
+    (when #+tx-hash (zerop (hash-table-count writes))
+          #-tx-hash (null writes)
       (log:debug "Tlog ~A committed (nothing to write)" (~ log))
       (invoke-after-commit log)
       (return-from commit t))
@@ -335,6 +414,8 @@ b) another TLOG is writing the same TVARs being committed
            ;; we must lock TVARs that have been read or written: expensive
            ;; but needed to ensure this threads sees other commits as atomic,
            ;; and other threads see this commit as atomic
+
+           #+tx-hash
            (let ((big-hash   reads)
                  (small-hash writes))
              
@@ -346,6 +427,14 @@ b) another TLOG is writing the same TVARs being committed
                ;; do not put duplicates in ACQUIRING list
                (unless (nth-value 1 (get-hash big-hash var))
                  (push var acquiring))))
+
+           #-tx-hash
+           (progn
+             (setf acquiring (copy-list reads))
+             (dolist (var writes)
+               ;; do not put duplicates in ACQUIRING list
+               (when (eq +unbound-tx+ (aref (tvar-tx-reads var) subscript))
+                 (push var acquiring))))
            
            (unless (try-lock-tvars acquiring acquired log "committed")
              (return))
@@ -356,18 +445,32 @@ b) another TLOG is writing the same TVARs being committed
              (return))
 
            ;; COMMIT, i.e. actually write new values into TVARs
+
+           #+tx-hash
            (do-hash (var val) writes
              (let1 current-val (raw-value-of var)
-                   (when (not (eq val current-val))
+                   (unless (eq val current-val)
                      (setf (raw-value-of var) val)
                      (push var changed)
                      #+never (log:trace "Tlog ~A tvar ~A changed value from ~A to ~A"
                                         (~ log) (~ var) current-val val))))
 
+           #-tx-hash
+           (dolist (var writes)
+             (let ((val (aref (tvar-tx-writes var) subscript))
+                   (current-val (raw-value-of var)))
+               (unless (eq val current-val)
+                 (setf (raw-value-of var) val)
+                 (push var changed)
+                 (log:trace "Tlog ~A tvar ~A changed value from ~A to ~A"
+                            (~ log) (~ var) current-val val))))
+
            (log:debug "Tlog ~A committed." (~ log))
            (setf success t))
 
+
       (unlock-tvars acquired log)
+
       (dolist (var changed)
         #+never (log:trace "Tlog ~A notifying threads waiting on tvar ~A"
                            (~ log) (~ var))
@@ -389,6 +492,8 @@ Return merged TLOG (either LOG1 or LOG2) if tlog-reads LOG1 and LOG2 are compati
 i.e. if they contain the same values for the TVARs common to both, otherwise return NIL
 \(in the latter case, the merge will not be completed)."
   (declare (type tlog log1 log2))
+
+  #+tx-hash
   (let* ((reads1 (tlog-reads log1))
          (reads2 (tlog-reads log2))
          (n1 (hash-table-count reads1))
@@ -401,7 +506,10 @@ i.e. if they contain the same values for the TVARs common to both, otherwise ret
 
     (if (or (zerop n2) (merge-hash-tables reads1 reads2))
         log1
-        nil)))
+        nil))
+
+  #-tx-hash
+  (error "~A not implemented for fast-tx" 'merge-tlog-reads))
 
   
 
@@ -415,6 +523,8 @@ Implementation note: copy tlog-reads, tlog-writes, tlog-before-commit
 and tlog-after-commit into parent, or swap them with parent"
 
   (declare (type tlog log))
+
+  #+tx-hash
   (let1 parent (the tlog (tlog-parent log))
 
     (rotatef (tlog-reads parent) (tlog-reads log))
@@ -432,5 +542,9 @@ and tlog-after-commit into parent, or swap them with parent"
              (vector-push-extend func parent-funcs))
         (rotatef (tlog-after-commit log) (tlog-after-commit parent))))
 
-    log))
+    log)
+
+  #-tx-hash
+  (error "~A not implemented for fast-tx" 'commit-nested))
+
 

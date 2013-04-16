@@ -202,6 +202,8 @@ transactional memory it read has changed."
 
   (prog ((log (new-tlog)))
 
+   (acquire-tlog-id log)
+
    run
    (handler-bind ((retry-error
                    (lambda (err)
@@ -220,9 +222,11 @@ transactional memory it read has changed."
                      (log:trace "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
                                 (~ log) (~ tx) (type-of err) (~ err))
                      (if (eq t (locked-valid? log))
-                         ;; return normally from lambda to propagate the error
-                         (log:debug "Tlog ~A {~A} will rollback and signal ~A"
-                                    (~ log) (~ tx) (type-of err))
+                         (progn
+                           (rollback log)
+                           ;; return normally from lambda to propagate the error
+                           (log:debug "Tlog ~A {~A} will rollback and signal ~A"
+                                      (~ log) (~ tx) (type-of err)))
                          (progn
                            (log:debug "Tlog ~A {~A} is invalid or unknown, masking the ~A it signalled and re-running it"
                                       (~ log) (~ tx) (type-of err))
@@ -238,7 +242,9 @@ transactional memory it read has changed."
              ;; all done, prepare to return.
              ;; we are not returning TLOGs to the pool in case tx signaled an error,
              ;; but that's not a problem since the TLOG pool is just a speed optimization
-             (free-tlog log)
+             (progn
+               (cleanup-after-commit-or-rollback log)
+               (free-tlog log))
 
              (progn
                (log:debug "Tlog ~A {~A} could not commit, re-running it" (~ log) (~ tx))

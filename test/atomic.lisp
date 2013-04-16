@@ -19,34 +19,37 @@
 (in-suite atomic-suite)
 
 (test tx-read-of
-  (let ((log (make-tlog))
-        (var (make-tvar :value 1)))
-    (is (= 1 (raw-value-of var)))
-    (is (= 1 (tx-read-of var log)))
-    (tx-write-of var 2 log)
-    (is (= 1 (raw-value-of var)))
-    (is (= 2 (tx-read-of var log)))))
+  (let ((var (make-tvar :value 1))
+        (log (make-tlog)))
+    (with-recording-to-tlog log
+      (is (= 1 (raw-value-of var)))
+      (is (= 1 (tx-read-of var)))
+      (tx-write-of var 2)
+      (is (= 1 (raw-value-of var)))
+      (is (= 2 (tx-read-of var))))))
 
 (test valid?
-  (let ((log (make-tlog))
-        (var  (make-tvar :value 1)))
-    (is-true (valid? log))
-    (tx-read-of var log)
-    (is-true (valid? log))
-    (setf (raw-value-of var) 2)
-    (is-false (valid? log))
-    (tx-read-of var log)
-    (is-false (valid? log))
-    (setf (raw-value-of var) 1)
-    (is-true (valid? log))))
+  (let ((var (make-tvar :value 1))
+        (log (make-tlog)))
+    (with-recording-to-tlog log
+      (is-true (valid? log))
+      (tx-read-of var log)
+      (is-true (valid? log))
+      (setf (raw-value-of var) 2)
+      (is-false (valid? log))
+      (tx-read-of var log)
+      (is-false (valid? log))
+      (setf (raw-value-of var) 1)
+      (is-true (valid? log)))))
     
 (test commit
-  (let ((log (make-tlog))
-        (var (make-tvar :value 1)))
-    (tx-write-of var 2 log)
-    (is-true (valid? log))
-    (is-true (commit log))
-    (is (= 2 (raw-value-of var)))))
+  (let ((var (make-tvar :value 1))
+        (log (make-tlog)))
+    (with-recording-to-tlog log
+      (tx-write-of var 2 log)
+      (is-true (valid? log))
+      (is-true (commit log))
+      (is (= 2 (raw-value-of var))))))
 
 (test $
   (let ((log (make-tlog))

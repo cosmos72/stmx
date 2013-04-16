@@ -53,7 +53,7 @@ and to check for any value stored in the log."
   (let1 value (if (recording?)
                   (tx-read-of var)
                   (raw-value-of var))
-    (unless (eq value +unbound+)
+    (unless (eq value +unbound-tvar+)
       (return-from $ value))
     (unbound-tvar-error var)))
 
@@ -78,7 +78,7 @@ During transactions, it uses transaction log to record the read
 and to check for any value stored in the log."
   (declare (type tvar var))
 
-  (not (eq +unbound+
+  (not (eq +unbound-tvar+
            (if (recording?)
                (tx-read-of var)
                (raw-value-of var)))))
@@ -92,8 +92,8 @@ During transactions, it uses transaction log to record the 'unbound' value."
   (declare (type tvar var))
 
   (if (recording?)
-      (tx-write-of var +unbound+)
-      (setf (raw-value-of var) +unbound+))
+      (tx-write-of var +unbound-tvar+)
+      (setf (raw-value-of var) +unbound-tvar+))
   var)
 
 
@@ -111,7 +111,7 @@ and to check for any value stored in the log."
   (let1 value (if (recording?)
                   (tx-read-of var)
                   (raw-value-of var))
-    (if (eq value +unbound+)
+    (if (eq value +unbound-tvar+)
       (values default nil)
       (values value t))))
 
@@ -128,16 +128,16 @@ and to check for any value stored in the log."
 
   (if (recording?)
       (let1 value (tx-read-of var)
-        (if (eq value +unbound+)
+        (if (eq value +unbound-tvar+)
             (values default nil)
             (progn
-              (tx-write-of var +unbound+)
+              (tx-write-of var +unbound-tvar+)
               (values value t))))
       (let1 value (raw-value-of var)
         (if (eq value +unbound+)
             (values default nil)
             (progn
-              (setf (raw-value-of var) +unbound+)
+              (setf (raw-value-of var) +unbound-tvar+)
               (values value t))))))
 
 
@@ -152,11 +152,11 @@ and to check for any value stored in the log."
 
   (if (recording?)
       (let1 old-value (tx-read-of var)
-        (if (eq old-value +unbound+)
+        (if (eq old-value +unbound-tvar+)
             (values (tx-write-of var value) t)
             (values default nil)))
       (let1 old-value (raw-value-of var)
-        (if (eq old-value +unbound+)
+        (if (eq old-value +unbound-tvar+)
             (values (setf (raw-value-of var) value) t)
             (values default nil)))))
 

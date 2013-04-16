@@ -38,10 +38,12 @@
             (1+ id))))))
 
 (defmacro next-id (place)
-  `(setf ,place (get-next-id ,place)))
+  `(setf ,place (get-next-id ,place)))       
+          
 
 
 ;;;; ** Implementation classes
+
 
 (defstruct tlog
   "A transaction log (TLOG) is a record of the reads and writes
@@ -52,9 +54,17 @@ transactional objects (TOBJs) or transactional variables (TVARs),
 and are later committed to memory if the transaction completes successfully."
 
   ;; TVARs read during transaction, mapped to their read value
+  #+tx-hash
   (reads (make-hash-table :test 'eq) :type hash-table) ;; tlog-reads
+
   ;; TVARs written during transaction, mapped to their new values
+  #+tx-hash
   (writes (make-hash-table :test 'eq) :type hash-table) ;; tlog-writes
+
+  #-tx-hash
+  (reads nil :type list)
+  #-tx-hash
+  (writes nil :type list)
 
   ;; Parent of this TLOG. Used by ORELSE for nested transactions
   (parent    nil :type (or null tlog)) ;; tlog-parent
@@ -68,7 +78,9 @@ and are later committed to memory if the transaction completes successfully."
   ;; Functions to call immediately after committing TLOG.
   (after-commit  nil :type (or null vector)) ;; tlog-after-commit
 
-  (id (next-id *tlog-id*) :type fixnum :read-only t)) ;; tlog-id
+  (id #+tx-hash (next-id *tlog-id*)
+      #-tx-hash -1
+      :type fixnum)) ;; tlog-id
 
 
 (defmethod id-of ((log tlog))
@@ -76,8 +88,9 @@ and are later committed to memory if the transaction completes successfully."
 
 
 
-(declaim (type symbol +unbound+))
-(defvar +unbound+ (gensym "UNBOUND-"))
+(declaim (type symbol +unbound-tvar+ +unbound-tx+))
+(defvar +unbound-tvar+ (gensym "UNBOUND-"))
+(defvar +unbound-tx+ (gensym "NO-TX-"))
 
 
 (defstruct tvar
@@ -91,11 +104,16 @@ with a more intuitive and powerful interface: you can read and write normally
 the slots of a transactional object (with slot-value, accessors ...),
 and behind the scenes the slots will be stored in transactional memory implemented by TVARs."
 
-  (value +unbound+)                             ;; tvar-value
+  #-tx-hash
+  (tx-reads  (make-array 10 :initial-element +unbound-tx+) :type simple-array :read-only t)
+  #-tx-hash
+  (tx-writes (make-array 10 :initial-element +unbound-tx+) :type simple-array :read-only t)
+
+  (value +unbound-tvar+)                        ;; tvar-value
   (lock (make-lock "TVAR") :read-only t)        ;; tvar-lock
   (waiting-for nil :type (or null hash-table))  ;; tvar-waiting-for
-  (waiting-lock (make-lock "WAITING-FOR-LOCK") :read-only t) ;; tvar-waiting-lock
-  (id (next-id *tvar-id*) :type fixnum :read-only t))       ;; tvar-id
+  (waiting-lock (make-lock "TVAR-WAITING") :read-only t) ;; tvar-waiting-lock
+  (id (next-id *tvar-id*) :type fixnum :read-only t))        ;; tvar-id
 
 (defmethod id-of ((var tvar))
   (tvar-id var))
@@ -108,8 +126,6 @@ and behind the scenes the slots will be stored in transactional memory implement
 (defun (setf raw-value-of) (value var)
   (declare (type tvar var))
   (setf (tvar-value var) value))
-
-
 
 
 
@@ -174,9 +190,9 @@ inside TOBJs slots while executing BODY."
 
 (defmacro with-tlog (log &body body)
   "Use LOG as the current transaction log while executing BODY."
-  `(let1 *tlog* ,log
+  `(let ((*tlog* ,log))
      ,@body))
-
+    
 (defmacro with-recording-to-tlog (log &body body)
   "Use LOG as the current transaction log and enable recording of transactions
 to TLOGs while executing BODY."

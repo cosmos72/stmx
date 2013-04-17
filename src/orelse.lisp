@@ -266,7 +266,7 @@ Return nil if all tx are valid and want to retry."
   (declare (type simple-vector txs))
 
   (loop for i from 0 to (1- (length txs))
-     for itx    = (aref txs i)
+     for itx    = (svref txs i)
      for ifunc  = (orelse-tx-func  itx)
      for ilog   = (orelse-tx-log   itx)
      for iretry = (orelse-tx-retry itx)
@@ -283,10 +283,10 @@ Return nil if all tx are valid and want to retry."
   "Return merged tlog of all tx, or nil if some tlog are mutually incompatible."
   (declare (type simple-vector txs))
 
-  (let1 log (orelse-tx-log (aref txs 0))
+  (let1 log (orelse-tx-log (svref txs 0))
     
     (loop for i from 1 to (1- (length txs))
-       for itx    = (aref txs i)
+       for itx    = (svref txs i)
        for ifunc  = (orelse-tx-func  itx)
        for ilog   = (orelse-tx-log   itx)
        do
@@ -347,10 +347,10 @@ Return nil if all tx are valid and want to retry."
                           :initial-element nil))
 
     (labels ((ensure-tx ()
-               (setf tx (aref txs index))
+               (setf tx (svref txs index))
                (unless tx
                  (setf tx (make-orelse-tx :func (pop funcs)))
-                 (setf (aref txs index) tx))
+                 (setf (svref txs index) tx))
                tx)
              
              (set-index (idx)
@@ -412,7 +412,7 @@ Return nil if all tx are valid and want to retry."
 
        (let1 idx (find-first-rerun-or-invalid-tx txs me)
          (when idx
-           ;; (aref txs idx) wants to rerun, or wants to retry but is invalid.
+           ;; (svref txs idx) wants to rerun, or wants to retry but is invalid.
            ;; in both cases, rerun it
            (set-index idx)
            (go run-tx)))

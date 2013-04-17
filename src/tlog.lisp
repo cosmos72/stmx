@@ -60,13 +60,9 @@ return LOG itself."
 
 (defun new-tlog ()
   "Get a TLOG from pool or create one, and return it."
-  #+tx-hash
   (if (zerop (length *tlog-pool*))
       (make-tlog)
-      (vector-pop *tlog-pool*))
-
-  #-tx-hash
-  (make-tlog))
+      (vector-pop *tlog-pool*)))
 
 (defun free-tlog (log)
   "Return a no-longer-needed TLOG to the pool."
@@ -108,20 +104,26 @@ and its parent is set to PARENT."
 
  (defun acquire-tlog-id (log)
    (declare (type tlog log))
-   (setf (tlog-id log)
+   (setf (tlog-id log) (pop *tlog-id-list*)))
+ #|
          (with-lock-held (*tlog-id-lock*)
            (loop for id = (pop *tlog-id-list*)
               until id do
                 (condition-wait *tlog-id-semaphore* *tlog-id-lock*)
               finally (return id)))))
-
+ |#
          
  (defun release-tlog-id (log)
    (declare (type tlog log))
 
+   (push (tlog-id log) *tlog-id-list*)
+   #|
    (with-lock-held (*tlog-id-lock*)
-     (push (tlog-id log) *tlog-id-list*)
-     (condition-notify *tlog-id-semaphore*))
+     (let1 orig-list *tlog-id-list*
+       (push (tlog-id log) *tlog-id-list*)
+       (when (null orig-list)
+         (condition-notify *tlog-id-semaphore*))))
+   |#
    t)
 
 
@@ -132,9 +134,9 @@ while LOG was the current transaction log"
 
    (let1 subscript (the fixnum (tlog-id log))
      (dolist (var (tlog-reads log))
-       (setf (aref (tvar-tx-reads var) subscript) +unbound-tx+))
+       (setf (svref (tvar-tx-reads var) subscript) +unbound-tx+))
      (dolist (var (tlog-writes log))
-       (setf (aref (tvar-tx-writes var) subscript) +unbound-tx+)))))
+       (setf (svref (tvar-tx-writes var) subscript) +unbound-tx+)))))
 
   
 
@@ -190,18 +192,18 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
 
   (let1 subscript (tlog-id log)
 
-    (let1 value (aref (tvar-tx-writes var) subscript)
+    (let1 value (svref (tvar-tx-writes var) subscript)
       (unless (eq +unbound-tx+ value)
         (return-from tx-read-of value)))
 
     (let1 reads-array (tvar-tx-reads var)
 
-      (let1 value (aref reads-array subscript)
+      (let1 value (svref reads-array subscript)
          (unless (eq +unbound-tx+ value)
            (return-from tx-read-of value)))
 
       (push var (tlog-reads log))
-      (setf (aref reads-array subscript) (raw-value-of var)))))
+      (setf (svref reads-array subscript) (raw-value-of var)))))
 
 
 #-tx-hash
@@ -216,11 +218,11 @@ and by writing TOBJs slots."
   (let ((writes-array (tvar-tx-writes var))
         (subscript (tlog-id log)))
 
-    (let1 value (aref writes-array subscript)
+    (let1 value (svref writes-array subscript)
       (when (eq +unbound-tx+ value)
         (push var (tlog-writes log))))
 
-    (setf (aref writes-array subscript) value)))
+    (setf (svref writes-array subscript) value)))
 
 
 
@@ -287,7 +289,7 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
       ;;   2) then, listen if we decided to
       ;; the tvar could change BETWEEN 1) and 2) and we would miss it
       ;; => DEADLOCK
-      (let1 val (aref (tvar-tx-reads var) (tlog-id log))
+      (let1 val (svref (tvar-tx-reads var) (tlog-id log))
         (if (eq val (raw-value-of var))
             (log:trace "Tlog ~A listening for tvar ~A changes"
                        (~ log) (~ var))

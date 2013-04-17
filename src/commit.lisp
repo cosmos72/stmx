@@ -49,7 +49,7 @@ of TVARs that were read during the transaction."
   (let1 subscript (tlog-id log)
     (dolist (var (tlog-reads log))
       (let ((actual-val (raw-value-of var))
-            (val (aref (tvar-tx-reads var) subscript)))
+            (val (svref (tvar-tx-reads var) subscript)))
 
         (if (eq val actual-val)
             (log:trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
@@ -118,7 +118,7 @@ tvar-id and are considered \"larger\". Returns (> (tvar-id var1) (tvar-id var2))
 
 
 
-(defun try-lock-tvars (vars locked-vars log txt)
+(defun try-lock-tvars (vars locked-vars n-vars log txt)
   "Sort VARS in order - actually in (tvar< ...) order -
 then non-blocking acquire their locks in such order.
 Reason: acquiring in unspecified order may cause livelock, as two transactions
@@ -132,20 +132,17 @@ In both cases, after this call (rest LOCKED-VARS) will be the list
 containing the locked tvars, sorted in order from first acquired
 to last acquired."
   (declare (type list vars locked-vars)
+           (type fixnum n-vars)
            (type tlog log)
            (type string txt))
 
   #+never (log:user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
 
-  ;; if locking 20 TVARs or more, sort them to avoid livelock.
-  ;; with less than 20 TVARS, the probability of a context switch
+  ;; if locking 1000 TVARs or more, sort them to avoid livelock.
+  ;; with less than 1000 TVARS, the probability of a context switch
   ;; while locking is so low that sorting is not worth the cost
-  (when-bind tail (cddddr vars)
-    (when-bind tail (cddddr tail)
-      (when-bind tail (cddddr tail)
-        (when-bind tail (cddddr tail)
-          (when-bind tail (cddddr tail)
-            (setf vars (sort vars #'tvar>)))))))
+  (when (> n-vars 1000)
+    (setf vars (sort vars #'tvar>)))
   #+never (log:user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
 
   (loop for cell = vars then rest
@@ -176,11 +173,13 @@ to last acquired."
 Return :UNKNOWN if relevant locks could not be acquired."
 
   (declare (type tlog log))
-  (let ((reads (tlog-reads log))
-        (acquiring nil)
-        (acquired (list nil)))
+  (let* ((reads (tlog-reads log))
+         (acquiring nil)
+         (acquired (list nil))
+         (n-reads (hash-table-count reads)))
+    (declare (type fixnum n-reads))
 
-    (when (zerop (hash-table-count reads))
+    (when (zerop n-reads)
       (return-from locked-valid? t))
 
     (unwind-protect
@@ -189,7 +188,7 @@ Return :UNKNOWN if relevant locks could not be acquired."
            ;; but needed to ensure this threads sees other commits as atomic
            (setf acquiring (hash-table-keys reads))
 
-           (unless (try-lock-tvars acquiring acquired log "rolled back")
+           (unless (try-lock-tvars acquiring acquired n-reads log "rolled back")
              (return-from locked-valid? :unknown))
 
            (let1 valid (valid? log)
@@ -207,20 +206,24 @@ Return :UNKNOWN if relevant locks could not be acquired."
 Return :UNKNOWN if relevant locks could not be acquired."
 
   (declare (type tlog log))
-  (let ((read-list (tlog-reads log))
+  (let ((reads (tlog-reads log))
+        (n-reads 0)
         (acquiring nil)
         (acquired (list nil)))
+    (declare (type fixnum n-reads))
 
-    (when (null read-list)
+    (when (null reads)
       (return-from locked-valid? t))
 
     (unwind-protect
          (progn
            ;; we must lock TVARs that have been read: expensive,
            ;; but needed to ensure this threads sees other commits as atomic
-           (setf acquiring (copy-list read-list))
+           (loop for var in reads do
+                (push var acquiring)
+                (incf (the fixnum n-reads)))
 
-           (unless (try-lock-tvars acquiring acquired log "rolled back")
+           (unless (try-lock-tvars acquiring acquired n-reads log "rolled back")
              (return-from locked-valid? :unknown))
 
            (let1 valid (valid? log)
@@ -389,13 +392,15 @@ b) another TLOG is writing the same TVARs being committed
   (declare (type tlog log))
   (let ((reads (tlog-reads log))
         (writes (tlog-writes log))
+        (n-vars 0)
         (subscript (the fixnum (tlog-id log)))
         (acquiring nil)
         (acquired (list nil))
         changed
         success)
 
-    (declare (ignorable subscript))
+    (declare (type fixnum n-vars)
+             (ignorable subscript))
 
     ;; before-commit functions run without locks
     (unless (invoke-before-commit log)
@@ -423,20 +428,26 @@ b) another TLOG is writing the same TVARs being committed
                (rotatef big-hash small-hash))
  
              (setf acquiring (hash-table-keys big-hash))
+             (setf n-vars (hash-table-count big-hash))
              (do-hash (var val) small-hash
                ;; do not put duplicates in ACQUIRING list
                (unless (nth-value 1 (get-hash big-hash var))
-                 (push var acquiring))))
+                 (push var acquiring)
+                 (incf (the fixnum n-vars)))))
 
            #-tx-hash
            (progn
-             (setf acquiring (copy-list reads))
+             (loop for var in reads do
+                  (push var acquiring)
+                  (incf (the fixnum n-vars)))
              (dolist (var writes)
                ;; do not put duplicates in ACQUIRING list
-               (when (eq +unbound-tx+ (aref (tvar-tx-reads var) subscript))
-                 (push var acquiring))))
+               (when (eq +unbound-tx+ (svref (tvar-tx-reads var) subscript))
+                 (push var acquiring)
+                 (incf (the fixnum n-vars)))))
+
            
-           (unless (try-lock-tvars acquiring acquired log "committed")
+           (unless (try-lock-tvars acquiring acquired n-vars log "committed")
              (return))
             
            ;; check for log validity one last time, with locks held.
@@ -457,7 +468,7 @@ b) another TLOG is writing the same TVARs being committed
 
            #-tx-hash
            (dolist (var writes)
-             (let ((val (aref (tvar-tx-writes var) subscript))
+             (let ((val (svref (tvar-tx-writes var) subscript))
                    (current-val (raw-value-of var)))
                (unless (eq val current-val)
                  (setf (raw-value-of var) val)

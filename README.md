@@ -513,8 +513,9 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
 - `TMAP` is a transactional sorted map, backed by a red-black tree.
   It is created with `(make-instance 'tmap :pred compare-function)`
   where COMPARE-FUNCTION must be a function accepting two arguments, KEY1 and KEY2,
-  and returning t if KEY1 is smaller that KEY2. Typical values for COMPARE-FUNCTION
-  are `#'<` and the faster `#'fixnum<` or, for string keys, `#'string<`
+  and returning t if KEY1 is smaller that KEY2. For numeric keys, typical
+  COMPARE-FUNCTIONs are `#'<` or `#'>` and the faster `#'fixnum<` or `#'fixnum>`.
+  For string keys, typical COMPARE-FUNCTIONs are `#'string<` and `#'string>`.
 
   Methods: `BMAP-PRED` `BMAP-COUNT` `BMAP-EMPTY?` `CLEAR-BMAP`
            `GET-BMAP` `(SETF GET-BMAP)` `SET-BMAP` `REM-BMAP` 
@@ -535,7 +536,7 @@ The short version is: as of April 2013, on a fast PC (Core i5 @ 3GHz or better)
 with a fast Common Lisp (SBCL or better), STMX can execute up to 1.5 millions
 transactions per second per CPU core.
 
-Taking as a small but somewhat realistic example the (dining philosophers)[example/dining-philosophers.lisp],
+Taking as a small but somewhat realistic example the [dining philosophers](example/dining-philosophers.lisp),
 with 5 reads and 5 writes to transactional memory per atomic block and
 a moderate rate of conflicts and retries (10-20%), each CPU core runs
 approximately 600000 transactions per second.

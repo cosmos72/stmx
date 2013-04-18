@@ -430,7 +430,7 @@ features are available:
 Utilities and examples
 ---------------------
 
-See the [examples](examples) and [util](util) folder, which contains several examples and utilities
+See the [example](example) and [util](util) folder, which contains several examples and utilities
 built with STMX and should be relatively straightforward to understand.
 The folder [util](util) contains the following classes with related methods and functions,
 all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` at REPL:

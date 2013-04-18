@@ -195,17 +195,33 @@ if VAR changes."
 
   (declare (type tvar var)
            (type tlog log))
-  (with-lock-held ((tvar-waiting-lock var))
-    (awhen (tvar-waiting-for var)
+  (awhen (tvar-waiting-for var)
+    (with-lock-held ((tvar-waiting-lock var))
       (remhash log it))))
 
 
 (defun notify-tvar (var)
   "Wake up all threads waiting for VAR to change."
-
   (declare (type tvar var))
   (with-lock-held ((tvar-waiting-lock var))
     (awhen (tvar-waiting-for var)
+      (do-hash (log) it
+        (notify-tlog log var)))))
+
+
+(defun notify-tvar-high-load (var)
+  "Wake up all threads waiting for VAR to change."
+  (declare (type tvar var))
+  ;; this is (almost) the infamous double-check locking anti-pattern.
+  ;; in this particular case, it is safe to check the lazily-initialized
+  ;; slot (tvar-waiting-for var) without locking, 
+  ;; because we actually use it only while holding the lock.
+  ;;
+  ;; the effect of this trick is a significant speedup under heavy load
+  ;; and under light load (i.e. single-thread), at the price of increasing
+  ;; the conflict rate and SLIGHTLY slowing down under moderate load
+  (awhen (tvar-waiting-for var)
+    (with-lock-held ((tvar-waiting-lock var))
       (do-hash (log) it
         (notify-tlog log var)))))
 

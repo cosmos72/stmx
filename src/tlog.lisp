@@ -19,21 +19,15 @@
 
 ;;;; ** thread-local TLOGs pool
 
-(declaim (type fixnum *tlog-pool-max-idle*))
-(defvar *tlog-pool-max-idle* 10)
+(defun make-tlog-pool (&optional (n 10))
+  (make-fast-vector n :element-type '(or null tlog) :initial-element nil))
 
-(defun make-tlog-pool (&optional (n *tlog-pool-max-idle*))
-  (declare (type fixnum n))
-  (make-array (list n) :element-type 'tlog :fill-pointer 0))
-
-
-(declaim (type (and (vector tlog) (not simple-array)) *tlog-pool*))
 (defvar *tlog-pool* (make-tlog-pool))
 
 (eval-when (:load-toplevel :execute)
   (ensure-thread-initial-bindings '(*tlog-pool* . (make-tlog-pool))))
 
-
+  
 ;;;; ** Creating, copying and clearing tlogs
 
                                             
@@ -53,17 +47,17 @@ return LOG itself."
   log)
 
 
+(declaim (inline new-tlog))
 (defun new-tlog ()
   "Get a TLOG from pool or create one, and return it."
-  (if (zerop (length *tlog-pool*))
-      (make-tlog)
-      (vector-pop *tlog-pool*)))
+  (the tlog (nth-value 0 (fast-vector-pop-macro *tlog-pool* (make-tlog)))))
 
 
+(declaim (inline free-tlog))
 (defun free-tlog (log)
   "Return a no-longer-needed TLOG to the pool."
   (declare (type tlog log))
-  (when (vector-push log *tlog-pool*)
+  (when (fast-vector-push log *tlog-pool*)
     (clear-tlog log))
   nil)
     

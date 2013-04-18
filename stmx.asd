@@ -32,6 +32,7 @@
                (:module :lang
                 :components ((:file "package")
                              (:file "macro"       :depends-on ("package"))
+                             (:file "fast-vector" :depends-on ("package"))
                              (:file "hash-table"  :depends-on ("package"))
                              (:file "print"       :depends-on ("package"))))
 

@@ -93,7 +93,7 @@ tvar-id and are considered \"larger\". Returns (> (tvar-id var1) (tvar-id var2))
 
 
 
-(defun try-lock-tvars (vars locked-vars log txt)
+(defun try-lock-tvars (vars locked-vars approx-n-vars log txt)
   "Sort VARS in order - actually in (tvar< ...) order -
 then non-blocking acquire their locks in such order.
 Reason: acquiring in unspecified order may cause livelock, as two transactions
@@ -107,20 +107,17 @@ In both cases, after this call (rest LOCKED-VARS) will be the list
 containing the locked tvars, sorted in order from first acquired
 to last acquired."
   (declare (type list vars locked-vars)
+           (type fixnum approx-n-vars)
            (type tlog log)
            (type string txt))
 
   #+never (log:user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
 
-  ;; if locking 20 TVARs or more, sort them to avoid livelock.
-  ;; with less than 20 TVARS, the probability of a context switch
+  ;; if locking 1000 TVARs or more, sort them to avoid livelock.
+  ;; with less than 1000 TVARS, the probability of a context switch
   ;; while locking is so low that sorting is not worth the cost
-  (when-bind tail (cddddr vars)
-    (when-bind tail (cddddr tail)
-      (when-bind tail (cddddr tail)
-        (when-bind tail (cddddr tail)
-          (when-bind tail (cddddr tail)
-            (setf vars (sort vars #'tvar>)))))))
+  (when (> approx-n-vars 1000)
+    (setf vars (sort vars #'tvar>)))
   #+never (log:user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
 
   (loop for cell = vars then rest
@@ -150,11 +147,13 @@ to last acquired."
 Return :UNKNOWN if relevant locks could not be acquired."
 
   (declare (type tlog log))
-  (let ((reads (tlog-reads log))
-        (acquiring nil)
-        (acquired (list nil)))
+  (let* ((reads (tlog-reads log))
+         (n-reads (hash-table-count reads))
+         (acquiring nil)
+         (acquired (list nil)))
+    (declare (type fixnum n-reads))
 
-    (when (zerop (hash-table-count reads))
+    (when (zerop n-reads)
       (return-from locked-valid? t))
 
     (unwind-protect
@@ -163,7 +162,7 @@ Return :UNKNOWN if relevant locks could not be acquired."
            ;; but needed to ensure this threads sees other commits as atomic
            (setf acquiring (hash-table-keys reads))
 
-           (unless (try-lock-tvars acquiring acquired log "rolled back")
+           (unless (try-lock-tvars acquiring acquired n-reads log "rolled back")
              (return-from locked-valid? :unknown))
 
            (let1 valid (valid? log)
@@ -314,10 +313,13 @@ b) another TLOG is writing the same TVARs being committed
   (declare (type tlog log))
   (let ((reads (tlog-reads log))
         (writes (tlog-writes log))
+        (approx-n-vars 0)
         (acquiring nil)
         (acquired (list nil))
         changed
         success)
+
+    (declare (type fixnum approx-n-vars))
 
     ;; before-commit functions run without locks
     (unless (invoke-before-commit log)
@@ -335,19 +337,24 @@ b) another TLOG is writing the same TVARs being committed
            ;; we must lock TVARs that have been read or written: expensive
            ;; but needed to ensure this threads sees other commits as atomic,
            ;; and other threads see this commit as atomic
-           (let ((big-hash   reads)
-                 (small-hash writes))
-             
-             (when (< (hash-table-count big-hash) (hash-table-count small-hash))
+           (let* ((big-hash   reads)
+                  (small-hash writes)
+                  (n-big-hash   (hash-table-count big-hash))
+                  (n-small-hash (hash-table-count small-hash)))
+
+             (setf approx-n-vars (the fixnum (+ n-big-hash n-small-hash)))
+
+             (when (< n-big-hash n-small-hash)
                (rotatef big-hash small-hash))
  
              (setf acquiring (hash-table-keys big-hash))
+
              (do-hash (var val) small-hash
                ;; do not put duplicates in ACQUIRING list
                (unless (nth-value 1 (get-hash big-hash var))
                  (push var acquiring))))
-           
-           (unless (try-lock-tvars acquiring acquired log "committed")
+
+           (unless (try-lock-tvars acquiring acquired approx-n-vars log "committed")
              (return))
             
            ;; check for log validity one last time, with locks held.
@@ -368,10 +375,12 @@ b) another TLOG is writing the same TVARs being committed
            (setf success t))
 
       (unlock-tvars acquired log)
+
       (dolist (var changed)
         #+never (log:trace "Tlog ~A notifying threads waiting on tvar ~A"
                            (~ log) (~ var))
-        (notify-tvar var))
+        (notify-tvar-high-load var))
+          
       (when success
         ;; after-commit functions run without locks
         (invoke-after-commit log)))))

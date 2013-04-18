@@ -150,8 +150,7 @@ For pre-defined transactional classes, see the package STMX.UTIL"
         `(values))))
 
 
-(declaim (type boolean *yield-before-rerun*))
-(defvar *yield-before-rerun* nil)
+(defmacro yield-before-rerun? () 'nil)
 
 (defun run-once (tx log)
   "Internal function invoked by RUN-ATOMIC and RUN-ORELSE2.
@@ -175,7 +174,7 @@ using LOG as its transaction log."
        (rerun-once ()
          (log:trace "Tlog ~A {~A} will rerun" (~ log) (~ tx))
          (new-or-clear-tlog log :parent parent)
-         (when *yield-before-rerun*
+         (when (yield-before-rerun?)
            (thread-yield))
          (go run))))))
 
@@ -251,7 +250,7 @@ transactional memory it read has changed."
    (go rerun-noyield)
 
    rerun
-   (when *yield-before-rerun*
+   (when (yield-before-rerun?)
      (thread-yield))
    ;; fallthrough
 

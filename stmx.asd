@@ -32,9 +32,11 @@
                (:module :lang
                 :components ((:file "package")
                              (:file "macro"       :depends-on ("package"))
-                             (:file "fast-vector" :depends-on ("package"))
-                             (:file "hash-table"  :depends-on ("package"))
-                             (:file "print"       :depends-on ("package"))))
+                             (:file "features"    :depends-on ("macro"))
+                             (:file "thread"      :depends-on ("features"))
+                             (:file "fast-vector" :depends-on ("macro"))
+                             (:file "hash-table"  :depends-on ("macro"))
+                             (:file "print"       :depends-on ("macro"))))
 
                (:module :src
                 :depends-on (:lang)
@@ -53,7 +55,7 @@
                              (:file "misc"        :depends-on ("package"))
                              (:file "print"       :depends-on ("package"))
 
-                             (:file "container"   :depends-on ("package"))
+                             (:file "container"   :depends-on ("misc"))
                              (:file "tvar"        :depends-on ("container"))
                              (:file "tcell"       :depends-on ("container"))
                              (:file "tfifo"       :depends-on ("container"))
@@ -62,7 +64,7 @@
 
 			     (:file "bheap"       :depends-on ("container"))
 
-                             (:file "bmap"        :depends-on ("print"))
+                             (:file "bmap"        :depends-on ("misc" "print"))
                              (:file "rbmap"       :depends-on ("bmap"))
                              (:file "tmap"        :depends-on ("rbmap"))
 

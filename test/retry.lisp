@@ -72,10 +72,10 @@
 
     (multiple-value-bind (f1 f2) (retry-funs n c1 c2)
 
-      (let* ((t1 (make-thread f1 :name "A"))
-             (t2 (make-thread f2 :name "B"))
-             (x1 (the fixnum (join-thread t1)))
-             (x2 (the fixnum (join-thread t2))))
+      (let* ((t1 (start-thread f1 :name "A"))
+             (t2 (start-thread f2 :name "B"))
+             (x1 (the fixnum (wait4-thread t1)))
+             (x2 (the fixnum (wait4-thread t2))))
         (log:debug "t1 returned ~A" x1)
         (log:debug "t2 returned ~A" x2)
 

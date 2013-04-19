@@ -49,16 +49,20 @@
 ;; for some reason, under certain circumstances SBCL invokes
 ;; slot-value-using-class only from slot accessors, not from (slot-value ...)
 
-#|
+;; LispWorks is much more picky: slot accessors systematically bypass slot-value-using-class
+;; UNLESS the DECLARED class for the object has the flag :optimize-slot-access nil
+;; Instead, (slot-value ...) works fine in LispWorks.
+
 (defmacro _ (obj slot-name)
   `(slot-value ,obj ',slot-name))
-|#
 
+#|
 (eval-always
   (let1 of (symbol-name '-of)
     (defmacro _ (obj slot-name)
       (let1 accessor (intern (concatenate 'string (symbol-name slot-name) of))
         `(,accessor ,obj)))))
+|#
 
 
 

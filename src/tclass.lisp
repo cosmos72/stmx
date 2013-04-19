@@ -78,10 +78,15 @@ Exactly analogous to TRANSACTIONAL-DIRECT-SLOT."))
     transactional-effective-slot-class))
 
 
-#+ccl
+
+
+#-stmx-have-mop.setf-slot-definition-type
 (defmethod slot-definition-type ((effective-slot transactional-effective-slot))
-  "Work around the lack of (setf slot-definition-type) in CCL"
-  t)
+  "Work around the lack of (setf slot-definition-type) in CCL, LispWorks etc."
+  (if (transactional-slot? effective-slot)
+      t
+      (call-next-method)))
+
 
 ;; guard against recursive calls
 (defvar *recursive-call-list-classes-containing-direct-slots* nil)
@@ -148,8 +153,9 @@ to the same value. Problematic classes containing slot ~A: ~{~A ~}"
           ;; will accept/return either a TVAR or the actual type.
           ;; Also set slot initfunction to (lambda () (make-tvar ...))
           (when is-tslot?
-            #-ccl
-            ;; in CCL, we specialize the method (slot-definition-type) instead - see above
+            #+stmx-have-mop.setf-slot-definition-type
+            ;; in CCL, Lispworks, etc. we specialize the method (slot-definition-type)
+            ;; instead - see above
             (when-bind type (slot-definition-type effective-slot)
               (unless (eq t type)
                 (setf (slot-definition-type effective-slot) t)))
@@ -163,8 +169,10 @@ to the same value. Problematic classes containing slot ~A: ~{~A ~}"
                         (lambda () (make-tvar :value (funcall direct-initfunction)))
                         lambda-new-tvar)))
 
-              #+ccl (setf (slot-value effective-slot 'ccl::initfunction) effective-initfunction)
-              #-ccl (setf (slot-definition-initfunction effective-slot) effective-initfunction)))))
+              #+stmx-have-mop.setf-slot-definition-initfunction
+              (setf (slot-definition-initfunction effective-slot) effective-initfunction)
+              #+lispworks (setf (slot-value effective-slot 'clos::initfunction) effective-initfunction)
+              #+ccl (setf (slot-value effective-slot 'ccl::initfunction) effective-initfunction)))))
 
       effective-slot)))
 

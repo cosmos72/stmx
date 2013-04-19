@@ -18,6 +18,7 @@
 (defpackage #:stmx.example1
   (:use #:cl
         #:bordeaux-threads
+        #:stmx.lang
         #:stmx
         #:stmx.util)
 
@@ -88,11 +89,11 @@
     (time
      (let ((threads (loop for philosopher in philosophers
                        for i from 1
-                       collect (make-thread philosopher
-                                            :name (format nil "philosopher ~A" i)))))
+                       collect (start-thread philosopher
+                                             :name (format nil "philosopher ~A" i)))))
 
        (loop for thread in threads do
-            (let ((result (join-thread thread)))
+            (let ((result (wait4-thread thread)))
               (when result
                 (print result))))))
 

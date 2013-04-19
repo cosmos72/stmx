@@ -22,8 +22,8 @@
 (defclass bnode ()
   ((left  :initform nil  :type (or null bnode)   :accessor left-of)
    (right :initform nil  :type (or null bnode)   :accessor right-of)
-   (key   :initarg :key                          :accessor key-of)
-   (value :initarg :value                        :accessor value-of))
+   (key        :initarg :key                     :accessor key-of)
+   (value      :initarg :value                   :accessor value-of))
   (:documentation "Generic binary tree node"))
 
 

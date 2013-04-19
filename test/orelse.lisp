@@ -175,10 +175,10 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
            (f2 ()
              (orelse-func iterations cells2 names2)))
 
-      (let1 ths (list (make-thread #'f1 :name "A")
-                      (make-thread #'f1 :name "B")
-                      (make-thread #'f2 :name "C")
-                      (make-thread #'f2 :name "D"))
+      (let1 ths (list (start-thread #'f1 :name "A")
+                      (start-thread #'f1 :name "B")
+                      (start-thread #'f2 :name "C")
+                      (start-thread #'f2 :name "D"))
 
         (sleep 0.01)
 
@@ -192,7 +192,7 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
 
         (values
          (loop for th in ths
-            collect (let1 x (join-thread th)
+            collect (let1 x (wait4-thread th)
                       (log:debug "thread ~A returned ~A" (thread-name th) x)
                       x))
 

@@ -18,7 +18,8 @@
 (in-package :cl-user)
 
 (defpackage #:stmx.lang
-  (:use #:cl)
+  (:use #:cl
+        #:bordeaux-threads)
 
   (:export #:with-gensym  #:with-gensyms
            #:eval-always  #:new     #:let1
@@ -35,7 +36,12 @@
            #:hash-table-keys  #:hash-table-values  #:hash-table-pairs
            #:copy-hash-table  #:merge-hash-tables
 
+           ;; bordeaux-threads wrappers
+           #:start-thread #:wait4-thread
+
            #:id-of ;; also (setf id-of)
            #:~     ;; also (setf ~)
 
            #:defprint-object))
+
+

@@ -21,11 +21,11 @@
 (transactional
  (defclass tnode (rbnode)
    ;; override all inherited slots to make them transactional
-   ((left  :initform nil) ;; :type (or null tnode))
-    (right :initform nil) ;;  :type (or null tnode))
-    (key   :initarg :key)
-    (value :initarg :value)
-    (color :initform +red+ :type bit))
+   ((left  :initform nil   :accessor left-of) ;; :type (or null tnode))
+    (right :initform nil   :accessor right-of) ;;  :type (or null tnode))
+    (key   :initarg :key   :accessor key-of)
+    (value :initarg :value :accessor value-of)
+    (color :initform +red+ :accessor color-of :type bit))
 
    (:documentation "Node of transactional sorted map, implemented with red-black tree")))
 

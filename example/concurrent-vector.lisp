@@ -234,23 +234,47 @@
     (1g (incf (the fixnum (gethash i h))))))
 
 
-;; 34.695 nanoseconds per (setf ...)
-;; (1m (dotimes (j 1000) (setf (gethash j h) t)))
-
-;; 41.592 seconds
-;; = 34.695 nanoseconds per (setf ...)
-;; + 6897   nanoseconds per (clrhash h)
-;; (1m (dotimes (j 1000) (setf (gethash j h) t)) (clrhash h))
-
-(defun test-clrhash (&optional (n 16))
+(defun test-recycle-hash (&optional (n 16))
   (declare (type fixnum n))
   (let ((h (make-hash-table :test 'eq)))
-    (dotimes (i n) (setf (gethash i h) t))
-    ;; 3.790 nanoseconds per clrhash, n = 16
-    ;; 3.792 nanoseconds per clrhash, n = 32
-    ;; 3.789
+    ;;  0.672 microseconds (n = 16)
+    ;;  1.383 microseconds (n = 32)
+    ;;  2.763 microseconds (n = 64)
+    ;;  5.502 microseconds (n = 128)
+    ;; 10.940 microseconds (n = 256)
+    ;; 21.905 microseconds (n = 512)
+    (1m
+     (dotimes (j n) (setf (gethash j h) t))
+     (clrhash h))))
 
-    (1g (clrhash h))))
+(defun test-recycle-hash2 (&optional (n 16))
+  (declare (type fixnum n))
+  (let ((h (make-hash-table :test 'eq)))
+    (dotimes (j n) (setf (gethash j h) t))
+    (clrhash h)
+    ;;  0.663 microseconds (n = 16)
+    ;;  0.790 microseconds (n = 32)
+    ;;  0.789 microseconds (n = 63)
+    ;;  0.974 microseconds (n = 64)
+    ;;  0.979 microseconds (n = 127)
+    ;;  1.339 microseconds (n = 128)
+    ;;  2.062 microseconds (n = 256)
+    ;;  3.496 microseconds (n = 512)
+    (1m
+     (dotimes (j 16) (setf (gethash j h) t))
+     (clrhash h))))
+
+(defun test-new-hash (&optional (n 16))
+  (declare (type fixnum n))
+  ;;  0.876 microseconds (n = 16)
+  ;;  2.775 microseconds (n = 32)
+  ;;  5.543 microseconds (n = 64)
+  ;; 11.158 microseconds (n = 128)
+  ;;        microseconds (n = 256)
+  ;; 46.594 microseconds (n = 512)
+  (1m
+   (let ((h (make-hash-table :test 'eq)))
+     (dotimes (j n) (setf (gethash j h) t)))))
 
 
 (defun test-lock-unlock (&optional i)

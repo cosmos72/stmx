@@ -75,65 +75,65 @@ Software: Debian GNU/Linux 7 (wheezy) x86_64, SBCL 1.1.6 x86_64, STMX 1.0.1
      <th><b>executed code</b></th>
      <th><b>average time</b></th></tr>
 
- <tr><td>atomic nil       </td><td><code>(atomic nil)</code>                </td><td>0.144&nbsp;microseconds</td></tr>
- <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code>              </td><td>0.274&nbsp;microseconds</td></tr>
- <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) i))</code>     </td><td>0.379&nbsp;microseconds</td></tr>
- <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($ v)))</code>     </td><td>0.549&nbsp;microseconds</td></tr>
+ <tr><td>atomic nil       </td><td><code>(atomic nil)</code>                </td><td>0.151&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code>              </td><td>0.286&nbsp;microseconds</td></tr>
+ <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) i))</code>     </td><td>0.372&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($ v)))</code>     </td><td>0.535&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-10</td>
      <td><code>(atomic (dotimes (j 10) (incf ($ v))))</code></td>
-     <td>0.809&nbsp;microseconds</td></tr>
+     <td>0.805&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-100</td>
      <td><code>(atomic (dotimes (j 100) (incf ($ v))))</code></td>
-     <td>3.482&nbsp;microseconds</td></tr>
+     <td>3.433&nbsp;microseconds</td></tr>
 
- <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(0.552+N*0.030)&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(0.509+N*0.029)&nbsp;microseconds</td></tr>
 
- <tr><td>orelse empty     </td><td><code>(atomic (orelse))</code>           </td><td>0.121&nbsp;microseconds</td></tr>
- <tr><td>orelse unary     </td><td><code>(atomic (orelse ($ v)))</code>     </td><td>0.591&nbsp;microseconds</td></tr>
- <tr><td>orelse retry-1   </td><td><code>(atomic (orelse (retry) ($ v)))</code> </td><td>0.987&nbsp;microseconds</td></tr>
- <tr><td>orelse retry-2   </td><td><code>(atomic (orelse (retry) (retry) ($ v)))</code> </td><td>1.488&nbsp;microseconds</td></tr>
- <tr><td>orelse retry-4   </td><td><code>(atomic (orelse (retry) (retry) (retry) (retry) ($ v)))</code></td><td>2.224&nbsp;microseconds</td></tr>
+ <tr><td>orelse empty     </td><td><code>(atomic (orelse))</code>           </td><td>0.123&nbsp;microseconds</td></tr>
+ <tr><td>orelse unary     </td><td><code>(atomic (orelse ($ v)))</code>     </td><td>0.605&nbsp;microseconds</td></tr>
+ <tr><td>orelse retry-1   </td><td><code>(atomic (orelse (retry) ($ v)))</code> </td><td>1.022&nbsp;microseconds</td></tr>
+ <tr><td>orelse retry-2   </td><td><code>(atomic (orelse (retry) (retry) ($ v)))</code> </td><td>1.578&nbsp;microseconds</td></tr>
+ <tr><td>orelse retry-4   </td><td><code>(atomic (orelse (retry) (retry) (retry) (retry) ($ v)))</code></td><td>2.325&nbsp;microseconds</td></tr>
 
- <tr><td>orelse retry-N   </td><td>best fit of the 3 runs above</td><td>(0.655+N*0.427)&nbsp;microseconds</td></tr>
+ <tr><td>orelse retry-N   </td><td>best fit of the 3 runs above</td><td>(0.648+N*0.425)&nbsp;microseconds</td></tr>
 
  <tr><td>tmap read-write-1</td>
      <td><code>(atomic (incf (get-bmap tm 1)))</code></td>
-     <td>1.570&nbsp;microseconds</td></tr>
+     <td>1.548&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-bmap tm))<br>
               (set-bmap tm i t))</code></td>
-     <td>6.767&nbsp;microseconds</td></tr>
+     <td>6.405&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 100)</td>
      <td><code>(atomic (when (zerop (mod i  100)) (clear-bmap tm))<br>
               (set-bmap tm i t))</code></td>
-     <td>9.710&nbsp;microseconds</td></tr>
+     <td>9.377&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 1000)</td>
      <td><code>(atomic (when (zerop (mod i 1000)) (clear-bmap tm))<br>
               (set-bmap tm i t))</code></td>
-     <td>11.726&nbsp;microseconds</td></tr>
+     <td>11.568&nbsp;microseconds</td></tr>
 
  <tr><td>thash read-write-1</td>
      <td><code>(atomic (incf (get-thash th 'x)))</code></td>
-     <td>2.783&nbsp;microseconds</td></tr>
+     <td>2.806&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-thash th))<br>
               (set-thash th i t))</code></td>
-     <td>3.399&nbsp;microseconds</td></tr>
+     <td>3.459&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 100)</td>
      <td><code>(atomic (when (zerop (mod i  100)) (clear-thash th))<br>
               (set-thash th i t))</code></td>
-     <td>8.723&nbsp;microseconds</td></tr>
+     <td>8.815&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 1000)</td>
      <td><code>(atomic (when (zerop (mod i  1000)) (clear-thash th))<br>
               (set-thash th i t))</code></td>
-     <td>59.748&nbsp;microseconds</td></tr>
+     <td>60.450&nbsp;microseconds</td></tr>
 
 </table>

@@ -33,7 +33,7 @@
 
   (:import-from #:stmx
                 #:new
-                #:tvar-lock #:raw-value-of
+                #:raw-value-of
                 #:do-hash))
 
 
@@ -234,6 +234,25 @@
     (1g (incf (the fixnum (gethash i h))))))
 
 
+;; 34.695 nanoseconds per (setf ...)
+;; (1m (dotimes (j 1000) (setf (gethash j h) t)))
+
+;; 41.592 seconds
+;; = 34.695 nanoseconds per (setf ...)
+;; + 6897   nanoseconds per (clrhash h)
+;; (1m (dotimes (j 1000) (setf (gethash j h) t)) (clrhash h))
+
+(defun test-clrhash (&optional (n 16))
+  (declare (type fixnum n))
+  (let ((h (make-hash-table :test 'eq)))
+    (dotimes (i n) (setf (gethash i h) t))
+    ;; 3.790 nanoseconds per clrhash, n = 16
+    ;; 3.792 nanoseconds per clrhash, n = 32
+    ;; 3.789
+
+    (1g (clrhash h))))
+
+
 (defun test-lock-unlock (&optional i)
   (declare (ignore i))
   (let ((lock (bt:make-lock)))
@@ -249,3 +268,4 @@
     ;; 27.01 nanoseconds per get + release
     (1g (sb-thread:get-mutex lock)
         (sb-thread:release-mutex lock))))
+

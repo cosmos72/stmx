@@ -34,6 +34,7 @@
                              (:file "macro"       :depends-on ("package"))
                              (:file "features"    :depends-on ("macro"))
                              (:file "thread"      :depends-on ("features"))
+                             (:file "fast-lock"   :depends-on ("features"))
                              (:file "fast-vector" :depends-on ("macro"))
                              (:file "hash-table"  :depends-on ("macro"))
                              (:file "print"       :depends-on ("macro"))))

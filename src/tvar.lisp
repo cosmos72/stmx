@@ -173,6 +173,26 @@ and to check for any value stored in the log."
 
 
 
+;;;; ** Locking and unlocking
+
+(declaim (ftype (function (tvar) boolean) try-lock-tvar)
+         (ftype (function (tvar)) unlock-tvar)
+         (inline try-lock-tvar unlock-tvar))
+
+(defun try-lock-tvar (var)
+  #+stmx-have-fast-lock
+  (try-acquire-fast-lock (the fast-lock var))
+  #-stmx-have-fast-lock
+  (acquire-lock (tvar-lock var) :wait-p nil))
+
+
+(defun unlock-tvar (var)
+  #+stmx-have-fast-lock
+  (release-fast-lock (the fast-lock var))
+  #-stmx-have-fast-lock
+  (release-lock (tvar-lock var)))
+
+
 
 ;;;; ** Listening and notifying
 

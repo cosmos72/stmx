@@ -80,7 +80,8 @@ and are later committed to memory if the transaction completes successfully."
 (defvar +unbound+ (gensym "UNBOUND-"))
 
 
-(defstruct tvar
+(defstruct (tvar #+stmx-have-fast-lock (:include fast-lock))
+
   "A transactional variable (TVAR) is the smallest unit
 of transactional memory.
 It contains a single value that can be read or written during a transaction
@@ -92,7 +93,10 @@ the slots of a transactional object (with slot-value, accessors ...),
 and behind the scenes the slots will be stored in transactional memory implemented by TVARs."
 
   (value +unbound+)                             ;; tvar-value
-  (lock (make-lock "TVAR") :read-only t)        ;; tvar-lock
+
+  #-stmx-have-fast-lock
+  (lock (make-lock "TVAR"))
+
   (waiting-for nil :type (or null hash-table))  ;; tvar-waiting-for
   (waiting-lock (make-lock "WAITING-FOR-LOCK") :read-only t) ;; tvar-waiting-lock
   (id (next-id *tvar-id*) :type fixnum :read-only t))       ;; tvar-id

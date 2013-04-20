@@ -16,9 +16,9 @@
 (in-package :stmx.lang)
 
 
-#-sbcl #-ccl #-lispworks
+#-sbcl #-ccl
 (eval-always
-  (error "unsupported Common Lisp implementation. STMX currently supports only SBCL, CCL and LispWorks."))
+  (error "unsupported Common Lisp implementation. STMX currently supports only SBCL and CCL."))
 
 (defun add-feature (f)
   (declare (type keyword f))
@@ -26,7 +26,7 @@
 
 (add-feature :stmx)
 
-#+lispworks
+#+lispworks ;; porting still in progress
 (dolist (f '(:stmx-must-disable-optimize-slot-access))
   (add-feature f))
 
@@ -36,6 +36,7 @@
 
 #+sbcl
 (dolist (f '(:stmx-sane-bt.join-thread
+             :stmx-have-fast-lock
              :stmx-have-mop.setf-slot-definition-type
              :stmx-have-mop.setf-slot-definition-initfunction))
   (add-feature f))

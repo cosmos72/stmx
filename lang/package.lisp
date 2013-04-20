@@ -26,9 +26,12 @@
            #:when-bind    #:awhen
            #:if-bind      #:aif
 
-           #:make-fast-vector
+           #:fast-lock             #:make-fast-lock        
+           #:try-acquire-fast-lock #:release-fast-lock
+
+           #:fast-vector        #:make-fast-vector
            #:fast-vector-length #:fast-vector-max-length
-           #:fast-vector-push #:fast-vector-pop #:fast-vector-pop-macro
+           #:fast-vector-push   #:fast-vector-pop #:fast-vector-pop-macro
            
            #:get-hash #:set-hash ;; also (setf get-hash)
            #:rem-hash #:clear-hash #:do-hash

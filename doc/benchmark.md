@@ -67,7 +67,7 @@ Date: 19 April 2013
 
 Hardware: Intel Core-i5 750 @4.0 GHz, 16GB RAM
 
-Software: Debian GNU/Linux 7 (wheezy) x86_64, SBCL 1.1.6 x86_64, STMX 1.0.1
+Software: Debian GNU/Linux 7 (wheezy) x86_64, SBCL 1.1.6 x86_64, STMX 1.0.2
 
 
 <table>
@@ -76,13 +76,13 @@ Software: Debian GNU/Linux 7 (wheezy) x86_64, SBCL 1.1.6 x86_64, STMX 1.0.1
      <th><b>average time</b></th></tr>
 
  <tr><td>atomic nil       </td><td><code>(atomic nil)</code>                </td><td>0.151&nbsp;microseconds</td></tr>
- <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code>              </td><td>0.286&nbsp;microseconds</td></tr>
- <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) i))</code>     </td><td>0.372&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code>              </td><td>0.284&nbsp;microseconds</td></tr>
+ <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) i))</code>     </td><td>0.369&nbsp;microseconds</td></tr>
  <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($ v)))</code>     </td><td>0.535&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-10</td>
      <td><code>(atomic (dotimes (j 10) (incf ($ v))))</code></td>
-     <td>0.805&nbsp;microseconds</td></tr>
+     <td>0.800&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-100</td>
      <td><code>(atomic (dotimes (j 100) (incf ($ v))))</code></td>

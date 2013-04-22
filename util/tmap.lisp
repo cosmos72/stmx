@@ -23,8 +23,9 @@
    ;; override all inherited slots to make them transactional.
    ;; No need to specify :initform, :initarg, :accessor or :type
    ;; unless we want to override the settings found in superclasses
-   ((left  :type (or null tnode))
-    (right :type (or null tnode))
+
+   ((left  ) ;; :type (or null tnode) ;; this sends SBCL in infinite recursion at (optimize (speed 3))
+    (right ) ;; :type (or null tnode) ;; idem
     (key   )
     (value )
     (color ))

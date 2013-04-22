@@ -37,7 +37,8 @@
                              (:file "fast-lock"   :depends-on ("features"))
                              (:file "fast-vector" :depends-on ("macro"))
                              (:file "hash-table"  :depends-on ("macro"))
-                             (:file "print"       :depends-on ("macro"))))
+                             (:file "print"       :depends-on ("macro"))
+                             (:file "class-precedence-list" :depends-on ("macro"))))
 
                (:module :src
                 :depends-on (:lang)
@@ -57,11 +58,12 @@
                              (:file "print"       :depends-on ("package"))
 
                              (:file "container"   :depends-on ("misc"))
+                             (:file "tcons"       :depends-on ("misc"))
                              (:file "tvar"        :depends-on ("container"))
                              (:file "tcell"       :depends-on ("container"))
-                             (:file "tfifo"       :depends-on ("container"))
                              (:file "tstack"      :depends-on ("container"))
-                             (:file "tchannel"    :depends-on ("container"))
+                             (:file "tfifo"       :depends-on ("container" "tcons"))
+                             (:file "tchannel"    :depends-on ("container" "tcons"))
 
 			     (:file "bheap"       :depends-on ("container"))
 

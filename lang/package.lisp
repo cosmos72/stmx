@@ -45,6 +45,6 @@
            #:id-of ;; also (setf id-of)
            #:~     ;; also (setf ~)
 
-           #:defprint-object))
+           #:defprint-object
 
-
+           #:clos-compute-class-precedence-list))

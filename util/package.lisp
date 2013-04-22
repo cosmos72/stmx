@@ -23,8 +23,10 @@
         #:stmx.lang
         #:stmx)
 
-  (:export #:tcell #:tfifo #:tstack #:tchannel #:tport ;; transactional containers
+  (:export #:tcons #:tlist #:tfirst #:trest #:tpush #:tpop ;; transactional CONS cell and list
 
+           #:tcell #:tfifo #:tstack #:tchannel #:tport  ;; transactional containers
+           
            #:full? #:empty? #:empty! ;; methods for transactional containers
            #:peek   #:take   #:put
            #:try-take    #:try-put

@@ -58,7 +58,8 @@ return LOG itself."
   "Return a no-longer-needed TLOG to the pool."
   (declare (type tlog log))
   ;; fix performance killer: if (tlog-reads log) or (tlog-writes log)
-  ;; are very large, clearing them takes ages. Better to just discard the TLOG.
+  ;; are very large, clearing them takes ages. In such case, better
+  ;; to just discard the TLOG.
   (when (and
          (<= (hash-table-count (tlog-reads log)) 127)
          (<= (hash-table-count (tlog-writes log)) 127))

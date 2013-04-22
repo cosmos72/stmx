@@ -419,7 +419,7 @@ features are available:
 - `TVAR` is the class implementing transactional memory behind the scenes.
    It is used internally by slots of transactional classes, but can also be used
    directly. All its functions and methods work both inside and outside transactions:
-   - `(make-tvar [:value initial-value])` Create a new TVAR, optionally bound to a value.
+   - `(tvar [initial-value])` Create a new TVAR, optionally bound to a value.
    - `($ var)` Get the value of VAR. Signals an error if VAR is not bound to any value.
    - `(setf ($ var) value)` Store VALUE into VAR.
    - `(bound-$? var)` Return true if VAR is bound to some value.
@@ -539,7 +539,7 @@ transactions per second per CPU core.
 Taking as a small but somewhat realistic example the [dining philosophers](example/dining-philosophers.lisp),
 with 5 reads and 5 writes to transactional memory per atomic block and
 a moderate rate of conflicts and retries (10-20%), each CPU core runs
-approximately 600000 transactions per second.
+approximately 700000 transactions per second.
 
 Obviously, performance in other cases will depend on the complexity of the code
 inside transactions, on the number of reads and writes to transactional memory,

@@ -82,15 +82,14 @@ and are later committed to memory if the transaction completes successfully."
 
 (defstruct (tvar #+stmx-have-fast-lock (:include fast-lock))
 
-  "A transactional variable (TVAR) is the smallest unit
-of transactional memory.
+  "A transactional variable (TVAR) is the smallest unit of transactional memory.
 It contains a single value that can be read or written during a transaction
-using ($ tvar) and (SETF ($ tvar) value).
+using ($ var) and (SETF ($ var) value).
 
 TVARs are seldom used directly, since transactional objects (TOBJs) wrap them
-with a more intuitive and powerful interface: you can read and write normally
-the slots of a transactional object (with slot-value, accessors ...),
-and behind the scenes the slots will be stored in transactional memory implemented by TVARs."
+with a more convenient interface: you can read and write normally the slots
+of a transactional object (with slot-value, accessors ...), and behind
+the scenes the slots will be stored in transactional memory implemented by TVARs."
 
   (value +unbound+)                             ;; tvar-value
 

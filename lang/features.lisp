@@ -31,12 +31,16 @@
   (add-feature f))
 
 #+ccl
-(dolist (f '(:stmx-sane-bt.join-thread))
-  (add-feature f *features*))
+(dolist (f '())
+  (add-feature f))
 
 #+sbcl
-(dolist (f '(:stmx-sane-bt.join-thread
-             :stmx-have-fast-lock
-             :stmx-have-mop.setf-slot-definition-type
-             :stmx-have-mop.setf-slot-definition-initfunction))
+(dolist (f '(:stmx-have-fast-lock))
   (add-feature f))
+
+
+(eval-when (:compile-toplevel)
+  (let ((x (gensym)))
+    (when (eq x
+              (bt:join-thread (bt:make-thread (lambda () x))))
+      (pushnew :stmx-sane-bt.join-thread *features*))))

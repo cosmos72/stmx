@@ -20,7 +20,7 @@
 
 (test tx-read-of
   (let ((log (make-tlog))
-        (var (make-tvar :value 1)))
+        (var (tvar 1)))
     (is (= 1 (raw-value-of var)))
     (is (= 1 (tx-read-of var log)))
     (tx-write-of var 2 log)
@@ -29,7 +29,7 @@
 
 (test valid?
   (let ((log (make-tlog))
-        (var  (make-tvar :value 1)))
+        (var  (tvar 1)))
     (is-true (valid? log))
     (tx-read-of var log)
     (is-true (valid? log))
@@ -42,7 +42,7 @@
     
 (test commit
   (let ((log (make-tlog))
-        (var (make-tvar :value 1)))
+        (var (tvar 1)))
     (tx-write-of var 2 log)
     (is-true (valid? log))
     (is-true (commit log))
@@ -50,7 +50,7 @@
 
 (test $
   (let ((log (make-tlog))
-        (var (make-tvar :value 1)))
+        (var (tvar 1)))
     (is (= 1 ($ var)))
     (with-recording-to-tlog log
       (is (= 1 ($ var)))
@@ -63,7 +63,7 @@
     (is (= 2 ($ var)))))
 
 (test atomic
-  (let1 var (make-tvar :value 0)
+  (let1 var (tvar 0)
 
     (atomic :id 'test-atomic
       (is (= 0 ($ var)0))
@@ -95,7 +95,7 @@
   ())
 
 (test rollback
-  (let1 var (make-tvar :value 1)
+  (let1 var (tvar 1)
     
     (signals test-error
       (atomic :id 'test-rollback
@@ -109,7 +109,7 @@
 
 
 (test invalid
-  (let ((var (make-tvar :value 1))
+  (let ((var (tvar 1))
         (counter 0)
         masked-test-error?)
     

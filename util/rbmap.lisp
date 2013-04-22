@@ -24,7 +24,8 @@
 
 
 (defclass rbnode (bnode)
-  ((color :initform +red+ :type bit :accessor color-of))
+  ;; allow COLOR to also be a TVAR, otherwise subclass TNODE cannot work
+  ((color :initform +red+ :type (or bit tvar) :accessor color-of))
   (:documentation "Node for red-black trees"))
 
 
@@ -71,7 +72,8 @@
 Return (values node stack) for some rebalanced node and its path from root.
 If stack is nil, returned node is the new root to set."
   (declare (type rbmap m)
-           (type list stack))
+           (type list stack)
+           (ignore m))
 
   (prog ((node (pop stack))
          left-node?
@@ -178,7 +180,8 @@ If stack is nil, returned node is the new root to set."
 Return some node in rebalanced tree and its stack as multiple values"
   (declare (type rbmap m)
            (type bnode node)
-           (type list stack))
+           (type list stack)
+           (ignore m))
 
   (let1 parent (pop stack)
     (unless parent

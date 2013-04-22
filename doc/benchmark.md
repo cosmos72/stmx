@@ -26,7 +26,7 @@ Setup and optimization flags:
     (defmacro 1m (&rest body)
       `(time (dotimes (i 1000000)
          ,@body)))
-    (defvar v (make-tvar :value 0))
+    (defvar v (tvar 0))
     (defvar m  (new 'rbmap :pred #'fixnum<)) 
     (defvar tm (new 'tmap  :pred #'fixnum<)) 
     (defvar h  (make-hash-table))  

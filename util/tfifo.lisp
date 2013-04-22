@@ -19,13 +19,13 @@
 
 (transactional
  (defclass tfifo ()
-   ((front :type cons :accessor front-of)
-    (back  :type cons :accessor back-of))))
+   ((front :type tcons :accessor front-of)
+    (back  :type tcons :accessor back-of))))
 
 
 (defmethod initialize-instance :after ((f tfifo) &key &allow-other-keys)
   "Initialize tfifo F."
-  (let1 cell (cons nil nil)
+  (let1 cell (tcons nil nil)
     (setf (front-of f) cell
           (back-of  f) cell)))
 
@@ -52,7 +52,7 @@ Return (values DEFAULT nil) if F contains no value."
    (with-ro-slots (front back) f
      (if (eq front back)
          (values default nil)
-         (values (first front) t)))))
+         (values (tfirst front) t)))))
 
 
 (transaction
@@ -62,7 +62,7 @@ then remove and return the first value."
    (with-rw-slots (front back) f
      (if (eq front back)
          (retry)
-         (pop front)))))
+         (tpop front)))))
 
 
 (transaction
@@ -70,9 +70,9 @@ then remove and return the first value."
    "Append VALUE as last element in tfifo F and return VALUE.
 Since tfifo can contain unlimited values, this method never blocks."
    (with-rw-slots (back) f
-     (let1 cell (cons nil nil)
-       (setf (first back) value
-             (rest  back) cell
+     (let1 cell (tcons nil nil)
+       (setf (tfirst back) value
+             (trest  back) cell
              back cell)))
    value))
    
@@ -85,7 +85,7 @@ Otherwise return (values nil nil)"
    (with-rw-slots (front back) f
      (if (eq front back)
          (values nil nil)
-         (values t (pop front))))))
+         (values t (tpop front))))))
    
 
 (defmethod try-put  ((f tfifo) value)
@@ -94,3 +94,18 @@ Since tfifo can contain unlimited values, this method never fails."
   (values t (put f value)))
 
 
+(defprint-object (obj tfifo :identity nil)
+  (write-string "(")
+  (let ((list (_ obj front))
+        (end  (_ obj back)))
+    (unless (eq list end)
+      (loop 
+         for value = (tfirst list)
+         for rest = (trest list)
+         do
+           (when (eq rest end)
+             (format t "~A" value)
+             (return))
+           (format t "~A " value)
+           (setf list rest))))
+  (write-string ")"))

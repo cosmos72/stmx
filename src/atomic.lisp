@@ -30,15 +30,12 @@ The effect is the same as DEFCLASS, plus:
 - by default, slots are transactional memory (implemented by TVARs)
 - it inherits also from TRANSACTIONAL-OBJECT
 - the metaclass is TRANSACTIONAL-CLASS"
-    `(eval-always
-       (,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
-         ,direct-slots
-         ,@class-options
-         #|
-         #+stmx-must-disable-optimize-slot-access
-         (:optimize-slot-access nil)
-         |#
-         (:metaclass transactional-class))))
+  `(eval-always
+     (,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
+       ,(adjust-transactional-slots-definitions direct-slots class-name direct-superclasses)
+       ,@class-options
+       #+stmx-must-disable-optimize-slot-access (:optimize-slot-access nil)
+       (:metaclass transactional-class))))
 
 
 (defmacro transaction ((defun-or-defmethod func-name args &body body))
@@ -197,7 +194,7 @@ transactional memory it read has changed."
 
   (declare (type function tx))
 
-  (when (and (recording?) (current-tlog))
+  (when (current-tlog)
     (return-from run-atomic (funcall tx)))
 
   (when id

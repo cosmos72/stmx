@@ -31,7 +31,7 @@
 
 
 (test before-commit-fails
-  (let ((var (make-tvar :value 'original)))
+  (let ((var (tvar 'original)))
 
     (signals test-error
       (atomic
@@ -54,7 +54,7 @@
 
 
 (test after-commit-fails
-  (let ((var (make-tvar :value 'original)))
+  (let ((var (tvar 'original)))
 
     (signals test-error
       (atomic

@@ -19,7 +19,7 @@
 
 (transactional
  (defclass tchannel ()
-   ((back  :type cons :initform (cons nil nil) :accessor back-of))
+   ((back  :type tcons :initform (tcons nil nil) :accessor back-of))
    (:documentation "Transactional multicast channel supporting unlimited reading ports.
 Values written into the tchannel are available to all reading ports in the same order.
 
@@ -41,9 +41,9 @@ so assume they are always empty and return t."
    "Append VALUE as last element in tchannel C and return VALUE.
 Since tchannel can contain unlimited values, this method never blocks."
    (with-rw-slots (back) c
-     (let1 cell (cons nil nil)
-       (setf (first back) value
-             (rest  back) cell
+     (let1 cell (tcons nil nil)
+       (setf (tfirst back) value
+             (trest  back) cell
              back cell)))
    value))
    
@@ -72,16 +72,16 @@ Values written into the tchannel are available to all reading ports in the same 
 
 (defun tchannel-back-of (p)
   (declare (type tport p))
-  (back-of (channel-of p)))
+  (_ (_ p channel) back))
 
 (defun tport-empty? (p)
   (declare (type tport p))
-  (eq (front-of p) (tchannel-back-of p)))
+  (eq (_ p front) (tchannel-back-of p)))
   
 
 (defmethod initialize-instance :after ((p tport) &key &allow-other-keys)
   "Initialize the reading tport P for a multicast tchannel."
-  (setf (front-of p) (tchannel-back-of p)))
+  (setf (_ p front) (tchannel-back-of p)))
 
 (transaction
  (defmethod empty? ((p tport))
@@ -89,7 +89,7 @@ Values written into the tchannel are available to all reading ports in the same 
 
 (transaction
  (defmethod empty! ((p tport))
-   (setf (front-of p) (tchannel-back-of p))
+   (setf (_ p front) (tchannel-back-of p))
    p))
                   
 (defmethod full? ((p tport))
@@ -104,7 +104,7 @@ so assume they are always full and return t."
 Return (values DEFAULT nil) if P contains no value."
    (if (tport-empty? p)
        (values default nil)
-       (values (first (front-of p)) t))))
+       (values (tfirst (_ p front)) t))))
 
 
 (transaction
@@ -113,7 +113,7 @@ Return (values DEFAULT nil) if P contains no value."
 then remove and return the first value."
    (if (tport-empty? p)
        (retry)
-       (pop (front-of p)))))
+       (tpop (_ p front)))))
 
 
 (transaction
@@ -123,4 +123,4 @@ and return t and the first value as multiple values.
 Otherwise return (values nil nil)"
    (if (tport-empty? p)
        (values nil nil)
-       (values t (pop (front-of p))))))
+       (values t (tpop (_ p front))))))

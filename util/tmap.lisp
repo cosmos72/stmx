@@ -20,12 +20,14 @@
 
 (transactional
  (defclass tnode (rbnode)
-   ;; override all inherited slots to make them transactional
-   ((left  :initform nil   :accessor left-of) ;; :type (or null tnode))
-    (right :initform nil   :accessor right-of) ;;  :type (or null tnode))
-    (key   :initarg :key   :accessor key-of)
-    (value :initarg :value :accessor value-of)
-    (color :initform +red+ :accessor color-of :type bit))
+   ;; override all inherited slots to make them transactional.
+   ;; No need to specify :initform, :initarg, :accessor or :type
+   ;; unless we want to override the settings found in superclasses
+   ((left  :type (or null tnode))
+    (right :type (or null tnode))
+    (key   )
+    (value )
+    (color ))
 
    (:documentation "Node of transactional sorted map, implemented with red-black tree")))
 
@@ -33,10 +35,10 @@
 (transactional
  (defclass tmap (rbmap)
    ;; override inherited slots to make them transactional
-   ((root  :initform nil :type (or null tnode))
+   ((root :type (or null tnode))
     ;; inherited slot pred is immutable -> no need to make it transactional
     ;; -> no need to override it
-    (count :initform 0   :type fixnum))
+    (count))
    (:documentation "Transactional sorted map, implemented with red-black tree")))
 
 

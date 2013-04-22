@@ -23,11 +23,11 @@
 
 
 (defmethod empty? ((s tstack))
-  (null (top-of s)))
+  (null (_ s top)))
 
 (transaction
  (defmethod empty! ((s tstack))
-   (setf (top-of s) nil)
+   (setf (_ s top) nil)
    q))
 
 (defmethod full? ((s tstack))
@@ -38,7 +38,7 @@
 (transaction
  (defmethod peek ((s tstack) &optional default)
    "Return the first value in tstack S without removing it, and t as multiple values.
-Return (values DEFAULT nil) if S contains no value."
+Return (values DEFAULT nil) if S contains no values."
    (with-ro-slots (top) s
      (if (null top)
          (values default nil)
@@ -59,7 +59,7 @@ and return the first value."
  (defmethod put ((s tstack) value)
    "Insert VALUE as first element in tstack S and return VALUE.
 Since tstack can contain unlimited values, this method never blocks."
-   (push value (top-of s))
+   (push value (_ s top))
    value))
    
 
@@ -79,4 +79,12 @@ Otherwise return (values nil nil)"
 Since fifo can contain unlimited values, this method never fails."
   (values t (put s value)))
 
+
+
+
+(defprint-object (obj tstack :identity nil)
+  (with-ro-slots (top) obj
+    (if top
+        (format t "~A" (reverse top))
+        (write-string "()"))))
 

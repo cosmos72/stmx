@@ -20,18 +20,21 @@
 ;;;; For a transactional version, see tmap.lisp
 
 (defclass bnode ()
-  ((left  :initform nil  :type (or null bnode)   :accessor left-of)
-   (right :initform nil  :type (or null bnode)   :accessor right-of)
-   (key        :initarg :key                     :accessor key-of)
-   (value      :initarg :value                   :accessor value-of))
+  ;; allow LEFT and RIGHT to also be TVARS, otherwise subclass TNODE cannot work
+  ((left  :initform nil  :type (or null bnode tvar) :accessor left-of)
+   (right :initform nil  :type (or null bnode tvar) :accessor right-of)
+   (key        :initarg :key                        :accessor key-of)
+   (value      :initarg :value                      :accessor value-of))
   (:documentation "Generic binary tree node"))
 
 
 (defclass bmap ()
-  ((root  :initform nil  :type (or null bnode)   :accessor root-of)
-   (pred  :initarg :pred :type function          :accessor pred-of
+  ;; allow ROOT to also be a TVAR, otherwise subclass TMAP cannot work
+  ((root  :initform nil  :type (or null bnode tvar) :accessor root-of)
+   (pred  :initarg :pred :type function             :accessor pred-of
           :initform (error "missing :pred argument instantiating ~A or a subclass" 'bmap))
-   (count :initform 0    :type fixnum            :accessor count-of))
+   ;; allow COUNT to also be a TVAR, otherwise subclass TMAP cannot work
+   (count :initform 0    :type (or fixnum tvar)     :accessor count-of))
   (:documentation "Generic binary tree"))
 
 
@@ -40,7 +43,7 @@
   (defmethod make-instance ((class (eql bmap-class)) &rest initargs &key &allow-other-keys)
     "BMAP is not supposed to be instantiated directly. For this reason,
 \(make-instance 'bmap ...) will signal an error. Most Lispers may consider this
-as bad style; I prefer to be notified early if I try to do something wrong."
+bad style; I prefer to be notified early if I try to do something wrong."
     (declare (ignore initargs))
     (error "Cannot instantiate abstract class ~A" class)))
 

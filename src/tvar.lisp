@@ -17,6 +17,10 @@
 
 ;;;; ** Transactional variables
 
+(declaim (inline tvar))
+(defun tvar (&optional (value +unbound+))
+  (the tvar (make-tvar :value value)))
+
 ;;;; ** Signalling unbound variables
 
 (defun unbound-tvar-error (var)
@@ -183,7 +187,7 @@ and to check for any value stored in the log."
   #+stmx-have-fast-lock
   (try-acquire-fast-lock (the fast-lock var))
   #-stmx-have-fast-lock
-  (acquire-lock (tvar-lock var) :wait-p nil))
+  (acquire-lock (tvar-lock var) nil))
 
 
 (defun unlock-tvar (var)

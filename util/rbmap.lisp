@@ -301,17 +301,14 @@ from rebalanced tree. Some-node will be nil only if the tree is empty after remo
         ;; node with two children. implementation choice:
         ;; replace node with successor (min of right subtree) if successor is red or has 1 child,
         ;; otherwise replace node with predecessor (max of left subtree)
-        (let ((other-stack stack)
-              (other-is-successor? t))
-
+        (let1 other-stack stack
           (loop for left = right then (_ left left)
              while left do
                (push left other-stack))
 
           (let1 other-node (first other-stack)
             (unless (or (red? other-node) (_ other-node left) (_ other-node right))
-              (setf other-stack stack
-                    other-is-successor? nil)
+              (setf other-stack stack)
               (loop for right = left then (_ right right)
                  while right do
                    (push right other-stack))))

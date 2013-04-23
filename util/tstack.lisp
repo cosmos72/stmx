@@ -28,7 +28,7 @@
 (transaction
  (defmethod empty! ((s tstack))
    (setf (_ s top) nil)
-   q))
+   s))
 
 (defmethod full? ((s tstack))
   "A tstack is never full, so this method always returns nil."

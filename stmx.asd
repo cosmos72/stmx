@@ -17,7 +17,7 @@
 
 (asdf:defsystem :stmx
   :name "STMX"
-  :version "1.0.1"
+  :version "1.0.3"
   :license "LLGPL"
   :author "Massimiliano Ghilardi"
   :description "Composable Software Transactional Memory"
@@ -96,5 +96,10 @@
                              (:file "retry"     :depends-on ("package"))
                              (:file "orelse"    :depends-on ("package"))
                              (:file "tmap"      :depends-on ("rbmap" "orelse"))))))
+
+
+(defmethod asdf:perform ((op asdf:test-op) (system (eql (asdf:find-system :stmx))))
+  (asdf:load-system :stmx.test)
+  (eval (read-from-string "(fiveam:run! 'stmx.test:suite)")))
 
 

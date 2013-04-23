@@ -114,8 +114,8 @@ If TO-LIST is not nil, it will be appended to the returned list.
 TO-LIST contents is not destructively modified."
   (declare (type hash-table src)
            (type list to-list))
-  (do-hash (key value) src
-    (push value to-list))
+  (loop for value being each hash-value in src
+     do (push value to-list))
   to-list)
 
 

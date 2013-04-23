@@ -261,7 +261,23 @@ UNLESS explicitly defined with the option :transactional nil."
     (or (null transactional-opt)
         (not (null (second transactional-opt))))))
 
-        
+(defun typespec-allows? (type typespec)
+  "Return T if TYPESPEC is compatible with TYPE, i.e. if:
+* TYPESPEC is equal to TYPE
+* TYPESPEC is equal to (OR ... TYPESPEC-I ...) and at least one TYPESPEC-I is compatible with TYPE
+* TYPESPEC is equal to (AND ... TYPESPEC-I ...) and all TYPESPEC-I are compatible with TYPE.
+Otherwise return NIL."
+  (and
+   (or
+    (equal type typespec)
+    (when (consp typespec)
+      (case (first typespec)
+        (or (loop for typespec-i in (rest typespec)
+                thereis (typespec-allows? type typespec-i)))
+        (and (loop for typespec-i in (rest typespec)
+                always (typespec-allows? type typespec-i)))
+        (otherwise nil))))
+   t))
 
 (defun adjust-transactional-slot-definition (slot-definition
                                              class-name class-precedence-list)
@@ -306,7 +322,7 @@ is defined as :transactional NIL, wrap its :initform with a TVAR and alter its
            (unless super-type?
              (setf super-type-tx? tx?
                    super-type? (slot-definition-type slot)
-                   super-type type?)))
+                   super-type super-type?)))
 
       ;; if super-slot :initform and/or :type are already TVAR-aware,
       ;; keep things simple and don't repeat them
@@ -318,7 +334,8 @@ is defined as :transactional NIL, wrap its :initform with a TVAR and alter its
       ;; but forbids adding alternatives... we cannot add TVARs as allowed :type,
       ;; the only hope is for them to be already allowed
       
-      (unless (or super-type-tx? (member super-type '(t nil)))
+      (unless (or super-type-tx? (member super-type '(t nil))
+                  (typespec-allows? 'tvar super-type))
         (warn "transactional class ~A defines transactional slot ~A to override
 a non-transactional superclass slot with the same name,
 but the superslot already contains a type definition ~A.

@@ -173,7 +173,7 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   "Un-listen on tvars, i.e. deregister not to get notifications if they change."
 
   (declare (type tlog log))
-  (do-hash (var val) (tlog-reads log)
+  (do-hash (var) (tlog-reads log)
     (unlisten-tvar var log))
   (values))
 

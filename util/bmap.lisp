@@ -247,6 +247,7 @@ but must NOT invoke (decf (_ m count))."))
 (defgeneric print-bnode (stream node &optional depth))
 
 (defmethod print-bnode (stream (node null) &optional (depth 0))
+  (declare (ignore stream node depth))
   nil)
 
 (defmethod print-bnode (stream (node bnode) &optional (depth 0))

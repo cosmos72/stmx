@@ -30,12 +30,11 @@ The effect is the same as DEFCLASS, plus:
 - by default, slots are transactional memory (implemented by TVARs)
 - it inherits also from TRANSACTIONAL-OBJECT
 - the metaclass is TRANSACTIONAL-CLASS"
-  `(eval-always
-     (,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
-       ,(adjust-transactional-slots-definitions direct-slots class-name direct-superclasses)
-       ,@class-options
-       #+stmx-must-disable-optimize-slot-access (:optimize-slot-access nil)
-       (:metaclass transactional-class))))
+  `(,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
+     ,(adjust-transactional-slots-definitions direct-slots class-name direct-superclasses)
+     ,@class-options
+     #+stmx-must-disable-optimize-slot-access (:optimize-slot-access nil)
+     (:metaclass transactional-class)))
 
 
 (defmacro transaction ((defun-or-defmethod func-name args &body body))
@@ -47,10 +46,9 @@ or
 
 The effect is the same as DEFUN - or DEFMETHOD - plus:
 - the BODY is wrapped inside (atomic ...)"
-    `(eval-always
-       (,defun-or-defmethod ,func-name ,args
-         (atomic :id ',func-name
-           ,@body))))
+  `(,defun-or-defmethod ,func-name ,args
+     (atomic :id ',func-name
+             ,@body)))
 
 
 

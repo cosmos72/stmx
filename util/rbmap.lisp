@@ -55,7 +55,6 @@
 
 
 (defmethod bmap/new-node ((m rbmap) key value)
-  (declare (type rbmap m))
   (new 'rbnode :key key :value value))
 
 

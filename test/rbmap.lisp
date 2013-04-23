@@ -138,8 +138,8 @@ bmap-count must be the actual nodes count, root must be black."
 (defun hash-table-to-sorted-values (hash pred)
   (declare (type hash-table hash)
            (type function pred))
-  (loop for (key . value) in (hash-table-to-sorted-pairs hash pred)
-     collect value))
+  (loop for pair in (hash-table-to-sorted-pairs hash pred)
+     collect (rest pair)))
          
 
 

@@ -454,7 +454,6 @@ and removes any other key/value already present in MCOPY."
     mcopy))
 
 
-
 (defun fwd-traverse-bmap-at (m node func)
   (declare (type bmap m)
            (type (or null bnode) node)

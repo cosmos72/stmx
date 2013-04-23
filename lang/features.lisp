@@ -18,7 +18,7 @@
 
 #-sbcl #-ccl
 (eval-always
-  (error "unsupported Common Lisp implementation. STMX currently supports only SBCL and CCL."))
+  (warn "Unsupported Common Lisp implementation. STMX is currently tested only on SBCL and CCL."))
 
 (defun add-feature (f)
   (declare (type keyword f))

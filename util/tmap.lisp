@@ -79,11 +79,7 @@
   (declare (ignore m))
   (run-atomic #'call-next-method))
 
-(defmethod copy-bmap-into ((mcopy tmap) m)
-  (declare (ignore mcopy m))
-  (run-atomic #'call-next-method))
-
-(defmethod copy-bmap-into (mcopy (m tmap))
+(defmethod copy-bmap-into ((mcopy tmap) (m tmap))
   (declare (ignore mcopy m))
   (run-atomic #'call-next-method))
 
@@ -112,6 +108,6 @@
 ;;;; ** Abstract methods to be implemented by BMAP subclasses
 
 (defmethod bmap/new-node ((m tmap) key value)
-   (new 'tnode :key key :value value))
+  (new 'tnode :key key :value value))
 
 

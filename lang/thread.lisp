@@ -18,23 +18,18 @@
 
 ;;;; * Wrappers around Bordeaux Threads to capture the values returned by functions executed in threads
 
-#-sane-bt-join-thread
+#-stmx-sane-bt.join-thread
 (defstruct wrapped-thread
   (result nil)
   (thread (current-thread) :type thread))
 
-
-#-sane-bt-join-thread
-(defstruct wrapped-thread
-  (result nil)
-  (thread (current-thread) :type thread))
 
 (defun start-thread (function &key name (initial-bindings bt:*default-special-bindings*))
 
-  #+sane-bt-join-thread
-  (make-thread function name initial-bindings)
+  #+stmx-sane-bt.join-thread
+  (make-thread function :name name :initial-bindings initial-bindings)
 
-  #-sane-bt-join-thread
+  #-stmx-sane-bt.join-thread
   (let1 th (make-wrapped-thread)
     (setf (wrapped-thread-thread th)
           (make-thread (lambda ()
@@ -44,7 +39,7 @@
                        :initial-bindings initial-bindings))
     th))
 
-#-sane-bt-join-thread
+#-stmx-sane-bt.join-thread
 (defun wait4-thread (th)
   (declare (type wrapped-thread th))
 
@@ -52,7 +47,7 @@
   (wrapped-thread-result th))
 
 
-#+sane-bt-join-thread
+#+stmx-sane-bt.join-thread
 (defun wait4-thread (th)
   (declare (type thread th))
   (join-thread th))

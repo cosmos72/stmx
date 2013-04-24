@@ -6,10 +6,6 @@ TO DO:
     and start behaving badly (illegal memory accesses, infinite loops...)
     before the STM machinery realizes it and re-executes the transaction.
 
-10) move locks and notifications from a per-slot tvar to per-object data.
-    Use a single slot or several one in transactional-object ?
-    Answer: benchmark.
-
 8) optimize ORELSE. The current implementation is quite naive,
    it makes a full copy of the current transaction log
 
@@ -54,10 +50,21 @@ DONE:
 
 
 WON'T DO:
+10) move locks and notifications from a per-slot tvar to per-object data.
+    Use a single slot or several one in transactional-object ?
+    FOR THE MOMENT, NO.
+    it increases code complexity and removes the ability to use raw TVARs from
+    application code for unclear benefits: no indication that performance
+    will be better, no significant reduction in memory footprint
+    (TVARs will need to hold a reference to TOBJ or TSLOT, plus their
+    index in the object's slots)
+    
+
 4.3) allow orelse/nonblocking to work even without a parent transaction,
      i.e. outside (atomic ...) ?
-     NO. the overhead of (atomic (orelse ...)) is minimal with respect to
-     bare (orelse ...), and the former is clearer to understand.
+     NO.
+     the overhead of (atomic (orelse ...)) is minimal with respect to bare
+     (orelse ...), and the former is clearer to understand.
      Also, doing this would make orelse implementation slower and even more
      complicated than what already is.
 

@@ -26,7 +26,7 @@
         (apply #'format nil txt args)
         (print-object-contents nil obj)
         (print-object-contents nil ref)))
-  
+
 
 (defun fsck-rbmap-at (m ref node seen)
   "Check rbmap invariants: no consecutive red nodes and
@@ -63,7 +63,8 @@ and the number of black nodes in all paths from node to leaves"
                    (_ node key) blacks-left blacks-right))
         (values (+ 1 nodes-left nodes-right)
                 (if (black? node) (1+ blacks-left) blacks-left))))))
-            
+
+
 
 (defun fsck-rbmap (m &optional ref)
   "Check all rbmap invariants: no consecutive red nodes,

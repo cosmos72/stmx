@@ -53,6 +53,18 @@
     (setf color (the bit (- (the bit 1) (the bit color))))))
 
 
+(declaim (inline is-left-rbnode-child?))
+(defun is-left-rbnode-child? (node parent)
+  (declare (type rbnode node parent))
+  (eq node (_ parent left)))
+
+(declaim (inline is-left-rbnode-child-red?))
+(defun is-left-rbnode-child-red? (node)
+  (declare (type rbnode node))
+  (red? (_ node left)))
+
+
+
 
 (defmethod bmap/new-node ((m rbmap) key value)
   (new 'rbnode :key key :value value))
@@ -77,7 +89,7 @@ If stack is nil, returned node is the new root to set."
   (prog ((node (pop stack))
          left-node?
          parent)
-     (declare (type (or null bnode) node parent))
+     (declare (type (or null rbnode) node parent))
      (declare (type boolean left-node?))
            
      ;; 0) if X is black, we're DONE.
@@ -126,8 +138,8 @@ If stack is nil, returned node is the new root to set."
      ;;         C*   rotate-right if      X*    
      ;;              X* is right child
      (log-debug-bmap node parent stack "rule-2")
-     (setf left-node? (is-left-bnode-child? node parent))
-     (unless (eq left-node? (is-left-bnode-child-red? node))
+     (setf left-node? (is-left-rbnode-child? node parent))
+     (unless (eq left-node? (is-left-rbnode-child-red? node))
        (setf node (rotate-bnode-around node parent :left left-node?))
        (log-debug-bmap node parent stack "rule-2, after rotate-bnode-around"))
 
@@ -178,7 +190,7 @@ If stack is nil, returned node is the new root to set."
   "Remove from red-black tree M black leaf NODE, whose path is STACK.
 Return some node in rebalanced tree and its stack as multiple values"
   (declare (type rbmap m)
-           (type bnode node)
+           (type rbnode node)
            (type list stack)
            (ignore m))
 
@@ -245,7 +257,7 @@ Return some node in rebalanced tree and its stack as multiple values"
          (unless (setf parent (pop stack))
            (log-debug-bmap node parent stack "rule-2.2 DONE" :brother brother)
            (return (values node stack)))
-         (setf left-node? (is-left-bnode-child? node parent))
+         (setf left-node? (is-left-rbnode-child? node parent))
          (go rule-1))
 
 
@@ -368,8 +380,7 @@ from rebalanced tree. Some-node will be nil only if the tree is empty after remo
 
 
 (defmethod print-bnode (stream (node rbnode) &optional (depth 0))
-  (declare (type (or null bnode) node)
-           (type fixnum depth))
+  (declare (type fixnum depth))
   (let1 depth+1 (the fixnum (1+ depth))
     (print-bnode stream (_ node right) depth+1)
     (dotimes (i depth) (format stream "  "))

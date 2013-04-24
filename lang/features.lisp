@@ -16,7 +16,7 @@
 (in-package :stmx.lang)
 
 
-#-sbcl #-ccl
+#-sbcl #-ccl #-cmucl
 (eval-always
   (warn "Unsupported Common Lisp implementation. STMX is currently tested only on SBCL and CCL."))
 

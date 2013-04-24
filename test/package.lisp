@@ -34,7 +34,7 @@
   (:import-from #:stmx.util
                 #:print-object-contents
                 #:print-bmap
-                #:rbnode #:tnode #:color-of
+                #:bnode #:rbnode #:tnode #:color-of
                 #:bmap/new-node
                 #:+red+ #:+black+
                 #:red? #:black?)

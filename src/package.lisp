@@ -32,6 +32,13 @@
                           #:defmethod
                           #:defgeneric)
 
+  ;; no need for closer-mop version of typep and subtypep;
+  ;; they even cause some tests to fail
+  #+cmucl
+  (:shadowing-import-from #:cl
+                          #:typep
+                          #:subtypep)
+
   (:export #:atomic    #:run-atomic
            #:retry
            #:orelse    #:run-orelse

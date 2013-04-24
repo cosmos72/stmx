@@ -530,12 +530,6 @@ all entries in M."
   (eq node (_ parent left)))
 
 
-(declaim (inline is-left-bnode-child-red?))
-(defun is-left-bnode-child-red? (node)
-  (declare (type bnode node))
-  (red? (_ node left)))
-
-
 (defun rotate-bnode-left (node)
   "Rotate left the subtree around node. Return new subtree root."
   (declare (type bnode node))

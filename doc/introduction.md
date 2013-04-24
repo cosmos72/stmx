@@ -75,3 +75,44 @@ about STMX:
   slots of the objects to be serialized and de-serialized.
 - it is NOT a million dollar library from some deep-pocket company. At the
   moment, it is the work of a single person.
+
+
+Implementation
+--------------
+
+STMX is based on the concepts described in [Composable Memory
+Transactions](http://research.microsoft.com/~simonpj/papers/stm/stm.pdf).
+In particular:
+- transactional memory reads and writes are stored in a transaction log,
+  and written values are copied into the actual memory location only during
+  commit
+- each transactional memory location is locked only during commit, not while
+  accessing it
+- conflicts, i.e. multiple transactions trying to write simultaneously
+  the same  memory location, are detected automatically during commit.
+  In such case, one transaction will commit and all other ones will be
+  re-executed
+- it *can* happen that a transaction reads an inconsistent view of
+  transactional memory, for example because two locations are always updated
+  together, but the transaction reads one of them before the update by another
+  thread, and reads the other after the update (remember: memory
+  locations are locked only during commit, not while the transaction runs)
+  
+  The inconsistent state of the transaction will be recognized during commit
+  or rollback, and the transaction will be re-executed instead of committing
+  or rolling it back. The problem is that it can be difficult to ensure that
+  such a transaction will not behave so badly as to damage the entire system,
+  for example by executing an operation with the dreaded "undefined consequences".
+  
+  This problem plagues enough STM implementations to have deserved the nickname
+  "zombie execution", and it is particularly serious in compiled languages where
+  illegal memory accesses are possible - Common Lisp can be such a language if
+  the compiler is explicitly instructed to optimize for speed and to disregard
+  safety, for example by something like `(declaim (optimize (speed 3) (safety 0)))`
+  
+  Several research papers exists to address this problem and try to propose
+  solutions guaranteeing that transactions always see a consistent view of
+  transactional memory.
+  
+  STMX does not yet implement a solution for this problem, but it is one of
+  the main points in the author's TODO list.

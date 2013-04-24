@@ -1,5 +1,15 @@
 TO DO:
 
+11) use global transaction counters to guarantee consistent memory reads.
+    This would solve a big problem that plagues many STM implementations:
+    a transaction can see an inconsistent view of transactional memory
+    and start behaving badly (illegal memory accesses, infinite loops...)
+    before the STM machinery realizes it and re-executes the transaction.
+
+10) move locks and notifications from a per-slot tvar to per-object data.
+    Use a single slot or several one in transactional-object ?
+    Answer: benchmark.
+
 8) optimize ORELSE. The current implementation is quite naive,
    it makes a full copy of the current transaction log
 

@@ -87,49 +87,47 @@
 
 (defun orelse-func (iterations cells names)
   (declare (type fixnum iterations)
-           (type vector cells names))
+           (type simple-vector cells names))
 
-  (let ((x nil)
+  (let ((x 0.0)
         (name nil))
+    (declare (type single-float x))
     (dotimes (i iterations)
 
-      (when x ;; skip this on first iteration
-        (incf x)
-
-        (atomic
-         
-         (orelse
-          (progn
-            (setf name (aref names 0))
-            (log:trace "trying to put ~A in cell ~A" x name)
-            (put (aref cells 0) x))
-          #+never
-          (progn
-            (setf name (aref names 1))
-            (log:trace "RETRIED, putting ~A in cell ~A" x name)
-            (put (aref cells 1) x))))
-
-        (log:debug "put  ~A in cell ~A" x name))
-
       (atomic
-       (orelse
+       ;;(orelse
         (progn
           ;; Warning: (setf name ...) and (setf x ...) are NOT transactional
           ;; because x and name are normal variables, not TVARs or TOBJs.
           ;; This still works as expected because each branch in orelse sets both x and name,
           ;; so the transaction that succeeds will overwrite both
-          (setf name (aref names 2))
+          (setf name (svref names 2))
           (log:trace "trying to take from cell ~A" name)
-          (setf x (take (aref cells 2))))
+          (setf x (take (svref cells 2))))
         #+never
         (progn
-          (setf name (aref names 3))
+          (setf name (svref names 3))
           (log:trace "RETRIED, taking from cell ~A" name)
-          (setf x (take (aref cells 3))))))
+          (setf x (take (svref cells 3)))))
 
-      (log:debug "took ~A from cell ~A" x name))
+      (log:debug "took ~A from cell ~A" x name)
+      (incf x)
 
-    x))
+      (atomic
+       ;;(orelse
+         (progn
+           (setf name (svref names 0))
+           (log:trace "trying to put ~A in cell ~A" x name)
+           (put (svref cells 0) x))
+         #+never
+         (progn
+           (setf name (svref names 1))
+           (log:trace "RETRIED, putting ~A in cell ~A" x name)
+           (put (svref cells 1) x)))
+
+      (log:debug "put  ~A in cell ~A" x name))
+
+    (- x)))
 
 
 (defun rotate-list (l n)
@@ -139,7 +137,7 @@
     (append l fragment)))
 
 (defun to-vector (seq)
-  (coerce seq 'vector))
+  (coerce seq 'simple-vector))
 
 (defun orelse-thread4-test (&optional (iterations 1))
   "This test runs a pass-the-ball algorithm with 4 threads
@@ -191,10 +189,10 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
 
         (log:debug "setting the four cell values...")
         (atomic
-         (put (aref cells1 0) 0.0)
-         (put (aref cells1 1) 0.25)
-         (put (aref cells1 2) 0.5)
-         (put (aref cells1 3) 0.75))
+         (dotimes (i 4)
+           (put (svref cells1 i) (* i 0.25))
+           (log:debug "put ~A in cell ~A (may re-run)"
+                      (* i 0.25) (svref names1 i))))
         (log:debug "...cells values set")
 
         (values
@@ -205,7 +203,7 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
 
          (atomic
           (loop for cell in cells
-             collect (empty? cell))))))))
+             collect (take cell))))))))
 
 (test orelse-thread4
   (let1 iterations 1000

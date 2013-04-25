@@ -24,15 +24,14 @@ of TVARs that were read during the transaction."
   (declare (type tlog log))
 
   (log.trace "Tlog ~A valid?.." (~ log))
-  (let1 tlog-version (tlog-id log)
-    (do-hash (var) (tlog-reads log)
-      (if (<= (the fixnum (tvar-version var)) (the fixnum tlog-version))
-          (log.trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
-          (progn
-            (log.trace "Tlog ~A conflict for tvar ~A: expecting version <= ~A, found version ~A"
-                       (~ log) (~ var) tlog-version (tvar-version var))
-            (log.debug "Tlog ~A ..not valid" (~ log))
-            (return-from valid? nil)))))
+  (do-hash (var val) (tlog-reads log)
+    (if (eq val (raw-value-of var))
+        (log.trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
+        (progn
+          (log.trace "Tlog ~A conflict for tvar ~A: expecting ~A, found ~A"
+                     (~ log) (~ var) val (raw-value-of var))
+          (log.debug "Tlog ~A ..not valid" (~ log))
+          (return-from valid? nil))))
   (log.trace "Tlog ~A ..is valid" (~ log))
   t)
 
@@ -44,20 +43,19 @@ locked by some other thread (being locked by current thread does not count)."
   (declare (type tlog log))
 
   (log.trace "Tlog ~A invalid-or-locked?.." (~ log))
-  (let1 tlog-version (tlog-id log)
-    (do-hash (var) (tlog-reads log)
-      (if (<= (the fixnum (tvar-version var)) (the fixnum tlog-version))
-          (progn
-            (log.trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
-            (when (tvar-is-locked-by-other-thread? var log)
-              (log.debug "Tlog ~A tvar ~A is locked by another thread" (~ log) (~ var))
-              (return-from invalid-or-locked? t)))
+  (do-hash (var val) (tlog-reads log)
+    (if (eq val (raw-value-of var))
+        (progn
+          (log.trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
+          (when (tvar-is-locked-by-other-thread? var log)
+            (log.debug "Tlog ~A tvar ~A is locked by another thread" (~ log) (~ var))
+            (return-from invalid-or-locked? t)))
 
-          (progn
-            (log.trace "Tlog ~A conflict for tvar ~A: expecting <= version ~A, found version ~A"
-                       (~ log) (~ var) tlog-version (tvar-version var))
-            (log.debug "Tlog ~A ..not valid" (~ log))
-            (return-from invalid-or-locked? t)))))
+        (progn
+          (log.trace "Tlog ~A conflict for tvar ~A: expecting ~A, found ~A"
+                     (~ log) (~ var) val (raw-value-of var))
+          (log.debug "Tlog ~A ..not valid" (~ log))
+          (return-from invalid-or-locked? t))))
   (log.trace "Tlog ~A ..is valid and not locked" (~ log))
   nil)
 
@@ -122,7 +120,7 @@ containing the locked tvars, sorted in order from first acquired
 to last acquired."
   (declare (type list vars locked-vars))
   #+never (log:user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
-  ;;(setf vars (sort vars #'tvar>))
+  (setf vars (sort vars #'tvar>))
   #+never (log:user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
 
   (loop for cell = vars then rest

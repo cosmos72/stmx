@@ -162,36 +162,24 @@
 
 
 (test invalid
-  (let ((var (tvar 1))
-        (counter 0)
-        masked-test-error?)
+  (let ((var (tvar 5))
+        (counter 0))
     
-    (handler-case
-        (progn
-          (atomic :id 'test-invalid
-            (log:debug "($ var) is ~A" ($ var))
-            (incf ($ var))
-            (log:debug "($ var) set to ~A" ($ var))
-            (when (= 1 (incf counter))
-              ;; simulate another thread writing into VAR
-              (setf (raw-value-of var) 10)
-              (log:debug "simulated another thread setting (raw-value-of var) to ~A"
-                         (raw-value-of var))
-              (is-false (valid? (current-tlog)))
-              (error 'test-error :format-arguments
-                     "BUG! an error signalled from an invalid transaction
-was propagated outside (atomic)"))
+    (atomic :id 'test-invalid
+      (log:debug "($ var) is ~A" ($ var))
+      (incf ($ var))
+      (log:debug "($ var) set to ~A" ($ var))
 
-            (is-true (valid? (current-tlog))))
+      (if (= 1 (incf counter))
+          (progn
+            ;; simulate another thread writing into VAR
+            (setf (raw-value-of var) 10)
+            (log:debug "simulated another thread setting (raw-value-of var) to ~A"
+                       (raw-value-of var))
+            (is-false (valid? (current-tlog))))
+          ;; else
+          (is-true (valid? (current-tlog)))))
           
-          ;; the test error we signalled from an invalid transaction
-          ;; must not propagate outside (atomic), so this code must execute
-          (setf masked-test-error? t))
-
-      (test-error (err)
-        (fail "~A ~A" (type-of err) err)))
-
-    (is-true masked-test-error?)
     (is (= 11 ($ var))))) ;; 10 for "(setf (raw-value-of var) 10)" plus 1 for "(incf ($ var))"
 
 

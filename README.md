@@ -22,13 +22,15 @@ and it aims at resolving the tension between granularity and concurrency.
 
 General documentation
 ---------------------
-An [introduction](doc/introduction.md) is available to explain more in detail what STMX is - and what it is not.
+An [introduction](doc/introduction.md) is available to explain more in detail
+what STMX is, what it is not, and how it is implemented.
 
 For background information,
 [Composable Memory Transactions](http://research.microsoft.com/~simonpj/papers/stm/stm.pdf)
 is a very good - though a bit technical - explanation of memory transactions and
 how they are used and combined. For the interested reader, it also goes in
 deep detail on how to actually implement them.
+
 
 
 Supported systems

@@ -16,31 +16,45 @@
 (in-package :stmx.lang)
 
 
-#-sbcl #-ccl #-cmucl
 (eval-always
-  (warn "Unsupported Common Lisp implementation. STMX is currently tested only on SBCL and CCL."))
 
-(defun add-feature (f)
-  (declare (type keyword f))
-  (pushnew f *features*))
+ #-sbcl #-ccl #-cmucl
+ (warn "Unsupported Common Lisp implementation. STMX is currently tested only on SBCL, CMUCL and CCL.")
 
-(add-feature :stmx)
 
-#+lispworks ;; porting still in progress
-(dolist (f '(:stmx-must-disable-optimize-slot-access))
-  (add-feature f))
+ (defun add-feature (f)
+   (declare (type keyword f))
+   (pushnew f *features*))
 
-#+ccl
-(dolist (f '())
-  (add-feature f))
+ (add-feature :stmx)
 
-#+sbcl
-(dolist (f '(:stmx-have-fast-lock))
-  (add-feature f))
+ (dolist
+     (f
+       #+lispworks ;; porting still in progress
+      '(:stmx-must-disable-optimize-slot-access)
+
+      #+ccl
+      nil
+
+      #+cmucl
+      nil
+
+      #+sbcl
+      '(:stmx-have-fast-lock :stmx-have-sbcl.atomic-ops))
+
+   (add-feature f))
+
+
+ (when (zerop (logand most-positive-fixnum (1+ most-positive-fixnum)))
+   (pushnew :stmx-fixnum-is-power-of-two *features*)))
 
 
 (eval-when (:compile-toplevel)
-  (let ((x (gensym)))
-    (when (eq x
-              (bt:join-thread (bt:make-thread (lambda () x))))
-      (pushnew :stmx-sane-bt.join-thread *features*))))
+  (defvar *join-thread-tested* nil)
+  
+  (unless *join-thread-tested*
+    (setf *join-thread-tested* t)
+    (let ((x (gensym)))
+      (when (eq x
+                (bt:join-thread (bt:make-thread (lambda () x))))
+        (pushnew :stmx-sane-bt.join-thread *features*)))))

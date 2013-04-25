@@ -52,57 +52,6 @@ The effect is the same as DEFUN - or DEFMETHOD - plus:
 
 
 
-;;;; ** Retrying
-
-(define-condition stmx-control-error (control-error)
-  ()
-  (:documentation "Parent class of all STMX errors"))
-
-
-(define-condition retry-error (stmx-control-error)
-  ()
-  (:report (lambda (err stream)
-             (declare (ignore err))
-             (format stream "Attempt to ~A outside an ~A block" 'retry 'atomic)))
-
-  (:documentation "Signalled by RETRY. It is captured by ATOMIC and ORELSE,
-so it is visible to application code only in case of bugs"))
-
-
-
-(define-condition rerun-error (stmx-control-error)
-  ()
-  (:report (lambda (err stream)
-             (declare (ignore err))
-             (format stream "Transactional memory conflict detected inside ~A.
-If you see this error, there is a bug either in STMX or in application code.
-Possible reason: code registered with ~A attempted to read transactional memory
-not already read or written during the transaction" 'orelse 'after-commit)))
-
-  (:documentation "Signalled by ORELSE to force re-running the parent transaction
-in case of conflicts. It is captured by ATOMIC, so it is visible
-to application code only in case of bugs"))
-
-
-
-(let1 retry-error-obj (make-condition 'retry-error)
-  (defun retry ()
-    "Abort the current transaction and re-run it again from the beginning.
-
-Before re-executing, the transaction will wait on all variables that it read
-until at least one of them changes."
-    (error retry-error-obj)))
-
-
-(let1 rerun-error-obj (make-condition 'rerun-error)
-  (defun rerun ()
-    "Abort the current transaction and immediately re-run it from the
-beginning without waiting. Used by ORELSE."
-    (error rerun-error-obj)))
-
-  
-
-
 ;;;; ** Running
 
 
@@ -149,7 +98,9 @@ For pre-defined transactional classes, see the package STMX.UTIL"
         `(values))))
 
 
-(defmacro yield-before-rerun? () 'nil)
+(defmacro maybe-yield-before-rerun ()
+  #-always nil
+  #+never  (thread-yield))
 
 (defun run-once (tx log)
   "Internal function invoked by RUN-ATOMIC and RUN-ORELSE2.
@@ -163,7 +114,9 @@ using LOG as its transaction log."
     (prog ((parent (tlog-parent log)))
 
      run
-     (log:debug "Tlog ~A {~A} starting~A" (~ log) (~ tx)
+     (set-tlog-version log)
+
+     (log.debug "Tlog ~A {~A} starting~A" (~ log) (~ tx)
                 (if parent
                     (format nil ", parent is tlog ~A" (~ parent))
                     ""))
@@ -171,10 +124,9 @@ using LOG as its transaction log."
          (return (funcall tx))
 
        (rerun-once ()
-         (log:trace "Tlog ~A {~A} will rerun" (~ log) (~ tx))
+         (log.trace "Tlog ~A {~A} will rerun" (~ log) (~ tx))
          (new-or-clear-tlog log :parent parent)
-         (when (yield-before-rerun?)
-           (thread-yield))
+         (maybe-yield-before-rerun)
          (go run))))))
 
 
@@ -204,32 +156,25 @@ transactional memory it read has changed."
    (handler-bind ((retry-error
                    (lambda (err)
                      (declare (ignore err))
-                     (log:trace "Tlog ~A {~A} wants to retry" (~ log) (~ tx))
+                     (log.trace "Tlog ~A {~A} wants to retry" (~ log) (~ tx))
                      (go retry)))
                   
                   (rerun-error
                    (lambda (err)
                      (declare (ignore err))
-                     (log:trace "Tlog ~A {~A} wants to re-run" (~ log) (~ tx))
+                     (log.trace "Tlog ~A {~A} wants to re-run" (~ log) (~ tx))
                      (invoke-restart 'rerun-once)))
 
                   (condition
                    (lambda (err)
-                     (log:trace "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
-                                (~ log) (~ tx) (type-of err) (~ err))
-                     (if (eq t (locked-valid? log))
-                         ;; return normally from lambda to propagate the error
-                         (log:debug "Tlog ~A {~A} will rollback and signal ~A"
-                                    (~ log) (~ tx) (type-of err))
-                         (progn
-                           (log:debug "Tlog ~A {~A} is invalid or unknown, masking the ~A it signalled and re-running it"
-                                      (~ log) (~ tx) (type-of err))
-                           (invoke-restart 'rerun-once))))))
-         
+                     ;; return normally from lambda to propagate the error
+                     (log.trace "Tlog ~A {~A} will rollback, signalled ~A: ~A"
+                                (~ log) (~ tx) (type-of err) err))))
      (return
        (multiple-value-prog1
            (run-once tx log)
-         (log:trace "Tlog ~A {~A} wants to commit" (~ log) (~ tx))
+
+         (log.trace "Tlog ~A {~A} wants to commit" (~ log) (~ tx))
 
          ;; commit also checks if log is valid
          (if (commit log)
@@ -239,21 +184,19 @@ transactional memory it read has changed."
              (free-tlog log)
 
              (progn
-               (log:debug "Tlog ~A {~A} could not commit, re-running it" (~ log) (~ tx))
+               (log.debug "Tlog ~A {~A} could not commit, re-running it" (~ log) (~ tx))
                (go rerun))))))
 
    retry
-   (log:debug "Tlog ~A {~A} will sleep, then retry" (~ log) (~ tx))
-   ;; wait-tlog sleeps only if log is valid
+   (log.debug "Tlog ~A {~A} will sleep, then retry" (~ log) (~ tx))
    (wait-tlog log)
-   (go rerun-noyield)
+   (go rerun-no-yield)
 
    rerun
-   (when (yield-before-rerun?)
-     (thread-yield))
+   (maybe-yield-before-rerun)
    ;; fallthrough
 
-   rerun-noyield
+   rerun-no-yield
    (new-or-clear-tlog log :parent (tlog-parent log))
    (go run)))
 

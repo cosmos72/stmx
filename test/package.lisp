@@ -24,8 +24,11 @@
         #:stmx.util)
 
   (:import-from #:stmx
-                #:raw-value-of #:tx-read-of #:tx-write-of
+                #:raw-value-of #:tvar-versioned-value #:+invalid-counter+
+                #:tx-read-of #:tx-write-of
                 #:tlog  #:make-tlog
+                #:rerun-error #:rerun
+                #:retry-error #:retry
                 #:commit
                 #:valid?
                 #:current-tlog
@@ -47,4 +50,4 @@
 (fiveam:def-suite suite)
 
 (defun configure-log4cl ()
-  (log:config :info :sane :this-console :pattern "[%D{%H:%M:%S}] [%-5P] {%t} <%c{}{}{:downcase}> %m%n"))
+  (log:config :clear :sane :info :this-console :pattern "[%D{%H:%M:%S}] [%-5P] {%t} <%c{}{}{:downcase}> %m%n"))

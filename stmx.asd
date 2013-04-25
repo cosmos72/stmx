@@ -31,47 +31,49 @@
 
                (:module :lang
                 :components ((:file "package")
-                             (:file "macro"       :depends-on ("package"))
-                             (:file "features"    :depends-on ("macro"))
-                             (:file "thread"      :depends-on ("features"))
-                             (:file "fast-lock"   :depends-on ("features"))
-                             (:file "fast-vector" :depends-on ("macro"))
-                             (:file "hash-table"  :depends-on ("macro"))
-                             (:file "print"       :depends-on ("macro"))
+                             (:file "macro"          :depends-on ("package"))
+                             (:file "features"       :depends-on ("macro"))
+                             (:file "thread"         :depends-on ("macro"))
+                             (:file "atomic-counter" :depends-on ("macro"))
+                             (:file "fast-lock"      :depends-on ("macro"))
+                             (:file "fast-vector"    :depends-on ("macro"))
+                             (:file "hash-table"     :depends-on ("macro"))
+                             (:file "print"          :depends-on ("macro"))
                              (:file "class-precedence-list" :depends-on ("macro"))))
 
                (:module :src
-                :depends-on (:lang)
                 :components ((:file "package")
-                             (:file "classes"     :depends-on ("package"))
-                             (:file "tlog"        :depends-on ("classes"))
-                             (:file "tvar"        :depends-on ("tlog"))
-                             (:file "tclass"      :depends-on ("tvar"))
-                             (:file "commit"      :depends-on ("tlog"))
-                             (:file "atomic"      :depends-on ("tclass" "commit"))
-                             (:file "orelse"      :depends-on ("atomic"))))
+                             (:file "classes"        :depends-on ("package"))
+                             (:file "tlog"           :depends-on ("classes"))
+                             (:file "tvar"           :depends-on ("tlog"))
+                             (:file "tclass"         :depends-on ("tvar"))
+                             (:file "commit"         :depends-on ("tlog"))
+                             (:file "atomic"         :depends-on ("tclass" "commit"))
+                             (:file "orelse"         :depends-on ("atomic")))
+                :depends-on (:lang))
+
 
                (:module :util
-                :depends-on (:lang :src)
                 :components ((:file "package")
-                             (:file "misc"        :depends-on ("package"))
-                             (:file "print"       :depends-on ("package"))
+                             (:file "misc"           :depends-on ("package"))
+                             (:file "print"          :depends-on ("package"))
 
-                             (:file "container"   :depends-on ("misc"))
-                             (:file "tcons"       :depends-on ("misc"))
-                             (:file "tvar"        :depends-on ("container"))
-                             (:file "tcell"       :depends-on ("container"))
-                             (:file "tstack"      :depends-on ("container"))
-                             (:file "tfifo"       :depends-on ("container" "tcons"))
-                             (:file "tchannel"    :depends-on ("container" "tcons"))
+                             (:file "container"      :depends-on ("misc"))
+                             (:file "tcons"          :depends-on ("misc"))
+                             (:file "tvar"           :depends-on ("container"))
+                             (:file "tcell"          :depends-on ("container"))
+                             (:file "tstack"         :depends-on ("container"))
+                             (:file "tfifo"          :depends-on ("container" "tcons"))
+                             (:file "tchannel"       :depends-on ("container" "tcons"))
 
-			     (:file "bheap"       :depends-on ("container"))
+			     (:file "bheap"          :depends-on ("container"))
 
-                             (:file "bmap"        :depends-on ("misc" "print"))
-                             (:file "rbmap"       :depends-on ("bmap"))
-                             (:file "tmap"        :depends-on ("rbmap"))
+                             (:file "bmap"           :depends-on ("misc" "print"))
+                             (:file "rbmap"          :depends-on ("bmap"))
+                             (:file "tmap"           :depends-on ("rbmap"))
 
-                             (:file "thash-table" :depends-on ("print"))))))
+                             (:file "thash-table"    :depends-on ("print")))
+                :depends-on (:lang :src))))
 
 
 
@@ -89,13 +91,13 @@
 
   :components ((:module :test
                 :components ((:file "package")
-                             (:file "misc"      :depends-on ("package"))
-                             (:file "rbmap"     :depends-on ("misc"))
-                             (:file "atomic"    :depends-on ("package"))
-                             (:file "on-commit" :depends-on ("atomic"))
-                             (:file "retry"     :depends-on ("package"))
-                             (:file "orelse"    :depends-on ("package"))
-                             (:file "tmap"      :depends-on ("rbmap" "orelse"))))))
+                             (:file "misc"         :depends-on ("package"))
+                             (:file "rbmap"        :depends-on ("misc"))
+                             (:file "atomic"       :depends-on ("package"))
+                             (:file "on-commit"    :depends-on ("atomic"))
+                             (:file "retry"        :depends-on ("package"))
+                             (:file "orelse"       :depends-on ("package"))
+                             (:file "tmap"         :depends-on ("rbmap" "orelse"))))))
 
 
 (defmethod asdf:perform ((op asdf:test-op) (system (eql (asdf:find-system :stmx))))

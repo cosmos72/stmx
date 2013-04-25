@@ -18,6 +18,9 @@
 (def-suite atomic-suite :in suite)
 (in-suite atomic-suite)
 
+(test rerun
+  (signals rerun-error (stmx::rerun)))
+
 (test tx-read-of
   (let ((log (make-tlog))
         (var (tvar 1)))
@@ -35,9 +38,10 @@
     (is-true (valid? log))
     (setf (raw-value-of var) 2)
     (is-false (valid? log))
-    (tx-read-of var log)
+    (signals rerun-error
+      (tx-read-of var log))
     (is-false (valid? log))
-    (setf (raw-value-of var) 1)
+    (setf (tvar-versioned-value var) (cons +invalid-counter+ 1))
     (is-true (valid? log))))
     
 (test commit
@@ -54,7 +58,7 @@
     (is (= 1 ($ var)))
     (with-recording-to-tlog log
       (is (= 1 ($ var)))
-      (setf ($ var) 2)
+      (is (= 2 (setf ($ var) 2)))
       (is (= 2 ($ var)))
       (is (= 1 (raw-value-of var)))
       (is-true (valid? log))
@@ -63,19 +67,33 @@
     (is (= 2 ($ var)))))
 
 (test atomic
-  (let1 var (tvar 0)
+  (let ((var (tvar 0)))
 
     (atomic :id 'test-atomic
-      (is (= 0 ($ var)0))
+      (is (= 0 (raw-value-of var)))
+      (is (= 0 ($ var)))
       (setf ($ var) 1)
       (is (= 0 (raw-value-of var)))
+      (is-true (valid? (current-tlog))))
+
+    (is (= 1 ($ var)))))
+
+
+(test atomic-invalid-1
+  (let ((var (tvar 0)))
+
+    (atomic :id 'test-atomic-invalid-1
+      (is (= 0 (raw-value-of var)))
+      (is (= 0 ($ var)))
+      (setf ($ var) 1)
       (is-true (valid? (current-tlog)))
 
       ;; simulate another thread committing tvar:
       ;; the current transaction log must become invalid
       (setf (raw-value-of var) -1)
-      (is (= 1 ($ var)))
       (is-false (valid? (current-tlog)))
+      ;; but reading from tvar must return the value written during transaction
+      (is (= 1 ($ var)))
       
       ;; an invalid transaction cannot become valid again
       ;; by writing into its vars. test it.
@@ -83,13 +101,48 @@
       (is-false (valid? (current-tlog)))
 
       ;; the only way for an invalid transaction to become valid again
-      ;; is for some other thread to commit and "by chance"
-      ;; restore the original value initially seen by the invalid one
-      (setf (raw-value-of var) 0)
+      ;; is for some other thread to commit and restore the original value
+      ;; and version initially seen by the invalid one.
+      ;; Not really possible in the wild because of the version counter.
+      (setf (tvar-versioned-value var) (cons +invalid-counter+ 0))
       (is-true (valid? (current-tlog)))
       (setf ($ var) 2))
 
     (is (= 2 ($ var)))))
+
+
+(test atomic-invalid-2
+  (let ((a (tvar 0)) ;; transactions in this example maintain
+        (b (tvar 0)) ;; the invariant (= ($ a) ($ b))
+        (first-run t))
+
+    (atomic :id 'test-atomic-invalid-2
+      (incf ($ a))
+      (is-true (valid? (current-tlog)))
+
+      ;; simulate another thread changing a and b:
+      ;; the current transaction will become invalid because it read a
+      (when first-run
+        (setf first-run nil
+              (raw-value-of a) 2
+              (raw-value-of b) 2)
+
+        (is-false (valid? (current-tlog)))
+
+        ;; reading from a must return the value written during transaction
+        (is (= 1 ($ a)))
+
+        ;; but reading from b must detect the inconsistency and rerun
+        (signals rerun-error (incf ($ b))))
+
+      ;; read b again: in first-run it will re-run, in second-run it will succeed
+      ;; and restore the invariant (= ($ a) ($ b))
+      (incf ($ b)))
+
+    (is (= 3 ($ a)))
+    (is (= 3 ($ b)))))
+
+
 
 (define-condition test-error (simple-error)
   ())
@@ -116,20 +169,20 @@
     (handler-case
         (progn
           (atomic :id 'test-invalid
-                  (log:debug "($ var) is ~A" ($ var))
-                  (incf ($ var))
-                  (log:debug "($ var) set to ~A" ($ var))
-                  (when (= 1 (incf counter))
-                    ;; simulate another thread writing into VAR
-                    (setf (raw-value-of var) 10)
-                    (log:debug "simulated another thread setting (raw-value-of var) to ~A"
-                               (raw-value-of var))
-                    (is-false (valid? (current-tlog)))
-                    (error 'test-error :format-arguments
-                           "BUG! an error signalled from an invalid transaction
+            (log:debug "($ var) is ~A" ($ var))
+            (incf ($ var))
+            (log:debug "($ var) set to ~A" ($ var))
+            (when (= 1 (incf counter))
+              ;; simulate another thread writing into VAR
+              (setf (raw-value-of var) 10)
+              (log:debug "simulated another thread setting (raw-value-of var) to ~A"
+                         (raw-value-of var))
+              (is-false (valid? (current-tlog)))
+              (error 'test-error :format-arguments
+                     "BUG! an error signalled from an invalid transaction
 was propagated outside (atomic)"))
 
-                  (is-true (valid? (current-tlog))))
+            (is-true (valid? (current-tlog))))
           
           ;; the test error we signalled from an invalid transaction
           ;; must not propagate outside (atomic), so this code must execute

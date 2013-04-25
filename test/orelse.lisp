@@ -55,26 +55,26 @@
   (loop for place in (list (new 'tcell) (tvar)) do
        (loop for takef in (list #'take1 #'take2 #'take3) do
             (loop for putf in (list #'put1 #'put2 #'put3)
-               for rand = (random most-positive-fixnum) do
+               for unique = (gensym) do
 
                  (multiple-value-bind (took? value) (funcall takef place)
                    (are-true (not took?)
                              (null value)
                              (empty? place)))
 
-                 (multiple-value-bind (put? value) (funcall putf place rand)
+                 (multiple-value-bind (put? value) (funcall putf place unique)
                    (are-true put?
-                             (= value rand)
+                             (eq value unique)
                              (full? place)))
 
-                 (multiple-value-bind (put? value) (funcall putf place rand)
+                 (multiple-value-bind (put? value) (funcall putf place unique)
                    (are-true (not put?)
                              (null value)
                              (full? place)))
 
                  (multiple-value-bind (took? value) (funcall takef place)
                    (are-true took?
-                             (= value rand)
+                             (eq value unique)
                              (empty? place)))))))
       
 (test orelse
@@ -97,15 +97,19 @@
         (incf x)
 
         (atomic
+         
          (orelse
           (progn
-            (log:debug "trying to put ~A in cell ~A" x (setf name (aref names 0)))
+            (setf name (aref names 0))
+            (log:trace "trying to put ~A in cell ~A" x name)
             (put (aref cells 0) x))
+          #+never
           (progn
-            (log:debug "RETRIED, putting ~A in cell ~A" x (setf name (aref names 1)))
+            (setf name (aref names 1))
+            (log:trace "RETRIED, putting ~A in cell ~A" x name)
             (put (aref cells 1) x))))
 
-        (log:debug "put ~A in cell ~A" x name))
+        (log:debug "put  ~A in cell ~A" x name))
 
       (atomic
        (orelse
@@ -114,10 +118,13 @@
           ;; because x and name are normal variables, not TVARs or TOBJs.
           ;; This still works as expected because each branch in orelse sets both x and name,
           ;; so the transaction that succeeds will overwrite both
-          (log:debug "trying to take from cell ~A" (setf name (aref names 2)))
+          (setf name (aref names 2))
+          (log:trace "trying to take from cell ~A" name)
           (setf x (take (aref cells 2))))
+        #+never
         (progn
-          (log:debug "RETRIED, taking from cell ~A" (setf name (aref names 3)))
+          (setf name (aref names 3))
+          (log:trace "RETRIED, taking from cell ~A" name)
           (setf x (take (aref cells 3))))))
 
       (log:debug "took ~A from cell ~A" x name))
@@ -184,7 +191,7 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
 
         (log:debug "setting the four cell values...")
         (atomic
-         (put (aref cells1 0) 0)
+         (put (aref cells1 0) 0.0)
          (put (aref cells1 1) 0.25)
          (put (aref cells1 2) 0.5)
          (put (aref cells1 3) 0.75))
@@ -209,7 +216,7 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
          do (is-true e))
 
       (let1 remainders (sort (loop for v in values collect (mod v 1)) #'<)
-        (is-true (equal remainders '(0 0.25 0.5 0.75))))
+        (is-true (equal remainders '(0.0 0.25 0.5 0.75))))
 
       (let1 total (loop for v in values sum (truncate v))
         (is-true (= total (* 4 (1- iterations))))))))

@@ -21,20 +21,45 @@
 (defun valid? (log)
   "Return t if a TLOG is valid, i.e. it contains an up-to-date view
 of TVARs that were read during the transaction."
-
   (declare (type tlog log))
-  (log:trace "Tlog ~A valid?.." (~ log))
-  (do-hash (var val) (tlog-reads log)
-    (let1 actual-val (raw-value-of var)
-      (if (eq val actual-val)
-          (log:trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
+
+  (log.trace "Tlog ~A valid?.." (~ log))
+  (let1 tlog-version (tlog-id log)
+    (do-hash (var) (tlog-reads log)
+      (if (<= (the fixnum (tvar-version var)) (the fixnum tlog-version))
+          (log.trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
           (progn
-            (log:trace "Tlog ~A conflict for tvar ~A: expecting ~A, found ~A"
-                       (~ log) (~ var) (~ val) (~ actual-val))
-            (log:debug "Tlog ~A ..not valid" (~ log))
+            (log.trace "Tlog ~A conflict for tvar ~A: expecting version <= ~A, found version ~A"
+                       (~ log) (~ var) tlog-version (tvar-version var))
+            (log.debug "Tlog ~A ..not valid" (~ log))
             (return-from valid? nil)))))
-  (log:trace "Tlog ~A ..is valid" (~ log))
-  (return-from valid? t))
+  (log.trace "Tlog ~A ..is valid" (~ log))
+  t)
+
+
+
+(defun invalid-or-locked? (log)
+  "Return T if LOG is invalid, or if TVARs read during transaction are currently
+locked by some other thread (being locked by current thread does not count)."
+  (declare (type tlog log))
+
+  (log.trace "Tlog ~A invalid-or-locked?.." (~ log))
+  (let1 tlog-version (tlog-id log)
+    (do-hash (var) (tlog-reads log)
+      (if (<= (the fixnum (tvar-version var)) (the fixnum tlog-version))
+          (progn
+            (log.trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
+            (when (tvar-is-locked-by-other-thread? var log)
+              (log.debug "Tlog ~A tvar ~A is locked by another thread" (~ log) (~ var))
+              (return-from invalid-or-locked? t)))
+
+          (progn
+            (log.trace "Tlog ~A conflict for tvar ~A: expecting <= version ~A, found version ~A"
+                       (~ log) (~ var) tlog-version (tvar-version var))
+            (log.debug "Tlog ~A ..not valid" (~ log))
+            (return-from invalid-or-locked? t)))))
+  (log.trace "Tlog ~A ..is valid and not locked" (~ log))
+  nil)
 
 
 (declaim (inline invalid? shallow-valid? shallow-invalid?))
@@ -43,6 +68,10 @@ of TVARs that were read during the transaction."
   "Return (not (valid? LOG))."
   (declare (type tlog log))
   (not (valid? log)))
+
+
+
+
 
 
 (defun shallow-valid? (log)
@@ -111,38 +140,18 @@ to last acquired."
   "Release locked (rest VARS) in same order of acquisition."
   (declare (type list vars))
   (loop for var in (rest vars) do
-       (unlock-tvar var))
-       #+never (log:trace "Tlog ~A unlocked tvar ~A" (~ log) (~ var)))
+       (unlock-tvar var)))
 
 
-
+(declaim (inline locked-valid?))
 (defun locked-valid? (log)
   "Return T if LOG is valid and NIL if it's invalid.
-Return :UNKNOWN if relevant locks could not be acquired."
+Return :UNKNOWN if relevant locks could not be acquired.
 
+Thanks to the global versioning of transactions, this method
+does not need to acquire locks."
   (declare (type tlog log))
-  (let* ((reads (tlog-reads log))
-         (acquiring nil)
-         (acquired (list nil)))
-
-    (when (zerop (hash-table-count reads))
-      (return-from locked-valid? t))
-
-    (unwind-protect
-         (progn
-           ;; we must lock TVARs that have been read: expensive,
-           ;; but needed to ensure this threads sees other commits as atomic
-           (setf acquiring (hash-table-keys reads))
-
-           (unless (try-lock-tvars acquiring acquired)
-             (return-from locked-valid? :unknown))
-
-           (let1 valid (valid? log)
-             (log:debug "Tlog ~A is ~A, verified with locks"
-                        (~ log) (if valid "valid" "invalid"))
-             (return-from locked-valid? valid)))
-
-      (unlock-tvars acquired))))
+  (valid? log))
 
 
 
@@ -252,7 +261,7 @@ and the error will be propagated to the caller"
       (handler-case
           (loop-funcall-on-appendable-vector funcs)
         (rerun-error ()
-          (log:trace "Tlog ~A before-commit wants to rerun" (~ log))
+          (log.trace "Tlog ~A before-commit wants to rerun" (~ log))
           (return-from invoke-before-commit nil)))))
   t)
 
@@ -283,74 +292,74 @@ b) another TLOG is writing the same TVARs being committed
    that the TLOG will still be valid."
    
   (declare (type tlog log))
-  (let ((reads (tlog-reads log))
-        (writes (tlog-writes log))
+  (let ((writes   (tlog-writes log))
+        (new-version +invalid-counter+)
         (acquiring nil)
         (acquired (list nil))
-        changed
-        success)
+        (changed   nil)
+        (success   nil))
+
+    (declare (type list acquiring acquired changed)
+             (type fixnum new-version)
+             (type boolean success))
 
     ;; before-commit functions run without locks
     (unless (invoke-before-commit log)
       (return-from commit nil))
 
     (when (zerop (hash-table-count writes))
-      (log:debug "Tlog ~A committed (nothing to write)" (~ log))
+      (log.debug "Tlog ~A committed (nothing to write)" (~ log))
       (invoke-after-commit log)
       (return-from commit t))
 
-    #+never (log:trace "Tlog ~A committing..." (~ log))
-
     (unwind-protect
          (block nil
-           ;; we must lock TVARs that have been read or written: expensive
-           ;; but needed to ensure this threads sees other commits as atomic,
-           ;; and other threads see this commit as atomic
-           (let* ((big-hash   reads)
-                  (small-hash writes)
-                  (n-big-hash   (hash-table-count big-hash))
-                  (n-small-hash (hash-table-count small-hash)))
-
-             (when (< n-big-hash n-small-hash)
-               (rotatef big-hash small-hash))
- 
-             (setf acquiring (hash-table-keys big-hash))
-
-             (do-hash (var) small-hash
-               ;; do not put duplicates in ACQUIRING list
-               (unless (nth-value 1 (get-hash big-hash var))
-                 (push var acquiring))))
-
+           ;; we must lock TVARs that have been written: expensive
+           ;; but needed to ensure concurrent commits do not conflict.
+           (setf acquiring (hash-table-keys writes))
            (unless (try-lock-tvars acquiring acquired)
+             (log.debug "Tlog ~A failed to lock tvars, not committed" (~ log))
              (return))
-            
-           ;; check for log validity one last time, with locks held.
-           (when (invalid? log)
-             (log:debug "Tlog ~A is invalid, not committed (checked with locks)" (~ log))
-             (return))
+           
+           (log.trace "Tlog ~A acquired locks..." (~ log))
+
+           (setf new-version (incf-atomic-counter *tlog-counter*))
+
+           ;; if new-version is (1+ read-version), no need to validate anything
+           (unless (= new-version (the fixnum (1+ (tlog-id log))))
+             ;; check for log validity one last time, with locks held.
+             ;; this time we also check that reads are NOT locked by other threads
+             (when (invalid-or-locked? log)
+               (log.debug "Tlog ~A is invalid or reads are locked, not committed" (~ log))
+               (return)))
+
+           (log.trace "Tlog ~A committing..." (~ log))
 
            ;; COMMIT, i.e. actually write new values into TVARs
            (do-hash (var val) writes
              (let1 current-val (raw-value-of var)
-                   (when (not (eq val current-val))
-                     (setf (raw-value-of var) val)
-                     (push var changed)
-                     #+never (log:trace "Tlog ~A tvar ~A changed value from ~A to ~A"
-                                        (~ log) (~ var) current-val val))))
+               (when (not (eq val current-val))
+                 (setf (tvar-versioned-value var) (cons new-version val))
+                 (push var changed)
+                 (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
+                            (~ log) (~ var) current-val val))))
 
-           (log:debug "Tlog ~A committed." (~ log))
+           (log.debug "Tlog ~A ...committed" (~ log))
            (setf success t))
 
       (unlock-tvars acquired)
-
+      (log.trace "Tlog ~A ...released locks" (~ log))
+      
       (dolist (var changed)
-        #+never (log:trace "Tlog ~A notifying threads waiting on tvar ~A"
-                           (~ log) (~ var))
+        (log.trace "Tlog ~A notifying threads waiting on tvar ~A"
+                   (~ log) (~ var))
         (notify-tvar-high-load var))
           
       (when success
         ;; after-commit functions run without locks
-        (invoke-after-commit log)))))
+        (invoke-after-commit log)))
+
+    success))
                    
 
 

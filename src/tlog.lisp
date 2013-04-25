@@ -89,41 +89,6 @@ and its parent is set to PARENT."
 
 
 
-;;;; ** Reads and writes
-
-
-(defun tx-read-of (var &optional (log (current-tlog)))
-  "If VAR's value is stored in transaction LOG, return the stored value.
-Otherwise, add (raw-value-of VAR) as the read of VAR stored in transaction LOG
-and return (raw-value-of VAR).
-
-TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots."
-  (declare (type tvar var)
-           (type tlog log))
-
-  (multiple-value-bind (value present?)
-      (get-hash (tlog-writes log) var)
-    (when present?
-      (return-from tx-read-of value)))
-
-  (let1 reads (tlog-reads log)
-    (multiple-value-bind (value present?)
-        (get-hash reads var)
-      (when present?
-        (return-from tx-read-of value)))
-
-    (set-hash reads var (raw-value-of var))))
-
-
-(defun tx-write-of (var value &optional (log (current-tlog)))
-  "Store in transaction LOG the writing of VALUE into VAR; return VALUE.
-
-TX-WRITE-OF is an internal function called by (setf ($ VAR) VALUE)
-and by writing TOBJs slots."
-  (declare (type tvar var)
-           (type tlog log))
-
-  (set-hash (tlog-writes log) var value))
 
 
 
@@ -158,11 +123,11 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
       ;; the tvar could change BETWEEN 1) and 2) and we would miss it
       ;; => DEADLOCK
       (if (eq val (raw-value-of var))
-          (log:trace "Tlog ~A listening for tvar ~A changes"
+          (log.trace "Tlog ~A listening for tvar ~A changes"
                      (~ log) (~ var))
           (progn
             (unlisten-tvar var log)
-            (log:debug "Tlog ~A: tvar ~A changed, not going to sleep"
+            (log.debug "Tlog ~A: tvar ~A changed, not going to sleep"
                        (~ log) (~ var))
             (return-from listen-tvars-of nil)))))
   (return-from listen-tvars-of t))
@@ -181,38 +146,28 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
 
       
 (defun wait-once (log)
-  "Sleep, i.e. wait for relevat TVARs to change.
-After sleeping, return t if log is valid, otherwise return nil."
+  "Sleep, i.e. wait for relevant TVARs to change. Return T."
 
   (declare (type tlog log))
-  (log:debug "Tlog ~A sleeping now" (~ log))
+  (log.debug "Tlog ~A sleeping now" (~ log))
   (let ((lock (tlog-lock log))
-        (valid t))
+        (slept t))
 
     (with-lock-held (lock)
-      (when (setf valid (not (tlog-prevent-sleep log)))
+      (when (setf slept (not (tlog-prevent-sleep log)))
         (condition-wait (tlog-semaphore log) lock)))
 
-    (if valid
-        (progn
-          (log:debug "Tlog ~A woke up" (~ log))
-          (setf valid (valid? log)))
-        (log:debug "Tlog ~A prevented from sleeping, some TVAR must have changed" (~ log)))
-    valid))
+    (when (log.debug)
+      (if slept
+          (log.debug "Tlog ~A woke up" (~ log))
+          (log.debug "Tlog ~A prevented from sleeping, some TVAR must have changed" (~ log))))
+    t))
 
 
-(defun wait-tlog (log &key once)
-  "Wait until the TVARs read during transaction have changed.
-Return t if log is valid after sleeping, otherwise return nil.
+(defun wait-tlog (log)
+  "Wait until the TVARs read during transaction have changed. Return T."
 
-Note from (CMT paragraph 6.3):
-When some other threads notifies the one waiting in this function,
-check if the log is valid. In case it's valid, re-executing
-the last transaction is useless: it means the relevant TVARs
-did not change, but the transaction is waiting for them to change"
-
-  (declare (type tlog log)
-           (type boolean once))
+  (declare (type tlog log))
 
   ;; lazily initialize (tlog-lock log) and (tlog-semaphore log)
   (when (null (tlog-lock log))
@@ -224,12 +179,10 @@ did not change, but the transaction is waiting for them to change"
   (with-lock-held ((tlog-lock log))
     (setf (tlog-prevent-sleep log) nil))
 
-  (prog1
-      (and (listen-tvars-of log)
-           (if once
-               (wait-once log)
-               (loop while (wait-once log))))
-    (unlisten-tvars-of log)))
+  (when (listen-tvars-of log)
+    (wait-once log)
+    (unlisten-tvars-of log))
+  t)
       
 
 
@@ -237,7 +190,7 @@ did not change, but the transaction is waiting for them to change"
 (defun notify-tlog (log var)
   (declare (type tlog log)
            (type tvar var))
-  (log:debug "Waking up tlog ~A listening on tvar ~A" (~ log) (~ var))
+  (log.debug "Waking up tlog ~A listening on tvar ~A" (~ log) (~ var))
   ;; Max, question: do we also need to acquire (tlog-lock log)?
   ;; Answering myself: YES! otherwise we can deadlock (tested, it happens)
   (with-lock-held ((tlog-lock log))

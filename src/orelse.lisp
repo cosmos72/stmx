@@ -37,44 +37,24 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
      (handler-bind ((retry-error
                      (lambda (err)
                        (declare (ignore err))
-                       (log:debug me "Tlog ~A {~A} wants to retry, trying next one"
+                       (log.debug me "Tlog ~A {~A} wants to retry, trying next one"
                                   (~ log) (~ func))
                        (go wants-to-retry)))
                     
                     (rerun-error
                      (lambda (err)
                        (declare (ignore err))
-                       (log:debug me "Tlog ~A {~A} wants to re-run, trying next one"
+                       (log.debug me "Tlog ~A {~A} wants to re-run, trying next one"
                                   (~ log) (~ func))
                        (go wants-to-rerun)))
 
                     (condition
                      (lambda (err)
-                       (log:trace me "Tlog ~A {~A} wants to rollback, signalled ~A: ~A"
-                                  (~ log) (~ func) (type-of err) (~ err))
-                       (if (eq t (locked-valid? log))
-                           ;; return normally from lambda to propagate the error
-                           (log:debug me "Tlog ~A {~A} will rollback and signal ~A"
-                                      (~ log) (~ func) (type-of err))
-                           (progn
-                             (log:debug me "Tlog ~A {~A} is invalid or unknown, masking the ~A it signalled and trying next one"
-                                        (~ log) (~ func) (type-of err))
-                             (go wants-to-rerun))))))
-    
-       (let ((vals (multiple-value-list (run-once func log)))
-             (parent-log (tlog-parent log)))
-       
-         (when (invalid? parent-log)
-           (log:debug me "Parent tlog ~A is invalid, re-running it"
-                      (~ parent-log))
-           (rerun))
+                       ;; return normally from lambda to propagate the error
+                       (log.trace me "Tlog ~A {~A} will rollback, signalled ~A: ~A"
+                                  (~ log) (~ func) (type-of err) (~ err)))))
 
-         (when (shallow-invalid? log)
-           (log:debug me "Tlog ~A {~A} is invalid, trying next one"
-                      (~ log) (~ func))
-           (go wants-to-rerun))
-
-         (return (values nil vals))))
+       (return (values nil (multiple-value-list (run-once func log)))))
 
      wants-to-retry
      (return 'wants-to-retry)
@@ -84,161 +64,6 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
 
        
        
-
-(defun run-orelse-1 (func)
-  (declare (type function func))
-
-  (prog* ((parent-log (current-tlog))
-          log retry?)
-       
-     (unless parent-log
-       (error 'orelse-error))
-
-     start
-     (setf log (new-or-clear-tlog log :parent parent-log))
-
-     (multiple-value-bind (flags vals) (run-orelse-once func log)
-       (cond
-         ((eq flags 'wants-to-rerun)
-          (setf retry? nil)
-          (go retry-or-rerun))
-
-         ((eq flags 'wants-to-retry)
-          (setf retry? t)
-          (go retry-or-rerun))
-
-         (t
-          (commit-nested log)
-          (log:debug "Tlog ~A {~A} committed to parent tlog ~A"
-                     (~ log) (~ func) (~ parent-log))
-          (free-tlog log)
-          (return-from run-orelse-1 (values-list vals)))))
-
-
-     retry-or-rerun
-     (when (yield-before-rerun?)
-       (thread-yield))
-
-     (when (invalid? parent-log)
-       (log:debug "Parent tlog ~A is invalid, re-running it"
-                  (~ parent-log))
-       (rerun))
-
-     (when retry?
-       (log:debug "Tlog ~A {~A} will sleep, then re-run" (~ log) (~ func))
-       ;; wait-tlog only sleeps if log is valid
-       (wait-tlog log)
-       
-       (when (invalid? parent-log)
-         (log:debug "Parent tlog ~A is invalid, re-running it"
-                    (~ parent-log))
-         (rerun))
-
-       (log:debug "Tlog ~A {~A} re-running now" (~ log) (~ func))
-       (go start))
-         
-     (log:debug "Tlog ~A {~A} was found invalid, re-running it" (~ log) (~ func))
-     (go start)))
-
-     
-
-
-
-(defun run-orelse-2 (func1 func2)
-  "Implementation of RUN-ORELSE for 2 functions."
-  (declare (type function func1 func2))
-
-  (prog ((parent-log (current-tlog))
-         log1 log2 retry1? retry2?)
-
-     (unless parent-log
-       (error 'orelse-error))
-
-     run-tx1
-     (setf log1 (new-or-clear-tlog log1 :parent parent-log))
-
-     (multiple-value-bind (flags vals) (run-orelse-once func1 log1)
-       (cond
-         ((eq flags 'wants-to-retry)
-          (setf retry1? t)
-          (go run-tx2))
-
-         ((eq flags 'wants-to-rerun)
-          (setf retry1? nil)
-          (go run-tx2))
-
-         (t
-          (commit-nested log1)
-          (log:debug "Tlog ~A {~A} committed to parent tlog ~A"
-                     (~ log1) (~ func1) (~ parent-log))
-          (free-tlog log1)
-          (when log2 (free-tlog log2))
-          (return-from run-orelse-2 (values-list vals)))))
-
-
-     run-tx2
-     (setf log2 (new-or-clear-tlog log2 :parent parent-log))
-
-     (multiple-value-bind (flags vals) (run-orelse-once func2 log2)
-       (cond
-         ((eq flags 'wants-to-retry)
-          (setf retry2? t)
-          (go retry-or-rerun))
-
-         ((eq flags 'wants-to-rerun)
-          (setf retry2? nil)
-          (go retry-or-rerun))
-
-         (t
-          (commit-nested log2)
-          (log:debug "Tlog ~A {~A} committed to parent tlog ~A"
-                     (~ log2) (~ func2) (~ parent-log))
-          (free-tlog log1)
-          (free-tlog log2)
-          (return-from run-orelse-2 (values-list vals)))))
-
-     retry-or-rerun
-     (when (yield-before-rerun?)
-       (thread-yield))
-
-     (when (invalid? parent-log)
-       (log:debug "Parent tlog ~A is invalid, re-running it"
-                  (~ parent-log))
-       (rerun))
-
-     (when (or (not retry1?) (invalid? log1))
-       ;; func1 wants to rerun, or wants to retry but is invalid.
-       ;; in both cases, rerun it
-       (go run-tx1))
-
-     (when (or (not retry2?) (invalid? log2))
-       ;; func2 wants to rerun, or wants to retry but is invalid.
-       ;; in both cases, rerun it
-       (go run-tx2))
-
-     ;; here all txs want to retry, and were valid when we checked.
-     ;; Note: it does not mean they are compatible and still valid
-
-     (unless (merge-tlog-reads log1 log2)
-       ;; some tlog was incompatible with previous ones
-       (log:debug "Tlog ~A {~A} is incompatible with tlog ~A {~A}, rerunning ORELSE"
-                      (~ log1) (~ func1) (~ log2) (~ func2))
-       (go run-tx1))
-
-     (log:debug "ORELSE will sleep, then re-run")
-     ;; wait-tlog only sleeps if log is valid
-     (wait-tlog log1)
-       
-     (when (invalid? parent-log)
-       (log:debug "Parent tlog ~A is invalid, re-running it"
-                  (~ parent-log))
-       (rerun))
-
-     (log:debug "Re-running ORELSE")
-     (go run-tx1)))
-
-
-
 
 
 
@@ -260,7 +85,7 @@ If FUNC calls (rerun) - used internally by orelse - return 'wants-to-rerun"
        (free-tlog log)))
 
 
-(defun find-first-rerun-or-invalid-tx (txs me)
+(defun find-first-rerun-tx (txs me)
   "Return index of the first tx that wants to rerun or is invalid.
 Return nil if all tx are valid and want to retry."
   (declare (type simple-vector txs))
@@ -271,11 +96,11 @@ Return nil if all tx are valid and want to retry."
      for ilog   = (orelse-tx-log   itx)
      for iretry = (orelse-tx-retry itx)
      do
-       (when (or (not iretry) (shallow-invalid? ilog))
-         ;; itx wants to rerun, or wants to retry but is invalid
-         (log:debug me "Tlog ~A {~A} ~A invalid, re-running it"
+       (unless iretry
+         ;; itx wants to rerun
+         (log.debug me "Tlog ~A {~A} ~A invalid, re-running it"
                     (~ ilog) (~ ifunc) (if iretry "is" "was found"))
-         (return-from find-first-rerun-or-invalid-tx i)))
+         (return-from find-first-rerun-tx i)))
   nil)
 
 
@@ -291,13 +116,13 @@ Return nil if all tx are valid and want to retry."
        for ilog   = (orelse-tx-log   itx)
        do
          (unless (merge-tlog-reads log ilog)
-           (log:debug me "Tlog ~A {~A} is incompatible with previous ones, rerunning ORELSE"
+           (log.debug me "Tlog ~A {~A} is incompatible with previous ones, rerunning ORELSE"
                       (~ ilog) (~ ifunc))
            (return-from merge-tlog-reads-tx nil)))
     log))
         
 
-(defun run-orelse-n (&rest funcs)
+(defun run-orelse-n (funcs)
   "Implementation of RUN-ORELSE for N functions."
   (declare (type list funcs))
 
@@ -388,7 +213,7 @@ Return nil if all tx are valid and want to retry."
 
            (t
             (commit-nested log)
-            (log:debug me "Tlog ~A {~A} committed to parent tlog ~A"
+            (log.debug me "Tlog ~A {~A} committed to parent tlog ~A"
                        (~ log) (~ func) (~ parent-log))
             (free-tx-logs txs)
             (return-from run-orelse-n (values-list vals)))))
@@ -398,44 +223,43 @@ Return nil if all tx are valid and want to retry."
        (when (< (incf index) (length txs))
          (ensure-tx)
          (go run-tx))
-       (go retry-or-rerun)
+       (go retry)
 
 
-       retry-or-rerun
-       (when (yield-before-rerun?)
-         (thread-yield))
+       rerun
+       (maybe-yield-before-rerun)
 
        (when (invalid? parent-log)
-         (log:debug me "Parent tlog ~A is invalid, re-running it"
+         (log.debug me "Parent tlog ~A is invalid, re-running it"
                     (~ parent-log))
          (rerun))
 
-       (let1 idx (find-first-rerun-or-invalid-tx txs me)
+       (let1 idx (find-first-rerun-tx txs me)
          (when idx
-           ;; (aref txs idx) wants to rerun, or wants to retry but is invalid.
-           ;; in both cases, rerun it
+           ;; (aref txs idx) wants to rerun, so rerun it
            (set-index idx)
            (go run-tx)))
+       ;; fallthrough
 
 
-       ;; here all txs want to retry, and were valid when we checked.
-       ;; Note: it does not mean they are compatible and still valid
+       retry
+       ;; All txs want to retry.
+       ;; Note: it does not mean they are compatible
 
        (setf log (merge-tlog-reads-tx txs me))
        (unless log
          ;; some tlog was incompatible with previous ones
          (go start))
            
-       (log:debug me "ORELSE will sleep, then re-run")
-       ;; wait-tlog only sleeps if log is valid
+       (log.debug me "ORELSE will sleep, then re-run")
        (wait-tlog log)
        
        (when (invalid? parent-log)
-         (log:debug me "Parent tlog ~A is invalid, re-running it"
+         (log.debug me "Parent tlog ~A is invalid, re-running it"
                     (~ parent-log))
          (rerun))
 
-       (log:debug me "Re-running ORELSE")
+       (log.debug me "Re-running ORELSE")
        (go start)))))
 
 
@@ -452,13 +276,10 @@ or signals the error raised by the transaction that failed.
 
 Can only be used inside an ATOMIC block."
   (declare (type list funcs))
-  (let ((f1 (first funcs))
-        (f2 (second funcs)))
-    (cond
-      ((null f1)            (values))
-      ((null f2)            (run-orelse-1 f1))
-      ((null (third funcs)) (run-orelse-2 f1 f2))
-      (t                    (apply #'run-orelse-n funcs)))))
+
+  (if (null (first funcs))
+      (values)
+      (run-orelse-n funcs)))
          
 
 
@@ -471,15 +292,11 @@ or signals the error raised by the transaction that failed.
 
 Can only be used inside an ATOMIC block."
 
-  (let* ((funcs (loop for form in body collect
-                     `(lambda () ,form)))
-         (f1 (first funcs))
-         (f2 (second funcs)))
-    (cond
-      ((null f1)            `(values))
-      ((null f2)            `(run-orelse-1 ,f1))
-      ((null (third funcs)) `(run-orelse-2 ,f1 ,f2))
-      (t                    `(run-orelse-n ,@funcs)))))
+  (let ((funcs (loop for form in body collect
+                    `(lambda () ,form))))
+    (if (null (first funcs))
+        `(values)
+        `(run-orelse-n (list ,@funcs)))))
          
       
 

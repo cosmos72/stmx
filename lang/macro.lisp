@@ -71,3 +71,26 @@
        ,then
        ,else)))
 
+;;;; ** Logging macros.
+;;
+;; Yes, I am so concerned with speed that even wasting some nanoseconds
+;; in a disabled (log:trace) is annoying
+
+
+(defmacro log.debug (&rest args)
+  `(log:debug ,@args))
+
+(defmacro log.trace (&rest args)
+  `(log:trace ,@args))
+
+#|
+(defmacro log.debug (&rest args)
+  (declare (ignore args))
+  nil)
+
+(defmacro log.trace (&rest args)
+  (declare (ignore args))
+  nil)
+|#
+
+

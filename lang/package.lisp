@@ -26,8 +26,14 @@
            #:when-bind    #:awhen
            #:if-bind      #:aif
 
+           #:log.trace    #:log.debug
+
+           #:atomic-counter #:make-atomic-counter
+           #:get-atomic-counter #:incf-atomic-counter
+
            #:fast-lock             #:make-fast-lock        
            #:try-acquire-fast-lock #:release-fast-lock
+           #:fast-lock-owner
 
            #:fast-vector        #:make-fast-vector
            #:fast-vector-length #:fast-vector-max-length

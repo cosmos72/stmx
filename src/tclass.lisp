@@ -144,7 +144,7 @@ to the same value. Problematic classes containing slot ~A: ~{~A ~}"
 
 (defmethod slot-value-using-class ((class transactional-class) instance
                                    (slot transactional-effective-slot))
-  (declare (ignore instance))
+  (declare (ignore class instance))
   
   ;; Get the TVAR from the slot
   (let1 obj (call-next-method)
@@ -378,7 +378,7 @@ and alter its :type to also accept TVARs"
                               slot-names &rest initargs)
   "For every transactional slot, wrap its initarg into a tvar."
 
-  ;;(log:trace "transactional-object ~A, slot-names = ~A~%  initargs = ~{~A~^ ~}" instance slot-names initargs)
+  ;;(log.trace "transactional-object ~A, slot-names = ~A~%  initargs = ~{~A~^ ~}" instance slot-names initargs)
 
   (let1 initargs (copy-list initargs)
     (dolist (slot (class-slots (class-of instance)))
@@ -392,7 +392,7 @@ and alter its :type to also accept TVARs"
               ;; wrap each initarg only once
               (return))))))
 
-    ;;(log:trace "updated initargs = ~{~A~^ ~}" initargs)
+    ;;(log.trace "updated initargs = ~{~A~^ ~}" initargs)
               
     ;; Disable recording so that slots initialization is NOT recorded to the log.
     ;; Show-tvars so that (setf slot-value) will set the tvar, not its contents

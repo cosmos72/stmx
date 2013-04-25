@@ -62,7 +62,7 @@
                (log:debug "putting ~A in cell c2" (1+ x))
                (put c2 (the fixnum (1+ x))))
              (log:debug "done")
-             x)))
+             (- x))))
     (values #'f1 #'f2)))
 
 (defun retry-thread-test (&optional (n 1))
@@ -73,20 +73,28 @@
     (multiple-value-bind (f1 f2) (retry-funs n c1 c2)
 
       (let* ((t1 (start-thread f1 :name "A"))
-             (t2 (start-thread f2 :name "B"))
+             (t2 (start-thread f1 :name "B"))
+             (t3 (start-thread f2 :name "C"))
+             (t4 (start-thread f2 :name "D"))
              (x1 (the fixnum (wait4-thread t1)))
-             (x2 (the fixnum (wait4-thread t2))))
+             (x2 (the fixnum (wait4-thread t2)))
+             (x3 (the fixnum (wait4-thread t3)))
+             (x4 (the fixnum (wait4-thread t4))))
+
         (log:debug "t1 returned ~A" x1)
         (log:debug "t2 returned ~A" x2)
+        (log:debug "t3 returned ~A" x3)
+        (log:debug "t4 returned ~A" x4)
 
-        (values x1 x2 (empty? c1) (empty? c2))))))
+        (values x1 x2 x3 x4 (empty? c1) (empty? c2))))))
 
 
 (test retry
   (let1 n 1000
-    (multiple-value-bind (x1 x2 empty-c1? empty-c2?)
+    (multiple-value-bind (x1 x2 x3 x4 empty-c1? empty-c2?)
         (retry-thread-test n)
-      (is-true (= x1 n))
-      (is-true (= x2 (1- n)))
+      (is-true (= (* 2 n) (+ x1 x2)))
+      (is-true (<= x3 0))
+      (is-true (<= x4 0))
       (is-true empty-c1?)
       (is-true empty-c2?))))

@@ -21,7 +21,7 @@
 (eval-always
 
  (defstruct (fast-lock (:constructor %make-fast-lock))
-   (fast-lock-status t :type t))
+   (fast-lock-owner nil :type t))
 
 
  (declaim (ftype (function () fast-lock) make-fast-lock)
@@ -33,21 +33,31 @@
     
 
 
- (declaim (ftype (function (fast-lock) boolean)
-                 try-acquire-fast-lock
-                 release-fast-lock)
-          (inline try-acquire-fast-lock
-                  release-fast-lock))
+ (declaim (ftype (function (fast-lock) boolean)   try-acquire-fast-lock)
+          (ftype (function (fast-lock) null)      release-fast-lock)
+          (ftype (function (fast-lock) (values (or null thread) &optional)) fast-lock-owner)
+          (inline
+            try-acquire-fast-lock release-fast-lock fast-lock-owner))
 
  (defun try-acquire-fast-lock (fast-lock)
    "Try to acquire FAST-LOCK. Return T if successful,
 or NIL if FAST-LOCK was already locked."
-   (sb-ext:compare-and-swap (fast-lock-fast-lock-status fast-lock) t nil))
+   #+stmx-have-sbcl.atomic-ops
+   (eq nil
+       (sb-thread:barrier (:write)
+         (sb-ext:compare-and-swap (fast-lock-fast-lock-owner fast-lock) nil (bt:current-thread)))))
 
  (defun release-fast-lock (fast-lock)
-   "Release FAST-LOCK and return T,
+   "Release FAST-LOCK. Return NIL.
 Does not signal any error if FAST-LOCK was already unlocked."
-   (sb-thread:barrier (:write))
-   (setf (fast-lock-fast-lock-status fast-lock) t)))
-  
+   #+stmx-have-sbcl.atomic-ops
+   (progn
+     (sb-thread:barrier (:write))
+     (setf (fast-lock-fast-lock-owner fast-lock) nil)))
+
+ (defun fast-lock-owner (fast-lock)
+   "Return the thread that acquired FAST-LOCK, or NIL if FAST-LOCK is free."
+   (sb-thread:barrier (:read))
+   (fast-lock-fast-lock-owner fast-lock)))
+   
 

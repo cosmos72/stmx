@@ -217,7 +217,7 @@ but must NOT invoke (decf (_ m count))."))
 ;;;; ** Debugging utilities
 
 #|
-(defun log-debug-bmap (node parent stack txt &rest args &key &allow-other-keys)
+(defun log.debug-bmap (node parent stack txt &rest args &key &allow-other-keys)
   (declare (type (or null bnode) node parent)
            (type list stack)
            (type string txt))
@@ -230,16 +230,9 @@ but must NOT invoke (decf (_ m count))."))
                (if node   (_ node   key) nil)
                (loop for arg in args collect (if (typep arg 'bnode) (_ arg key) arg))
                (print-object-contents nil root))))
-
-(defmacro log-debug (&rest args)
-  `(log:debug ,@args))
 |#
 
-(defmacro log-debug (&rest args)
-  (declare (ignore args))
-  nil)
-
-(defmacro log-debug-bmap (&rest args &key &allow-other-keys)
+(defmacro log.debug-bmap (&rest args &key &allow-other-keys)
   (declare (ignore args))
   nil)
 
@@ -533,22 +526,22 @@ all entries in M."
 (defun rotate-bnode-left (node)
   "Rotate left the subtree around node. Return new subtree root."
   (declare (type bnode node))
-  (log-debug "before:~%~A" (print-object-contents nil node))
+  (log.debug "before:~%~A" (print-object-contents nil node))
   (let1 x (_ node right)
     (setf (_ node right) (_ x left))
     (setf (_ x left)     node)
-    (log-debug "after:~%~A" (print-object-contents nil x))
+    (log.debug "after:~%~A" (print-object-contents nil x))
     x))
 
 
 (defun rotate-bnode-right (node)
   "Rotate right the subtree around node. Return new subtree root."
   (declare (type bnode node))
-  (log-debug "before:~%~A" (print-object-contents nil node))
+  (log.debug "before:~%~A" (print-object-contents nil node))
   (let1 x (_ node left)
     (setf (_ node left)  (_ x right))
     (setf (_ x right)    node)
-    (log-debug "after:~%~A" (print-object-contents nil x))
+    (log.debug "after:~%~A" (print-object-contents nil x))
     x))
 
 

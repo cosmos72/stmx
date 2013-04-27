@@ -18,11 +18,8 @@
 
 (eval-always
 
- #|
  #-sbcl #-ccl #-cmucl
- (warn "Unsupported Common Lisp implementation. STMX is currently tested only on SBCL, CMUCL and CCL.")
- |#
-
+ (warn "Untested Common Lisp implementation. STMX is currently tested only on SBCL, CMUCL and CCL.")
 
  (defun add-feature (f)
    (declare (type keyword f))
@@ -44,8 +41,22 @@
    (add-feature f))
 
 
+ ;; (1+ most-positive-fixnum) is a power of two?
  (when (zerop (logand most-positive-fixnum (1+ most-positive-fixnum)))
-   (pushnew :stmx-fixnum-is-power-of-two *features*)))
+   (pushnew :stmx-fixnum-is-power-of-two *features*))
+
+
+ ;; fixnum is large enough to count 10 million transactions
+ ;; per second for at least one year?
+ (when (>= most-positive-fixnum #xffffffffffff)
+   (pushnew :stmx-fixnum-is-large *features*))
+
+ ;; both the above two features
+ (when (and (member :stmx-fixnum-is-large *features*)
+            (member :stmx-fixnum-is-power-of-two *features*))
+   (pushnew :stmx-fixnum-is-large-power-of-two *features*)))
+
+
 
 
 (eval-when (:compile-toplevel)

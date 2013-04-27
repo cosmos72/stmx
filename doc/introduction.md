@@ -71,8 +71,8 @@ about STMX:
 - it is NOT a serialization or persistence framework. Rather, messing with
   metaclasses and playing (allowed) tricks with slots contents as STMX does,
   quite likely does **not** mix well with serialization or persistence
-  libraries such as CL-STORE, because they typically need full control on the
-  slots of the objects to be serialized and de-serialized.
+  libraries such as CL-STORE or CL-MARSHAL, because they typically need
+  full control on the slots of the objects to be serialized and de-serialized.
 - it is NOT a million dollar library from some deep-pocket company. At the
   moment, it is the work of a single person.
 

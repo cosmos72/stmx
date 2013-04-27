@@ -95,7 +95,7 @@
     (dotimes (i iterations)
 
       (atomic
-       ;;(orelse
+       (orelse
         (progn
           ;; Warning: (setf name ...) and (setf x ...) are NOT transactional
           ;; because x and name are normal variables, not TVARs or TOBJs.
@@ -104,30 +104,29 @@
           (setf name (svref names 2))
           (log:trace "trying to take from cell ~A" name)
           (setf x (take (svref cells 2))))
-        #+never
         (progn
           (setf name (svref names 3))
           (log:trace "RETRIED, taking from cell ~A" name)
-          (setf x (take (svref cells 3)))))
+          (setf x (take (svref cells 3))))))
     
       (log:debug "took ~A from cell ~A" x name)
       (incf x)
 
       (atomic
-       ;;(orelse
+       (orelse
          (progn
            (setf name (svref names 0))
            (log:trace "trying to put ~A in cell ~A" x name)
            (put (svref cells 0) x))
-         #+never
          (progn
            (setf name (svref names 1))
            (log:trace "RETRIED, putting ~A in cell ~A" x name)
-           (put (svref cells 1) x)))
+           (put (svref cells 1) x))))
 
       (log:debug "put  ~A in cell ~A" x name))
 
-    (- x)))
+    (log:debug "put  ~A in cell ~A [DONE]" x name)
+    x))
 
 
 (defun rotate-list (l n)
@@ -191,7 +190,7 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
         (atomic
          (dotimes (i 4)
            (put (svref cells1 i) (* i 0.25))
-           (log:debug "put ~A in cell ~A (may re-run)"
+           (log:debug "put ~A in cell ~A (may retry)"
                       (* i 0.25) (svref names1 i))))
         (log:debug "...cells values set")
 
@@ -207,14 +206,15 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
 
 (test orelse-thread4
   (let1 iterations 1000
-    (multiple-value-bind (values empty-cells?)
+    (multiple-value-bind (values cells)
         (orelse-thread4-test iterations)
 
-      (loop for e in empty-cells?
-         do (is-true e))
+      (loop for list in (list values cells) do
+           (loop for e in list do
+                (is-true (numberp e))))
 
-      (let1 remainders (sort (loop for v in values collect (mod v 1)) #'<)
-        (is-true (equal remainders '(0.0 0.25 0.5 0.75))))
+      (let1 remainders (sort (loop for v in cells collect (mod v 1)) #'<)
+        (is-true (equalp '(0.0 0.25 0.5 0.75) remainders)))
 
-      (let1 total (loop for v in values sum (truncate v))
-        (is-true (= total (* 4 (1- iterations))))))))
+      (let1 total (apply #'+ cells)
+        (is-true (= total (+ 1.5 (* 4 iterations))))))))

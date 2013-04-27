@@ -183,3 +183,24 @@
     (is (= 11 ($ var))))) ;; 10 for "(setf (raw-value-of var) 10)" plus 1 for "(incf ($ var))"
 
 
+(transaction
+ (defun transaction-return-from-setf (var value &key return-from?)
+   (declare (type tvar var)
+            (type boolean return-from?))
+   (when return-from?
+     (return-from transaction-return-from-setf (setf ($ var) value)))
+   (setf ($ var) value)))
+     
+     
+
+(test transaction-return-from
+  (let1 var (tvar 1)
+    
+    (transaction-return-from-setf var 2 :return-from? nil)
+    (is (= 2 ($ var)))
+
+    (transaction-return-from-setf var 3 :return-from? t)
+    (is (= 3 ($ var)))))
+
+    
+  

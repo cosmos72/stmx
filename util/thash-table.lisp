@@ -21,10 +21,10 @@
 
 (transactional
  (defclass thash-table ()
-   ((original              :type hash-table           :accessor original-of)
-    (delta   :initform nil :type (or null hash-table) :accessor delta-of)
-    (count   :initform 0   :type fixnum               :accessor count-of)
-    (options :initform nil :type list                 :accessor options-of))))
+   ((original              :type hash-table              :accessor original-of)
+    (delta   :initform nil :type (or null hash-table)    :accessor delta-of)
+    (count   :initform 0   :type fixnum                  :accessor count-of)
+    (options :initform nil :type list :transactional nil :accessor options-of))))
 
 
 (defmethod initialize-instance :after
@@ -40,8 +40,8 @@ including any non-standard arguments supported by MAKE-HASH-TABLE implementation
   (when (or (getf other-keys :weak) (getf other-keys :weakness))
     (error "~A does not support weak keys and/or values" 'thash-table))
 
-  (setf (options-of instance)  other-keys
-        (original-of instance) (apply #'make-hash-table :test test other-keys)))
+  (setf (_ instance options)  other-keys
+        (_ instance original) (apply #'make-hash-table :test test other-keys)))
 
 
 (defun ensure-thash-delta (thash)
@@ -53,14 +53,14 @@ including any non-standard arguments supported by MAKE-HASH-TABLE implementation
         delta
         (progn
           (before-commit (normalize-thash thash))
-          (setf delta (apply #'make-hash-table :test (hash-table-test (original-of thash))
-                             (options-of thash)))))))
+          (setf delta (apply #'make-hash-table :test (hash-table-test (_ thash original))
+                             (_ thash options)))))))
 
 
 (defun thash-count (thash)
   "Return the number of KEY/VALUE entries in THASH."
   (declare (type thash-table thash))
-  (the fixnum (count-of thash)))
+  (the fixnum (_ thash count)))
 
 
 (transaction
@@ -79,7 +79,7 @@ If THASH does not contain KEY, return (values DEFAULT NIL)."
                  (values value t))))))) ;; key was changed
                
    ;; forward to original hash table
-   (gethash key (original-of thash) default)))
+   (gethash key (_ thash original) default)))
 
 
 (transaction
@@ -90,7 +90,7 @@ If THASH does not contain KEY, return (values DEFAULT NIL)."
    (multiple-value-bind (old-value present?) (get-thash thash key)
      (declare (ignore old-value))
      (unless present?
-       (incf (the fixnum (count-of thash)))))
+       (incf (the fixnum (_ thash count)))))
 
    (let1 delta (ensure-thash-delta thash)
      (setf (gethash key delta) value))))
@@ -114,7 +114,7 @@ Return T if KEY was found in THASH, otherwise return NIL."
      (declare (ignore orig-value))
      (if present?
          (let ((delta (ensure-thash-delta thash)))
-           (decf (the fixnum (count-of thash)))
+           (decf (the fixnum (_ thash count)))
            (setf (gethash key delta) *thash-removed-entry*)
            t)
          nil)))) ;; key not present in THASH
@@ -125,7 +125,7 @@ Return T if KEY was found in THASH, otherwise return NIL."
    "Remove all KEYS and VALUES in THASH. Return THASH."
    (declare (type thash-table thash))
 
-   (setf (count-of thash) (the fixnum 0))
+   (setf (_ thash count) (the fixnum 0))
 
    (with-ro-slots (original delta) thash
      (when (zerop (hash-table-count original))

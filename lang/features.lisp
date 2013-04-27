@@ -18,8 +18,10 @@
 
 (eval-always
 
+ #|
  #-sbcl #-ccl #-cmucl
  (warn "Unsupported Common Lisp implementation. STMX is currently tested only on SBCL, CMUCL and CCL.")
+ |#
 
 
  (defun add-feature (f)
@@ -33,14 +35,11 @@
        #+lispworks ;; porting still in progress
       '(:stmx-must-disable-optimize-slot-access)
 
-      #+ccl
-      nil
-
-      #+cmucl
-      nil
-
       #+sbcl
-      '(:stmx-have-fast-lock :stmx-have-sbcl.atomic-ops))
+      '(:stmx-have-fast-lock :stmx-have-sbcl.atomic-ops)
+
+      #-lispworks #-sbcl
+      nil)
 
    (add-feature f))
 

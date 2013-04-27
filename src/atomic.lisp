@@ -48,7 +48,13 @@ The effect is the same as DEFUN - or DEFMETHOD - plus:
 - the BODY is wrapped inside (atomic ...)"
   `(,defun-or-defmethod ,func-name ,args
      (atomic :id ',func-name
-             ,@body)))
+             ,@(if (symbolp func-name)
+                   ;; support (return-from ,func-name ...)
+                   `((block ,func-name
+                       ;; support (declare ...)
+                       (let ()
+                         ,@body)))
+                   body))))
 
 
 

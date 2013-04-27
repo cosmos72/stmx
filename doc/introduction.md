@@ -34,7 +34,7 @@ Main features
 - Includes transactional data structure for multicast publish/subscribe
 - Creating new transactional data structures is easy.
 - Extensive test suite.
-- Tested on SBCL; Porting to CCL almost completed.
+- Tested on SBCL, CCL and CMUCL.
 - Very simple to install with [Quicklisp](http://www.quicklisp.org/).
 
 A quick-start guide and installation instructions are provided in the file
@@ -61,13 +61,15 @@ about STMX:
   in transactional memory and finally copies the transaction log onto the
   transactional memory while holding locks. STMX is quite optimized, but this
   machinery comes at an obvious performance cost with respect to hand-made,
-  highly optimized locking code (but a good reality check is to ask yourself
-  how many people have the skill and patience to write such code without bugs).
+  highly optimized locking code (but a good cross-check is to ask yourself
+  how many people have the skill and patience to write such locking code
+  without bugs).
 - it is NOT supposed to be used for all data structures in a Common Lisp
   program. STMX is intended only for the data accessed concurrently by multiple
   threads while being modified by at least one thread. And even in that case,
-  transactional memory is **not always** needed: it depends on the kinds of
-  modifications.
+  transactional memory is **not always** needed: for simple modifications
+  locking code is usually feasible; for complex, structural modifications
+  transactions can help greatly.
 - it is NOT a serialization or persistence framework. Rather, messing with
   metaclasses and playing (allowed) tricks with slots contents as STMX does,
   quite likely does **not** mix well with serialization or persistence

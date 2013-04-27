@@ -31,9 +31,9 @@
            #:atomic-counter #:make-atomic-counter
            #:get-atomic-counter #:incf-atomic-counter
 
-           #:fast-lock             #:make-fast-lock        
-           #:try-acquire-fast-lock #:release-fast-lock
-           #:fast-lock-owner
+           #:lock-rw             #:make-lock-rw        
+           #:try-acquire-lock-rw #:release-lock-rw
+           #:try-acquire-lock-ro #:release-lock-ro
 
            #:fast-vector        #:make-fast-vector
            #:fast-vector-length #:fast-vector-max-length

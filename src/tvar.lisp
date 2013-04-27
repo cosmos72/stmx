@@ -64,7 +64,12 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
          (value (rest pair)))
 
     (when (> (the fixnum version) (tlog-id log))
-      ;; inconsistent data!
+      ;; inconsistent data? let's check
+      (multiple-value-bind (prev-value present?)
+          (get-hash (tlog-reads log) var)
+        (when (and present? (eq value prev-value))
+          (return-from tx-read-of value)))
+      ;; yes, inconsistent data
       (rerun))
 
     (set-hash (tlog-reads log) var value)))
@@ -217,60 +222,29 @@ and to check for any value stored in the log."
 
 ;;;; ** Locking and unlocking
 
-(declaim (ftype (function (tvar) boolean) try-lock-tvar)
-         (ftype (function (tvar) null)    unlock-tvar)
+(declaim (ftype (function (tvar) boolean) try-lock-tvar-rw)
+         (ftype (function (tvar) boolean) try-lock-tvar-ro)
+         (ftype (function (tvar) null)    unlock-tvar-rw)
+         (ftype (function (tvar) null)    unlock-tvar-ro)
          (inline
-           try-lock-tvar unlock-tvar))
+           try-lock-tvar-rw
+           try-lock-tvar-ro
+           unlock-tvar-rw
+           unlock-tvar-ro))
 
-(defun try-lock-tvar (var)
-  #+stmx-have-fast-lock
-  (try-acquire-fast-lock (the fast-lock var))
-  #-stmx-have-fast-lock
-  (acquire-lock (tvar-lock var) nil))
+(defun try-lock-tvar-rw (var)
+  (try-acquire-lock-rw (the lock-rw var)))
 
-
-(defun unlock-tvar (var)
+(defun unlock-tvar-rw (var)
   "Always returns NIL."
-  #+stmx-have-fast-lock
-  (release-fast-lock (the fast-lock var))
-  #-stmx-have-fast-lock
-  (release-lock (tvar-lock var)))
+  (release-lock-rw (the lock-rw var)))
 
+(defun try-lock-tvar-ro (var)
+  (try-acquire-lock-ro (the lock-rw var)))
 
-(declaim (ftype (function (tvar tlog) boolean) tvar-is-locked-by-other-thread?)
-         (inline
-           tvar-is-locked-by-other-thread?))
-
-(defvar *current-thread* (current-thread))
-
-(defun tvar-is-locked-by-other-thread? (var log)
-  "Return T if VAR is locked by some other thread,
-return NIL if VAR is unlocked, or locked by current thread.
-
-This is not a general function to get the owner of a lock:
-it assumes all TVARs in (tlog-writes log) are locked by current thread
-\(which happens during transaction commit)."
-  (declare (ignorable log))
-
-  #+stmx-have-fast-lock
-  (let1 owner (fast-lock-owner (the fast-lock var))
-    (not (or
-          (eq owner nil)
-          (eq owner (current-thread)))))
-  #-stmx-have-fast-lock
-  (progn
-    (multiple-value-bind (value present?)
-        (get-hash (tlog-writes log) var)
-      (when present?
-        (return-from tvar-is-locked-by-other-thread? nil)))
-
-    ;; VAR is not in (tlog-writes log), try to lock and unlock it.
-    ;; expensive, but it's the only correct and portable solution
-    (let1 lock (tvar-lock var)
-      (if (acquire-lock lock nil)
-          (release-lock lock) ;; returns nil
-          t))))
-
+(defun unlock-tvar-ro (var)
+  "Always returns NIL."
+  (release-lock-ro (the lock-rw var)))
 
 
 

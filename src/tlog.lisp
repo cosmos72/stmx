@@ -115,21 +115,27 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   must be read before retrying an ATOMIC block." (~ log)))
 
     (do-hash (var val) reads
+      (unless (eq val (raw-value-of var))
+        (log.debug "Tlog ~A: tvar ~A changed before listening, not sleeping"
+                   (~ log) (~ var))
+        (return-from listen-tvars-of nil))
+
       (listen-tvar var log)
-      ;; to avoid deadlocks, check raw-value AFTER listening on tvar.
+      ;; to avoid deadlocks, check raw-value also AFTER listening on tvar.
       ;; otherwise if we naively
       ;;   1) first, check raw-value and decide whether to listen
       ;;   2) then, listen if we decided to
       ;; the tvar could change BETWEEN 1) and 2) and we would miss it
       ;; => DEADLOCK
-      (if (eq val (raw-value-of var))
-          (log.trace "Tlog ~A listening for tvar ~A changes"
-                     (~ log) (~ var))
-          (progn
-            (unlisten-tvar var log)
-            (log.debug "Tlog ~A: tvar ~A changed, not going to sleep"
-                       (~ log) (~ var))
-            (return-from listen-tvars-of nil)))))
+      (unless (eq val (raw-value-of var))
+        (unlisten-tvar var log)
+        (log.debug "Tlog ~A: tvar ~A changed after  listening, not sleeping"
+                   (~ log) (~ var))
+        (return-from listen-tvars-of nil))
+
+      (log.trace "Tlog ~A listening for tvar ~A changes"
+                 (~ log) (~ var))))
+
   (return-from listen-tvars-of t))
 
 
@@ -149,18 +155,19 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   "Sleep, i.e. wait for relevant TVARs to change. Return T."
 
   (declare (type tlog log))
-  (log.debug "Tlog ~A sleeping now" (~ log))
   (let ((lock (tlog-lock log))
-        (slept t))
+        (prevent-sleep nil))
+
+    (log.debug "Tlog ~A sleeping now" (~ log))
 
     (with-lock-held (lock)
-      (when (setf slept (not (tlog-prevent-sleep log)))
+      (unless (setf prevent-sleep (tlog-prevent-sleep log))
         (condition-wait (tlog-semaphore log) lock)))
 
     (when (log.debug)
-      (if slept
-          (log.debug "Tlog ~A woke up" (~ log))
-          (log.debug "Tlog ~A prevented from sleeping, some TVAR must have changed" (~ log))))
+      (if prevent-sleep
+          (log.debug "Tlog ~A prevented from sleeping, some TVAR must have changed" (~ log))
+          (log.debug "Tlog ~A woke up" (~ log))))
     t))
 
 
@@ -180,8 +187,8 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
     (setf (tlog-prevent-sleep log) nil))
 
   (when (listen-tvars-of log)
-    (wait-once log)
-    (unlisten-tvars-of log))
+    (wait-once log))
+  (unlisten-tvars-of log)
   t)
       
 

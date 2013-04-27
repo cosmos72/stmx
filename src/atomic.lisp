@@ -156,20 +156,12 @@ transactional memory it read has changed."
    (handler-bind ((retry-error
                    (lambda (err)
                      (declare (ignore err))
-                     (log.trace "Tlog ~A {~A} wants to retry" (~ log) (~ tx))
                      (go retry)))
                   
                   (rerun-error
                    (lambda (err)
                      (declare (ignore err))
-                     (log.trace "Tlog ~A {~A} wants to re-run" (~ log) (~ tx))
-                     (invoke-restart 'rerun-once)))
-
-                  (condition
-                   (lambda (err)
-                     ;; return normally from lambda to propagate the error
-                     (log.trace "Tlog ~A {~A} will rollback, signalled ~A: ~A"
-                                (~ log) (~ tx) (type-of err) err))))
+                     (invoke-restart 'rerun-once))))
      (return
        (multiple-value-prog1
            (run-once tx log)
@@ -193,6 +185,7 @@ transactional memory it read has changed."
    (go rerun-no-yield)
 
    rerun
+   (log.debug "Tlog ~A {~A} will re-run" (~ log) (~ tx))
    (maybe-yield-before-rerun)
    ;; fallthrough
 

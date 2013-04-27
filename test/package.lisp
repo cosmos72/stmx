@@ -50,4 +50,6 @@
 (fiveam:def-suite suite)
 
 (defun configure-log4cl ()
-  (log:config :clear :sane :info :this-console :pattern "[%D{%H:%M:%S}] [%-5P] {%t} <%c{}{}{:downcase}> %m%n"))
+  (log:config :clear :sane :daily "log.txt"
+              :pattern "[%D{%H:%M:%S}] [%-5P] <%c{}{}{:downcase}> {%t} %m%n")
+  (log:config :info))

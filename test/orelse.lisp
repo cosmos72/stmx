@@ -109,7 +109,7 @@
           (setf name (svref names 3))
           (log:trace "RETRIED, taking from cell ~A" name)
           (setf x (take (svref cells 3)))))
-
+    
       (log:debug "took ~A from cell ~A" x name)
       (incf x)
 

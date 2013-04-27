@@ -37,29 +37,6 @@ of TVARs that were read during the transaction."
 
 
 
-(defun invalid-or-locked? (log)
-  "Return T if LOG is invalid, or if TVARs read during transaction are currently
-locked by some other thread (being locked by current thread does not count)."
-  (declare (type tlog log))
-
-  (log.trace "Tlog ~A invalid-or-locked?.." (~ log))
-  (do-hash (var val) (tlog-reads log)
-    (if (eq val (raw-value-of var))
-        (progn
-          (log.trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
-          (when (tvar-is-locked-by-other-thread? var log)
-            (log.debug "Tlog ~A tvar ~A is locked by another thread" (~ log) (~ var))
-            (return-from invalid-or-locked? t)))
-
-        (progn
-          (log.trace "Tlog ~A conflict for tvar ~A: expecting ~A, found ~A"
-                     (~ log) (~ var) val (raw-value-of var))
-          (log.debug "Tlog ~A ..not valid" (~ log))
-          (return-from invalid-or-locked? t))))
-  (log.trace "Tlog ~A ..is valid and not locked" (~ log))
-  nil)
-
-
 (declaim (inline invalid? shallow-valid? shallow-invalid?))
 
 (defun invalid? (log)
@@ -87,6 +64,8 @@ but does *not* check log parents for validity."
   (not (shallow-valid? log)))
 
 
+(declaim (ftype (function (tvar tvar) (values boolean &optional)) tvar>))
+
 (defun tvar> (var1 var2)
   (declare (type tvar var1 var2))
   "Compare var1 and var2 with respect to age: newer tvars usually have larger
@@ -101,11 +80,22 @@ tvar-id and are considered \"larger\". Returns (> (tvar-id var1) (tvar-id var2))
      (the fixnum (sxhash var2))))
 
 
+(declaim (ftype (function (cons cons) (values boolean &optional)) cons-tvar>))
+
+(defun cons-tvar> (c1 c2)
+  "Compare var1 and var2 with respect to age: newer tvars usually have larger
+tvar-id and are considered \"larger\". Returns (> (tvar-id var1) (tvar-id var2))."
+  (declare (type cons c1 c2))
+  (let ((var1 (first c1))
+        (var2 (first c2)))
+    (declare (type tvar var1 var2))
+    (> (the fixnum (tvar-id var1))
+       (the fixnum (tvar-id var2)))))
 
 
 
 
-(defun try-lock-tvars (rw-vars locked-rw-vars ro-vars locked-ro-vars)
+(defun old___try-lock-tvars (rw-vars locked-rw-vars ro-vars locked-ro-vars)
   "Sort VARS in order - actually in (tvar< ...) order -
 then non-blocking acquire their locks in such order.
 Reason: acquiring in unspecified order may cause livelock, as two transactions
@@ -143,28 +133,47 @@ to last acquired."
            (setf (rest cell) nil)
          finally (return t))))
 
+(defun try-lock-tvars (vars locked-vars)
+  "Sort VARS in order - actually in (tvar> ...) order -
+then non-blocking acquire their locks in such order.
+Reason: acquiring in unspecified order may cause livelock, as two transactions
+may repeatedly try acquiring the same two TVARs in opposite order.
+
+LOCKED-VARS must be the one-element list '(nil).
+Destructively modifies VARS and LOCKED-VARS.
+
+Return t if all VARS where locked successfully, otherwise return nil.
+In both cases, after this call (rest LOCKED-VARS) will be the list
+containing the locked tvars, sorted in order from first acquired
+to last acquired."
+  (declare (type list vars locked-vars))
+  #+never (log:user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
+  (setf vars (sort vars #'cons-tvar>))
+  #+never (log:user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
+
+  (loop for cell = vars then rest
+     while cell
+     for rest = (rest cell)
+     for (var . rw) = (first cell)
+     always
+       (if rw
+           (try-lock-tvar-rw var)
+           (try-lock-tvar-ro var))
+     do (setf (rest locked-vars) cell)
+       (setf locked-vars cell)
+       (setf (rest cell) nil)
+     finally (return t)))
+
 
 
 (declaim (inline unlock-tvars))
-(defun unlock-tvars (rw-vars ro-vars)
+(defun unlock-tvars (vars)
   "Release locked (rest VARS) in same order of acquisition."
-  (declare (type list rw-vars ro-vars))
-  (loop for var in (rest rw-vars) do
-       (unlock-tvar-rw var))
-  (loop for var in (rest ro-vars) do
-       (unlock-tvar-ro var)))
-
-
-(declaim (inline locked-valid?))
-(defun locked-valid? (log)
-  "Return T if LOG is valid and NIL if it's invalid.
-Return :UNKNOWN if relevant locks could not be acquired.
-
-Thanks to the global versioning of transactions, this method
-does not need to acquire locks."
-  (declare (type tlog log))
-  (valid? log))
-
+  (declare (type list vars))
+  (loop for (var . rw) in (rest vars) do
+       (if rw
+           (unlock-tvar-rw var)
+           (unlock-tvar-ro var))))
 
 
 ;;;; ** Committing
@@ -307,15 +316,12 @@ b) another TLOG is writing the same TVARs being committed
   (let ((writes   (tlog-writes log))
         (reads    (tlog-reads log))
         (new-version +invalid-counter+)
-        (rw-acquiring nil)
-        (ro-acquiring nil)
-        (rw-acquired (list nil))
-        (ro-acquired (list nil))
+        (acquiring nil)
+        (acquired (list nil))
         (changed   nil)
         (success   nil))
 
-    (declare (type list rw-acquiring rw-acquired
-                        ro-acquiring ro-acquired changed)
+    (declare (type list acquiring acquired changed)
              (type fixnum new-version)
              (type boolean success))
 
@@ -332,14 +338,16 @@ b) another TLOG is writing the same TVARs being committed
          (block nil
            ;; we must lock TVARs that will been written: expensive
            ;; but needed to ensure concurrent commits do not conflict.
-           (setf rw-acquiring (hash-table-keys writes))
+           (do-hash (var) writes
+             (push (cons var t) acquiring))
 
            (do-hash (var) reads
              (multiple-value-bind (value present?) (get-hash writes var)
+               (declare (ignore value))
                (unless present?
-                 (push var ro-acquiring))))
+                 (push (cons var nil) acquiring))))
            
-           (unless (try-lock-tvars rw-acquiring rw-acquired ro-acquiring ro-acquired)
+           (unless (try-lock-tvars acquiring acquired)
              (log.debug "Tlog ~A failed to lock tvars, not committed" (~ log))
              (return))
            
@@ -348,7 +356,7 @@ b) another TLOG is writing the same TVARs being committed
            (setf new-version (incf-atomic-counter *tlog-counter*))
 
            ;; check for log validity one last time, with locks held.
-           (unless (valid? log) ;; (when (invalid-or-locked? log)
+           (unless (valid? log)
              (log.debug "Tlog ~A is invalid, not committed" (~ log))
              (return))
 
@@ -366,7 +374,7 @@ b) another TLOG is writing the same TVARs being committed
            (log.debug "Tlog ~A ...committed" (~ log))
            (setf success t))
 
-      (unlock-tvars rw-acquired ro-acquired)
+      (unlock-tvars acquired)
       (log.trace "Tlog ~A ...released locks" (~ log))
       
       (dolist (var changed)

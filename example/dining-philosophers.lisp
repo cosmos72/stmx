@@ -61,7 +61,7 @@
   (log:info "philosopher ~A: fork1=~A fork2=~A plate=~A~%"
             i ($ fork1) ($ fork2) (car plate))
   ;;(sb-sprof:with-profiling
-  ;;    (:max-samples 1000 :sample-interval 0.001 :report :graph :loop nil :show-progress t)
+  ;;  (:max-samples 1000 :sample-interval 0.001 :report :graph :loop nil :show-progress t)
   (loop while (plusp (philosopher-eats fork1 fork2 plate))))
 
 

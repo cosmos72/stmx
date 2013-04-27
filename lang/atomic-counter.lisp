@@ -60,20 +60,26 @@
 
     #-stmx-have-sbcl.atomic-ops
     ;; locking version
-    (with-lock-held ((atomic-counter-lock counter))
-      (setf (atomic-counter-version counter)
-            (logand most-positive-fixnum
-                    (1+ (atomic-counter-version counter))))))
+    (let ((lock (atomic-counter-lock counter)))
+      (acquire-lock lock)
+      (unwind-protect
+           (setf (atomic-counter-version counter)
+                 (logand most-positive-fixnum
+                         (1+ (atomic-counter-version counter))))
+        (release-lock lock))))
 
   #-stmx-fixnum-is-power-of-two
   ;; generic version
-  (with-lock-held ((atomic-counter-lock counter))
-    (setf (atomic-counter-version counter)
-          (let ((n (atomic-counter-version counter)))
-            (the fixnum
-              (if (= n most-positive-fixnum)
-                  0
-                  (1+ n)))))))
+  (let ((lock (atomic-counter-lock counter)))
+    (acquire-lock lock)
+    (unwind-protect
+         (setf (atomic-counter-version counter)
+               (let ((n (atomic-counter-version counter)))
+                 (the fixnum
+                   (if (= n most-positive-fixnum)
+                       0
+                       (1+ n)))))
+      (release-lock lock))))
 
 
 (defun get-atomic-counter (counter)
@@ -92,5 +98,8 @@
 
   #-(and stmx-fixnum-is-power-of-two stmx-have-sbcl.atomic-ops)
   ;; locking version
-  (with-lock-held ((atomic-counter-lock counter))
-    (atomic-counter-version counter)))
+  (let ((lock (atomic-counter-lock counter)))
+    (acquire-lock lock)
+    (unwind-protect
+         (atomic-counter-version counter)
+      (release-lock lock))))

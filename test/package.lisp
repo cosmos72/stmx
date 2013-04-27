@@ -23,6 +23,13 @@
         #:stmx
         #:stmx.util)
 
+  ;; no need for closer-mop version of typep and subtypep;
+  ;; they even cause some tests to fail
+  #+cmucl
+  (:shadowing-import-from #:cl
+                          #:typep
+                          #:subtypep)
+
   (:import-from #:stmx
                 #:raw-value-of #:tvar-versioned-value #:+invalid-counter+
                 #:tx-read-of #:tx-write-of

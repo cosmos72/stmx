@@ -40,7 +40,7 @@
       nil
 
       #+sbcl
-      nil #+never '(:stmx-have-fast-lock :stmx-have-sbcl.atomic-ops))
+      '(:stmx-have-fast-lock :stmx-have-sbcl.atomic-ops))
 
    (add-feature f))
 

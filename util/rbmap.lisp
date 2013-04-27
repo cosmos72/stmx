@@ -34,6 +34,7 @@
   (:documentation "Red-black tree implementation of sorted binary map"))
 
 
+#-cmucl
 (declaim (inline red? black? flip-color))
 
 (defun red? (node)

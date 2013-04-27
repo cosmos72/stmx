@@ -23,6 +23,13 @@
         #:stmx.lang
         #:stmx)
 
+  ;; no need for closer-mop version of typep and subtypep;
+  ;; they even cause some tests to fail
+  #+cmucl
+  (:shadowing-import-from #:cl
+                          #:typep
+                          #:subtypep)
+
   (:export #:tcons #:tlist #:tfirst #:trest #:tpush #:tpop ;; transactional CONS cell and list
 
            #:tcell #:tfifo #:tstack #:tchannel #:tport  ;; transactional containers

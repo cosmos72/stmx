@@ -47,6 +47,14 @@ or
 The effect is the same as DEFUN - or DEFMETHOD - plus:
 - the BODY is wrapped inside (atomic ...)"
   `(,defun-or-defmethod ,func-name ,args
+     ;; move docstring here
+     ,@(when (and (stringp (first body)) (rest body))
+             (list (pop body)))
+     ;; also copy all declarations
+     ,@(loop for form in body
+          while (and (listp form) (eq 'declare (first form)))
+          collect form)
+     
      (atomic :id ',func-name
              ,@(if (symbolp func-name)
                    ;; support (return-from ,func-name ...)

@@ -63,7 +63,7 @@ Benchmark results
 What follows are some timings obtained on the authors's system, and by no means they
 claim to be exact, absolute or reproducible: your mileage may vary.
 
-Date: 19 April 2013
+Date: 27 April 2013
 
 Hardware: Intel Core-i5 750 @4.0 GHz, 16GB RAM
 

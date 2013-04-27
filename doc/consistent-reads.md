@@ -11,7 +11,7 @@ In database terminology, how to guarantee transactions coerency and isolation, i
 the C and I in [ACID](http://en.wikipedia.org/wiki/ACID) ?
 
 Doing an actual copy of all transactional memory when a transaction starts
-is obviously prohibitively expensive, and thus not considered.
+is prohibitively expensive, and obviously not considered.
 
 A good solution is to use a global version clock as described in [Transactional
 Locking II](http://home.comcast.net/~pjbishop/Dave/GVTL-TL2-Disc06-060711-Camera.pdf)
@@ -42,7 +42,9 @@ to guarantee atomicity, consistency and isolation (the A, C and I in ACID) ?
           WW
 
 1) no dependencies: no constraints on the implementation
+
 2) RR dependency: no constraints on the implementation
+
 3) RW dependency:
    Tx1 appears to commit before Tx2 *if-and-only-if* Tx1 does not see Tx2 writes.
    Tx1 must either see *all* Tx1 writes that it also reads, or none of them.
@@ -143,3 +145,11 @@ to guarantee atomicity, consistency and isolation (the A, C and I in ACID) ?
    Consequence 2: checking the reads must fail if some other Tx has modified
    them, i.e. if the values found during checks are different from the values
    stored in the transaction read log.
+
+4) WR dependency: same as 3) - just swap Tx1 and Tx2
+
+5) WW dependency: exclusively locking locations before committing is enough,
+   as it guarantees mutual exclusion.
+
+6) multiple dependencies: RW+WR, RW+WW (same as WR+WW) or RW+WR+WW -
+   just apply simultaneously the constraints coming from each single dependency

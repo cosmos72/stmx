@@ -117,12 +117,13 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
              ;; ...
             )))
 
-  Note: on some Common Lisp implementations, `slot-value` and `(setf slot-value)`
-  are known to ignore the transactional machinery (implemented with MOP
-  slot-value-using-class, if you wonder) causing all kinds of bugs
+  Note: on some Common Lisp implementations, slot accessors are known
+  to ignore by default the transactional machinery (implemented with MOP
+  slot-value-using-class, if you wonder) causing all kinds of errors
   on transactional classes.
-  To avoid hard-to-debug problems, always use accessors to read and write
-  the slots of transactional classes.
+  For this reason, it is recommended to use `slot-value` to read and write
+  the slots of transactional classes or, even better, to use a macro that can
+  be defined to either use `slot-value` or slot accessors.
 
 
 - `TRANSACTION` declares that a method or function is an atomic

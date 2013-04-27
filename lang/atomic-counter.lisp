@@ -20,14 +20,14 @@
 
 (deftype counter-num ()
   #+stmx-fixnum-is-large 'fixnum
-  #-stmx-fixnum-is-large 'bignum)
+  #-stmx-fixnum-is-large '(or fixnum bignum))
 
 
 #+(and stmx-have-sbcl.atomic-ops stmx-fixnum-is-large-power-of-two)
 (eval-always
 
  (defstruct (atomic-counter (:constructor %make-atomic-counter))
-   ;; we assume that sb-ext:word is the same or wider than fixnum
+   ;; we assume that sb-ext:word is same or wider than fixnum
    (version 1 :type sb-ext:word))
 
  (declaim (inline incf-atomic-counter
@@ -63,7 +63,9 @@
   #+(and stmx-fixnum-is-large-power-of-two stmx-have-sbcl.atomic-ops)
   (the fixnum
     (logand most-positive-fixnum
-            (sb-ext:atomic-incf (atomic-counter-version counter))))
+            (1+
+             (logand most-positive-fixnum
+                     (sb-ext:atomic-incf (atomic-counter-version counter))))))
 
   #-(and stmx-fixnum-is-large-power-of-two stmx-have-sbcl.atomic-ops)
   ;; locking version
@@ -106,9 +108,7 @@
     (sb-thread:barrier (:read))
     (the fixnum
       (logand most-positive-fixnum
-              (1-
-               (logand most-positive-fixnum
-                       (atomic-counter-version counter))))))
+              (atomic-counter-version counter))))
 
   #-(and stmx-have-sbcl.atomic-ops stmx-fixnum-is-large-power-of-two)
   ;; locking version

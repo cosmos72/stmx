@@ -18,6 +18,15 @@
 
 ;;;; * Wrappers around Bordeaux Threads to capture the values returned by functions executed in threads
 
+(declaim (type bt:thread *current-thread*))
+(defvar *current-thread* (current-thread))
+
+(eval-always
+  (unless (assoc '*current-thread* bt:*default-special-bindings* :test 'eq)
+         (push (cons '*current-thread* '(current-thread))
+               bt:*default-special-bindings*)))
+
+
 #-stmx-sane-bt.join-thread
 (defstruct wrapped-thread
   (result nil)

@@ -111,54 +111,54 @@ Return nil if all tx are valid and want to retry."
     log))
         
 
-(defun run-orelse-n (funcs)
-  "Implementation of RUN-ORELSE for N functions."
-  (declare (type list funcs))
+(defun run-orelse (&rest funcs)
+  "Function variant of `orelse'. Execute the functions in FUNCS list
+one by one from left to right in separate, nested transactions until one succeeds
+\(i.e. commits) or signals an error.
 
+If a nested transaction is invalid or wants to retry, run the next one.
+
+Returns the value of the transaction that succeeded,
+or signals the error raised by the transaction that failed.
+
+Can only be used inside an ATOMIC block."
+  (declare (type list funcs))
 
   ;; n-ary implementation, n transactions tx[0...n-1]: set i=0, run tx[i], then:
   ;;
-  ;; a) if tx[i] is executed:
-  ;;    1. if tx[i] is invalid:
-  ;;       1.1 if tx[i+1] exists, run it. reason: more possibilities
-  ;;           to get a valid run of one of tx[]
-  ;;       1.2 if parent-tx is invalid, tell it to re-execute with (rerun)
+  ;; a. if tx[i] is executed:
+  ;;    1. if tx[i] wants to retry or rerun:
+  ;;       1.1 if tx[i+1] exists, run it (increase i and jump to a).
+  ;;           reason: orelse exists to implement this behaviours
+  ;;       1.2 otherwise, if parent-tx is invalid, tell it to re-execute with (rerun)
   ;;           this is necessary to break infinite loops cycling
   ;;           on some of the tx[i], caused by the parent-tx being invalid
-  ;;       1.3 if i<>0 and tx[0] is invalid, run it. reason: it means some TVARs
-  ;;           relevant for tx[0] have changed, and there is no reason
-  ;;           to re-execute parent-tx
-  ;;       1.4 run tx[i] again
-  ;;    2. if tx[i] wants to retry:
-  ;;       2.1. if tx[i+1] exists, run it. reason: orelse exists exactly
-  ;;            to implement this behaviour
-  ;;       2.2. otherwise, sleep on tx[0]+ ... + tx[n-1]
+  ;;       1.3 otherwise, find the smallest i such that tx[i] wanted to rerun, and run it.
+  ;;       1.4 otherwise it means all tx[i] wanted to retry, so jump to b.
   ;;    3. if tx[i] wants to commit (returns normally), merge to parent log and return
   ;;    4. if tx[i] wants to rollback (signals an error), rollback and signal the error
   ;; 
-  ;; c) if sleeping on tx[0]+ ... + tx[n-1]:
+  ;; b. all tx[i] want to retry.
   ;;    1. if tx[0] ... tx[n-1] are incompatible => at least one of them is invalid
   ;;       1.1 if parent-tx is invalid, tell it to re-execute with (rerun)
   ;;       1.2 otherwise, run the first invalid one among tx[0] ... tx[n-1]
   ;;    2. merge tx[0] ... tx[n-1] logs into logN, and sleep on it. when waking up:
   ;;       2.1 if logN is valid, sleep again on it
-  ;;       2.2 if parent-tx is invalid, tell it to re-execute with (rerun)
-  ;;       2.3 run tx[0] (we could check which tx is invalid to run it instead,
-  ;;           but we lost some logs when merging them)
+  ;;       2.2 otherwise, if parent-tx is invalid, tell it to re-execute with (rerun)
+  ;;       2.3 otherwise, run tx[0] (set i=0 and jump to a).
 
 
-  (let ((parent-log (current-tlog))
-        txs tx index)
+  (let ((parent-log (aif (current-tlog) it (error 'orelse-error)))
+        (index 0)
+        tx
+        (txs (if funcs
+                 (make-array (length funcs)
+                             :element-type '(or null orelse-tx)
+                             :initial-element nil)
+                 (return-from run-orelse (values)))))
 
-    (unless parent-log
-      (error 'orelse-error))
-
-    (unless funcs
-      (return-from run-orelse-n (values)))
-
-    (setf txs (make-array (length funcs)
-                          :element-type '(or null orelse-tx)
-                          :initial-element nil))
+    (declare (type fixnum index)
+             (type simple-vector txs))
 
     (labels ((ensure-tx ()
                (unless (setf tx (aref txs index))
@@ -193,18 +193,16 @@ Return nil if all tx are valid and want to retry."
 
        (multiple-value-bind (flag vals) (run-orelse-once func log)
          (case flag
-           (:wants-to-retry (wants-to-retry)
-                            (go run-next))
+           (:wants-to-retry (wants-to-retry) (go run-next))
 
-           (:wants-to-rerun (wants-to-rerun)
-                            (go run-next))
+           (:wants-to-rerun (wants-to-rerun) (go run-next))
 
            (otherwise
             (commit-nested log)
             (log.debug me "Tlog ~A {~A} committed to parent tlog ~A"
                        (~ log) (~ func) (~ parent-log))
             (free-tx-logs txs)
-            (return-from run-orelse-n (values-list vals)))))
+            (return-from run-orelse (values-list vals)))))
 
 
        run-next
@@ -245,25 +243,6 @@ Return nil if all tx are valid and want to retry."
 
        (log.debug me "Re-running ORELSE")
        (go start)))))
-
-
-
-(defun run-orelse (&rest funcs)
-  "Function variant of `orelse'. Execute the functions in FUNCS list
-one by one from left to right in separate, nested transactions until one succeeds
-\(i.e. commits) or signals an error.
-
-If a nested transaction is invalid or wants to retry, run the next one.
-
-Returns the value of the transaction that succeeded,
-or signals the error raised by the transaction that failed.
-
-Can only be used inside an ATOMIC block."
-  (declare (type list funcs))
-
-  (if (null (first funcs))
-      (values)
-      (run-orelse-n funcs)))
          
 
 
@@ -278,9 +257,7 @@ Can only be used inside an ATOMIC block."
 
   (let ((funcs (loop for form in body collect
                     `(lambda () ,form))))
-    (if (null (first funcs))
-        `(values)
-        `(run-orelse-n (list ,@funcs)))))
+    `(run-orelse ,@funcs)))
          
       
 

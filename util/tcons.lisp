@@ -26,10 +26,12 @@ To use TCONS cells, see the functions TCONS, TLIST, TFIRST and TREST.")))
 
 (deftype tlist () '(or tcons null))
 
-(declaim (inline tcons))
+(declaim (ftype (function (t t) (values tcons &optional)) tcons)
+         (inline tcons))
+
 (defun tcons (first rest)
   "Create and return a new TCONS."
-  (the tcons (new 'tcons :first first :rest rest)))
+  (new 'tcons :first first :rest rest))
 
 
 (declaim (ftype (function (&rest t) (values tlist &optional)) tlist))
@@ -53,20 +55,20 @@ To use TCONS cells, see the functions TCONS, TLIST, TFIRST and TREST.")))
 
 
 
-(declaim (ftype (function (tlist) t) tfirst trest))
+(declaim (ftype (function (tlist) t) tfirst trest)
+         (inline
+           tfirst trest))
 
 (defun tfirst (tlist)
   "Return the first element in a TCONS or TLIST."
-  (if tlist
-      (_ tlist first)
-      nil))
+  (when tlist
+      (_ tlist first)))
   
 
 (defun trest (tlist)
   "Return the rest element in a TCONS or TLIST."
-  (if tlist
-      (_ tlist rest)
-      nil))
+  (when tlist
+    (_ tlist rest)))
   
 
 

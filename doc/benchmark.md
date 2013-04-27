@@ -71,69 +71,151 @@ Software: Debian GNU/Linux 7 (wheezy) x86_64, SBCL 1.1.6 x86_64, STMX 1.2.0
 
 
 <table>
+
+ <tr><th colspan="3">
+       Single-thread benchmarks,
+       executed one million times with `(x3 (1m (atomic ...)))`
+     </th></tr>
+
  <tr><th><b>name</b>      </th>
      <th><b>executed code</b></th>
      <th><b>average time</b></th></tr>
 
- <tr><td>atomic nil       </td><td><code>(atomic nil)</code>                </td><td>0.148&nbsp;microseconds</td></tr>
- <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code>              </td><td>0.270&nbsp;microseconds</td></tr>
- <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) i))</code>     </td><td>0.381&nbsp;microseconds</td></tr>
- <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($ v)))</code>     </td><td>0.547&nbsp;microseconds</td></tr>
+ <tr><td>atomic nil       </td><td><code>(atomic nil)</code>                </td><td>0.147&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code>              </td><td>0.267&nbsp;microseconds</td></tr>
+ <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) i))</code>     </td><td>0.363&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($ v)))</code>     </td><td>0.511&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-10</td>
      <td><code>(atomic (dotimes (j 10) (incf ($ v))))</code></td>
-     <td>0.821&nbsp;microseconds</td></tr>
+     <td>0.811&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-100</td>
      <td><code>(atomic (dotimes (j 100) (incf ($ v))))</code></td>
-     <td>3.534&nbsp;microseconds</td></tr>
+     <td>3.675&nbsp;microseconds</td></tr>
 
- <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(0.518+N*0.030)&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(0.485+N*0.032)&nbsp;microseconds</td></tr>
 
  <tr><td>orelse empty     </td><td><code>(atomic (orelse))</code>           </td><td>0.122&nbsp;microseconds</td></tr>
- <tr><td>orelse unary     </td><td><code>(atomic (orelse ($ v)))</code>     </td><td>0.578&nbsp;microseconds</td></tr>
- <tr><td>orelse retry-1   </td><td><code>(atomic (orelse (retry) ($ v)))</code> </td><td>1.101&nbsp;microseconds</td></tr>
- <tr><td>orelse retry-2   </td><td><code>(atomic (orelse (retry) (retry) ($ v)))</code> </td><td>1.543&nbsp;microseconds</td></tr>
- <tr><td>orelse retry-4   </td><td><code>(atomic (orelse (retry) (retry) (retry) (retry) ($ v)))</code></td><td>2.309&nbsp;microseconds</td></tr>
+ <tr><td>orelse unary     </td><td><code>(atomic (orelse ($ v)))</code>     </td><td>0.597&nbsp;microseconds</td></tr>
+ <tr><td>orelse retry-1   </td><td><code>(atomic (orelse (retry) ($ v)))</code> </td><td>1.064&nbsp;microseconds</td></tr>
+ <tr><td>orelse retry-2   </td><td><code>(atomic (orelse (retry) (retry) ($ v)))</code> </td><td>1.461&nbsp;microseconds</td></tr>
+ <tr><td>orelse retry-4   </td><td><code>(atomic (orelse (retry) (retry) (retry) (retry) ($ v)))</code></td><td>2.227&nbsp;microseconds</td></tr>
 
- <tr><td>orelse retry-N   </td><td>best fit of the 3 runs above</td><td>(0.718+N*0.400)&nbsp;microseconds</td></tr>
+ <tr><td>orelse retry-N   </td><td>best fit of the 3 runs above</td><td>(0.681+N*0.387)&nbsp;microseconds</td></tr>
 
  <tr><td>tmap read-write-1</td>
      <td><code>(atomic (incf (get-bmap tm 1)))</code></td>
-     <td>1.667&nbsp;microseconds</td></tr>
+     <td>1.453&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-bmap tm))<br>
               (set-bmap tm i t))</code></td>
-     <td>7.593&nbsp;microseconds</td></tr>
+     <td>6.648&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 100)</td>
      <td><code>(atomic (when (zerop (mod i  100)) (clear-bmap tm))<br>
               (set-bmap tm i t))</code></td>
-     <td>11.204&nbsp;microseconds</td></tr>
+     <td>9.146&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 1000)</td>
      <td><code>(atomic (when (zerop (mod i 1000)) (clear-bmap tm))<br>
               (set-bmap tm i t))</code></td>
-     <td>14.007&nbsp;microseconds</td></tr>
+     <td>11.039&nbsp;microseconds</td></tr>
 
  <tr><td>thash read-write-1</td>
      <td><code>(atomic (incf (get-thash th 'x)))</code></td>
-     <td>2.983&nbsp;microseconds</td></tr>
+     <td>2.616&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-thash th))<br>
               (set-thash th i t))</code></td>
-     <td>3.660&nbsp;microseconds</td></tr>
+     <td>3.188&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 100)</td>
      <td><code>(atomic (when (zerop (mod i  100)) (clear-thash th))<br>
               (set-thash th i t))</code></td>
-     <td>9.017&nbsp;microseconds</td></tr>
+     <td>8.497&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 1000)</td>
      <td><code>(atomic (when (zerop (mod i  1000)) (clear-thash th))<br>
               (set-thash th i t))</code></td>
-     <td>60.299&nbsp;microseconds</td></tr>
+     <td>60.090&nbsp;microseconds</td></tr>
+
+
+ <tr><th colspan="3">
+       Concurrent benchmarks on a 4-core CPU.
+       They already internally iterate one million times,
+       do not wrap them in <code>(1m ...)</code>
+     </th></tr>
+
+ <tr><th colspan="3">
+       Dining philosophers, load with<br>
+       <code>(load "stmx/examples/dining-philosophers.lisp")</code><br>
+       <code>(in-package :stmx.example1)</code>
+     </th></tr>
+
+ <tr><th><b>name</b>      </th>
+     <th><b>executed code</b></th>
+     <th><b>average transactions per second</b></th></tr>
+
+ <tr><td>dining philosophers, 2 threads</td>
+     <td><code>(dining-philosophers 2 1000000)</code></td>
+     <td>1.63&nbsp;millions</td></tr>
+
+ <tr><td>dining philosophers, 3 threads</td>
+     <td><code>(dining-philosophers 3 1000000)</code></td>
+     <td>2.33&nbsp;millions</td></tr>
+
+ <tr><td>dining philosophers, 4 threads</td>
+     <td><code>(dining-philosophers 4 1000000)</code></td>
+     <td>2.91&nbsp;millions</td></tr>
+
+ <tr><td>dining philosophers, 5 threads</td>
+     <td><code>(dining-philosophers 5 1000000)</code></td>
+     <td>2.95&nbsp;millions</td></tr>
+
+ <tr><td>dining philosophers, 6 threads</td>
+     <td><code>(dining-philosophers 6 1000000)</code></td>
+     <td>2.84&nbsp;millions</td></tr>
+
+ <tr><td>dining philosophers, 7 threads</td>
+     <td><code>(dining-philosophers 7 1000000)</code></td>
+     <td>2.86&nbsp;millions</td></tr>
+
+ <tr><td>dining philosophers, 8 threads</td>
+     <td><code>(dining-philosophers 8 1000000)</code></td>
+     <td>2.84&nbsp;millions</td></tr>
+
+ <tr><td>dining philosophers, 10 threads</td>
+     <td><code>(dining-philosophers 10 1000000)</code></td>
+     <td>2.78&nbsp;millions</td></tr>
+
+ <tr><td>dining philosophers, 15 threads</td>
+     <td><code>(dining-philosophers 15 1000000)</code></td>
+     <td>2.63&nbsp;millions</td></tr>
+
+ <tr><td>dining philosophers, 20 threads</td>
+     <td><code>(dining-philosophers 20 1000000)</code></td>
+     <td>2.80&nbsp;millions</td></tr>
+
+ <tr><td>dining philosophers, 30 threads</td>
+     <td><code>(dining-philosophers 30 1000000)</code></td>
+     <td>2.76&nbsp;millions</td></tr>
+
+ <tr><td>dining philosophers, 40 threads</td>
+     <td><code>(dining-philosophers 40 1000000)</code></td>
+     <td>2.61&nbsp;millions</td></tr>
+
+ <tr><td>dining philosophers, 50 threads</td>
+     <td><code>(dining-philosophers 50 1000000)</code></td>
+     <td>2.54&nbsp;millions</td></tr>
+
+ <tr><td>dining philosophers, 100 threads</td>
+     <td><code>(dining-philosophers 100 1000000)</code></td>
+     <td>2.47&nbsp;millions</td></tr>
+
 
 </table>
+
+

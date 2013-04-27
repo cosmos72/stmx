@@ -13,8 +13,9 @@ A transaction gets committed if it returns normally, while it gets rolled
 back if it signals an error (and the error is propagated to the caller).
 
 Finally, transactions can safely run in parallel in different threads,
-are re-executed from the beginning in case of conflicts, and effects
-of a transaction are not visible from other threads until it commits.
+are re-executed from the beginning in case of conflicts or if consistent reads
+cannot be guaranteed, and effects of a transaction are not visible from other
+threads until it commits.
 
 STM gives freedom from deadlocks, automatic roll-back on failure,
 and it aims at resolving the tension between granularity and concurrency.
@@ -122,8 +123,8 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   slot-value-using-class, if you wonder) causing all kinds of errors
   on transactional classes.
   For this reason, it is recommended to use `slot-value` to read and write
-  the slots of transactional classes or, even better, to use a macro that can
-  be defined to either use `slot-value` or slot accessors.
+  the slots of transactional classes or, even better, a macro that can
+  be defined to use either `slot-value` or slot accessors.
 
 
 - `TRANSACTION` declares that a method or function is an atomic
@@ -224,7 +225,7 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
 
   The STM machinery will guarantee that transactions intermediate status, where
   an atomic block is half-way through its job, will **never** be visible to other
-  (successful) transactions.
+  transactions.
 
   For example, it becomes trivial to write some code that atomically removes
   an object from a transactional container and adds it to another one:
@@ -271,10 +272,10 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   there yet.
 
 - `ORELSE` is a macro to execute two or more Lisp forms as alternatives
-  in separate, nested transactions: if the first retries or is invalid,
-  the second will be executed and so on, until one transaction either
-  commits (returns normally) or rollbacks (signals an error or condition).
-  It can only be used inside a transaction.
+  in separate, nested transactions: if the first retries or detects an
+  inconsistent read, the second will be executed and so on, until one
+  transaction either commits (returns normally) or rollbacks (signals
+  an error or condition). It can only be used inside a transaction.
 
 - `NONBLOCKING` is an utility macro based on `ORELSE` to convert a blocking
   transaction into another that returns NIL instead of waiting
@@ -536,8 +537,8 @@ Performance
 See the included file [doc/benchmark.md](doc/benchmark.md) for performance
 considerations and a lot of raw numbers.
 
-The short version is: as of April 2013, on a fast PC (Core i5 @ 3GHz or better)
-with a fast Common Lisp (SBCL or better), STMX can execute up to 1.5 millions
+The short version is: as of April 2013, on a fast home PC (Core i5 @ 3GHz or better)
+with a fast Common Lisp (SBCL or better), STMX can execute up to 2 millions
 transactions per second per CPU core.
 
 Taking as a small but somewhat realistic example the [dining philosophers](example/dining-philosophers.lisp),

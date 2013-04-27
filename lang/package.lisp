@@ -28,12 +28,16 @@
 
            #:log.trace    #:log.debug
 
+           ;; bordeaux-threads helpers
+           #:start-thread #:wait4-thread
+           #:*current-thread*
+
            #:atomic-counter #:make-atomic-counter
            #:get-atomic-counter #:incf-atomic-counter
 
-           #:lock-rw             #:make-lock-rw        
-           #:try-acquire-lock-rw #:release-lock-rw
-           #:try-acquire-lock-ro #:release-lock-ro
+           #:fast-lock             #:make-fast-lock        
+           #:try-acquire-fast-lock #:release-fast-lock
+           #:fast-lock-is-own-or-free?
 
            #:fast-vector        #:make-fast-vector
            #:fast-vector-length #:fast-vector-max-length
@@ -44,9 +48,6 @@
 
            #:hash-table-keys  #:hash-table-values  #:hash-table-pairs
            #:copy-hash-table  #:merge-hash-tables
-
-           ;; bordeaux-threads wrappers
-           #:start-thread #:wait4-thread
 
            #:id-of ;; also (setf id-of)
            #:~     ;; also (setf ~)

@@ -21,6 +21,10 @@
 (defun tvar (&optional (value +unbound+))
   (the tvar (make-tvar :versioned-value (cons +invalid-counter+ value))))
 
+(declaim (ftype (function (tvar) t) $)
+         (ftype (function (t tvar) t) (setf $)))
+         
+
 ;;;; ** Signalling unbound variables
 
 (defun unbound-tvar-error (var)
@@ -222,30 +226,48 @@ and to check for any value stored in the log."
 
 ;;;; ** Locking and unlocking
 
-(declaim (ftype (function (tvar) boolean) try-lock-tvar-rw)
-         (ftype (function (tvar) boolean) try-lock-tvar-ro)
-         (ftype (function (tvar) null)    unlock-tvar-rw)
-         (ftype (function (tvar) null)    unlock-tvar-ro)
+(declaim (ftype (function (tvar)      boolean) try-lock-tvar)
+         (ftype (function (tvar)      null)    unlock-tvar)
+         (ftype (function (tvar tlog) boolean) tvar-unlocked?)
          (inline
-           try-lock-tvar-rw
-           try-lock-tvar-ro
-           unlock-tvar-rw
-           unlock-tvar-ro))
+           try-lock-tvar unlock-tvar
+           #+stmx-have-fast-lock tvar-unlocked?))
 
-(defun try-lock-tvar-rw (var)
-  (try-acquire-lock-rw (the lock-rw var)))
+(defun try-lock-tvar (var)
+  "Return T if VAR was locked successfully, otherwise return NIL."
+  #+stmx-have-fast-lock
+  (try-acquire-fast-lock (the fast-lock var))
+  #-stmx-have-fast-lock
+  (bt:acquire-lock (tvar-lock var) nil))
+  
+  
+(defun unlock-tvar (var)
+  "Unlock VAR, always return NIL."
+  #+stmx-have-fast-lock
+  (release-fast-lock (the fast-lock var))
+  #-stmx-have-fast-lock
+  (bt:release-lock (tvar-lock var)))
 
-(defun unlock-tvar-rw (var)
-  "Always returns NIL."
-  (release-lock-rw (the lock-rw var)))
 
-(defun try-lock-tvar-ro (var)
-  (try-acquire-lock-ro (the lock-rw var)))
+(defun tvar-unlocked? (var log)
+  "Return T if VAR is locked by current thread or unlocked.
+Return NIL if VAR is locked by some other thread."
+  (declare (ignorable log))
 
-(defun unlock-tvar-ro (var)
-  "Always returns NIL."
-  (release-lock-ro (the lock-rw var)))
-
+  #+stmx-have-fast-lock
+  (fast-lock-is-own-or-free? (the fast-lock var))
+  #-stmx-have-fast-lock
+  ;; check transaction log writes first
+  (multiple-value-bind (value present?)
+      (get-hash (tlog-writes log) var)
+    (if present?
+        t
+        ;; then fall back on trying to acquire the lock (messy)
+        (let1 lock (tvar-lock var)
+          (when (bt:acquire-lock lock nil)
+            (bt:release-lock lock)
+            t)))))
+  
 
 
 ;;;; ** Listening and notifying

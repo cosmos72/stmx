@@ -19,7 +19,7 @@
 
 
 (defun valid? (log)
-  "Return t if a TLOG is valid, i.e. it contains an up-to-date view
+  "Return t if LOG is valid, i.e. it contains an up-to-date view
 of TVARs that were read during the transaction."
   (declare (type tlog log))
 
@@ -37,14 +37,36 @@ of TVARs that were read during the transaction."
 
 
 
+(defun valid-and-unlocked? (log)
+  "Return t if LOG is valid and unlocked, i.e. it contains an up-to-date view
+of TVARs that were read during the transaction and none of them is locked
+by other threads."
+  (declare (type tlog log))
+
+  (log.trace "Tlog ~A valid-and-unlocked?.." (~ log))
+  (do-hash (var val) (tlog-reads log)
+    (if (eq val (raw-value-of var))
+        (progn
+          (log.trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
+          (unless (tvar-unlocked? var log)
+            (log.debug "Tlog ~A tvar ~A is locked!" (~ log) (~ var))
+            (return-from valid-and-unlocked? nil)))
+        (progn
+          (log.trace "Tlog ~A conflict for tvar ~A: expecting ~A, found ~A"
+                     (~ log) (~ var) val (raw-value-of var))
+          (log.debug "Tlog ~A ..not valid" (~ log))
+          (return-from valid-and-unlocked? nil))))
+  (log.trace "Tlog ~A ..is valid and unlocked" (~ log))
+  t)
+
+
+
 (declaim (inline invalid? shallow-valid? shallow-invalid?))
 
 (defun invalid? (log)
   "Return (not (valid? LOG))."
   (declare (type tlog log))
   (not (valid? log)))
-
-
 
 
 
@@ -80,58 +102,7 @@ tvar-id and are considered \"larger\". Returns (> (tvar-id var1) (tvar-id var2))
      (the fixnum (sxhash var2))))
 
 
-(declaim (ftype (function (cons cons) (values boolean &optional)) cons-tvar>))
 
-(defun cons-tvar> (c1 c2)
-  "Compare var1 and var2 with respect to age: newer tvars usually have larger
-tvar-id and are considered \"larger\". Returns (> (tvar-id var1) (tvar-id var2))."
-  (declare (type cons c1 c2))
-  (let ((var1 (first c1))
-        (var2 (first c2)))
-    (declare (type tvar var1 var2))
-    (> (the fixnum (tvar-id var1))
-       (the fixnum (tvar-id var2)))))
-
-
-
-
-(defun old___try-lock-tvars (rw-vars locked-rw-vars ro-vars locked-ro-vars)
-  "Sort VARS in order - actually in (tvar< ...) order -
-then non-blocking acquire their locks in such order.
-Reason: acquiring in unspecified order may cause livelock, as two transactions
-may repeatedly try acquiring the same two TVARs in opposite order.
-
-LOCKED-VARS must be the one-element list '(nil).
-Destructively modifies VARS and LOCKED-VARS.
-
-Return t if all VARS where locked successfully, otherwise return nil.
-In both cases, after this call (rest LOCKED-VARS) will be the list
-containing the locked tvars, sorted in order from first acquired
-to last acquired."
-  (declare (type list rw-vars locked-rw-vars ro-vars locked-ro-vars))
-  #+never (log:user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
-  (setf rw-vars (sort rw-vars #'tvar>))
-  (setf ro-vars (sort ro-vars #'tvar>))
-  #+never (log:user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
-
-  (when
-      (loop for cell = rw-vars then rest
-         while cell
-         for rest = (rest cell)
-         always (try-lock-tvar-rw (first cell))
-         do (setf (rest locked-rw-vars) cell)
-           (setf locked-rw-vars cell)
-           (setf (rest cell) nil)
-         finally (return t))
-
-    (loop for cell = ro-vars then rest
-         while cell
-         for rest = (rest cell)
-         always (try-lock-tvar-ro (first cell))
-         do (setf (rest locked-ro-vars) cell)
-           (setf locked-ro-vars cell)
-           (setf (rest cell) nil)
-         finally (return t))))
 
 (defun try-lock-tvars (vars locked-vars)
   "Sort VARS in order - actually in (tvar> ...) order -
@@ -148,20 +119,18 @@ containing the locked tvars, sorted in order from first acquired
 to last acquired."
   (declare (type list vars locked-vars))
   #+never (log:user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
-  (setf vars (sort vars #'cons-tvar>))
+  ;;(setf vars (sort vars #'tvar>))
   #+never (log:user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
 
   (loop for cell = vars then rest
      while cell
      for rest = (rest cell)
-     for (var . rw) = (first cell)
+     for var = (first cell)
      always
-       (if rw
-           (try-lock-tvar-rw var)
-           (try-lock-tvar-ro var))
-     do (setf (rest locked-vars) cell)
+       (try-lock-tvar var)
+     do (setf (rest cell) nil)
+       (setf (rest locked-vars) cell)
        (setf locked-vars cell)
-       (setf (rest cell) nil)
      finally (return t)))
 
 
@@ -170,10 +139,8 @@ to last acquired."
 (defun unlock-tvars (vars)
   "Release locked (rest VARS) in same order of acquisition."
   (declare (type list vars))
-  (loop for (var . rw) in (rest vars) do
-       (if rw
-           (unlock-tvar-rw var)
-           (unlock-tvar-ro var))))
+  (loop for var in (rest vars) do
+       (unlock-tvar var)))
 
 
 ;;;; ** Committing
@@ -182,19 +149,18 @@ to last acquired."
 (defun ensure-tlog-before-commit (log)
   "Create tlog-before-commit log if nil, and return it."
   (declare (type tlog log))
-  (the vector
+  (the tlog-func-vector
     (or (tlog-before-commit log)
         (setf (tlog-before-commit log)
-              (make-array '(1) :element-type 'function :fill-pointer 0 :adjustable t)))))
+              (make-array 1 :element-type 'function :fill-pointer 0 :adjustable t)))))
 
 (defun ensure-tlog-after-commit (log)
   "Create tlog-after-commit log if nil, and return it."
   (declare (type tlog log))
-  (the vector
+  (the tlog-func-vector
     (or (tlog-after-commit log)
         (setf (tlog-after-commit log)
-              (make-array '(1) :element-type 'function :fill-pointer 0 :adjustable t)))))
-
+              (make-array 1 :element-type 'function :fill-pointer 0 :adjustable t)))))
 
 
 
@@ -262,11 +228,11 @@ can register other functions - or themselves again - with (before-commit ...)
 or with (after-commit ...).
 This means new elements can be appended to FUNCS vector during the loop
 => (loop for func across funcs ...) is not enough."
-  (declare (type vector funcs))
+  (declare (type tlog-func-vector funcs))
   (loop for i from 0
      while (< i (length funcs))
      do
-       (funcall (aref funcs i))))
+       (funcall (the function (aref funcs i)))))
 
 
 (defun invoke-before-commit (log)
@@ -314,7 +280,6 @@ b) another TLOG is writing the same TVARs being committed
    
   (declare (type tlog log))
   (let ((writes   (tlog-writes log))
-        (reads    (tlog-reads log))
         (new-version +invalid-counter+)
         (acquiring nil)
         (acquired (list nil))
@@ -338,14 +303,7 @@ b) another TLOG is writing the same TVARs being committed
          (block nil
            ;; we must lock TVARs that will been written: expensive
            ;; but needed to ensure concurrent commits do not conflict.
-           (do-hash (var) writes
-             (push (cons var t) acquiring))
-
-           (do-hash (var) reads
-             (multiple-value-bind (value present?) (get-hash writes var)
-               (declare (ignore value))
-               (unless present?
-                 (push (cons var nil) acquiring))))
+           (setf acquiring (hash-table-keys writes))
            
            (unless (try-lock-tvars acquiring acquired)
              (log.debug "Tlog ~A failed to lock tvars, not committed" (~ log))
@@ -356,8 +314,10 @@ b) another TLOG is writing the same TVARs being committed
            (setf new-version (incf-atomic-counter *tlog-counter*))
 
            ;; check for log validity one last time, with locks held.
-           (unless (valid? log)
-             (log.debug "Tlog ~A is invalid, not committed" (~ log))
+           ;; Also ensure that TVARs in (tlog-reads log) are not locked
+           ;; by other threads. For the reason, see doc/consistent-reads.md
+           (unless (valid-and-unlocked? log)
+             (log.debug "Tlog ~A is invalid or reads are locked, not committed" (~ log))
              (return))
 
            (log.trace "Tlog ~A committing..." (~ log))
@@ -381,7 +341,7 @@ b) another TLOG is writing the same TVARs being committed
         (log.trace "Tlog ~A notifying threads waiting on tvar ~A"
                    (~ log) (~ var))
         (notify-tvar-high-load var))
-          
+
       (when success
         ;; after-commit functions run without locks
         (invoke-after-commit log)))

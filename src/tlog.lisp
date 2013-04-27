@@ -152,7 +152,8 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
 
       
 (defun wait-once (log)
-  "Sleep, i.e. wait for relevant TVARs to change. Return T."
+  "Sleep, i.e. wait for relevant TVARs to change.
+Return T if slept, or NIL if some TVAR definitely changed before sleeping."
 
   (declare (type tlog log))
   (let ((lock (tlog-lock log))
@@ -168,7 +169,7 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
       (if prevent-sleep
           (log.debug "Tlog ~A prevented from sleeping, some TVAR must have changed" (~ log))
           (log.debug "Tlog ~A woke up" (~ log))))
-    t))
+    (not prevent-sleep)))
 
 
 (defun wait-tlog (log)
@@ -187,7 +188,7 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
     (setf (tlog-prevent-sleep log) nil))
 
   (when (listen-tvars-of log)
-    (wait-once log))
+    (loop while (and (wait-once log) (valid? log))))
   (unlisten-tvars-of log)
   t)
       

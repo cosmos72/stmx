@@ -25,6 +25,8 @@
 
 ;;;; ** Implementation class: TLOG
 
+(deftype tlog-func-vector () '(and vector (not simple-array)))
+
 (defstruct tlog
   "A transaction log (TLOG) is a record of the reads and writes
 to transactional memory performed during a transaction.
@@ -46,9 +48,9 @@ and are later committed to memory if the transaction completes successfully."
   ;; Flag to prevent TLOGs from sleeping. Set by TVARs when they change.
   (prevent-sleep nil :type boolean) ;; tlog-prevent-sleep
   ;; Functions to call immediately before committing TLOG.
-  (before-commit nil :type (or null vector)) ;; tlog-before-commit
+  (before-commit nil :type (or null tlog-func-vector)) ;; tlog-before-commit
   ;; Functions to call immediately after committing TLOG.
-  (after-commit  nil :type (or null vector)) ;; tlog-after-commit
+  (after-commit  nil :type (or null tlog-func-vector)) ;; tlog-after-commit
 
   (id +invalid-counter+ :type fixnum)) ;; tlog-id
 
@@ -87,8 +89,11 @@ and are later committed to memory if the transaction completes successfully."
 (declaim (type symbol +unbound+))
 (defvar +unbound+ (gensym "UNBOUND-"))
 
+(declaim (type cons +versioned-unbound+))
+(defvar +versioned-unbound+ (cons +invalid-counter+ +unbound+))
 
-(defstruct (tvar (:include lock-rw))
+
+(defstruct (tvar #+stmx-have-fast-lock (:include fast-lock))
 
   "A transactional variable (TVAR) is the smallest unit of transactional memory.
 It contains a single value that can be read or written during a transaction
@@ -99,7 +104,10 @@ with a more convenient interface: you can read and write normally the slots
 of a transactional object (with slot-value, accessors ...), and behind
 the scenes the slots will be stored in transactional memory implemented by TVARs."
 
-  (versioned-value (cons +invalid-counter+ +unbound+))         ;; tvar-versioned-value
+  (versioned-value +versioned-unbound+)         ;; tvar-versioned-value
+
+  #-stmx-have-fast-lock
+  (lock (make-lock "TVAR"))
 
   (waiting-for nil :type (or null hash-table))           ;; tvar-waiting-for
   (waiting-lock (make-lock "TVAR-WAITING") :read-only t) ;; tvar-waiting-lock

@@ -71,19 +71,20 @@
   "Prepare the table, sit the philosophers, let them eat."
   (declare (type fixnum philosophers-count philosophers-initial-hunger))
 
-  (when (< philosophers-count 2)
-    (error "philosophers-count is ~A, expecting at least 2" philosophers-count))
+  (when (< philosophers-count 1)
+    (error "philosophers-count is ~A, expecting at least 1" philosophers-count))
 
   (let* ((n philosophers-count)
-         (forks (loop for i from 1 to n collect (tvar i)))
+         (nforks (max n 2))
+         (forks (loop for i from 1 to nforks collect (tvar i)))
          (plates (loop for i from 1 to n collect
                       (cons (tvar philosophers-initial-hunger)
                             philosophers-initial-hunger)))
          (philosophers
           (loop for i from 1 to n collect
-               (let ((fork1 (nth (1- i) forks))
-                     (fork2 (nth (mod i n) forks))
-                     (plate (nth (1- i) plates))
+               (let ((fork1 (nth (1- i)         forks))
+                     (fork2 (nth (mod i nforks) forks))
+                     (plate (nth (1- i)         plates))
                      (j i))
                  (lambda ()
                    (dining-philosopher j fork1 fork2 plate))))))

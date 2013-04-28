@@ -85,20 +85,6 @@ To use TCONS cells, see the functions TCONS, TLIST, TFIRST and TREST.")))
    (setf (_ tcons rest) value)))
 
 
-(defmacro tpop (place)
-  "Equivalent to POP, but for TCONS transactional cells.
-Removes and returns the first element in PLACE."
-  (multiple-value-bind (temps vals stores store-form get-form)
-      (get-setf-expansion place)
-    (let1 get-place (gensym (symbol-name 'get-place-))
-      `(let* (,@(loop for temp in temps
-                   for val in vals
-                   collect `(,temp ,val))
-              (,get-place ,get-form)
-              (,(first stores) (trest ,get-place)))
-         ,store-form
-         (tfirst ,get-place)))))
-
 
 (defmacro tpush (value place)
   "Equivalent to PUSH, but for TCONS transactional cells.
@@ -113,6 +99,21 @@ Return the modified PLACE."
                    collect `(,temp ,val))
               (,(first stores) (tcons ,value-to-push ,get-form)))
          ,store-form))))
+
+
+(defmacro tpop (place)
+  "Equivalent to POP, but for TCONS transactional cells.
+Removes and returns the first element in PLACE."
+  (multiple-value-bind (temps vals stores store-form get-form)
+      (get-setf-expansion place)
+    (let1 get-place (gensym (symbol-name 'get-place-))
+      `(let* (,@(loop for temp in temps
+                   for val in vals
+                   collect `(,temp ,val))
+              (,get-place ,get-form)
+              (,(first stores) (trest ,get-place)))
+         ,store-form
+         (tfirst ,get-place)))))
 
 
 (defprint-object (obj tcons :type nil :identity nil)

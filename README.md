@@ -453,6 +453,22 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
 
   Note: raw TVARs support exactly the same methods.
 
+- `TCONS` is a transactional cons cell. It is created with
+  `(tcons first-value second-value)`.
+
+  Methods: `TFIRST` `(SETF TFIRST)` `TREST` `(SETF TREST)`.
+
+  Seldom used directly.
+
+- `TLIST` is a transactional list. It is created with
+  `(tlist [values ...])`.
+
+  Methods: `TFIRST` `(SETF TFIRST)` `TREST` `(SETF TREST)` `TPUSH` `TPOP`.
+
+  Normal lists are perfectly suitable for transactional use as long as
+  they are not destructively modified, so TLIST is often unnecessary:
+  it becomes needed only to support transactional destructive modifications.
+
 - `TSTACK` is a transactional first-in-last-out buffer. It is created with
   `(make-instance 'tstack)` and it can be empty or hold unlimited values.
 

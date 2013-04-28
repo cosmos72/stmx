@@ -17,31 +17,31 @@ Setup and optimization flags:
 
 2. Start the REPL and execute what follows:
 
-    (declaim (optimize (compilation-speed 0) (space 0) (debug 0) (safety 0) (speed 3)))
-    (ql:quickload "stmx")
-    (in-package :stmx.util)
-    (defmacro x3 (&rest body)
-      `(dotimes (,(gensym) 3)
-         ,@body))
-    (defmacro 1m (&rest body)
-      `(time (dotimes (i 1000000)
-         ,@body)))
-    (defvar v (tvar 0))
-    (defvar m  (new 'rbmap :pred #'fixnum<)) 
-    (defvar tm (new 'tmap  :pred #'fixnum<)) 
-    (defvar h  (make-hash-table))  
-    (defvar th (new 'thash-table)) 
-    ;; some initial values
-    (set-bmap m 1 0)
-    (set-bmap tm 1 0)
-    (setf (gethash   'x h)  0)
-    (setf (get-thash th 'x) 0)
+        (declaim (optimize (compilation-speed 0) (space 0) (debug 0) (safety 0) (speed 3)))
+        (ql:quickload "stmx")
+        (in-package :stmx.util)
+        (defmacro x3 (&rest body)
+          `(dotimes (,(gensym) 3)
+             ,@body))
+        (defmacro 1m (&rest body)
+          `(time (dotimes (i 1000000)
+             ,@body)))
+        (defvar v (tvar 0))
+        (defvar m  (new 'rbmap :pred #'fixnum<)) 
+        (defvar tm (new 'tmap  :pred #'fixnum<)) 
+        (defvar h  (make-hash-table))  
+        (defvar th (new 'thash-table)) 
+        ;; some initial values
+        (set-bmap m 1 0)
+        (set-bmap tm 1 0)
+        (setf (gethash   'x h)  0)
+        (setf (get-thash th 'x) 0)
 
 3. to warm-up STMX and the common-lisp process before starting the benchmarks,
    it is also recommended to run first the test suite with:
 
-    (ql:quickload "stmx.test")
-    (fiveam:run! 'stmx.test:suite)
+        (ql:quickload "stmx.test")
+        (fiveam:run! 'stmx.test:suite)
 
 4. Run each benchmark one million times (see `1m` macro above) in a single
    thread. Repeat each run three times (see `3x` macro above) and take the lowest

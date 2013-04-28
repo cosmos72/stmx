@@ -73,8 +73,8 @@ Software: Debian GNU/Linux 7 (wheezy) x86_64, SBCL 1.1.6 x86_64, STMX 1.2.0
 <table>
 
  <tr><th colspan="3">
-       Single-thread benchmarks,
-       executed one million times with `(x3 (1m (atomic ...)))`
+       Single-thread benchmarks, executed one million times
+       with <code>(x3 (1m (atomic ...)))</code>
      </th></tr>
 
  <tr><th><b>name</b>      </th>
@@ -144,9 +144,8 @@ Software: Debian GNU/Linux 7 (wheezy) x86_64, SBCL 1.1.6 x86_64, STMX 1.2.0
 
 
  <tr><th colspan="3">
-       Concurrent benchmarks on a 4-core CPU.
-       They already internally iterate one million times,
-       do not wrap them in <code>(1m ...)</code>
+       Concurrent benchmarks on a 4-core CPU. They already iterate
+       one million times, do not wrap them in <code>(1m ...)</code>
      </th></tr>
 
  <tr><th colspan="3">
@@ -155,65 +154,65 @@ Software: Debian GNU/Linux 7 (wheezy) x86_64, SBCL 1.1.6 x86_64, STMX 1.2.0
        <code>(in-package :stmx.example1)</code>
      </th></tr>
 
- <tr><th><b>name</b>      </th>
+ <tr><th><b>number of threads</b></th>
      <th><b>executed code</b></th>
      <th><b>average transactions per second</b></th></tr>
 
- <tr><td>dining philosophers, 2 threads</td>
+ <tr><td>2 threads</td>
      <td><code>(dining-philosophers 2 1000000)</code></td>
-     <td>1.63&nbsp;millions</td></tr>
+     <td>1.73&nbsp;millions</td></tr>
 
- <tr><td>dining philosophers, 3 threads</td>
+ <tr><td>3 threads</td>
      <td><code>(dining-philosophers 3 1000000)</code></td>
-     <td>2.33&nbsp;millions</td></tr>
+     <td>2.49&nbsp;millions</td></tr>
 
- <tr><td>dining philosophers, 4 threads</td>
+ <tr><td>4 threads</td>
      <td><code>(dining-philosophers 4 1000000)</code></td>
-     <td>2.91&nbsp;millions</td></tr>
+     <td>3.05&nbsp;millions</td></tr>
 
- <tr><td>dining philosophers, 5 threads</td>
+ <tr><td>5 threads</td>
      <td><code>(dining-philosophers 5 1000000)</code></td>
-     <td>2.95&nbsp;millions</td></tr>
+     <td>2.97&nbsp;millions</td></tr>
 
- <tr><td>dining philosophers, 6 threads</td>
+ <tr><td>6 threads</td>
      <td><code>(dining-philosophers 6 1000000)</code></td>
-     <td>2.84&nbsp;millions</td></tr>
+     <td>3.16&nbsp;millions</td></tr>
 
- <tr><td>dining philosophers, 7 threads</td>
+ <tr><td>7 threads</td>
      <td><code>(dining-philosophers 7 1000000)</code></td>
-     <td>2.86&nbsp;millions</td></tr>
+     <td>3.07&nbsp;millions</td></tr>
 
- <tr><td>dining philosophers, 8 threads</td>
+ <tr><td>8 threads</td>
      <td><code>(dining-philosophers 8 1000000)</code></td>
-     <td>2.84&nbsp;millions</td></tr>
+     <td>2.96&nbsp;millions</td></tr>
 
- <tr><td>dining philosophers, 10 threads</td>
+ <tr><td>10 threads</td>
      <td><code>(dining-philosophers 10 1000000)</code></td>
-     <td>2.78&nbsp;millions</td></tr>
+     <td>3.01&nbsp;millions</td></tr>
 
- <tr><td>dining philosophers, 15 threads</td>
+ <tr><td>15 threads</td>
      <td><code>(dining-philosophers 15 1000000)</code></td>
-     <td>2.63&nbsp;millions</td></tr>
+     <td>2.83&nbsp;millions</td></tr>
 
- <tr><td>dining philosophers, 20 threads</td>
+ <tr><td>20 threads</td>
      <td><code>(dining-philosophers 20 1000000)</code></td>
-     <td>2.80&nbsp;millions</td></tr>
+     <td>3.15&nbsp;millions</td></tr>
 
- <tr><td>dining philosophers, 30 threads</td>
+ <tr><td>30 threads</td>
      <td><code>(dining-philosophers 30 1000000)</code></td>
-     <td>2.76&nbsp;millions</td></tr>
+     <td>2.97&nbsp;millions</td></tr>
 
- <tr><td>dining philosophers, 40 threads</td>
+ <tr><td>40 threads</td>
      <td><code>(dining-philosophers 40 1000000)</code></td>
-     <td>2.61&nbsp;millions</td></tr>
+     <td>2.97&nbsp;millions</td></tr>
 
- <tr><td>dining philosophers, 50 threads</td>
+ <tr><td>50 threads</td>
      <td><code>(dining-philosophers 50 1000000)</code></td>
-     <td>2.54&nbsp;millions</td></tr>
+     <td>2.98&nbsp;millions</td></tr>
 
- <tr><td>dining philosophers, 100 threads</td>
+ <tr><td>100 threads</td>
      <td><code>(dining-philosophers 100 1000000)</code></td>
-     <td>2.47&nbsp;millions</td></tr>
+     <td>2.91&nbsp;millions</td></tr>
 
 
 </table>

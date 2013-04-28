@@ -39,11 +39,13 @@
 (declaim (ftype (function (tvar tvar cons) fixnum) philosopher-eats))
 (defun philosopher-eats (fork1 fork2 plate)
   "Eat once. return remaining hunger"
-  (atomic
+  (declare (type tvar fork1 fork2)
+           (type cons plate))
+  (atomic 
    ;; use a normal (non-transactional) counter to keep track
    ;; of retried transactions for demonstration purposes.
    (decf (the fixnum (cdr plate)))
-
+   
    (let ((f1 (take fork1))
          (f2 (take fork2)))
      (prog1 (eat-from-plate plate)

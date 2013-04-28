@@ -69,7 +69,7 @@
 (test atomic
   (let ((var (tvar 0)))
 
-    (atomic :id 'test-atomic
+    (atomic
       (is (= 0 (raw-value-of var)))
       (is (= 0 ($ var)))
       (setf ($ var) 1)
@@ -82,7 +82,7 @@
 (test atomic-invalid-1
   (let ((var (tvar 0)))
 
-    (atomic :id 'test-atomic-invalid-1
+    (atomic
       (is (= 0 (raw-value-of var)))
       (is (= 0 ($ var)))
       (setf ($ var) 1)
@@ -116,7 +116,7 @@
         (b (tvar 0)) ;; the invariant (= ($ a) ($ b))
         (first-run t))
 
-    (atomic :id 'test-atomic-invalid-2
+    (atomic
       (incf ($ a))
       (is-true (valid? (current-tlog)))
 
@@ -151,9 +151,9 @@
   (let1 var (tvar 1)
     
     (signals test-error
-      (atomic :id 'test-rollback
-              (setf ($ var) 2)
-              (error 'test-error :format-arguments "test-error signalled to cause rollback"))
+      (atomic
+       (setf ($ var) 2)
+       (error 'test-error :format-arguments "test-error signalled to cause rollback"))
       
       (fail "error signaled inside ATOMIC was not propagated to caller"))
 
@@ -165,7 +165,7 @@
   (let ((var (tvar 5))
         (counter 0))
     
-    (atomic :id 'test-invalid
+    (atomic
       (log:debug "($ var) is ~A" ($ var))
       (incf ($ var))
       (log:debug "($ var) set to ~A" ($ var))

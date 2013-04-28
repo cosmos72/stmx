@@ -55,14 +55,14 @@ The effect is the same as DEFUN - or DEFMETHOD - plus:
           while (and (listp form) (eq 'declare (first form)))
           collect form)
      
-     (atomic :id ',func-name
-             ,@(if (symbolp func-name)
-                   ;; support (return-from ,func-name ...)
-                   `((block ,func-name
-                       ;; support (declare ...)
-                       (let ()
-                         ,@body)))
-                   body))))
+     (atomic
+      ,@(if (symbolp func-name)
+            ;; support (return-from ,func-name ...)
+            `((block ,func-name
+                ;; support (declare ...)
+                (let ()
+                  ,@body)))
+            body))))
 
 
 
@@ -104,12 +104,9 @@ For advanced features inside transactions, see RETRY, ORELSE, NONBLOCKING,
 
 For pre-defined transactional classes, see the package STMX.UTIL"
 
-  (let1 id (when (eq :id (first body))
-             (pop body)
-             (pop body))
-    (if body
-        `(run-atomic (lambda () ,@body) :id ,id)
-        `(values))))
+  (if body
+      `(run-atomic (lambda () ,@body))
+      `(values)))
 
 
 (defmacro maybe-yield-before-rerun ()
@@ -144,7 +141,7 @@ using LOG as its transaction log."
          (go run))))))
 
 
-(defun run-atomic (tx &key id)
+(defun run-atomic (tx)
   "Function equivalent of the ATOMIC macro.
 
 Run the function TX inside a transaction.
@@ -160,9 +157,6 @@ transactional memory it read has changed."
 
   (when (current-tlog)
     (return-from run-atomic (funcall tx)))
-
-  (when id
-    (setf (~ tx) id))
 
   (prog ((log (new-tlog)))
 

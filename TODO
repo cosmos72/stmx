@@ -1,15 +1,15 @@
 TO DO:
 
-11) use global transaction counters to guarantee consistent memory reads.
-    This would solve a big problem that plagues many STM implementations:
-    a transaction can see an inconsistent view of transactional memory
-    and start behaving badly (illegal memory accesses, infinite loops...)
-    before the STM machinery realizes it and re-executes the transaction.
-
 8) optimize ORELSE. The current implementation is quite naive,
    it makes a full copy of the current transaction log
 
 DONE:
+
+11) use global transaction counters to guarantee consistent memory reads.
+    This solved a big problem that plagues many STM implementations:
+    a transaction can see an inconsistent view of transactional memory
+    and start behaving badly (illegal memory accesses, infinite loops...)
+    before the STM machinery realizes it and re-executes the transaction.
 
 9) contacted Lars Rune Nostdal <larsnostdal at gmail dot com>, author of SW-STM:
    see http://blog.nostdal.org/

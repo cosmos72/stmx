@@ -47,8 +47,8 @@
 
 
  ;; fixnum is large enough to count 10 million transactions
- ;; per second for at least one year?
- (when (>= most-positive-fixnum #xffffffffffff)
+ ;; per second for at least 100 years?
+ (when (>= most-positive-fixnum #x7fffffffffffff)
    (pushnew :stmx-fixnum-is-large *features*))
 
  ;; both the above two features

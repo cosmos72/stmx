@@ -98,9 +98,11 @@
           (is-true (null c1))
           (is-true (= expected c2)))))
 
-    (let1 cs (nth-value 1 (retry-thread4-test :two-tokens t :iterations n))
-      (destructuring-bind (c1 c2) cs
-        (is-true (not (null c1)))
-        (is-true (not (null c2)))
-        (is-true (= expected (+ c1 c2)))))))
+    (multiple-value-bind (xs cs) (retry-thread4-test :two-tokens t :iterations n)
+      (destructuring-bind (x1 x2 x3 x4) xs
+        (destructuring-bind (c1 c2) cs
+          (is-true (= (max c1 c2) (max x1 x2 x3 x4)))
+          (is-true (not (null c1)))
+          (is-true (not (null c2)))
+          (is-true (= expected (+ c1 c2))))))))
 

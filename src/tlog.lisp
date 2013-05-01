@@ -159,16 +159,16 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
   (let ((lock (tlog-lock log))
         (prevent-sleep nil))
 
-    (log:debug "Tlog ~A sleeping now" (~ log))
+    (log.debug "Tlog ~A sleeping now" (~ log))
 
     (with-lock-held (lock)
       (unless (setf prevent-sleep (tlog-prevent-sleep log))
         (condition-wait (tlog-semaphore log) lock)))
 
-    (when (log:debug)
+    (when (log.debug)
       (if prevent-sleep
-          (log:debug "Tlog ~A prevented from sleeping, some TVAR must have changed" (~ log))
-          (log:debug "Tlog ~A woke up" (~ log))))
+          (log.debug "Tlog ~A prevented from sleeping, some TVAR must have changed" (~ log))
+          (log.debug "Tlog ~A woke up" (~ log))))
     (not prevent-sleep)))
 
 
@@ -198,7 +198,7 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
 (defun notify-tlog (log var)
   (declare (type tlog log)
            (type tvar var))
-  (log:debug "Waking up tlog ~A listening on tvar ~A" (~ log) (~ var))
+  (log.debug "Waking up tlog ~A listening on tvar ~A" (~ log) (~ var))
   ;; Max, question: do we also need to acquire (tlog-lock log)?
   ;; Answering myself: YES! otherwise we can deadlock (tested, it happens)
   (with-lock-held ((tlog-lock log))

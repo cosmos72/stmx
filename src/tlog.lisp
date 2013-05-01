@@ -39,8 +39,8 @@ return LOG itself."
 
   (setf (tlog-parent log) nil)
 
-  (clrhash (tlog-reads log))
-  (clrhash (tlog-writes log))
+  (clear-txhash (tlog-reads log))
+  (clear-txhash (tlog-writes log))
 
   (awhen (tlog-before-commit log) (setf (fill-pointer it) 0))
   (awhen (tlog-after-commit log)  (setf (fill-pointer it) 0))
@@ -61,8 +61,8 @@ return LOG itself."
   ;; are very large, clearing them takes ages. In such case, better
   ;; to just discard the TLOG.
   (when (and
-         (<= (hash-table-count (tlog-reads log)) 127)
-         (<= (hash-table-count (tlog-writes log)) 127))
+         (<= (txhash-table-count (tlog-reads log)) 127)
+         (<= (txhash-table-count (tlog-writes log)) 127))
     (when (fast-vector-push log *tlog-pool*)
       (clear-tlog log)))
   nil)
@@ -80,8 +80,8 @@ and its parent is set to PARENT."
 
     (when parent
       (setf (tlog-parent log) parent)
-      (copy-hash-table (tlog-reads log)  (tlog-reads parent))
-      (copy-hash-table (tlog-writes log) (tlog-writes parent)))
+      (copy-txhash-table-into (tlog-reads log)  (tlog-reads parent))
+      (copy-txhash-table-into (tlog-writes log) (tlog-writes parent)))
     log))
 
 
@@ -107,14 +107,14 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   (declare (type tlog log))
   (let1 reads (tlog-reads log)
 
-    (when (zerop (hash-table-count reads))
+    (when (zerop (txhash-table-count reads))
       (error "BUG! Transaction ~A called (retry), but no TVARs to wait for changes.
   This is a bug either in the STMX library or in the application code.
   Possible reason: some code analogous to (atomic (retry)) was executed.
   Such code is not allowed, because at least one TVAR or one TOBJ slot
   must be read before retrying an ATOMIC block." (~ log)))
 
-    (do-hash (var val) reads
+    (do-txhash (var val) reads
       (unless (eq val (raw-value-of var))
         (log.debug "Tlog ~A: tvar ~A changed before listening, not sleeping"
                    (~ log) (~ var))
@@ -144,7 +144,7 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   "Un-listen on tvars, i.e. deregister not to get notifications if they change."
 
   (declare (type tlog log))
-  (do-hash (var) (tlog-reads log)
+  (do-txhash (var) (tlog-reads log)
     (unlisten-tvar var log))
   (values))
 
@@ -159,16 +159,16 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
   (let ((lock (tlog-lock log))
         (prevent-sleep nil))
 
-    (log.debug "Tlog ~A sleeping now" (~ log))
+    (log:debug "Tlog ~A sleeping now" (~ log))
 
     (with-lock-held (lock)
       (unless (setf prevent-sleep (tlog-prevent-sleep log))
         (condition-wait (tlog-semaphore log) lock)))
 
-    (when (log.debug)
+    (when (log:debug)
       (if prevent-sleep
-          (log.debug "Tlog ~A prevented from sleeping, some TVAR must have changed" (~ log))
-          (log.debug "Tlog ~A woke up" (~ log))))
+          (log:debug "Tlog ~A prevented from sleeping, some TVAR must have changed" (~ log))
+          (log:debug "Tlog ~A woke up" (~ log))))
     (not prevent-sleep)))
 
 
@@ -198,7 +198,7 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
 (defun notify-tlog (log var)
   (declare (type tlog log)
            (type tvar var))
-  (log.debug "Waking up tlog ~A listening on tvar ~A" (~ log) (~ var))
+  (log:debug "Waking up tlog ~A listening on tvar ~A" (~ log) (~ var))
   ;; Max, question: do we also need to acquire (tlog-lock log)?
   ;; Answering myself: YES! otherwise we can deadlock (tested, it happens)
   (with-lock-held ((tlog-lock log))

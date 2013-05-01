@@ -124,26 +124,6 @@ bmap-count must be the actual nodes count, root must be black."
 
            
 
-(defun hash-table-to-sorted-keys (hash pred)
-  (declare (type hash-table hash)
-           (type function pred))
-  (sort (hash-table-keys hash) pred))
-
-
-(defun hash-table-to-sorted-pairs (hash pred)
-  (declare (type hash-table hash)
-           (type function pred))
-  (sort (hash-table-pairs hash) pred :key #'first))
-
-
-(defun hash-table-to-sorted-values (hash pred)
-  (declare (type hash-table hash)
-           (type function pred))
-  (loop for pair in (hash-table-to-sorted-pairs hash pred)
-     collect (rest pair)))
-         
-
-
 (defun is-equal-bmap-and-hash-table (m hash)
   (declare (type bmap m)
            (type hash-table hash))

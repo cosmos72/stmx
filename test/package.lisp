@@ -39,7 +39,12 @@
                 #:commit
                 #:valid?
                 #:current-tlog
-                #:with-recording-to-tlog)
+                #:with-recording-to-tlog
+
+                #:tvar>
+                #:txhash-table #:make-txhash-table
+                #:txhash-table-count
+                #:get-txhash #:set-txhash #:do-txhash)
 
   (:import-from #:stmx.util
                 #:print-object-contents
@@ -57,6 +62,6 @@
 (fiveam:def-suite suite)
 
 (defun configure-log4cl ()
-  (log:config :clear :sane :this-console ;; :daily "log.txt"
+  (log:config :clear :sane :daily "log.txt" ;;:this-console
               :pattern "[%D{%H:%M:%S}] [%-5P] <%c{}{}{:downcase}> {%t} %m%n")
   (log:config :info))

@@ -28,7 +28,7 @@
 
  (defstruct (atomic-counter (:constructor %make-atomic-counter))
    ;; we assume that sb-ext:word is same or wider than fixnum
-   (version 1 :type sb-ext:word))
+   (version 0 :type sb-ext:word))
 
  (declaim (inline incf-atomic-counter
                   get-atomic-counter)))

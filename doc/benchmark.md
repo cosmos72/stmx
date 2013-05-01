@@ -67,7 +67,7 @@ Date: 27 April 2013
 
 Hardware: Intel Core-i5 750 @4.0 GHz (quad-core), 16GB RAM
 
-Software: Debian GNU/Linux 7 (wheezy) x86_64, SBCL 1.1.6 x86_64, STMX 1.2.1
+Software: Debian GNU/Linux 7 (wheezy) x86_64, SBCL 1.1.6 x86_64, STMX 1.3.0
 
 
 <table>
@@ -81,22 +81,24 @@ Software: Debian GNU/Linux 7 (wheezy) x86_64, SBCL 1.1.6 x86_64, STMX 1.2.1
      <th><b>executed code</b></th>
      <th><b>average time</b></th></tr>
 
- <tr><td>atomic nil       </td><td><code>(atomic nil)</code>                </td><td>0.137&nbsp;microseconds</td></tr>
- <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code>              </td><td>0.258&nbsp;microseconds</td></tr>
- <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) i))</code>     </td><td>0.321&nbsp;microseconds</td></tr>
- <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($ v)))</code>     </td><td>0.458&nbsp;microseconds</td></tr>
+ <tr><td>atomic nil       </td><td><code>(atomic nil)</code>                </td><td>0.139&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code>              </td><td>0.163&nbsp;microseconds</td></tr>
+ <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) i))</code>     </td><td>0.204&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($ v)))</code>     </td><td>0.239&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-10</td>
      <td><code>(atomic (dotimes (j 10) (incf ($ v))))</code></td>
-     <td>0.746&nbsp;microseconds</td></tr>
+     <td>0.444&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-100</td>
      <td><code>(atomic (dotimes (j 100) (incf ($ v))))</code></td>
-     <td>3.446&nbsp;microseconds</td></tr>
+     <td>2.500&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-1000</td>
      <td><code>(atomic (dotimes (j 1000) (incf ($ v))))</code></td>
-     <td>31.757&nbsp;microseconds</td></tr>
+     <td>22.202&nbsp;microseconds</td></tr>
+
+ ------------- RESUME FROM HERE ---------
 
  <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(0.373+N*0.031)&nbsp;microseconds</td></tr>
 
@@ -164,28 +166,28 @@ Software: Debian GNU/Linux 7 (wheezy) x86_64, SBCL 1.1.6 x86_64, STMX 1.2.1
 
  <tr><td>1 thread</td>
      <td><code>(dining-philosophers 1 1000000)</code></td>
-     <td>1.10&nbsp;millions</td></tr>
+     <td>1.91&nbsp;millions</td></tr>
 
  <tr><td>2 threads</td>
      <td><code>(dining-philosophers 2 1000000)</code></td>
-     <td>1.77&nbsp;millions</td></tr>
+     <td>2.51&nbsp;millions</td></tr>
 
  <tr><td>3 threads</td>
      <td><code>(dining-philosophers 3 1000000)</code></td>
-     <td>2.49&nbsp;millions</td></tr>
+     <td>3.50&nbsp;millions</td></tr>
 
  <tr><td>4 threads</td>
      <td><code>(dining-philosophers 4 1000000)</code></td>
-     <td>3.07&nbsp;millions</td></tr>
+     <td>4.33&nbsp;millions</td></tr>
 
  <tr><td>5 threads</td>
      <td><code>(dining-philosophers 5 1000000)</code></td>
-     <td>2.97&nbsp;millions</td></tr>
+     <td>4.199&nbsp;millions</td></tr>
 
  <tr><td>6 threads</td>
      <td><code>(dining-philosophers 6 1000000)</code></td>
-     <td>3.16&nbsp;millions</td></tr>
-
+     <td>4.147&nbsp;millions</td></tr>
+------------------------------------ HERE -----------------------
  <tr><td>7 threads</td>
      <td><code>(dining-philosophers 7 1000000)</code></td>
      <td>3.07&nbsp;millions</td></tr>

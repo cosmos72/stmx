@@ -17,7 +17,7 @@
 
 (asdf:defsystem :stmx
   :name "STMX"
-  :version "1.2.1"
+  :version "1.3.0"
   :license "LLGPL"
   :author "Massimiliano Ghilardi"
   :description "Composable Software Transactional Memory"
@@ -44,7 +44,8 @@
                (:module :src
                 :components ((:file "package")
                              (:file "classes"        :depends-on ("package"))
-                             (:file "tlog"           :depends-on ("classes"))
+                             (:file "txhash"         :depends-on ("classes"))
+                             (:file "tlog"           :depends-on ("txhash"))
                              (:file "tvar"           :depends-on ("tlog"))
                              (:file "tclass"         :depends-on ("tvar"))
                              (:file "commit"         :depends-on ("tlog"))
@@ -79,7 +80,7 @@
 
 (asdf:defsystem :stmx.test
   :name "STMX.TEST"
-  :version "1.2.1"
+  :version "1.3.0"
   :author "Massimiliano Ghilardi"
   :license "LLGPL"
   :description "test suite for STMX"
@@ -91,13 +92,15 @@
 
   :components ((:module :test
                 :components ((:file "package")
-                             (:file "misc"         :depends-on ("package"))
-                             (:file "rbmap"        :depends-on ("misc"))
-                             (:file "atomic"       :depends-on ("package"))
-                             (:file "on-commit"    :depends-on ("atomic"))
-                             (:file "retry"        :depends-on ("package"))
-                             (:file "orelse"       :depends-on ("package"))
-                             (:file "tmap"         :depends-on ("rbmap" "orelse"))))))
+                             (:file "misc"           :depends-on ("package"))
+			     (:file "hash"           :depends-on ("misc"))
+                             (:file "txhash"         :depends-on ("hash"))
+                             (:file "rbmap"          :depends-on ("hash"))
+                             (:file "atomic"         :depends-on ("package"))
+                             (:file "on-commit"      :depends-on ("atomic"))
+                             (:file "retry"          :depends-on ("package"))
+                             (:file "orelse"         :depends-on ("package"))
+                             (:file "tmap"           :depends-on ("rbmap" "orelse"))))))
 
 
 (defmethod asdf:perform ((op asdf:test-op) (system (eql (asdf:find-system :stmx))))

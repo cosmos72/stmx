@@ -65,7 +65,9 @@ Return NIL if FAST-LOCK is currently locked by some other thread."
    #+stmx-have-sbcl.atomic-ops
    (progn
      (sb-thread:barrier (:read))
-     (let ((owner (fast-lock-owner fast-lock)))
+     (let ((owner
+            (sb-thread:barrier (:read)
+              (fast-lock-owner fast-lock))))
        (or
         (eq owner nil)
         (eq owner *current-thread*))))

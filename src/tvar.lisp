@@ -59,7 +59,7 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
            (type tlog log))
 
   (multiple-value-bind (value present?)
-      (get-hash (tlog-writes log) var)
+      (get-txhash (tlog-writes log) var)
     (when present?
       (return-from tx-read-of value)))
 
@@ -70,13 +70,13 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
     (when (> (the fixnum version) (tlog-id log))
       ;; inconsistent data? let's check
       (multiple-value-bind (prev-value present?)
-          (get-hash (tlog-reads log) var)
+          (get-txhash (tlog-reads log) var)
         (when (and present? (eq value prev-value))
           (return-from tx-read-of value)))
       ;; yes, inconsistent data
       (rerun))
 
-    (set-hash (tlog-reads log) var value)))
+    (set-txhash (tlog-reads log) var value)))
 
 
 
@@ -88,7 +88,7 @@ and by writing TOBJs slots."
   (declare (type tvar var)
            (type tlog log))
 
-  (set-hash (tlog-writes log) var value))
+  (set-txhash (tlog-writes log) var value))
 
 
 
@@ -259,7 +259,7 @@ Return NIL if VAR is locked by some other thread."
   #-stmx-have-fast-lock
   ;; check transaction log writes first
   (multiple-value-bind (value present?)
-      (get-hash (tlog-writes log) var)
+      (get-txhash (tlog-writes log) var)
     (if present?
         t
         ;; then fall back on trying to acquire the lock (messy)
@@ -324,7 +324,7 @@ if VAR changes."
 
 ;;;; ** Printing
 
-(defprint-object (obj tvar)
+(defprint-object (obj tvar :identity nil)
   (multiple-value-bind (value present?) (peek-$ obj)
     (if present?
         (format t "~A [~A]" (~ obj) value)

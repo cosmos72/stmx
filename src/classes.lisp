@@ -1,21 +1,152 @@
 ;; -*- lisp -*-
 
-;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; this file is part of stmx.
+;; copyright (c) 2013 massimiliano ghilardi
 ;;
-;; This library is free software: you can redistribute it and/or
-;; modify it under the terms of the Lisp Lesser General Public License
-;; (http://opensource.franz.com/preamble.html), known as the LLGPL.
+;; this library is free software: you can redistribute it and/or
+;; modify it under the terms of the lisp lesser general public license
+;; (http://opensource.franz.com/preamble.html), known as the llgpl.
 ;;
-;; This library is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty
-;; of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-;; See the Lisp Lesser General Public License for more details.
+;; this library is distributed in the hope that it will be useful,
+;; but without any warranty; without even the implied warranty
+;; of merchantability or fitness for a particular purpose.
+;; see the lisp lesser general public license for more details.
 
 
 (in-package :stmx)
 
-;;;; ** TLOG global versioning - exact, atomic counter
+;;;; ** tvar approximate counter (fast but not fully exact in multi-threaded usage)
+
+(declaim (type fixnum *tvar-id*))
+(defvar *tvar-id* -1)
+
+(declaim (inline get-next-id))
+(defun get-next-id (id)
+  (declare (type fixnum id))
+  (the fixnum
+    #+stmx-fixnum-is-power-of-two
+    (logand most-positive-fixnum (1+ id))
+
+    #-stmx-fixnum-is-power-of-two
+    (if (= id most-positive-fixnum)
+        0
+        (1+ id))))
+
+(defmacro next-id (place)
+  `(the fixnum
+     #+stmx-fixnum-is-power-of-two
+     (logand most-positive-fixnum (incf (the fixnum ,place)))
+
+     #-stmx-fixnum-is-power-of-two
+     `(setf ,place (get-next-id ,place))))
+
+
+;;;; ** implementation class: tvar
+
+
+(declaim (type symbol +unbound+))
+(defvar +unbound+ (gensym "unbound-"))
+
+(declaim (type cons +versioned-unbound+))
+(defvar +versioned-unbound+ (cons +invalid-counter+ +unbound+))
+
+
+(defstruct (tvar #+stmx-have-fast-lock (:include fast-lock))
+
+  "a transactional variable (tvar) is the smallest unit of transactional memory.
+it contains a single value that can be read or written during a transaction
+using ($ var) and (setf ($ var) value).
+
+tvars are seldom used directly, since transactional objects (tobjs) wrap them
+with a more convenient interface: you can read and write normally the slots
+of a transactional object (with slot-value, accessors ...), and behind
+the scenes the slots will be stored in transactional memory implemented by tvars."
+
+  (versioned-value +versioned-unbound+)         ;; tvar-versioned-value
+
+  (id (next-id *tvar-id*) :type fixnum :read-only t)    ;; tvar-id
+
+  #-stmx-have-fast-lock
+  (lock (make-lock "tvar")  :read-only t)
+
+  (waiting-for nil :type (or null hash-table))           ;; tvar-waiting-for
+  (waiting-lock (make-lock "tvar-waiting") :read-only t));; tvar-waiting-lock
+
+
+(defmethod id-of ((var tvar))
+  (the fixnum (tvar-id var)))
+
+(declaim (ftype (function (tvar) fixnum) tvar-version)
+         (inline tvar-version))
+(defun tvar-version (var)
+  (first (tvar-versioned-value var)))
+
+
+(defun raw-value-of (var)
+  "return the current value of var, or +unbound+ if var is not bound to a value.
+this method intentionally ignores transactions and it is only useful for debugging
+purposes. please use ($ var) instead."
+  (declare (type tvar var))
+  (rest (tvar-versioned-value var)))
+
+
+(defun (setf raw-value-of) (value var)
+  "bind var to value and return value. this method intentionally ignores
+transactions and it is only useful for debugging purposes.
+please use (setf ($ var) value) instead."
+  (declare (type tvar var))
+  (setf (tvar-versioned-value var) (cons (incf-atomic-counter *tlog-counter*) value))
+  value)
+
+
+
+
+
+;;;; ** txhash-table, a hash table specialized for tvar keys
+
+(defconstant +txhash-max-capacity+
+  (let ((array-max-len (min array-dimension-limit array-total-size-limit)))
+    (if (zerop (logand array-max-len (1- array-max-len)))
+        array-max-len
+        (let ((size 1))
+          (declare (type fixnum size))
+          (loop for ceil = array-max-len then (ash (the fixnum ceil) -1)
+             until (= 1 ceil)
+             do  (setf size (ash size 1))
+             finally (return size))))))
+
+(deftype txhash-capacity () `(integer 0 ,+txhash-max-capacity+))
+
+(defconstant +txhash-default-capacity+ 4)
+
+(defstruct (txhash-table (:constructor %make-txhash-table))
+  "a hash table specialized for tvar keys."
+  (vec   0   :type simple-vector)
+  (count 0   :type fixnum)
+  (pool  nil :type t)
+  (pool-size 0 :type fixnum))
+
+(declaim (ftype (function (&key (:initial-capacity txhash-capacity))
+                          txhash-table) make-txhash-table))
+
+(defun make-txhash-table (&key (initial-capacity +txhash-default-capacity+))
+  (declare (type txhash-capacity initial-capacity))
+
+  (unless (zerop (logand initial-capacity (1- initial-capacity)))
+    (error "~A invalid initial capacity ~A: expecting a power of two."
+           'txhash-table initial-capacity))
+
+  (the txhash-table
+    (%make-txhash-table :vec (make-array initial-capacity :initial-element nil)
+                        :count 0)))
+           
+
+
+
+
+
+
+;;;; ** tlog global versioning - exact, atomic counter
 
 (declaim (type atomic-counter *tlog-counter*))
 (defvar *tlog-counter* (make-atomic-counter))
@@ -23,22 +154,29 @@
 (declaim (type fixnum +invalid-counter+))
 (defconstant +invalid-counter+ -1)
 
-;;;; ** Implementation class: TLOG
+;;;; ** implementation class: tlog
 
 (deftype tlog-func-vector () '(and vector (not simple-array)))
 
 (defstruct tlog
-  "A transaction log (TLOG) is a record of the reads and writes
+  "a transaction log (tlog) is a record of the reads and writes
 to transactional memory performed during a transaction.
 
-Transaction logs are automatically populated by reading and writing
-transactional objects (TOBJs) or transactional variables (TVARs),
+transaction logs are automatically populated by reading and writing
+transactional objects (tobjs) or transactional variables (tvars),
 and are later committed to memory if the transaction completes successfully."
 
-  ;; TVARs read during transaction, mapped to their read value
-  (reads (make-hash-table :test 'eq) :type hash-table) ;; tlog-reads
-  ;; TVARs written during transaction, mapped to their new values
-  (writes (make-hash-table :test 'eq) :type hash-table) ;; tlog-writes
+  ;; tlog-reads: tvars read during transaction, mapped to their read value
+  #+tlog-hash
+  (reads (make-hash-table :test 'eq) :type hash-table)
+  #-tlog-hash
+  (reads (make-txhash-table) :type txhash-table)
+
+  ;; tlog-writes: tvars written during transaction, mapped to their new values
+  #+tlog-hash
+  (writes (make-hash-table :test 'eq) :type hash-table)
+  #-tlog-hash
+  (writes (make-txhash-table) :type txhash-table)
 
   ;; Parent of this TLOG. Used by ORELSE for nested transactions
   (parent    nil :type (or null tlog)) ;; tlog-parent
@@ -62,83 +200,8 @@ and are later committed to memory if the transaction completes successfully."
 
 
 
-;;;; ** TVAR approximate counter (fast but not fully exact in multi-threaded usage)
-
-(declaim (type fixnum *tvar-id*))
-(defvar *tvar-id* 0)
-
-(declaim (inline get-next-id))
-(defun get-next-id (id)
-  (declare (type fixnum id))
-  (the fixnum
-    #+stmx-fixnum-is-power-of-two
-    (logand most-positive-fixnum (1+ id))
-
-    #-stmx-fixnum-is-power-of-two
-    (if (= id most-positive-fixnum)
-        0
-        (1+ id))))
-
-(defmacro next-id (place)
-  `(setf ,place (get-next-id ,place)))
 
 
-;;;; ** Implementation class: TVAR
-
-
-(declaim (type symbol +unbound+))
-(defvar +unbound+ (gensym "UNBOUND-"))
-
-(declaim (type cons +versioned-unbound+))
-(defvar +versioned-unbound+ (cons +invalid-counter+ +unbound+))
-
-
-(defstruct (tvar #+stmx-have-fast-lock (:include fast-lock))
-
-  "A transactional variable (TVAR) is the smallest unit of transactional memory.
-It contains a single value that can be read or written during a transaction
-using ($ var) and (SETF ($ var) value).
-
-TVARs are seldom used directly, since transactional objects (TOBJs) wrap them
-with a more convenient interface: you can read and write normally the slots
-of a transactional object (with slot-value, accessors ...), and behind
-the scenes the slots will be stored in transactional memory implemented by TVARs."
-
-  (versioned-value +versioned-unbound+)         ;; tvar-versioned-value
-
-  #-stmx-have-fast-lock
-  (lock (make-lock "TVAR"))
-
-  (waiting-for nil :type (or null hash-table))           ;; tvar-waiting-for
-  (waiting-lock (make-lock "TVAR-WAITING") :read-only t) ;; tvar-waiting-lock
-  (id (next-id *tvar-id*) :type fixnum :read-only t))    ;; tvar-id
-
-
-(defmethod id-of ((var tvar))
-  (tvar-id var))
-
-
-(declaim (ftype (function (tvar) fixnum) tvar-version)
-         (inline tvar-version))
-(defun tvar-version (var)
-  (first (tvar-versioned-value var)))
-
-
-(defun raw-value-of (var)
-  "Return the current value of VAR, or +unbound+ if VAR is not bound to a value.
-This method intentionally ignores transactions and it is only useful for debugging
-purposes. Please use ($ var) instead."
-  (declare (type tvar var))
-  (rest (tvar-versioned-value var)))
-
-
-(defun (setf raw-value-of) (value var)
-  "Bind VAR to VALUE and return VALUE. This method intentionally ignores
-transactions and it is only useful for debugging purposes.
-Please use (setf ($ var) value) instead."
-  (declare (type tvar var))
-  (setf (tvar-versioned-value var) (cons (incf-atomic-counter *tlog-counter*) value))
-  value)
 
 
 

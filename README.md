@@ -554,7 +554,7 @@ See the included file [doc/benchmark.md](doc/benchmark.md) for performance
 considerations and a lot of raw numbers.
 
 The short version is: as of April 2013, on a fast home PC (Core i5 @ 3GHz or better)
-with a fast Common Lisp (SBCL or better), STMX can execute up to 2 millions
+with a fast Common Lisp (SBCL or better), STMX can execute up to 4 millions
 transactions per second per CPU core.
 
 Taking as a small but somewhat realistic example the [dining philosophers](example/dining-philosophers.lisp),

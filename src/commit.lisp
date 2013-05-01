@@ -23,16 +23,16 @@
 of TVARs that were read during the transaction."
   (declare (type tlog log))
 
-  (log.trace "Tlog ~A valid?.." (~ log))
-  (do-hash (var val) (tlog-reads log)
+  (log:trace "Tlog ~A valid?.." (~ log))
+  (do-txhash (var val) (tlog-reads log)
     (if (eq val (raw-value-of var))
-        (log.trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
+        (log:trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
         (progn
-          (log.trace "Tlog ~A conflict for tvar ~A: expecting ~A, found ~A"
+          (log:trace "Tlog ~A conflict for tvar ~A: expecting ~A, found ~A"
                      (~ log) (~ var) val (raw-value-of var))
-          (log.debug "Tlog ~A ..not valid" (~ log))
+          (log:debug "Tlog ~A ..not valid" (~ log))
           (return-from valid? nil))))
-  (log.trace "Tlog ~A ..is valid" (~ log))
+  (log:trace "Tlog ~A ..is valid" (~ log))
   t)
 
 
@@ -43,20 +43,20 @@ of TVARs that were read during the transaction and none of them is locked
 by other threads."
   (declare (type tlog log))
 
-  (log.trace "Tlog ~A valid-and-unlocked?.." (~ log))
-  (do-hash (var val) (tlog-reads log)
+  (log:trace "Tlog ~A valid-and-unlocked?.." (~ log))
+  (do-txhash (var val) (tlog-reads log)
     (if (eq val (raw-value-of var))
         (progn
-          (log.trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
+          (log:trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
           (unless (tvar-unlocked? var log)
-            (log.debug "Tlog ~A tvar ~A is locked!" (~ log) (~ var))
+            (log:debug "Tlog ~A tvar ~A is locked!" (~ log) (~ var))
             (return-from valid-and-unlocked? nil)))
         (progn
-          (log.trace "Tlog ~A conflict for tvar ~A: expecting ~A, found ~A"
+          (log:trace "Tlog ~A conflict for tvar ~A: expecting ~A, found ~A"
                      (~ log) (~ var) val (raw-value-of var))
-          (log.debug "Tlog ~A ..not valid" (~ log))
+          (log:debug "Tlog ~A ..not valid" (~ log))
           (return-from valid-and-unlocked? nil))))
-  (log.trace "Tlog ~A ..is valid and unlocked" (~ log))
+  (log:trace "Tlog ~A ..is valid and unlocked" (~ log))
   t)
 
 
@@ -103,44 +103,78 @@ tvar-id and are considered \"larger\". Returns (> (tvar-id var1) (tvar-id var2))
 
 
 
-
-(defun try-lock-tvars (vars locked-vars)
-  "Sort VARS in order - actually in (tvar> ...) order -
+#|
+(defun try-lock-tvars (vars)
+  "Optionally sort VARS in (tvar> ...) order,
 then non-blocking acquire their locks in such order.
 Reason: acquiring in unspecified order may cause livelock, as two transactions
 may repeatedly try acquiring the same two TVARs in opposite order.
 
-LOCKED-VARS must be the one-element list '(nil).
-Destructively modifies VARS and LOCKED-VARS.
-
-Return t if all VARS where locked successfully, otherwise return nil.
-In both cases, after this call (rest LOCKED-VARS) will be the list
-containing the locked tvars, sorted in order from first acquired
-to last acquired."
-  (declare (type list vars locked-vars))
-  #+never (log:user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
+Return the number of VARS locked successfully."
+  (declare (type txhash-table vars))
   ;;(setf vars (sort vars #'tvar>))
-  #+never (log:user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
 
-  (loop for cell = vars then rest
-     while cell
-     for rest = (rest cell)
-     for var = (first cell)
-     always
-       (try-lock-tvar var)
-     do (setf (rest cell) nil)
-       (setf (rest locked-vars) cell)
-       (setf locked-vars cell)
-     finally (return t)))
+  (let1 locked-n 0
+    (declare (type fixnum locked-n))
 
+    (do-txhash (var) vars
+      (if (try-lock-tvar var)
+          (progn
+            (log:trace "locked ~A" var)
+            (incf locked-n))
+          (return)))
+
+    locked-n))
 
 
 (declaim (inline unlock-tvars))
-(defun unlock-tvars (vars)
+(defun unlock-tvars (vars locked-n)
   "Release locked (rest VARS) in same order of acquisition."
+  (declare (type txhash-table vars)
+           (type fixnum locked-n))
+
+  (do-txhash (var) vars
+    (unlock-tvar var)
+    (log:trace "unlocked ~A" var)
+    (when (zerop (decf locked-n))
+      (return))))
+|#
+
+
+(defun try-lock-tvars (vars)
+  "Optionally sort VARS in (tvar> ...) order,
+then non-blocking acquire their locks in such order.
+Reason: acquiring in unspecified order may cause livelock, as two transactions
+may repeatedly try acquiring the same two TVARs in opposite order.
+
+Return the number of VARS locked successfully."
   (declare (type list vars))
-  (loop for var in (rest vars) do
-       (unlock-tvar var)))
+  ;;(setf vars (sort vars #'tvar>))
+
+  (let1 locked-n 0
+    (declare (type fixnum locked-n))
+
+    (dolist (var vars)
+      (if (try-lock-tvar var)
+          (progn
+            (log:trace "locked ~A" var)
+            (incf locked-n))
+          (return)))
+
+    locked-n))
+
+
+(declaim (inline unlock-tvars))
+(defun unlock-tvars (vars locked-n)
+  "Release locked VARS in same order of acquisition."
+  (declare (type list vars)
+           (type fixnum locked-n))
+
+  (dolist (var vars)
+    (unlock-tvar var)
+    (log:trace "unlocked ~A" var)
+    (when (zerop (decf locked-n))
+      (return))))
 
 
 ;;;; ** Committing
@@ -248,7 +282,7 @@ and the error will be propagated to the caller"
       (handler-case
           (loop-funcall-on-appendable-vector funcs)
         (rerun-error ()
-          (log.trace "Tlog ~A before-commit wants to rerun" (~ log))
+          (log:trace "Tlog ~A before-commit wants to rerun" (~ log))
           (return-from invoke-before-commit nil)))))
   t)
 
@@ -279,23 +313,23 @@ b) another TLOG is writing the same TVARs being committed
    that the TLOG will still be valid."
    
   (declare (type tlog log))
-  (let ((writes   (tlog-writes log))
-        (new-version +invalid-counter+)
-        (acquiring nil)
-        (acquired (list nil))
-        (changed   nil)
-        (success   nil))
+  (let* ((writes    (tlog-writes log))
+         (to-lock-n (txhash-table-count writes))
+         (locked-n  0)
+         (vars      nil)
+         (new-version +invalid-counter+)
+         (changed   nil)
+         (success   nil))
 
-    (declare (type list acquiring acquired changed)
-             (type fixnum new-version)
+    (declare (type fixnum locked-n to-lock-n new-version)
              (type boolean success))
 
     ;; before-commit functions run without locks
     (unless (invoke-before-commit log)
       (return-from commit nil))
 
-    (when (zerop (hash-table-count writes))
-      (log.debug "Tlog ~A committed (nothing to write)" (~ log))
+    (when (zerop to-lock-n)
+      (log:debug "Tlog ~A committed (nothing to write)" (~ log))
       (invoke-after-commit log)
       (return-from commit t))
 
@@ -303,13 +337,16 @@ b) another TLOG is writing the same TVARs being committed
          (block nil
            ;; we must lock TVARs that will been written: expensive
            ;; but needed to ensure concurrent commits do not conflict.
-           (setf acquiring (hash-table-keys writes))
-           
-           (unless (try-lock-tvars acquiring acquired)
-             (log.debug "Tlog ~A failed to lock tvars, not committed" (~ log))
+           (do-txhash (var) writes
+             (push var vars))
+
+           (setf locked-n (try-lock-tvars vars))
+
+           (unless (= locked-n to-lock-n)
+             (log:debug "Tlog ~A failed to lock tvars, not committed" (~ log))
              (return))
            
-           (log.trace "Tlog ~A acquired locks..." (~ log))
+           (log:trace "Tlog ~A acquired locks..." (~ log))
 
            (setf new-version (incf-atomic-counter *tlog-counter*))
 
@@ -317,28 +354,28 @@ b) another TLOG is writing the same TVARs being committed
            ;; Also ensure that TVARs in (tlog-reads log) are not locked
            ;; by other threads. For the reason, see doc/consistent-reads.md
            (unless (valid-and-unlocked? log)
-             (log.debug "Tlog ~A is invalid or reads are locked, not committed" (~ log))
+             (log:debug "Tlog ~A is invalid or reads are locked, not committed" (~ log))
              (return))
 
-           (log.trace "Tlog ~A committing..." (~ log))
+           (log:trace "Tlog ~A committing..." (~ log))
 
            ;; COMMIT, i.e. actually write new values into TVARs
-           (do-hash (var val) writes
+           (do-txhash (var val) writes
              (let1 current-val (raw-value-of var)
                (when (not (eq val current-val))
                  (setf (tvar-versioned-value var) (cons new-version val))
                  (push var changed)
-                 (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
+                 (log:trace "Tlog ~A tvar ~A changed value from ~A to ~A"
                             (~ log) (~ var) current-val val))))
 
-           (log.debug "Tlog ~A ...committed" (~ log))
+           (log:debug "Tlog ~A ...committed" (~ log))
            (setf success t))
 
-      (unlock-tvars acquired)
-      (log.trace "Tlog ~A ...released locks" (~ log))
+      (unlock-tvars vars locked-n)
+      (log:trace "Tlog ~A ...released locks" (~ log))
       
       (dolist (var changed)
-        (log.trace "Tlog ~A notifying threads waiting on tvar ~A"
+        (log:trace "Tlog ~A notifying threads waiting on tvar ~A"
                    (~ log) (~ var))
         (notify-tvar-high-load var))
 
@@ -357,21 +394,24 @@ b) another TLOG is writing the same TVARs being committed
 (defun merge-tlog-reads (log1 log2)
   "Merge (tlog-reads LOG1) and (tlog-reads LOG2).
 
-Return merged TLOG (either LOG1 or LOG2) if tlog-reads LOG1 and LOG2 are compatible,
-i.e. if they contain the same values for the TVARs common to both, otherwise return NIL
-\(in the latter case, the merge will not be completed)."
+Return merged TLOG (either LOG1 or LOG2) if tlog-reads LOG1 and LOG2
+are compatible, i.e. if they contain the same values for the TVARs
+common to both, otherwise return NIL.
+\(in the latter case, the merge will not be completed).
+
+Destructively modifies (tlog-reads log1) and (tlog-reads log2)."
   (declare (type tlog log1 log2))
   (let* ((reads1 (tlog-reads log1))
          (reads2 (tlog-reads log2))
-         (n1 (hash-table-count reads1))
-         (n2 (hash-table-count reads2)))
+         (n1 (txhash-table-count reads1))
+         (n2 (txhash-table-count reads2)))
          
     (when (< n1 n2)
       (rotatef log1 log2)
       (rotatef reads1 reads2)
       (rotatef n1 n2)) ;; guarantees n1 >= n2
 
-    (if (or (zerop n2) (merge-hash-tables reads1 reads2))
+    (if (or (zerop n2) (merge-txhash-tables reads1 reads2))
         log1
         nil)))
 

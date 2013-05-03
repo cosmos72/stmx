@@ -57,6 +57,6 @@
 
            ;; low-level API to use TVARs directly
            #:tvar
-           #:$   ;; also (setf $)
+           #:$ #:fast-$  ;; also (setf $) and (setf fast-$)
            #:bound-$? #:unbind-$ 
            #:peek-$ #:try-take-$ #:try-put-$))

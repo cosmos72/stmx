@@ -17,37 +17,92 @@
 
 ;;;; * Hash-table specialized for TVAR keys
 
-(declaim (inline txhash-mask))
+(declaim (inline make-txlist))
 
-(defun txhash-mask (vec)
-  "Return the bitmask to use for hash indexes."
-  (declare (type simple-vector vec))
-  (the fixnum (1- (length vec))))
-
-
-(declaim (inline make-triplet))
-
-(defstruct triplet
+(defstruct txlist
   (key   nil :type tvar)
   (value nil :type t)
-  (next  nil :type (or null triplet)))
+  (next  nil :type (or null txlist)))
 
 
-(declaim (inline txhash-subscript get-txhash))
 
-(defun txhash-subscript (hash vec hash-code)
+(defmacro do-txhash-entries ((entry) hash &body body)
+  "Execute BODY on each TXLIST entry contained in HASH. Return NIL."
+  (let ((h     (gensym "HASH-"))
+	(vec   (gensym "VEC-"))
+	(i     (gensym "I-"))
+	(n     (gensym "N-"))
+	(left  (gensym "LEFT-"))
+	(next  (gensym "NEXT-"))
+        (loop-name (gensym "LOOP-")))
+    `(let* ((,h    (the txhash-table ,hash))
+            (,vec  (the simple-vector (txhash-table-vec ,h)))
+            (,n    (the fixnum (length ,vec)))
+            (,left (txhash-table-count ,h)))
+       (declare (fixnum ,left))
+           
+       (dotimes (,i ,n)
+         (when (zerop ,left)
+           (return))
+         (loop named ,loop-name
+            for ,entry = (svref ,vec ,i) then ,next
+            while ,entry
+            for ,next = (txlist-next ,entry)
+            do
+              (decf ,left)
+              ,@body)))))
+                
+
+
+(defmacro do-txhash ((key &optional value) hash &body body)
+  "Execute BODY on each KEY/VALUE contained in HASH. Return NIL."
+  (let ((entry (gensym "ENTRY-")))
+    `(do-txhash-entries (,entry) ,hash
+       (let ((,key (txlist-key ,entry))
+             ,@(when value `((,value (txlist-value ,entry)))))
+         ,@body))))
+                
+
+
+
+	   
+(declaim (inline txhash-mask))
+
+(defun txhash-mask (vec-len)
+  "Return the bitmask to use for hash indexes."
+  (declare (type fixnum vec-len))
+  (the fixnum (1- vec-len)))
+
+
+
+(declaim (inline txhash-subscript find-txhash get-txhash))
+
+(defun txhash-subscript (hash-code vec &optional (vec-len (length vec)))
   "Return the array subscript in HASH corresponding to TXHASH."
-  (declare (type txhash-table hash)
-           (type simple-vector vec)
-           (type fixnum hash-code)
-           (ignore hash))
+  (declare (type simple-vector vec)
+           (type fixnum hash-code vec-len))
   (the fixnum (logand
-               (txhash-mask vec)
+               (txhash-mask vec-len)
                (logxor hash-code
                        (ash hash-code -10)))))
                
 
 
+(defun find-txhash (hash key)
+  "If KEY is present in HASH, return the TXLIST containing KEY.
+Otherwise return NIL."
+  (declare (type txhash-table hash)
+           (type tvar key))
+
+  (let* ((id (the fixnum (tvar-id key)))
+         (vec (txhash-table-vec hash))
+         (subscript (txhash-subscript id vec)))
+         
+    (the (or null txlist)
+      (loop for entry = (svref vec subscript) then (txlist-next entry)
+         while entry do
+           (when (eq key (txlist-key entry))
+             (return entry))))))
 
 
 (defun get-txhash (hash key &optional default)
@@ -55,22 +110,48 @@
 Otherwise return (values DEFAULT nil)."
   (declare (type txhash-table hash)
            (type tvar key))
-  (let* ((id (the fixnum (tvar-id key)))
-         (vec (txhash-table-vec hash))
-         (subscript (txhash-subscript hash vec id)))
-         
-    (loop for entry = (svref vec subscript) then (triplet-next entry)
-       while entry do
-         (when (eq key (triplet-key entry))
-           (return-from get-txhash (values (triplet-value entry) t)))))
+  (if-bind entry (find-txhash hash key)
+    (values (txlist-value entry) t)
+    (values default nil)))
 
-  (values default nil))
     
-
+  
 (defun rehash-txhash (hash)
+  (declare (type txhash-table hash))
+
+  (let* ((vec1 (the simple-vector (txhash-table-vec hash)))
+         (n2   (the fixnum (ash (length vec1) 1)))
+         (vec2 (the simple-vector (make-array n2 :initial-element nil))))
+    
+    (do-txhash-entries (entry) hash
+      (let* ((key (txlist-key entry))
+             (id (tvar-id key))
+             (subscript (txhash-subscript id vec2 n2))
+             (head (svref vec2 subscript)))
+        
+        (setf (txlist-next entry) head
+              (svref vec2 subscript) entry)))
+
+    (setf (txhash-table-vec hash) vec2)))
+        
+        
+      
+(declaim (inline new-txlist-from-pool))
+(defun new-txlist-from-pool (hash txlist-next key value)
   (declare (type txhash-table hash)
-	   (ignore hash))
-  (error "~A not yet implemented" 'rehash-txhash))
+           (type (or null txlist) txlist-next))
+
+  (the txlist
+    (if-bind entry (txhash-table-pool hash)
+      (progn
+        (decf (txhash-table-pool-size hash))
+        (setf (txhash-table-pool hash) (txlist-next entry)
+              (txlist-key   entry) key
+              (txlist-value entry) value
+              (txlist-next  entry) txlist-next)
+        entry)
+      (make-txlist :key key :value value :next txlist-next))))
+
 
 (defun set-txhash (hash key value)
   "Add KEY to HASH, associating it to VALUE. Return VALUE."
@@ -79,26 +160,15 @@ Otherwise return (values DEFAULT nil)."
 
   (let* ((id (tvar-id key))
          (vec (txhash-table-vec hash))
-         (subscript (txhash-subscript hash vec id))
+         (subscript (txhash-subscript id vec))
          (head (svref vec subscript)))
 
-    (loop for entry = head then (triplet-next entry)
+    (loop for entry = head then (txlist-next entry)
        while entry do
-         (when (eq key (triplet-key entry))
-           (return-from set-txhash (setf (triplet-value entry) value))))
+         (when (eq key (txlist-key entry))
+           (return-from set-txhash (setf (txlist-value entry) value))))
 
-    (let* ((pool (txhash-table-pool hash))
-           (triplet (if pool
-                        (progn
-                            (decf (txhash-table-pool-size hash))
-                            (setf (txhash-table-pool hash) (triplet-next pool)
-                                  (triplet-key   pool) key
-                                  (triplet-value pool) value
-                                  (triplet-next  pool) head)
-                            pool)
-                        (make-triplet :key key :value value :next head))))
-      
-      (setf (svref vec subscript) triplet))
+    (setf (svref vec subscript) (new-txlist-from-pool hash head key value))
 
     (when (> (the fixnum (incf (txhash-table-count hash)))
              (length vec))
@@ -108,23 +178,23 @@ Otherwise return (values DEFAULT nil)."
 
 
 (let ((dummy-tvar (make-tvar :id -1)))
-  (defun add-triplets-to-pool (hash triplets)
+  (defun add-txlist-to-pool (hash txlist)
     (declare (type txhash-table hash)
-             (type triplet triplets))
+             (type txlist txlist))
     (let ((pool      (txhash-table-pool      hash))
           (pool-size (txhash-table-pool-size hash)))
       (declare (type fixnum pool-size))
-      (loop for entry = triplets then next
+      (loop for entry = txlist then next
          while entry
-         for next = (triplet-next entry)
+         for next = (txlist-next entry)
          do
-           (setf (triplet-key   entry) dummy-tvar
-                 (triplet-value entry) nil)
+           (setf (txlist-key   entry) dummy-tvar
+                 (txlist-value entry) nil)
            (incf pool-size)
            (unless next
-             (setf (triplet-next entry) pool)
+             (setf (txlist-next entry) pool)
              (return)))
-      (setf (txhash-table-pool      hash) triplets
+      (setf (txhash-table-pool      hash) txlist
             (txhash-table-pool-size hash) pool-size))))
             
                
@@ -136,50 +206,26 @@ Otherwise return (values DEFAULT nil)."
   "Remove all keys and values from HASH. Return HASH."
   (declare (type txhash-table hash)
 	   (type txhash-capacity min-capacity))
-  (let* ((vec (txhash-table-vec hash))
-         (n (length vec)))
-    (if (<= min-capacity n (ash min-capacity 1))
-        (loop for i from 0 to (1- n)
-           for triplet = (svref vec i)
-           when triplet do
-             (when (< (txhash-table-pool-size hash) n)
-               (add-triplets-to-pool hash triplet))
-             (setf (svref vec i) nil))
-        (setf (txhash-table-vec hash)
-	      (make-array min-capacity
-			  :initial-element nil))))
-  (setf (txhash-table-count hash) 0)
+
+  (unless (zerop (txhash-table-count hash))
+    (let* ((vec (txhash-table-vec hash))
+           (n (length vec)))
+      (if (<= min-capacity n (ash min-capacity 1))
+          (loop for i from 0 to (1- n)
+             for txlist = (svref vec i)
+             when txlist do
+               (when (< (txhash-table-pool-size hash) n)
+                 (add-txlist-to-pool hash txlist))
+               (setf (svref vec i) nil))
+          (setf (txhash-table-vec hash)
+                (make-array min-capacity
+                            :initial-element nil))))
+    (setf (txhash-table-count hash) 0))
   hash)
 
-(defmacro do-txhash ((key &optional value) hash &body body)
-  "Execute BODY on each KEY/VALUE contained in HASH. Return NIL."
-  (let ((h    (gensym "HASH-"))
-	(vec  (gensym "VEC-"))
-	(i    (gensym "I-"))
-	(n    (gensym "N-"))
-	(left (gensym "SEEN-"))
-	(entry (gensym "ENTRY-")))
-    `(block nil
-       (let* ((,h (the txhash-table ,hash))
-	      (,vec (the simple-vector (txhash-table-vec ,h)))
-	      (,n (the fixnum (length ,vec)))
-	      (,left ,n))
-	 (declare (fixnum ,left))
-	 (dotimes (,i ,n)
-	   (loop for ,entry = (svref ,vec ,i) then (triplet-next ,entry)
-	      while ,entry
-	      for ,key = (triplet-key ,entry)
-		,@(when value 
-			`(for ,value = (triplet-value ,entry)))
-	      do
-		(progn
-		  (decf ,left)
-		  ,@body))
-	   (unless (plusp ,left)
-	     (return)))))))
-		
 
-	   
+
+
        
 (defun copy-txhash-table-into (dst src)
   "Clear DST, then copy SRC contents into it. Return NIL."
@@ -242,14 +288,14 @@ otherwise return nil.
 ;;  9.0 nanoseconds per (clrhash h) (incf n (hash-table-count h)), empty hash table
 ;;380   nanoseconds per (incf n (hash-table-count (make-hash-table))))
 
-(defmethod print-object ((obj triplet) stream)
-  (format stream "#S(~S " 'triplet)
-  (loop for entry = obj then (triplet-next entry)
+(defmethod print-object ((obj txlist) stream)
+  (format stream "#S(~S " 'txlist)
+  (loop for entry = obj then (txlist-next entry)
      while entry do
        (unless (eq entry obj)
          (format stream "~&"))
        (format stream "~S ~S ~S ~S"
-               :key (triplet-key entry) :value (triplet-value entry)))
+               :key (txlist-key entry) :value (txlist-value entry)))
   (format stream ")"))
 
 

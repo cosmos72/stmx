@@ -104,7 +104,6 @@ tvar-id and are considered \"larger\". Returns (> (tvar-id var1) (tvar-id var2))
 
 
 
-
 (defmacro try-lock-tvars (txhash-vars locked-n)
   "Optionally sort VARS in (tvar> ...) order,
 then non-blocking acquire their locks in such order.
@@ -117,7 +116,6 @@ Return the number of VARS locked successfully."
         (blk  (gensym "BLOCK-")))
 
     `(let ((,vars ,txhash-vars))
-       
        (declare (type txhash-table ,vars))
 
        ;;(setf vars (sort vars #'tvar>))
@@ -131,120 +129,21 @@ Return the number of VARS locked successfully."
 
 
 (declaim (inline unlock-tvars))
-(defun unlock-tvars (vars locked-n locked-all?)
+(defun unlock-tvars (txhash-vars locked-n locked-all?)
   "Release locked (rest VARS) in same order of acquisition."
-  (declare (type txhash-table vars)
+  (declare (type txhash-table txhash-vars)
            (type fixnum locked-n))
 
   (if locked-all?
-      (do-txhash (var) vars
+      (do-txhash (var) txhash-vars
         (unlock-tvar var))
-      (do-txhash (var) vars
+      (do-txhash (var) txhash-vars
         (when (= -1 (decf locked-n))
           (return))
         (unlock-tvar var))))
 
 
 
-
-
-
-#+never
-(defun try-lock-tvars (vars locked-vars)
-  "Sort VARS in order - actually in (tvar> ...) order -
-then non-blocking acquire their locks in such order.
-Reason: acquiring in unspecified order may cause livelock, as two transactions
-may repeatedly try acquiring the same two TVARs in opposite order.
-
-LOCKED-VARS must be the one-element list '(nil).
-Destructively modifies VARS and LOCKED-VARS.
-
-Return t if all VARS where locked successfully, otherwise return nil.
-In both cases, after this call (rest LOCKED-VARS) will be the list
-containing the locked tvars, sorted in order from first acquired
-to last acquired."
-  (declare (type txhash-table vars)
-           (type list locked-vars))
-  #+never (log.user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
-  ;;(setf vars (sort vars #'tvar>))
-  #+never (log.user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
-
-  (let ((locked-n 0))
-    (declare (type fixnum locked-n))
-    
-    (do-txhash (var) vars
-      (unless (try-lock-tvar var)
-        (return))
-
-      (let1 cell (cons var nil)
-        (setf (rest locked-vars) cell
-              locked-vars cell))
-      (incf locked-n))
-    
-    locked-n))
-        
-  
-
-
-#+never
-(defun unlock-tvars (vars)
-  "Release locked (rest VARS) in same order of acquisition."
-  (declare (type list vars))
-  (loop for var in (rest vars) do
-       (unlock-tvar var)))
-
-
-#+never
-(defun compare-locked-tvars (writes locked locked-n)
-  (declare (type txhash-table writes)
-           (type list locked)
-           (type fixnum locked-n))
-  (when (or (/= locked-n (length (rest locked)))
-            (> locked-n (txhash-table-count writes)))
-    (break))
-        
-  (do-txhash (var1) writes
-    (when (minusp (decf locked-n))
-      (return))
-    (let ((var2 (first (setf locked (rest locked)))))
-      (unless (eq var1 var2)
-        (error "mismatched ~A ~A" var1 var2)))))
-
-#+never
-(defun try-lock-tvars (vars locked-n)
-  "Sort VARS in order - actually in (tvar> ...) order -
-then non-blocking acquire their locks in such order.
-Reason: acquiring in unspecified order may cause livelock, as two transactions
-may repeatedly try acquiring the same two TVARs in opposite order.
-
-LOCKED-VARS must be the one-element list '(nil).
-Destructively modifies VARS and LOCKED-VARS.
-
-Return t if all VARS where locked successfully, otherwise return nil.
-In both cases, after this call (rest LOCKED-VARS) will be the list
-containing the locked tvars, sorted in order from first acquired
-to last acquired."
-  (declare (type list vars locked-n))
-  #+never (log.user5 "unsorted TVARs to lock: (~{~A~^ ~})" vars)
-  ;;(setf vars (sort vars #'tvar>))
-  #+never (log.user5 "  sorted TVARs to lock: (~{~A~^ ~})" vars)
-
-  (loop for var in vars
-     always (try-lock-tvar var)
-     do (incf (the fixnum (first locked-n)))
-     finally (return t)))
-
-
-
-#+never
-(defun unlock-tvars (vars locked-n)
-  "Release locked (rest VARS) in same order of acquisition."
-  (declare (type list vars)
-           (type fixnum locked-n))
-  (loop for var in vars
-     do
-       (unlock-tvar var)
-     until (zerop (decf locked-n))))
 
 ;;;; ** Committing
 
@@ -454,6 +353,12 @@ b) another TLOG is writing the same TVARs being committed
         (invoke-after-commit log)))
 
     success))
+                   
+
+
+
+
+
                    
 
 

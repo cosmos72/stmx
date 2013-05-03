@@ -109,8 +109,9 @@ and to check for any value stored in the log."
     (unbound-tvar-error var)))
 
 
+
 (defun (setf $) (value var)
-    "Store VALUE inside transactional variable VAR.
+    "Store VALUE inside transactional variable VAR and return VALUE.
 
 Works both outside and inside transactions.
 During transactions, it uses transaction log to record the value."
@@ -119,6 +120,28 @@ During transactions, it uses transaction log to record the value."
   (if (recording?)
       (tx-write-of var value)
       (setf (raw-value-of var) value)))
+
+
+
+(declaim (inline fast-$))
+(defun fast-$ (var)
+    "Get the value from the transactional variable VAR and return it.
+Return +unbound+ if VAR is not bound to a value.
+Works ONLY inside transactions."
+  (declare (type tvar var))
+  (tx-read-of var))
+
+
+(declaim (inline (setf fast-$)))
+(defun (setf fast-$) (value var)
+  "Store VALUE inside transactional variable VAR and return VALUE.
+Works ONLY inside transactions."
+  (declare (type tvar var))
+  (tx-write-of var value))
+
+
+
+
                
   
 (defun bound-$? (var)

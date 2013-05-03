@@ -66,8 +66,8 @@
          (setf ($ var) 'before-commit))
        ;; after-commit blocks are executed in forward order
        (after-commit
-         (is (eq 'before-commit ($ var)))
          (is (eq 'before-commit (raw-value-of var)))
+         (is (eq 'before-commit ($ var)))
          ;; after-commit functions MUST NOT write to transactional memory
          ;; (setf ($ var) 'after-commit))
          (error 'test-error))

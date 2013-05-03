@@ -126,7 +126,6 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   the slots of transactional classes or, even better, a macro that can
   be defined to use either `slot-value` or slot accessors.
 
-
 - `TRANSACTION` declares that a method or function is an atomic
   transaction, and is actually just a convenience macro for `ATOMIC`.
   Use it to wrap a function definition:
@@ -176,6 +175,18 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   methods: it can be used to wrap *any* list of forms (it contains an
   implicit `progn`).
 
+  Note: STMX allows using transactional memory both inside and outside
+  transactions started with `TRANSACTION` or `ATOMIC`, but be aware that
+  accessing transactional memory from outside transactions is only intended
+  for **debugging** purposes at the REPL: in a program it would cause a lot
+  of problems, due to inconsistencies and due to other threads not being
+  notified when a transactional memory location is updated.
+  Future versions may remove this convenience hack and replace it with a cleaner,
+  stricter mechanism.
+  In a program, **always** wrap with `TRANSACTION` or `ATOMIC` all code
+  that uses transactional memory.
+
+- Composing transactions
 
   A key feature of `atomic` and `transaction` is their composability:
   smaller transactions can be composed to create larger transactions.
@@ -423,7 +434,9 @@ features are available:
 
 - `TVAR` is the class implementing transactional memory behind the scenes.
    It is used internally by slots of transactional classes, but can also be used
-   directly. All its functions and methods work both inside and outside transactions:
+   directly. All its functions and methods work both inside and outside transactions
+   (remember that using transactional memory outside transactions is only
+   intended for **debugging** purposes). Functions and methods:
    - `(tvar [initial-value])` Create a new TVAR, optionally bound to a value.
    - `($ var)` Get the value of VAR. Signals an error if VAR is not bound to any value.
    - `(setf ($ var) value)` Store VALUE into VAR.
@@ -553,13 +566,13 @@ Performance
 See the included file [doc/benchmark.md](doc/benchmark.md) for performance
 considerations and a lot of raw numbers.
 
-The short version is: as of April 2013, on a fast home PC (Core i5 @ 3GHz or better)
+The short version is: as of April 2013, on a fast consumer PC (Core i5 @ 4GHz or better)
 with a fast Common Lisp (SBCL or better), STMX can execute up to 4 millions
 transactions per second per CPU core.
 
 Taking as a small but somewhat realistic example the [dining philosophers](example/dining-philosophers.lisp),
 with 5 reads and 5 writes to transactional memory per atomic block and
-a moderate rate of conflicts and retries (20-30%), each CPU core runs
+a moderate rate of conflicts and retries (20-40%), each CPU core runs
 approximately 1 million transactions per second.
 
 Obviously, performance in other cases will depend on the complexity of the code

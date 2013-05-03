@@ -592,7 +592,7 @@ The author will also try to answer support requests, but gives no guarantees.
 Status
 ------
 
-As of April 2013, STMX is being written by Massimiliano Ghilardi
+As of May 2013, STMX is being written by Massimiliano Ghilardi
 and is considered by the author to be stable.
 
 STMX is a full rewrite of CL-STM, which has been developed by Hoan Ton-That

@@ -106,3 +106,4 @@
 (defmethod asdf:perform ((op asdf:test-op) (system (eql (asdf:find-system :stmx))))
   (asdf:load-system :stmx.test)
   (eval (read-from-string "(fiveam:run! 'stmx.test:suite)")))
+

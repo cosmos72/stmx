@@ -15,6 +15,18 @@
 
 (in-package :stmx)
 
+;;;; ** constants
+
+(declaim (type symbol +unbound+))
+(defvar +unbound+ (gensym "unbound-"))
+
+(declaim (type fixnum +invalid-counter+))
+(defconstant +invalid-counter+ -1)
+
+(declaim (type cons +versioned-unbound+))
+(defvar +versioned-unbound+ (cons +invalid-counter+ +unbound+))
+
+
 ;;;; ** tvar approximate counter (fast but not fully exact in multi-threaded usage)
 
 (declaim (type fixnum *tvar-id*))
@@ -42,13 +54,6 @@
 
 
 ;;;; ** implementation class: tvar
-
-
-(declaim (type symbol +unbound+))
-(defvar +unbound+ (gensym "unbound-"))
-
-(declaim (type cons +versioned-unbound+))
-(defvar +versioned-unbound+ (cons +invalid-counter+ +unbound+))
 
 
 (defstruct (tvar #+stmx-have-fast-lock (:include fast-lock))
@@ -150,9 +155,6 @@ please use (setf ($ var) value) instead."
 
 (declaim (type atomic-counter *tlog-counter*))
 (defvar *tlog-counter* (make-atomic-counter))
-
-(declaim (type fixnum +invalid-counter+))
-(defconstant +invalid-counter+ -1)
 
 ;;;; ** implementation class: tlog
 

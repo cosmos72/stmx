@@ -1,5 +1,10 @@
 TO DO:
 
+12) reduce consing in (commit): add changed TVARs to a pooled FAST-VECTOR,
+    replace versioned-value cons with two TVAR slots - when writing,
+    update the version first, then the value - when reading, get the value first,
+    then the version. Beware of reordering, memory barriers would be needed.
+    
 8) optimize ORELSE. The current implementation is quite naive,
    it makes a full copy of the current transaction log
 

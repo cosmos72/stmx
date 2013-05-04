@@ -31,8 +31,10 @@
                           #:subtypep)
 
   (:import-from #:stmx
-                #:raw-value-of #:tvar-versioned-value #:+invalid-counter+
-                #:tx-read-of #:tx-write-of
+                #:+invalid-counter+
+                #:tvar-version-and-value #:set-tvar-version-and-value
+                #:raw-value-of #:tx-read-of #:tx-write-of
+
                 #:tlog  #:make-tlog
                 #:rerun-error #:rerun
                 #:retry-error #:retry
@@ -62,6 +64,6 @@
 (fiveam:def-suite suite)
 
 (defun configure-log4cl ()
-  (log:config :clear :sane :daily "log.txt" ;;:this-console
+  (log:config :clear :sane :this-console ;; :daily "log.txt"
               :pattern "[%D{%H:%M:%S}] [%-5P] <%c{}{}{:downcase}> {%t} %m%n")
   (log:config :info))

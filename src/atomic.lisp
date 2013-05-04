@@ -33,7 +33,7 @@ The effect is the same as DEFCLASS, plus:
   `(,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
      ,(adjust-transactional-slots-definitions direct-slots class-name direct-superclasses)
      ,@class-options
-     #+stmx-must-disable-optimize-slot-access (:optimize-slot-access nil)
+     #+stmx.must-disable-optimize-slot-access (:optimize-slot-access nil)
      (:metaclass transactional-class)))
 
 

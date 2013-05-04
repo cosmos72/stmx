@@ -36,28 +36,27 @@
 (defun get-next-id (id)
   (declare (type fixnum id))
   (the fixnum
-    #+stmx-fixnum-is-power-of-two
+    #+stmx.fixnum-is-powerof2
     (logand most-positive-fixnum (1+ id))
 
-    #-stmx-fixnum-is-power-of-two
+    #-stmx.fixnum-is-powerof2
     (if (= id most-positive-fixnum)
         0
         (1+ id))))
 
 (defmacro next-id (place)
   `(the fixnum
-     #+stmx-fixnum-is-power-of-two
+     #+stmx.fixnum-is-powerof2
      (logand most-positive-fixnum (incf (the fixnum ,place)))
 
-     #-stmx-fixnum-is-power-of-two
+     #-stmx.fixnum-is-powerof2
      `(setf ,place (get-next-id ,place))))
 
 
 ;;;; ** implementation class: tvar
 
 
-(defstruct (tvar #+stmx-have-fast-lock (:include fast-lock))
-
+(defstruct (tvar (:include mutex))
   "a transactional variable (tvar) is the smallest unit of transactional memory.
 it contains a single value that can be read or written during a transaction
 using ($ var) and (setf ($ var) value).
@@ -67,12 +66,16 @@ with a more convenient interface: you can read and write normally the slots
 of a transactional object (with slot-value, accessors ...), and behind
 the scenes the slots will be stored in transactional memory implemented by tvars."
 
+  #+stmx.have-atomic-ops
+  (version +invalid-counter+ :type fixnum)
+  #+stmx.have-atomic-ops
+  (value   +unbound+         :type t)
+
+  #-stmx.have-atomic-ops
   (versioned-value +versioned-unbound+)         ;; tvar-versioned-value
 
-  (id (next-id *tvar-id*) :type fixnum :read-only t)    ;; tvar-id
 
-  #-stmx-have-fast-lock
-  (lock (make-lock "tvar")  :read-only t)
+  (id (next-id *tvar-id*) :type fixnum :read-only t)    ;; tvar-id
 
   (waiting-for nil :type (or null hash-table))           ;; tvar-waiting-for
   (waiting-lock (make-lock "tvar-waiting") :read-only t));; tvar-waiting-lock
@@ -81,46 +84,28 @@ the scenes the slots will be stored in transactional memory implemented by tvars
 (defmethod id-of ((var tvar))
   (the fixnum (tvar-id var)))
 
-(declaim (ftype (function (tvar) fixnum) tvar-version)
-         (inline tvar-version))
-(defun tvar-version (var)
-  (first (tvar-versioned-value var)))
 
+(declaim (ftype (function (  tvar) t) raw-value-of)
+         (inline
+           raw-value-of))
 
 (defun raw-value-of (var)
-  "return the current value of var, or +unbound+ if var is not bound to a value.
+  "return the current value of VAR, or +unbound+ if VAR is not bound to a value.
 this method intentionally ignores transactions and it is only useful for debugging
 purposes. please use ($ var) instead."
   (declare (type tvar var))
+  #+stmx.have-atomic-ops
+  (tvar-value var)
+  #-stmx.have-atomic-ops
   (rest (tvar-versioned-value var)))
 
 
-(defun (setf raw-value-of) (value var)
-  "bind var to value and return value. this method intentionally ignores
-transactions and it is only useful for debugging purposes.
-please use (setf ($ var) value) instead."
-  (declare (type tvar var))
-  (setf (tvar-versioned-value var) (cons (incf-atomic-counter *tlog-counter*) value))
-  value)
 
 
 
 
 
 ;;;; ** txhash-table, a hash table specialized for tvar keys
-
-(defconstant +txhash-max-capacity+
-  (let ((array-max-len (min array-dimension-limit array-total-size-limit)))
-    (if (zerop (logand array-max-len (1- array-max-len)))
-        array-max-len
-        (let ((size 1))
-          (declare (type fixnum size))
-          (loop for ceil = array-max-len then (ash (the fixnum ceil) -1)
-             until (= 1 ceil)
-             do  (setf size (ash size 1))
-             finally (return size))))))
-
-(deftype txhash-capacity () `(integer 0 ,+txhash-max-capacity+))
 
 (defconstant +txhash-default-capacity+ 4)
 
@@ -131,11 +116,11 @@ please use (setf ($ var) value) instead."
   (pool  nil :type t)
   (pool-size 0 :type fixnum))
 
-(declaim (ftype (function (&key (:initial-capacity txhash-capacity))
+(declaim (ftype (function (&key (:initial-capacity fixnum))
                           txhash-table) make-txhash-table))
 
 (defun make-txhash-table (&key (initial-capacity +txhash-default-capacity+))
-  (declare (type txhash-capacity initial-capacity))
+  (declare (type fixnum initial-capacity))
 
   (unless (zerop (logand initial-capacity (1- initial-capacity)))
     (error "~A invalid initial capacity ~A: expecting a power of two."
@@ -180,6 +165,10 @@ and are later committed to memory if the transaction completes successfully."
   #-tlog-hash
   (writes (make-txhash-table) :type txhash-table)
 
+  (changed (make-fast-vector +txhash-default-capacity+) :type fast-vector :read-only t)
+
+  (id +invalid-counter+ :type fixnum) ;; tlog-id
+
   ;; Parent of this TLOG. Used by ORELSE for nested transactions
   (parent    nil :type (or null tlog)) ;; tlog-parent
   (lock      nil) ;; tlog-lock
@@ -190,9 +179,8 @@ and are later committed to memory if the transaction completes successfully."
   ;; Functions to call immediately before committing TLOG.
   (before-commit nil :type (or null tlog-func-vector)) ;; tlog-before-commit
   ;; Functions to call immediately after committing TLOG.
-  (after-commit  nil :type (or null tlog-func-vector)) ;; tlog-after-commit
+  (after-commit  nil :type (or null tlog-func-vector))) ;; tlog-after-commit
 
-  (id +invalid-counter+ :type fixnum)) ;; tlog-id
 
 
 (defmethod id-of ((log tlog))
@@ -304,12 +292,12 @@ to TLOGs while executing BODY."
 
 ;;;; ** Retrying
 
-(define-condition stmx-control-error (control-error)
+(define-condition stmx.control-error (control-error)
   ()
   (:documentation "Parent class of all STMX errors"))
 
 
-(define-condition retry-error (stmx-control-error)
+(define-condition retry-error (stmx.control-error)
   ()
   (:report (lambda (err stream)
              (declare (ignore err))
@@ -320,7 +308,7 @@ so it is visible to application code only in case of bugs"))
 
 
 
-(define-condition rerun-error (stmx-control-error)
+(define-condition rerun-error (stmx.control-error)
   ()
   (:report (lambda (err stream)
              (declare (ignore err))

@@ -255,17 +255,35 @@ and the error will be propagated to the caller"
   t)
 
 
+
+(defmacro invoke-after-commit-macro (log &optional (when-form t) &body cleanup)
+  "After committing, call in order all functions registered with (after-commit)
+If any of them signals an error, it will be propagated to the caller
+but the TLOG will remain committed.
+CLEANUP forms will be invoked after all functions registered with (after-commit),
+even if they signal an error."
+  (with-gensyms (tlog funcs)
+    `(let ((,tlog ,log)
+           (,funcs nil))
+       (declare (type tlog ,tlog))
+       (if (and ,when-form (setf ,funcs (tlog-after-commit ,tlog)))
+           (unwind-protect
+                ;; restore recording and log as the current tlog, functions may need them
+                ;; to read transactional memory
+                (with-recording-to-tlog log
+                  (loop-funcall-on-appendable-vector ,funcs))
+             ,@cleanup)
+           (progn
+             ,@cleanup))
+       t)))
+
+
 (defun invoke-after-commit (log)
   "After committing, call in order all functions registered with (after-commit)
 If any of them signals an error, it will be propagated to the caller
 but the TLOG will remain committed."
   (declare (type tlog log))
-  (when-bind funcs (tlog-after-commit log)
-    ;; restore recording and log as the current tlog, functions may need them
-    ;; to read transactional memory
-    (with-recording-to-tlog log
-      (loop-funcall-on-appendable-vector funcs)))
-  t)
+  (invoke-after-commit-macro log))
 
 
 (defun commit (log)
@@ -292,13 +310,13 @@ b) another TLOG is writing the same TVARs being committed
   (let* ((writes (tlog-writes log))
          (locked-n    0)
          (locked-all? nil)
+         (changed     (tlog-changed log))
          (new-version +invalid-counter+)
-         (changed     nil)
          (success     nil))
 
     (declare (type txhash-table writes)
              (type fixnum locked-n new-version)
-             (type list changed)
+             (type fast-vector changed)
              (type boolean locked-all? success))
 
     (when (zerop (txhash-table-count writes))
@@ -310,6 +328,8 @@ b) another TLOG is writing the same TVARs being committed
          (block nil
            ;; we must lock TVARs that will been written: expensive
            ;; but needed to ensure concurrent commits do not conflict.
+           (log.trace "before (try-lock-tvars)")
+
            (unless (setf locked-all? (try-lock-tvars writes locked-n))
              (log.debug "Tlog ~A failed to lock tvars, not committed" (~ log))
              (return))
@@ -331,8 +351,8 @@ b) another TLOG is writing the same TVARs being committed
            (do-txhash (var val) writes
              (let1 current-val (raw-value-of var)
                (when (not (eq val current-val))
-                 (setf (tvar-versioned-value var) (cons new-version val))
-                 (push var changed)
+                 (set-tvar-version-and-value var new-version val)
+                 (fast-vector-push-extend var changed)
                  (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
                             (~ log) (~ var) current-val val))))
 
@@ -342,15 +362,14 @@ b) another TLOG is writing the same TVARs being committed
       ;;(compare-locked-tvars writes locked locked-n)
       (unlock-tvars writes locked-n locked-all?)
       (log.trace "Tlog ~A ...released locks" (~ log))
-      
-      (dolist (var changed)
-        (log.trace "Tlog ~A notifying threads waiting on tvar ~A"
-                   (~ log) (~ var))
-        (notify-tvar-high-load var))
 
-      (when success
-        ;; after-commit functions run without locks
-        (invoke-after-commit log)))
+
+      ;; after-commit functions run without locks
+      (invoke-after-commit-macro log success
+        (do-fast-vector (var) changed
+          (log.trace "Tlog ~A notifying threads waiting on tvar ~A"
+                     (~ log) (~ var))
+          (notify-tvar-high-load var))))
 
     success))
                    

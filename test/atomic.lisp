@@ -41,7 +41,7 @@
     (signals rerun-error
       (tx-read-of var log))
     (is-false (valid? log))
-    (setf (tvar-versioned-value var) (cons +invalid-counter+ 1))
+    (set-tvar-version-and-value var +invalid-counter+ 1)
     (is-true (valid? log))))
     
 (test commit
@@ -104,7 +104,8 @@
       ;; is for some other thread to commit and restore the original value
       ;; and version initially seen by the invalid one.
       ;; Not really possible in the wild because of the version counter.
-      (setf (tvar-versioned-value var) (cons +invalid-counter+ 0))
+      (set-tvar-version-and-value var +invalid-counter+ 0)
+
       (is-true (valid? (current-tlog)))
       (setf ($ var) 2))
 

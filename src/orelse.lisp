@@ -23,39 +23,6 @@
              (declare (ignore err))
              (format stream "Attempt to use ~A outside an ~A block" 'orelse 'atomic))))
 
-(defun run-orelse-once (func log)
-  "Run FUNC once inside a nested transaction.
-
-If FUNC returns normally, return (values nil (multiple-value-list (funcall func)))
-If FUNC calls (retry), return :wants-to-retry
-If FUNC calls (rerun) - used internally by orelse - return :wants-to-rerun"
-
-  (declare (type function func)
-           (type tlog log))
-
-  (prog ((me (log:make-logger)))
-     (handler-bind ((retry-error
-                     (lambda (err)
-                       (declare (ignore err))
-                       (log.debug me "Tlog ~A {~A} wants to retry, trying next one"
-                                  (~ log) (~ func))
-                       (return-from run-orelse-once :wants-to-retry)))
-                    
-                    (rerun-error
-                     (lambda (err)
-                       (declare (ignore err))
-                       (log.debug me "Tlog ~A {~A} wants to re-run, trying next one"
-                                  (~ log) (~ func))
-                       (return-from run-orelse-once :wants-to-rerun))))
-
-       (return (values nil (multiple-value-list (run-once func log)))))))
-
-
-       
-       
-
-
-
 
 
 
@@ -77,7 +44,8 @@ If FUNC calls (rerun) - used internally by orelse - return :wants-to-rerun"
 (defun find-first-rerun-tx (txs me)
   "Return index of the first tx that wants to rerun or is invalid.
 Return nil if all tx are valid and want to retry."
-  (declare (type simple-vector txs))
+  (declare (type simple-vector txs)
+           (ignorable me))
 
   (loop for i from 0 to (1- (length txs))
      for itx    = (aref txs i)
@@ -95,7 +63,8 @@ Return nil if all tx are valid and want to retry."
 
 (defun merge-tlog-reads-tx (txs me)
   "Return merged tlog of all tx, or nil if some tlog are mutually incompatible."
-  (declare (type simple-vector txs))
+  (declare (type simple-vector txs)
+           (ignorable me))
 
   (let1 log (orelse-tx-log (aref txs 0))
     
@@ -177,7 +146,7 @@ Can only be used inside an ATOMIC block."
                (setf (orelse-tx-retry tx) nil)))
            
 
-      (prog (func log (me (log:make-logger)))
+      (prog (func log (me (log.make-logger)))
 
        start
        (set-index 0)
@@ -191,18 +160,29 @@ Can only be used inside an ATOMIC block."
              log  (new-or-clear-tlog (orelse-tx-log tx) :parent parent-log)
              (orelse-tx-log tx) log)
 
-       (multiple-value-bind (flag vals) (run-orelse-once func log)
-         (case flag
-           (:wants-to-retry (wants-to-retry) (go run-next))
+       (handler-bind ((retry-error
+                       (lambda (err)
+                         (declare (ignore err))
+                         (log.debug me "Tlog ~A {~A} wants to retry, trying next one"
+                                    (~ log) (~ func))
+                         (wants-to-retry)
+                         (go run-next)))
+                    
+                    (rerun-error
+                     (lambda (err)
+                       (declare (ignore err))
+                       (log.debug me "Tlog ~A {~A} wants to re-run, trying next one"
+                                  (~ log) (~ func))
+                       (wants-to-rerun)
+                       (go run-next))))
 
-           (:wants-to-rerun (wants-to-rerun) (go run-next))
+         (return-from run-orelse
+           (multiple-value-prog1 (run-once func log)
 
-           (otherwise
-            (commit-nested log)
-            (log.debug me "Tlog ~A {~A} committed to parent tlog ~A"
-                       (~ log) (~ func) (~ parent-log))
-            (free-tx-logs txs)
-            (return-from run-orelse (values-list vals)))))
+             (commit-nested log)
+             (log.debug me "Tlog ~A {~A} committed to parent tlog ~A"
+                        (~ log) (~ func) (~ parent-log))
+             (free-tx-logs txs))))
 
 
        run-next
@@ -231,6 +211,7 @@ Can only be used inside an ATOMIC block."
        (setf log (merge-tlog-reads-tx txs me))
        (unless log
          ;; some tlog was incompatible with previous ones
+         (maybe-yield-before-rerun)
          (go start))
            
        (log.debug me "ORELSE will sleep, then re-run")

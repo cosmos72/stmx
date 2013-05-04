@@ -16,45 +16,54 @@
 (in-package :stmx.lang)
 
 
+(eval-when (:compile-toplevel)
+  #-(or sbcl ccl cmucl)
+  (warn "Untested Common Lisp implementation.
+STMX is currently tested only on SBCL, CMUCL and CCL."))
+
+
+
+
 (eval-always
+ (defun add-features (&rest list)
+   (declare (type list list))
+   (dolist (f list)
+     (pushnew (the keyword f) *features*)))
 
- #-sbcl #-ccl #-cmucl
- (warn "Untested Common Lisp implementation. STMX is currently tested only on SBCL, CMUCL and CCL.")
+ (defun features? (&rest list)
+   (declare (type list list))
+   (loop for f in list
+      always (member (the keyword f) *features*)
+      finally (return t)))
 
- (defun add-feature (f)
-   (declare (type keyword f))
-   (pushnew f *features*))
+ (add-features :stmx)
 
- (add-feature :stmx)
+ #+lispworks ;; porting still in progress
+ (add-features :stmx.disable-optimize-slot-access)
 
- (dolist
-     (f
-       #+lispworks ;; porting still in progress
-      '(:stmx-must-disable-optimize-slot-access)
+ #+(or ccl cmucl)
+ nil ;; nothing to do
 
-      #+sbcl
-      '(:stmx-have-fast-lock :stmx-have-sbcl.atomic-ops)
-
-      #-lispworks #-sbcl
-      nil)
-
-   (add-feature f))
+ #+sbcl
+ (add-features :stmx.have-atomic-ops :stmx.have-atomic-ops.sbcl))
 
 
+
+
+
+(eval-always
  ;; (1+ most-positive-fixnum) is a power of two?
  (when (zerop (logand most-positive-fixnum (1+ most-positive-fixnum)))
-   (pushnew :stmx-fixnum-is-power-of-two *features*))
-
+   (add-features :stmx.fixnum-is-powerof2))
 
  ;; fixnum is large enough to count 10 million transactions
  ;; per second for at least 100 years?
  (when (>= most-positive-fixnum #x7fffffffffffff)
-   (pushnew :stmx-fixnum-is-large *features*))
+   (add-features :stmx.fixnum-is-large))
 
  ;; both the above two features
- (when (and (member :stmx-fixnum-is-large *features*)
-            (member :stmx-fixnum-is-power-of-two *features*))
-   (pushnew :stmx-fixnum-is-large-power-of-two *features*)))
+ (when (features? :stmx.fixnum-is-large :stmx.fixnum-is-powerof2)
+   (add-features :stmx.fixnum-is-large-powerof2)))
 
 
 
@@ -67,4 +76,4 @@
     (let ((x (gensym)))
       (when (eq x
                 (bt:join-thread (bt:make-thread (lambda () x))))
-        (pushnew :stmx-sane-bt.join-thread *features*)))))
+        (add-features :stmx.sane-bt.join-thread)))))

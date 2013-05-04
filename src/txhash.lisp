@@ -205,7 +205,11 @@ Otherwise return (values DEFAULT nil)."
                                 +txhash-default-capacity+))
   "Remove all keys and values from HASH. Return HASH."
   (declare (type txhash-table hash)
-	   (type txhash-capacity min-capacity))
+	   (type fixnum min-capacity))
+
+  (unless (zerop (logand min-capacity (1- min-capacity)))
+    (error "~A invalid initial capacity ~A: expecting a power of two."
+           'txhash-table min-capacity))
 
   (unless (zerop (txhash-table-count hash))
     (let* ((vec (txhash-table-vec hash))

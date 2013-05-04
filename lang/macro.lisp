@@ -83,6 +83,10 @@
 
 (defmacro log.trace (&rest args)
   `(log:trace ,@args))
+
+(defmacro log.make-logger (&rest args)
+  `(log:make-logger ,@args))
+
 |#
 
 
@@ -91,5 +95,9 @@
   nil)
 
 (defmacro log.trace (&rest args)
+  (declare (ignore args))
+  nil)
+
+(defmacro log.make-logger (&rest args)
   (declare (ignore args))
   nil)

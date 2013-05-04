@@ -26,22 +26,31 @@
            #:when-bind    #:awhen
            #:if-bind      #:aif
 
-           #:log.trace    #:log.debug
+           #:log.trace    #:log.debug   #:log.make-logger
 
            ;; bordeaux-threads helpers
            #:start-thread #:wait4-thread
            #:*current-thread*
+           #:with-lock
+
+           ;; atomic operations
+           #:atomic-num #:atomic-incf #:atomic-decf
+           #:atomic-compare-and-swap
+           #:atomic-read-barrier #:atomic-write-barrier
 
            #:atomic-counter #:make-atomic-counter
            #:get-atomic-counter #:incf-atomic-counter
 
-           #:fast-lock             #:make-fast-lock        
-           #:try-acquire-fast-lock #:release-fast-lock
-           #:fast-lock-is-own-or-free?
+           #:mutex             #:make-mutex
+           #:mutex-owner       #:mutex-lock
+           #:try-acquire-mutex #:release-mutex
+           #:mutex-is-own-or-free?
 
            #:fast-vector        #:make-fast-vector
-           #:fast-vector-length #:fast-vector-max-length
-           #:fast-vector-push   #:fast-vector-pop #:fast-vector-pop-macro
+           #:fast-vector-length #:fast-vector-capacity
+           #:fast-vector-pop    #:fast-vector-pop-macro
+           #:fast-vector-push   #:fast-vector-push-extend
+           #:fast-vector-clear  #:do-fast-vector
            
            #:get-hash #:set-hash ;; also (setf get-hash)
            #:rem-hash #:clear-hash #:do-hash

@@ -19,7 +19,13 @@
 
 (declaim (inline tvar))
 (defun tvar (&optional (value +unbound+))
-  (the tvar (make-tvar :versioned-value (cons +invalid-counter+ value))))
+  #+stmx.have-atomic-ops
+  (the tvar (make-tvar :value value))
+  #-stmx.have-atomic-ops
+  (the tvar (make-tvar :versioned-value
+                       (if (eq value +unbound+)
+                           +versioned-unbound+
+                           (cons +invalid-counter+ value)))))
 
 (declaim (ftype (function (tvar) t) $)
          (ftype (function (t tvar) t) (setf $)))
@@ -49,6 +55,62 @@
 ;;;; ** Reading and writing
 
 
+
+(declaim (ftype (function (tvar) (values fixnum t)) tvar-version-and-value)
+         (ftype (function (tvar fixnum t) t)    set-tvar-version-and-value)
+         (ftype (function (t tvar) t)           (setf raw-value-of))
+         (inline
+           tvar-version-and-value set-tvar-version-and-value (setf raw-value-of)))
+
+(defun tvar-version-and-value (var)
+  "return as multiple values:
+1) the current version of VAR
+2) the current value of VAR, or +unbound+ if VAR is not bound to a value."
+  (declare (type tvar var))
+
+  (let*
+      #+stmx.have-atomic-ops
+    ((version (progn (atomic-read-barrier) (tvar-version var)))
+     (value   (progn (atomic-read-barrier) (tvar-value   var))))
+
+    #-stmx.have-atomic-ops
+    ((pair (tvar-versioned-value var))
+     (version (first pair))
+     (value (rest pair)))
+
+    (values version value)))
+
+
+
+(defun set-tvar-version-and-value (var version value)
+  "Set the VERSION and VALUE of VAR. Return VALUE."
+  (declare (type tvar var)
+           (type fixnum version))
+
+  #+stmx.have-atomic-ops
+  (progn
+    (atomic-write-barrier
+      (setf (tvar-version var) version))
+    (atomic-write-barrier
+      (setf (tvar-value   var) value)))
+  #-stmx.have-atomic-ops
+  (progn
+    (setf (tvar-versioned-value var) (cons version value))
+    value))
+
+
+(defun (setf raw-value-of) (value var)
+  "Set the VALUE of VAR. Return VALUE."
+  (declare (type tvar var))
+  (set-tvar-version-and-value var
+                              (incf-atomic-counter *tlog-counter*)
+                              value))
+           
+
+  
+  
+
+
 (defun tx-read-of (var &optional (log (current-tlog)))
   "If VAR's value is stored in writes of transaction LOG, return the stored value.
 Otherwise, validate VAR version, add VAR into the reads of transaction LOG,
@@ -63,9 +125,7 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
     (when present?
       (return-from tx-read-of value)))
 
-  (let* ((pair (tvar-versioned-value var))
-         (version (first pair))
-         (value (rest pair)))
+  (multiple-value-bind (version value) (tvar-version-and-value var)
 
     (when (> (the fixnum version) (tlog-id log))
       ;; inconsistent data? let's check
@@ -254,22 +314,16 @@ and to check for any value stored in the log."
          (ftype (function (tvar tlog) boolean) tvar-unlocked?)
          (inline
            try-lock-tvar unlock-tvar
-           #+stmx-have-fast-lock tvar-unlocked?))
+           #+stmx.have-atomic-ops tvar-unlocked?))
 
 (defun try-lock-tvar (var)
   "Return T if VAR was locked successfully, otherwise return NIL."
-  #+stmx-have-fast-lock
-  (try-acquire-fast-lock (the fast-lock var))
-  #-stmx-have-fast-lock
-  (bt:acquire-lock (tvar-lock var) nil))
+  (stmx.lang::try-acquire-mutex (the mutex var)))
   
   
 (defun unlock-tvar (var)
   "Unlock VAR, always return NIL."
-  #+stmx-have-fast-lock
-  (release-fast-lock (the fast-lock var))
-  #-stmx-have-fast-lock
-  (bt:release-lock (tvar-lock var)))
+  (release-mutex (the mutex var)))
 
 
 (defun tvar-unlocked? (var log)
@@ -277,16 +331,17 @@ and to check for any value stored in the log."
 Return NIL if VAR is locked by some other thread."
   (declare (ignorable log))
 
-  #+stmx-have-fast-lock
-  (fast-lock-is-own-or-free? (the fast-lock var))
-  #-stmx-have-fast-lock
+  #+stmx.have-atomic-ops
+  (mutex-is-own-or-free? (the mutex var))
+  #-stmx.have-atomic-ops
   ;; check transaction log writes first
   (multiple-value-bind (value present?)
       (get-txhash (tlog-writes log) var)
+    (declare (ignore value))
     (if present?
         t
         ;; then fall back on trying to acquire the lock (messy)
-        (let1 lock (tvar-lock var)
+        (let1 lock (mutex-lock (the mutex var))
           (when (bt:acquire-lock lock nil)
             (bt:release-lock lock)
             t)))))
@@ -300,7 +355,7 @@ Return NIL if VAR is locked by some other thread."
 
   (declare (type tvar var)
            (type tlog log))
-  (with-lock-held ((tvar-waiting-lock var))
+  (with-lock ((tvar-waiting-lock var))
     (let1 waiting (tvar-waiting-for var)
       (unless waiting
         (setf waiting (make-hash-table :test 'eq)
@@ -315,14 +370,14 @@ if VAR changes."
   (declare (type tvar var)
            (type tlog log))
   (awhen (tvar-waiting-for var)
-    (with-lock-held ((tvar-waiting-lock var))
+    (with-lock ((tvar-waiting-lock var))
       (remhash log it))))
 
 
 (defun notify-tvar (var)
   "Wake up all threads waiting for VAR to change."
   (declare (type tvar var))
-  (with-lock-held ((tvar-waiting-lock var))
+  (with-lock ((tvar-waiting-lock var))
     (awhen (tvar-waiting-for var)
       (do-hash (log) it
         (notify-tlog log var)))))
@@ -340,7 +395,7 @@ if VAR changes."
   ;; and under light load (i.e. single-thread), at the price of increasing
   ;; the conflict rate and SLIGHTLY slowing down under moderate load
   (awhen (tvar-waiting-for var)
-    (with-lock-held ((tvar-waiting-lock var))
+    (with-lock ((tvar-waiting-lock var))
       (do-hash (log) it
         (notify-tlog log var)))))
 

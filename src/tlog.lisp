@@ -42,6 +42,8 @@ return LOG itself."
   (clear-txhash (tlog-reads log))
   (clear-txhash (tlog-writes log))
 
+  (fast-vector-clear (tlog-changed log))
+
   (awhen (tlog-before-commit log) (setf (fill-pointer it) 0))
   (awhen (tlog-after-commit log)  (setf (fill-pointer it) 0))
   log)
@@ -161,7 +163,7 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
 
     (log.debug "Tlog ~A sleeping now" (~ log))
 
-    (with-lock-held (lock)
+    (with-lock (lock)
       (unless (setf prevent-sleep (tlog-prevent-sleep log))
         (condition-wait (tlog-semaphore log) lock)))
 
@@ -184,7 +186,7 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
 
   ;; we are going to sleep, unless some TVAR changes
   ;; and/or tells us not to.
-  (with-lock-held ((tlog-lock log))
+  (with-lock ((tlog-lock log))
     (setf (tlog-prevent-sleep log) nil))
 
   (when (listen-tvars-of log)
@@ -197,11 +199,12 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
 
 (defun notify-tlog (log var)
   (declare (type tlog log)
-           (type tvar var))
+           (type tvar var)
+           (ignorable var))
   (log.debug "Waking up tlog ~A listening on tvar ~A" (~ log) (~ var))
   ;; Max, question: do we also need to acquire (tlog-lock log)?
   ;; Answering myself: YES! otherwise we can deadlock (tested, it happens)
-  (with-lock-held ((tlog-lock log))
+  (with-lock ((tlog-lock log))
     (setf (tlog-prevent-sleep log) t)
     (condition-notify (tlog-semaphore log))))
 

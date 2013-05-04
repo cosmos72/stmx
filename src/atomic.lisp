@@ -113,6 +113,9 @@ For pre-defined transactional classes, see the package STMX.UTIL"
   #-always nil
   #+never  (thread-yield))
 
+
+(declaim (inline run-once))
+
 (defun run-once (tx log)
   "Internal function invoked by RUN-ATOMIC and RUN-ORELSE2.
 
@@ -122,23 +125,13 @@ using LOG as its transaction log."
            (type tlog log))
 
   (with-recording-to-tlog log
-    (prog ((parent (tlog-parent log)))
-
-     run
      (set-tlog-version log)
 
-     (log.debug "Tlog ~A {~A} starting~A" (~ log) (~ tx)
-                (if parent
+     (log.debug "Tlog ~A {~A} starting~A" (~ log) (~ tx) 
+		(if-bind parent (tlog-parent log)
                     (format nil ", parent is tlog ~A" (~ parent))
                     ""))
-     (restart-case
-         (return (funcall tx))
-
-       (rerun-once ()
-         (log.trace "Tlog ~A {~A} will rerun" (~ log) (~ tx))
-         (new-or-clear-tlog log :parent parent)
-         (maybe-yield-before-rerun)
-         (go run))))))
+     (funcall tx)))
 
 
 (defun run-atomic (tx)
@@ -161,31 +154,25 @@ transactional memory it read has changed."
   (prog ((log (new-tlog)))
 
    run
-   (handler-bind ((retry-error
-                   (lambda (err)
-                     (declare (ignore err))
-                     (go retry)))
-                  
-                  (rerun-error
-                   (lambda (err)
-                     (declare (ignore err))
-                     (invoke-restart 'rerun-once))))
-     (return
-       (multiple-value-prog1
-           (run-once tx log)
+   (handler-case
+       (return
+	 (multiple-value-prog1 (run-once tx log)
 
-         (log.trace "Tlog ~A {~A} wants to commit" (~ log) (~ tx))
+	   (log.trace "Tlog ~A {~A} wants to commit" (~ log) (~ tx))
 
-         ;; commit also checks if log is valid
-         (if (commit log)
-             ;; all done, prepare to return.
-             ;; we are not returning TLOGs to the pool in case tx signaled an error,
-             ;; but that's not a problem since the TLOG pool is just a speed optimization
-             (free-tlog log)
+	   ;; commit also checks if log is valid
+	   (if (commit log)
+	       ;; all done, prepare to return.
+	       ;; we are not returning TLOGs to the pool in case tx signaled an error,
+	       ;; but that's not a problem since the TLOG pool is just a speed optimization
+	       (free-tlog log)
 
-             (progn
-               (log.debug "Tlog ~A {~A} could not commit, re-running it" (~ log) (~ tx))
-               (go rerun))))))
+	       (progn
+		 (log.debug "Tlog ~A {~A} could not commit, re-running it" (~ log) (~ tx))
+		 (go rerun)))))
+
+     (retry-error () (go retry))
+     (rerun-error () (go rerun)))
 
    retry
    (log.debug "Tlog ~A {~A} will sleep, then retry" (~ log) (~ tx))

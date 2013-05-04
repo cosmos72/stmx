@@ -160,29 +160,27 @@ Can only be used inside an ATOMIC block."
              log  (new-or-clear-tlog (orelse-tx-log tx) :parent parent-log)
              (orelse-tx-log tx) log)
 
-       (handler-bind ((retry-error
-                       (lambda (err)
-                         (declare (ignore err))
-                         (log.debug me "Tlog ~A {~A} wants to retry, trying next one"
-                                    (~ log) (~ func))
-                         (wants-to-retry)
-                         (go run-next)))
-                    
-                    (rerun-error
-                     (lambda (err)
-                       (declare (ignore err))
-                       (log.debug me "Tlog ~A {~A} wants to re-run, trying next one"
-                                  (~ log) (~ func))
-                       (wants-to-rerun)
-                       (go run-next))))
+       (handler-case
+	   (return-from run-orelse
+	     (multiple-value-prog1 (run-once func log)
 
-         (return-from run-orelse
-           (multiple-value-prog1 (run-once func log)
+	       (commit-nested log)
+	       (log.debug me "Tlog ~A {~A} committed to parent tlog ~A"
+			  (~ log) (~ func) (~ parent-log))
+	       (free-tx-logs txs)))
+	 
+	 (retry-error ()
+	   (log.debug me "Tlog ~A {~A} wants to retry, trying next one"
+		      (~ log) (~ func))
+	   (wants-to-retry)
+	   (go run-next))
 
-             (commit-nested log)
-             (log.debug me "Tlog ~A {~A} committed to parent tlog ~A"
-                        (~ log) (~ func) (~ parent-log))
-             (free-tx-logs txs))))
+	 (rerun-error ()
+	   (log.debug me "Tlog ~A {~A} wants to re-run, trying next one"
+		      (~ log) (~ func))
+	   (wants-to-rerun)
+	   (go run-next)))
+
 
 
        run-next

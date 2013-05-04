@@ -311,7 +311,7 @@ b) another TLOG is writing the same TVARs being committed
          (locked-n    0)
          (locked-all? nil)
          (changed     (tlog-changed log))
-         (new-version +invalid-counter+)
+         (new-version +invalid-version+)
          (success     nil))
 
     (declare (type txhash-table writes)

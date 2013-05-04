@@ -140,26 +140,51 @@ to the same value. Problematic classes containing slot ~A: ~{~A ~}"
 
 
 
+;;;; ** Signalling unbound slots
+
+(defun unbound-slot-error (class instance slot)
+  "Signal an unbound-slot error and allow the user to continue by specifying or storing a value."
+  (declare (type transactional-class class)
+           (type transactional-object instance)
+           (type transactional-effective-slot slot))
+
+  (restart-case (error 'unbound-slot :instance instance :name (slot-definition-name slot))
+    (use-value (value)
+      :report "Specify a value to return as the slot-value."
+      :interactive (lambda ()
+                     (format t "~&Value to return: ")
+                     (list (eval (read))))
+      value)
+    (store-value (value)
+      :report "Specify a value to store and return as the slot-value ."
+      :interactive (lambda ()
+                     (format t "~&Value to store and return: ")
+                     (list (eval (read))))
+      (setf (slot-value-using-class class instance slot) value))))
+
+
 ;;;; ** Slot access
+
 
 (defmethod slot-value-using-class ((class transactional-class) instance
                                    (slot transactional-effective-slot))
   (declare (ignore class instance))
   
-  ;; Get the TVAR from the slot
+  ;; Get the slot value - it may be a TVAR.
   (let1 obj (call-next-method)
-    (cond
-      ((not (transactional-slot? slot))
-       obj)
+
+    (if (and (transactional-slot? slot)
+             (or (recording?) (hide-tvars?)))
+
+        ;; It is a TVAR, return its value.
+        ;; During transactions, reading from tvars is recorded to the current tlog.
+        (multiple-value-bind (value bound?) (peek-$ (the tvar obj))
+          (if bound?
+              value
+              (unbound-slot-error class instance slot)))
     
-      ;; Return the value inside the TVAR.
-      ;; During transactions, reading from tvars is recorded to the current tlog.
-      ((or (recording?) (hide-tvars?))
-       ($ (the tvar obj)))
-    
-      (t
-       ;; Return the tvar itself.
-       (the tvar obj)))))
+        ;; Return the plain slot-value.
+        obj)))
 
 
 (declaim (inline slot-raw-tvar))
@@ -170,53 +195,45 @@ to the same value. Problematic classes containing slot ~A: ~{~A ~}"
 
 (defmethod (setf slot-value-using-class) (value    (class transactional-class)
                                           instance (slot transactional-effective-slot))
-  (cond
-    ((not (transactional-slot? slot))
-     (call-next-method))
+
+  (if (and (transactional-slot? slot)
+           (or (recording?) (hide-tvars?)))
     
-    ((or (recording?) (hide-tvars?))
-     ;; Get the tvar from the slot and write inside it.
-     ;; During transactions, writing tvars is recorded into the current tlog.
-     (let1 var (slot-raw-tvar class instance slot)
-       (setf ($ var) value)))
+      ;; Get the tvar from the slot and write inside it.
+      ;; During transactions, writing tvars is recorded into the current tlog.
+      (let1 var (slot-raw-tvar class instance slot)
+        (setf ($ var) value))
       
-    (t
-     ;; Set the tvar in the slot
-     (call-next-method))))
+      ;; Write in the slot
+      (call-next-method)))
 
 
 
 (defmethod slot-boundp-using-class ((class transactional-class) instance
                                     (slot transactional-effective-slot))
-  (cond
-    ((not (transactional-slot? slot))
-     (call-next-method))
-    
-    ((or (recording?) (hide-tvars?))
+  (if (and (transactional-slot? slot)
+           (or (recording?) (hide-tvars?)))
+
      ;; Get the tvar from the slot, and return true if it is bound to a value.
      ;; During transactions, the checking whether the tvar is bound
      ;; is recorded to the current tlog.
-     (bound-$? (slot-raw-tvar class instance slot)))
+     (bound-$? (slot-raw-tvar class instance slot))
 
-    (t
      ;; Raw access: check if the slot itself is bound
-     (call-next-method))))
+     (call-next-method)))
 
 
 (defmethod slot-makunbound-using-class ((class transactional-class) instance
                                         (slot transactional-effective-slot))
-  (cond
-    ((not (transactional-slot? slot))
-     (call-next-method))
+  (if (and (transactional-slot? slot)
+           (or (recording?) (hide-tvars?)))
+
+      ;; Get the tvar from the slot, and unbind its value.
+      ;; During transactions, unbinding the tvar is recorded into the current tlog.
+      (unbind-$ (slot-raw-tvar class instance slot))
     
-    ((or (recording?) (hide-tvars?))
-     ;; Get the tvar from the slot, and unbind its value.
-     ;; During transactions, unbinding the tvar is recorded into the current tlog.
-     (unbind-$ (slot-raw-tvar class instance slot)))
-    
-    (t
-     ;; raw access: unbind the slot.
-     (call-next-method))))
+      ;; raw access: unbind the slot.
+      (call-next-method)))
 
 
 

@@ -56,7 +56,7 @@
            #:transactional-class
 
            ;; low-level API to use TVARs directly
-           #:tvar
+           #:tvar #:+unbound-tvar+
            #:$ #:fast-$  ;; also (setf $) and (setf fast-$)
            #:bound-$? #:unbind-$ 
            #:peek-$ #:try-take-$ #:try-put-$))

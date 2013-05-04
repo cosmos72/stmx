@@ -18,14 +18,14 @@
 ;;;; ** Transactional variables
 
 (declaim (inline tvar))
-(defun tvar (&optional (value +unbound+))
+(defun tvar (&optional (value +unbound-tvar+))
   #+stmx.have-atomic-ops
   (the tvar (make-tvar :value value))
   #-stmx.have-atomic-ops
   (the tvar (make-tvar :versioned-value
-                       (if (eq value +unbound+)
-                           +versioned-unbound+
-                           (cons +invalid-counter+ value)))))
+                       (if (eq value +unbound-tvar+)
+                           +versioned-unbound-tvar+
+                           (cons +invalid-version+ value)))))
 
 (declaim (ftype (function (tvar) t) $)
          (ftype (function (t tvar) t) (setf $)))
@@ -65,7 +65,7 @@
 (defun tvar-version-and-value (var)
   "return as multiple values:
 1) the current version of VAR
-2) the current value of VAR, or +unbound+ if VAR is not bound to a value."
+2) the current value of VAR, or +unbound-tvar+ if VAR is not bound to a value."
   (declare (type tvar var))
 
   (let*
@@ -164,7 +164,7 @@ and to check for any value stored in the log."
   (let1 value (if (recording?)
                   (tx-read-of var)
                   (raw-value-of var))
-    (unless (eq value +unbound+)
+    (unless (eq value +unbound-tvar+)
       (return-from $ value))
     (unbound-tvar-error var)))
 
@@ -186,7 +186,7 @@ During transactions, it uses transaction log to record the value."
 (declaim (inline fast-$))
 (defun fast-$ (var)
     "Get the value from the transactional variable VAR and return it.
-Return +unbound+ if VAR is not bound to a value.
+Return +unbound-tvar+ if VAR is not bound to a value.
 Works ONLY inside transactions."
   (declare (type tvar var))
   (tx-read-of var))
@@ -212,7 +212,7 @@ During transactions, it uses transaction log to record the read
 and to check for any value stored in the log."
   (declare (type tvar var))
 
-  (not (eq +unbound+
+  (not (eq +unbound-tvar+
            (if (recording?)
                (tx-read-of var)
                (raw-value-of var)))))
@@ -226,8 +226,8 @@ During transactions, it uses transaction log to record the 'unbound' value."
   (declare (type tvar var))
 
   (if (recording?)
-      (tx-write-of var +unbound+)
-      (setf (raw-value-of var) +unbound+))
+      (tx-write-of var +unbound-tvar+)
+      (setf (raw-value-of var) +unbound-tvar+))
   var)
 
 
@@ -245,7 +245,7 @@ and to check for any value stored in the log."
   (let1 value (if (recording?)
                   (tx-read-of var)
                   (raw-value-of var))
-    (if (eq value +unbound+)
+    (if (eq value +unbound-tvar+)
       (values default nil)
       (values value t))))
 
@@ -262,16 +262,16 @@ and to check for any value stored in the log."
 
   (if (recording?)
       (let1 value (tx-read-of var)
-        (if (eq value +unbound+)
+        (if (eq value +unbound-tvar+)
             (values default nil)
             (progn
-              (tx-write-of var +unbound+)
+              (tx-write-of var +unbound-tvar+)
               (values value t))))
       (let1 value (raw-value-of var)
-        (if (eq value +unbound+)
+        (if (eq value +unbound-tvar+)
             (values default nil)
             (progn
-              (setf (raw-value-of var) +unbound+)
+              (setf (raw-value-of var) +unbound-tvar+)
               (values value t))))))
 
 
@@ -286,11 +286,11 @@ and to check for any value stored in the log."
 
   (if (recording?)
       (let1 old-value (tx-read-of var)
-        (if (eq old-value +unbound+)
+        (if (eq old-value +unbound-tvar+)
             (values (tx-write-of var value) t)
             (values default nil)))
       (let1 old-value (raw-value-of var)
-        (if (eq old-value +unbound+)
+        (if (eq old-value +unbound-tvar+)
             (values (setf (raw-value-of var) value) t)
             (values default nil)))))
 

@@ -17,14 +17,14 @@
 
 ;;;; ** constants
 
-(declaim (type symbol +unbound+))
-(defvar +unbound+ (gensym "unbound-"))
+(declaim (type symbol +unbound-tvar+))
+(defvar +unbound-tvar+ (gensym (symbol-name 'unbound-tvar-)))
 
-(declaim (type fixnum +invalid-counter+))
-(defconstant +invalid-counter+ -1)
+(declaim (type fixnum +invalid-version+))
+(defconstant +invalid-version+ -1)
 
-(declaim (type cons +versioned-unbound+))
-(defvar +versioned-unbound+ (cons +invalid-counter+ +unbound+))
+(declaim (type cons +versioned-unbound-tvar+))
+(defvar +versioned-unbound-tvar+ (cons +invalid-version+ +unbound-tvar+))
 
 
 ;;;; ** tvar approximate counter (fast but not fully exact in multi-threaded usage)
@@ -67,12 +67,12 @@ of a transactional object (with slot-value, accessors ...), and behind
 the scenes the slots will be stored in transactional memory implemented by tvars."
 
   #+stmx.have-atomic-ops
-  (version +invalid-counter+ :type fixnum)
+  (version +invalid-version+ :type fixnum)
   #+stmx.have-atomic-ops
-  (value   +unbound+         :type t)
+  (value   +unbound-tvar+         :type t)
 
   #-stmx.have-atomic-ops
-  (versioned-value +versioned-unbound+)         ;; tvar-versioned-value
+  (versioned-value +versioned-unbound-tvar+)         ;; tvar-versioned-value
 
 
   (id (next-id *tvar-id*) :type fixnum :read-only t)    ;; tvar-id
@@ -90,7 +90,7 @@ the scenes the slots will be stored in transactional memory implemented by tvars
            raw-value-of))
 
 (defun raw-value-of (var)
-  "return the current value of VAR, or +unbound+ if VAR is not bound to a value.
+  "return the current value of VAR, or +unbound-tvar+ if VAR is not bound to a value.
 this method intentionally ignores transactions and it is only useful for debugging
 purposes. please use ($ var) instead."
   (declare (type tvar var))
@@ -167,7 +167,7 @@ and are later committed to memory if the transaction completes successfully."
 
   (changed (make-fast-vector +txhash-default-capacity+) :type fast-vector :read-only t)
 
-  (id +invalid-counter+ :type fixnum) ;; tlog-id
+  (id +invalid-version+ :type fixnum) ;; tlog-id
 
   ;; Parent of this TLOG. Used by ORELSE for nested transactions
   (parent    nil :type (or null tlog)) ;; tlog-parent

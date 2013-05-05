@@ -221,6 +221,14 @@ while it is normally disabled in these cases:
      ,@body))
 
 
+(declaim (inline transaction?))
+(defun transaction? ()
+  "Return true if inside a transaction."
+  *record-to-tlogs*)
+
+
+
+
 (declaim (type boolean *hide-tvars*))
 (defvar *hide-tvars* t
   "A boolean controlling the behaviour of the function (slot-value)

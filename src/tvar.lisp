@@ -235,7 +235,7 @@ During transactions, it uses transaction log to record the 'unbound' value."
 (defun peek-$ (var &optional default)
     "Get the value from the transactional variable VAR
 and return it and t as multiple values.
-If VAR is not bound to a value, return (values default nil).
+If VAR is not bound to a value, return (values DEFAULT nil).
 
 Works both outside and inside transactions.
 During transactions, it uses transaction log to record the read
@@ -252,8 +252,8 @@ and to check for any value stored in the log."
 
 (defun try-take-$ (var &optional default)
     "Get the value from the transactional variable VAR,
-unbind it and and return the original value and t as multiple values.
-If VAR is not bound to a value, return (values DEFAULT nil).
+unbind it and and return t and the original value as multiple values.
+If VAR is not bound to a value, return (values nil DEFAULT).
 
 Works both outside and inside transactions.
 During transactions, it uses transaction log to record the read and write
@@ -263,16 +263,16 @@ and to check for any value stored in the log."
   (if (recording?)
       (let1 value (tx-read-of var)
         (if (eq value +unbound-tvar+)
-            (values default nil)
+            (values nil default)
             (progn
               (tx-write-of var +unbound-tvar+)
-              (values value t))))
+              (values t value))))
       (let1 value (raw-value-of var)
         (if (eq value +unbound-tvar+)
-            (values default nil)
+            (values nil default)
             (progn
               (setf (raw-value-of var) +unbound-tvar+)
-              (values value t))))))
+              (values t value))))))
 
 
 (defun try-put-$ (var value &optional default)
@@ -287,12 +287,12 @@ and to check for any value stored in the log."
   (if (recording?)
       (let1 old-value (tx-read-of var)
         (if (eq old-value +unbound-tvar+)
-            (values (tx-write-of var value) t)
-            (values default nil)))
+            (values t (tx-write-of var value))
+            (values nil default)))
       (let1 old-value (raw-value-of var)
         (if (eq old-value +unbound-tvar+)
-            (values (setf (raw-value-of var) value) t)
-            (values default nil)))))
+            (values t (setf (raw-value-of var) value))
+            (values nil default)))))
 
 ;;;; ** Accessors
 

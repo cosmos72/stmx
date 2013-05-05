@@ -45,6 +45,7 @@
 
            #:transactional
            #:transaction
+           #:transaction?
 
            ;; utilities
            #:nonblocking
@@ -58,5 +59,6 @@
            ;; low-level API to use TVARs directly
            #:tvar #:+unbound-tvar+
            #:$ #:fast-$  ;; also (setf $) and (setf fast-$)
-           #:bound-$? #:unbind-$ 
-           #:peek-$ #:try-take-$ #:try-put-$))
+           #:bound-$? #:unbind-$
+
+           #:fast-atomic))

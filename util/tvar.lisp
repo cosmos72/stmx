@@ -28,49 +28,46 @@
 (defmethod empty? ((var tvar))
   (not (bound-$? var)))
 
-(transaction
- (defmethod empty! ((var tvar))
-   "Remove value from tvar."
+
+(defmethod empty! ((var tvar))
+  "Remove value from tvar."
+  (fast-atomic
    (unbind-$ var)))
 
-;; no need to specialize (full?) on TVARs: the method in cell.lisp is enough
+;; no need to specialize (full?) on TVARs: the method in container.lisp is enough
 ;;
 ;; (defmethod full? ((var tvar))
 ;;   (not (empty? var)))
 
 
-(transaction
- (defmethod peek ((var tvar) &optional default)
-   (peek-$ var default)))
+(defmethod peek ((var tvar) &optional default)
+  (peek-$ var default))
 
-(transaction
- (defmethod take ((var tvar))
-   (multiple-value-bind (value took?) (try-take-$ var)
-     (unless took?
-       (retry))
-     value)))
+(defmethod take ((var tvar))
+  (fast-atomic
+   (multiple-value-bind (took? value) (try-take-$ var)
+     (if took?
+         value
+         (retry)))))
 
+(defmethod put ((var tvar) value)
+  (fast-atomic
+   (if (try-put-$ var value)
+       value
+       (retry))))
 
-(transaction
- (defmethod put ((var tvar) value)
-   (unless (nth-value 1 (try-put-$ var value))
-     (retry))
-   value))
-
-(transaction
- (defmethod try-take ((var tvar))
-   "hand-made, nonblocking version of (take place) for TVARs.
+(defmethod try-take ((var tvar))
+  "hand-made, nonblocking version of (take place) for TVARs.
 Less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
 Linux amd64) than the unspecialized (try-take place) which calls
 \(atomic (nonblocking (take place)))"
-   (multiple-value-bind (value took?) (try-take-$ var)
-     (values took? value))))
+  (fast-atomic
+   (try-take-$ var)))
 
-(transaction
- (defmethod try-put ((var tvar) value)
-   "hand-made, nonblocking version of (put place) for TVARs.
+(defmethod try-put ((var tvar) value)
+  "hand-made, nonblocking version of (put place) for TVARs.
 Less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
 Linux amd64) than the unspecialized (try-put place) which calls
 \(atomic (nonblocking (put place value)))"
-   (multiple-value-bind (value-or-nil put?) (try-put-$ var value)
-     (values put? value-or-nil))))
+  (fast-atomic
+   (try-put-$ var value)))

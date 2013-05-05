@@ -41,16 +41,16 @@
   "Eat once. return remaining hunger"
   (declare (type tvar fork1 fork2)
            (type cons plate))
-  (atomic 
-   ;; use a normal (non-transactional) counter to keep track
-   ;; of retried transactions for demonstration purposes.
-   (decf (the fixnum (cdr plate)))
+  ;; use a normal (non-transactional) counter to keep track
+  ;; of retried transactions for demonstration purposes.
+  (decf (the fixnum (cdr plate)))
    
-   (let ((f1 (take fork1))
-         (f2 (take fork2)))
-     (prog1 (eat-from-plate plate)
-       (put fork1 f1)
-       (put fork2 f2)))))
+  (let ((f1 (take fork1))
+        (f2 (take fork2)))
+    (prog1 (eat-from-plate plate)
+      (put fork1 f1)
+      (put fork2 f2))))
+
 
 
 (defun dining-philosopher (i fork1 fork2 plate)
@@ -65,7 +65,13 @@
   ;;(sb-sprof:with-profiling
   ;;  (:max-samples 1000 :sample-interval 0.001 :report :graph
   ;;   :loop nil :show-progress t :mode :alloc)
-  (loop while (plusp (philosopher-eats fork1 fork2 plate))))
+
+
+  ;; NOTE: this simpler version works too, but allocates a closure at each iteration:
+  ;; (loop until (zerop (the fixnum (atomic (philosopher-eats fork1 fork2 plate)))))
+
+  (let1 lambda-philosopher-eats (lambda () (philosopher-eats fork1 fork2 plate)) 
+    (loop until (zerop (the fixnum (run-atomic lambda-philosopher-eats))))))
 
 
 (defun dining-philosophers (philosophers-count &optional (philosophers-initial-hunger 1000000))

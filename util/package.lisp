@@ -30,6 +30,9 @@
                           #:typep
                           #:subtypep)
 
+  (:import-from #:stmx
+                #:peek-$ #:try-take-$ #:try-put-$)
+
   (:export #:tcons #:tlist #:tfirst #:trest #:tpush #:tpop ;; transactional CONS cell and list
 
            #:tcell #:tfifo #:tstack #:tchannel #:tport  ;; transactional containers

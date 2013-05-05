@@ -30,9 +30,10 @@
 (defmethod empty? ((cell tcell))
   (eq (value-of cell) *empty-tcell*))
 
-(transaction
- (defmethod empty! ((cell tcell))
-   "Remove value from CELL. Return CELL."
+
+(defmethod empty! ((cell tcell))
+  "Remove value from CELL. Return CELL."
+  (fast-atomic
    (setf (value-of cell) *empty-tcell*)
    cell))
 
@@ -51,8 +52,8 @@
         (values value t))))
 
 
-(transaction
- (defmethod take ((cell tcell))
+(defmethod take ((cell tcell))
+  (fast-atomic
    (let1 value (value-of cell)
      (if (eq value *empty-tcell*)
          (retry)
@@ -60,18 +61,20 @@
            (setf (value-of cell) *empty-tcell*)
            value)))))
 
-(transaction
- (defmethod put ((cell tcell) value)
+
+(defmethod put ((cell tcell) value)
+  (fast-atomic
    (if (empty? cell)
        (setf (value-of cell) value)
        (retry))))
 
-(transaction
- (defmethod try-take ((cell tcell))
-   "hand-made, nonblocking version of (take place) for cells.
+
+(defmethod try-take ((cell tcell))
+  "hand-made, nonblocking version of (take place) for cells.
 less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
 Linux amd64) than the unspecialized (try-take place) which calls
 \(atomic (nonblocking (take place)))"
+  (fast-atomic
    (let1 value (value-of cell)
      (if (eq value *empty-tcell*)
          nil
@@ -79,12 +82,13 @@ Linux amd64) than the unspecialized (try-take place) which calls
            (setf (value-of cell) *empty-tcell*)
            (values t value))))))
 
-(transaction
- (defmethod try-put ((cell tcell) value)
-   "hand-made, nonblocking version of (put place) for tcells.
+
+(defmethod try-put ((cell tcell) value)
+  "hand-made, nonblocking version of (put place) for tcells.
 less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
 Linux amd64) than the unspecialized (try-put place) which calls
 \(atomic (nonblocking (put place value)))"
+  (fast-atomic
    (if (empty? cell)
        (values t (setf (value-of cell) value))
        nil)))

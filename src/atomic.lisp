@@ -109,6 +109,15 @@ For pre-defined transactional classes, see the package STMX.UTIL"
       `(values)))
 
 
+(defmacro fast-atomic (&rest body)
+  (if body
+      `(if (transaction?)
+           (progn  ,@body)
+           (%run-atomic (lambda () ,@body)))
+      `(values)))
+
+       
+
 (defmacro maybe-yield-before-rerun ()
   #-always nil
   #+never  (thread-yield))
@@ -134,7 +143,7 @@ using LOG as its transaction log."
      (funcall tx)))
 
 
-(defun run-atomic (tx)
+(defun %run-atomic (tx)
   "Function equivalent of the ATOMIC macro.
 
 Run the function TX inside a transaction.
@@ -147,9 +156,6 @@ Finally, if TX called (retry), re-run it after at least some of the
 transactional memory it read has changed."
 
   (declare (type function tx))
-
-  (when (current-tlog)
-    (return-from run-atomic (funcall tx)))
 
   (prog ((log (new-tlog)))
 
@@ -187,6 +193,29 @@ transactional memory it read has changed."
    rerun-no-yield
    (new-or-clear-tlog log :parent (tlog-parent log))
    (go run)))
+
+
+
+(declaim (inline run-atomic))
+
+(defun run-atomic (tx)
+  "Function equivalent of the ATOMIC macro.
+
+Run the function TX inside a transaction.
+If the transaction is invalid (conflicts) re-run TX immediately, ignoring
+any error it may signal.
+
+Otherwise, commit if TX returns normally, or rollback if it signals an error.
+
+Finally, if TX called (retry), re-run it after at least some of the
+transactional memory it read has changed."
+
+  (declare (type function tx))
+
+  (if (transaction?)
+      (funcall tx)
+      (%run-atomic tx)))
+
 
 
 

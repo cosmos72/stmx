@@ -38,7 +38,7 @@ Supported systems
 -----------------
 STMX is currently tested on the following Common Lisp implementations:
 
-* SBCL  version 1.1.6        64bit (x86_64) on Debian GNU/Linux 7.0 (wheezy) 64bit
+* SBCL  version 1.1.7        64bit (x86_64) on Debian GNU/Linux 7.0 (wheezy) 64bit
 * SBCL  version 1.0.55.0     32bit (x86)    on Ubuntu 12.04LTS (precise pangolin) 32bit
 * CCL   version 1.9-r15769   64bit (x86_64) on Debian GNU/Linux 7.0 (wheezy) 64bit
 * CCL   version 1.9-r15769M  32bit (x86)    on Debian GNU/Linux 7.0 (wheezy) 64bit
@@ -445,6 +445,15 @@ features are available:
    - `(value-of var)` getter method, equivalent to `($ var)`
    - `(setf (value-of var) value)` setter method, equivalent to `(setf ($ var) value)`
 
+   For programmers that want to squeeze the last CPU cycle out of STMX, there are
+   two more functions that work **only** inside transactions:
+   - `(fast-$ var)` Get the value of VAR. Return `+unbound-tvar+` if VAR is not
+     bound to any value.
+   - `(setf (fast-$ var) value)` Store VALUE into VAR.
+   Quite obviously, explicitly checking the value returned by `fast-$` against
+   `+unbound-tvar+` would negate the speed advantage: `fast-$` is intended
+   for those cases where the TVAR is known to be bound to a value.
+
 Utilities and examples
 ---------------------
 
@@ -566,14 +575,14 @@ Performance
 See the included file [doc/benchmark.md](doc/benchmark.md) for performance
 considerations and a lot of raw numbers.
 
-The short version is: as of April 2013, on a fast consumer PC (Core i5 @ 4GHz or better)
-with a fast Common Lisp (SBCL or better), STMX can execute up to 4 millions
+The short version is: as of May 2013, on a fast consumer PC (Core i5 @ 4GHz or better)
+with a fast Common Lisp (SBCL 1.1.7 or better), STMX can execute up to 6 millions
 transactions per second per CPU core.
 
 Taking as a small but somewhat realistic example the [dining philosophers](example/dining-philosophers.lisp),
 with 5 reads and 5 writes to transactional memory per atomic block and
 a moderate rate of conflicts and retries (20-40%), each CPU core runs
-approximately 1 million transactions per second.
+approximately 1.9 millions transactions per second.
 
 Obviously, performance in other cases will depend on the complexity of the code
 inside transactions, on the number of reads and writes to transactional memory,

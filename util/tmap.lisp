@@ -29,7 +29,6 @@
     (key   )
     (value )
     (color ))
-
    (:documentation "Node of transactional sorted map, implemented with red-black tree")))
 
 
@@ -44,7 +43,7 @@
 
 
 
-;;;; ** Public API. Most methods simply wrap (call-next-method) in a transaction
+;;;; ** Public API. All methods simply wrap (call-next-method) in a transaction
 
 
 (defmethod get-bmap ((m tmap) key &optional default)

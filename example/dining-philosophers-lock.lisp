@@ -15,63 +15,92 @@
 
 (in-package :cl-user)
 
-(defpackage #:stmx.example1
-  (:use #:cl
-        #:bordeaux-threads
-        #:stmx.lang
-        #:stmx
-        #:stmx.util)
+(defpackage #:stmx.example2
+  (:use #:cl)
 
-  (:import-from #:stmx #:new))
+  (:import-from #:stmx.lang
+                #:eval-always
+                #:start-thread #:wait4-thread))
+                
+
+(in-package :stmx.example2)
 
 
-(in-package :stmx.example1)
-  
+;; standard bordeaux-threads lock. for this simple example,
+;; they are up to 3 times faster than STMX transactions
+#+never
+(eval-always
+ (deftype lock () 't)
 
-(declaim (ftype (function (cons) fixnum) eat-from-plate))
-(declaim (inline eat-from-plate))
+ (defmacro make-lock (&optional name)
+   `(bt:make-lock ,name))
+
+ (defmacro acquire-lock (lock)
+   `(bt:acquire-lock ,lock nil))
+
+ (defmacro unlock (lock)
+   `(bt:release-lock ,lock)))
+
+
+;; fast locks using atomic compare-and-swap. for this simple example,
+;; they are up to 10 times faster than STMX transactions
+#-always
+(eval-always
+ (deftype lock () 'stmx::mutex)
+
+ (defmacro make-lock (&optional name)
+   (declare (ignore name))
+   `(stmx.lang::make-mutex))
+ 
+ (defmacro acquire-lock (lock)
+   `(stmx.lang::try-acquire-mutex ,lock))
+
+ (defmacro unlock (lock)
+   `(stmx.lang::release-mutex ,lock)))
+
+
+
+(declaim (ftype (function (cons) fixnum) eat-from-plate)
+         (inline eat-from-plate))
 (defun eat-from-plate (plate)
   "Decrease by one TVAR in plate."
   (declare (type cons plate))
-  (decf (the fixnum ($ (car plate)))))
+  (decf (the fixnum (car plate))))
 
 
-(declaim (ftype (function (tvar tvar cons) fixnum) philosopher-eats))
+(declaim (ftype (function (lock lock cons) fixnum) philosopher-eats))
 (defun philosopher-eats (fork1 fork2 plate)
   "Eat once. return remaining hunger"
-  (declare (type tvar fork1 fork2)
+  (declare (type lock fork1 fork2)
            (type cons plate))
-  ;; use a normal (non-transactional) counter to keep track
-  ;; of retried transactions for demonstration purposes.
+
+  ;; also keep track of failed lock attempts for demonstration purposes.
   (decf (the fixnum (cdr plate)))
-   
-  (let ((f1 (take fork1))
-        (f2 (take fork2)))
-    (prog1 (eat-from-plate plate)
-      (put fork1 f1)
-      (put fork2 f2))))
+
+  (when (acquire-lock fork1)
+    (when (acquire-lock fork2)
+      (eat-from-plate plate)
+      (unlock fork2))
+    (unlock fork1))
+  
+  (the fixnum (car plate)))
 
 
 
 (defun dining-philosopher (i fork1 fork2 plate)
   "Eat until not hungry anymore."
-  (declare (type tvar fork1 fork2)
+  (declare (type lock fork1 fork2)
            (type cons plate)
            (type fixnum i))
   ;;(with-output-to-string (out)
   ;;  (let ((*standard-output* out))
   (log:info "philosopher ~A: fork1=~A fork2=~A plate=~A~%"
-            i ($ fork1) ($ fork2) (car plate))
+            i fork1 fork2 (car plate))
   ;;(sb-sprof:with-profiling
   ;;  (:max-samples 1000 :sample-interval 0.001 :report :graph
   ;;   :loop nil :show-progress t :mode :alloc)
 
-
-  ;; NOTE: this simpler version works too, but allocates a closure at each iteration:
-  ;; (loop until (zerop (the fixnum (atomic (philosopher-eats fork1 fork2 plate)))))
-
-  (let1 lambda-philosopher-eats (lambda () (philosopher-eats fork1 fork2 plate)) 
-    (loop until (zerop (the fixnum (run-atomic lambda-philosopher-eats))))))
+  (loop until (zerop (philosopher-eats fork1 fork2 plate))))
 
 
 (defun dining-philosophers (philosophers-count &optional (philosophers-initial-hunger 1000000))
@@ -83,9 +112,9 @@
 
   (let* ((n philosophers-count)
          (nforks (max n 2))
-         (forks (loop for i from 1 to nforks collect (tvar i)))
+         (forks (loop for i from 1 to nforks collect (make-lock (format nil "~A" i))))
          (plates (loop for i from 1 to n collect
-                      (cons (tvar philosophers-initial-hunger)
+                      (cons philosophers-initial-hunger
                             philosophers-initial-hunger)))
          (philosophers
           (loop for i from 1 to n collect
@@ -93,6 +122,11 @@
                      (fork2 (nth (mod i nforks) forks))
                      (plate (nth (1- i)         plates))
                      (j i))
+
+                 ;; make the last philospher left-handed
+                 (when (= i n)
+                   (rotatef fork1 fork2))
+
                  (lambda ()
                    (dining-philosopher j fork1 fork2 plate))))))
 
@@ -109,8 +143,5 @@
 
     (loop for (plate . fails) in plates
        for i from 1 do
-         (format t "philosopher ~A: ~A successful transactions, ~A retried~%"
-                 i (- philosophers-initial-hunger ($ plate)) (- fails)))))
-
-    
-  
+         (format t "philosopher ~A: ~A successful attempts, ~A failed~%"
+                 i (- philosophers-initial-hunger plate) (- fails)))))

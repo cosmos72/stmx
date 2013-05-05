@@ -304,7 +304,7 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
 
 Input/Output during transactions
 --------------------------------
-**WARNING:** since transactions will be re-executed in case of conflicts with other ones
+**WARNING:** since transactions will be re-executed in case of conflicts with others
 and can also rollback or retry, all non-transactional code inside an atomic block
 may be executed more times than expected, or may be executed when **not** expected.
 
@@ -319,7 +319,7 @@ action can also be performed inside an atomic block.
 This means you are free to launch missiles during a transaction, and blow the world
 when you shouldn't have. **You have been warned.**
 
-Despite the risk, there are at least two reasons for such design choice:
+Despite the risk, there are at least two reasons for such a design choice:
 * Forbidding I/O operations inside transactions, if done at all, should be done
   while compiling a program rather than while running it.
   In Common Lisp, neither of the two seems easy to implement.

@@ -449,10 +449,10 @@ features are available:
    two more functions that work **only** inside transactions:
    - `(fast-$ var)` Get the value of VAR. Return `+unbound-tvar+` if VAR is not
      bound to any value.
+     Quite obviously, explicitly checking the value returned by `fast-$` against
+     `+unbound-tvar+` would negate the speed advantage: `fast-$` is intended
+     for those cases where the TVAR is known to be bound to a value.
    - `(setf (fast-$ var) value)` Store VALUE into VAR.
-   Quite obviously, explicitly checking the value returned by `fast-$` against
-   `+unbound-tvar+` would negate the speed advantage: `fast-$` is intended
-   for those cases where the TVAR is known to be bound to a value.
 
 Utilities and examples
 ---------------------
@@ -471,7 +471,7 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
   puts a value.
   
   When full, putting a value will (retry) and wait until some other thread
-  removes the previous value.
+  removes the current value.
 
   Note: raw TVARs support exactly the same methods.
 

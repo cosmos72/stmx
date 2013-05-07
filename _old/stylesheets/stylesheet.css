@@ -66,69 +66,34 @@ a:hover {
 header {
   padding-top: 40px;
   padding-bottom: 40px;
-  font-family: 'Helvetica Neue', Helvetica, Arial, serif; 
-  background: #2e7bcf url(../images/header-bg.png) 0 0 repeat-x;
+  font-family: 'Architects Daughter', 'Helvetica Neue', Helvetica, Arial, serif; 
+  background: #2e7bcf url(../images/header-bg.jpg) 0 0 repeat-x;
   border-bottom: solid 1px #275da1;
 }
 
-header a {
-  color: #ffffff;
-}
-
-header a:hover,
-header a.active {
-  background-color: #ffffff;
-  color: #2e7bcf;
-}
-
-
 header h1 {
-  display: inline;
-}
-
-
-header h1 a {
-  float: left;
-  position: relative;
-  top: -0.3em;
   letter-spacing: -1px;
-  font-size: 48px;
+  font-size: 72px;
+  color: #fff;
   line-height: 1;
-  margin: 0 0.5em 0.2em;
+  margin-bottom: 0.2em;
+  width: 540px;
 }
 
-header .menu {
-  display: inline;
-  // float: left;
-  list-style-type: none;
-  padding: 64px 0 0 45px;
-  // text-transform: uppercase; 
-}
-
-header .menu li {
-  display: inline;
-  float: left;
-}
-
-header .menu li a {
-  // display: block;
-  // letter-spacing: 1px;
-  font-size: 16px;
-  font-weight: normal;
-  text-decoration: none;
-  text-transform: uppercase;
-  // padding: 2px 9px;
-}
-
-
-h2 {
+header h2 {
   font-size: 26px;
+  color: #9ddcff;
   font-weight: normal;
   line-height: 1.3;
-  // width: 540px;
+  width: 540px;
   letter-spacing: 0;
 }
 
+.inner {
+  position: relative;
+  width: 940px;
+  margin: 0 auto;
+}
 
 #content-wrapper {
   border-top: solid 1px #fff;
@@ -171,17 +136,16 @@ a.button {
   color: #fff;
   padding-left: 68px;
   padding-top: 22px;
-  font-family: 'Helvetica Neue', Helvetica, Arial, serif; 
+  font-family: 'Architects Daughter', 'Helvetica Neue', Helvetica, Arial, serif; 
 }
 a.button small {
   display: block;
-  font-size: 9px;
+  font-size: 11px;
 }
-
 header a.button {
   position: absolute;
-  right: 0px;
-  top: 16px;
+  right: 0;
+  top: 0;
   background: transparent url(../images/github-button.png) 0 0 no-repeat;
 }
 aside a.button {
@@ -261,7 +225,7 @@ form {
 /* GENERAL ELEMENT TYPE STYLES */
 
 #main-content h1 {
-  font-family: 'Helvetica Neue', Helvetica, Arial, serif; 
+  font-family: 'Architects Daughter', 'Helvetica Neue', Helvetica, Arial, serif; 
   font-size: 2.8em;
   letter-spacing: -1px;
   color: #474747;
@@ -275,7 +239,7 @@ form {
 }
 
 #main-content h2 {
-  font-family: 'Helvetica Neue', Helvetica, Arial, serif; 
+  font-family: 'Architects Daughter', 'Helvetica Neue', Helvetica, Arial, serif; 
   font-size: 22px;
   font-weight: bold;
   margin-bottom: 8px;
@@ -289,7 +253,7 @@ form {
 }
 
 #main-content h3 {
-  font-family: 'Helvetica Neue', Helvetica, Arial, serif; 
+  font-family: 'Architects Daughter', 'Helvetica Neue', Helvetica, Arial, serif; 
   font-size: 18px;
   font-weight: bold;
   margin-top: 24px;
@@ -305,7 +269,7 @@ form {
 }
 
 #main-content h4 {
-  font-family: 'Helvetica Neue', Helvetica, Arial, serif; 
+  font-family: 'Architects Daughter', 'Helvetica Neue', Helvetica, Arial, serif; 
   font-size: 15px;
   font-weight: bold;
   color: #474747;
@@ -319,7 +283,7 @@ h4:before {
 }
 
 #main-content h5 {
-  font-family: 'Helvetica Neue', Helvetica, Arial, serif; 
+  font-family: 'Architects Daughter', 'Helvetica Neue', Helvetica, Arial, serif; 
   font-size: 14px;
   color: #474747;
 } 
@@ -331,7 +295,7 @@ h5:before {
 }
 
 #main-content h6 {
-  font-family: 'Helvetica Neue', Helvetica, Arial, serif; 
+  font-family: 'Architects Daughter', 'Helvetica Neue', Helvetica, Arial, serif; 
   font-size: .8em;
   color: #474747;
 } 
@@ -413,6 +377,9 @@ footer a:hover {
 
 /* Tablet Portrait size to standard 960 (devices and browsers) */
 @media only screen and (min-width: 768px) and (max-width: 959px) {
+  .inner {
+    width: 740px;
+  }
   header h1, header h2 {
     width: 340px;
   }
@@ -439,8 +406,14 @@ footer a:hover {
 
 /* All Mobile Sizes (devices and browser) */
 @media only screen and (max-width: 767px) {
+  .inner {
+    width: 93%;
+  }
   header {
     padding: 20px 0;
+  }
+  header .inner {
+    position: relative;
   }
   header h1, header h2 {
     width: 100%;

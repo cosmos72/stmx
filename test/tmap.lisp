@@ -46,6 +46,8 @@
   (test-tmap-rollback))
 
 (test tmap
-  (test-rbmap-class 'tmap)
+  (test-rbmap-class 'tmap))
+
+(test tmap-atomic
   (atomic (test-rbmap-class 'tmap)))
 

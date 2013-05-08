@@ -156,7 +156,6 @@ bmap-count must be the actual nodes count, root must be black."
         (fsck-rbmap m1 m2)
         (set-bmap m2 key value)))
         
-
     (dotimes (i (* 2 count))
       (let1 key (random count)
         (is (eql (hash-table-count hash) (bmap-count m1)))
@@ -172,11 +171,7 @@ bmap-count must be the actual nodes count, root must be black."
            (is-equal-bmap-and-hash-table m1 hash)
            (fsck-rbmap m1 m2)
            (rem-bmap m2 key)))))
-           
 
 (test rbmap
   (test-rbmap-class 'rbmap))
 
-
-           
-    

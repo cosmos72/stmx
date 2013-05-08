@@ -56,13 +56,13 @@ bad style; I prefer to be notified early if I try to do something wrong."
 (defun bmap-pred (m)
   "Return predicate used by binary tree M to sort keys."
   (declare (type bmap m))
-  (the function (pred-of m)))
+  (the function (_ m pred)))
 
 
 (defun bmap-count (m)
   "Return number of elements in binary tree M."
   (declare (type bmap m))
-  (the fixnum (count-of m)))
+  (the fixnum (_ m count)))
 
 
 (defun bmap-empty? (m)
@@ -576,3 +576,6 @@ Return t if left child was replaced, nil if right child was replaced"
           (setf (_ parent left) new-node)
           (setf (_ parent right) new-node))
       left-child?)))
+
+(defprint-object (obj bmap)
+  (format t "~S ~S ~S ~S" :count (_ obj count) :pred (_ obj pred)))

@@ -63,11 +63,11 @@ Benchmark results
 What follows are some timings obtained on the authors's system, and by no means they
 claim to be exact, absolute or reproducible: your mileage may vary.
 
-Date: 27 April 2013
+Date: 05 May 2013
 
 Hardware: Intel Core-i5 750 @4.0 GHz (quad-core), 16GB RAM
 
-Software: Debian GNU/Linux 7 (wheezy) x86_64, SBCL 1.1.6 x86_64, STMX 1.3.0
+Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.7 (x86_64), STMX 1.3.1
 
 
 <table>

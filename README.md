@@ -38,11 +38,13 @@ Supported systems
 -----------------
 STMX is currently tested on the following Common Lisp implementations:
 
-* SBCL  version 1.1.7        64bit (x86_64) on Debian GNU/Linux 7.0 (wheezy) 64bit
-* SBCL  version 1.0.55.0     32bit (x86)    on Ubuntu 12.04LTS (precise pangolin) 32bit
-* CCL   version 1.9-r15769   64bit (x86_64) on Debian GNU/Linux 7.0 (wheezy) 64bit
-* CCL   version 1.9-r15769M  32bit (x86)    on Debian GNU/Linux 7.0 (wheezy) 64bit
-* CMUCL version 20d Unicode  32bit (x86)    on Debian GNU/Linux 7.0 (wheezy) 64bit
+* SBCL  version 1.1.7        (x86_64) on Debian GNU/Linux 7.0  (x86_64)
+* SBCL  version 1.0.55.0     (x86)    on Ubuntu Linux 12.04LTS (x86)
+* CMUCL version 20d Unicode  (x86)    on Debian GNU/Linux 7.0  (x86_64)
+* ABCL  version 1.1.1 with OpenJDK 6b27-1.12.5-1 (x86_64) on Debian GNU/Linux 7.0 (x86_64)
+* CCL   version 1.9-r15769   (x86_64) on Debian GNU/Linux 7.0  (x86_64)
+* CCL   version 1.9-r15769M  (x86)    on Debian GNU/Linux 7.0  (x86_64)
+* CCL   version 1.9-dev-r15475M-trunk (LinuxARM32) on Raspbian GNU/Linux (armhf) Raspberry Pi
 
 It will probably work on several other Common Lisp implementations as long as they support
 log4cl, closer-mop, bordeaux-threads and trivial-garbage, but the author gives no guarantees.
@@ -118,13 +120,14 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
              ;; ...
             )))
 
-  Note: on some Common Lisp implementations, slot accessors are known
-  to ignore by default the transactional machinery (implemented with MOP
-  slot-value-using-class, if you wonder) causing all kinds of errors
-  on transactional classes.
-  For this reason, it is recommended to use `slot-value` to read and write
-  the slots of transactional classes or, even better, a macro that can
-  be defined to use either `slot-value` or slot accessors.
+  Note: on some Common Lisp implementations (ABCL and possibly others)
+  slot accessors are known to ignore by default the transactional machinery
+  (implemented with MOP slot-value-using-class, if you wonder) causing all kinds
+  of errors on transactional classes.
+  Even though usually this problem can be *partially* fixed with
+  implementation-specific options, it is recommended to use `slot-value`
+  to read and write the slots of transactional classes or, even better, a macro
+  that can be defined to use either `slot-value` or slot accessors.
 
 - `TRANSACTION` declares that a method or function is an atomic
   transaction, and is actually just a convenience macro for `ATOMIC`.

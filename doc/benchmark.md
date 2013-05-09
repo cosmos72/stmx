@@ -163,63 +163,63 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.7 (x86_64), STMX 1.3.1
 
  <tr><td>1 thread</td>
      <td><code>(dining-philosophers 1 1000000)</code></td>
-     <td>2.60&nbsp;millions</td></tr>
+     <td>2.84&nbsp;millions</td></tr>
 
  <tr><td>2 threads</td>
      <td><code>(dining-philosophers 2 1000000)</code></td>
-     <td>3.97&nbsp;millions</td></tr>
+     <td>4.19&nbsp;millions</td></tr>
 
  <tr><td>3 threads</td>
      <td><code>(dining-philosophers 3 1000000)</code></td>
-     <td>5.15&nbsp;millions</td></tr>
+     <td>5.11&nbsp;millions</td></tr>
 
  <tr><td>4 threads</td>
      <td><code>(dining-philosophers 4 1000000)</code></td>
-     <td>5.74&nbsp;millions</td></tr>
+     <td>5.94&nbsp;millions</td></tr>
 
  <tr><td>5 threads</td>
      <td><code>(dining-philosophers 5 1000000)</code></td>
-     <td>5.88&nbsp;millions</td></tr>
+     <td>6.52&nbsp;millions</td></tr>
 
  <tr><td>6 threads</td>
      <td><code>(dining-philosophers 6 1000000)</code></td>
-     <td>6.61&nbsp;millions</td></tr>
+     <td>6.68&nbsp;millions</td></tr>
 
  <tr><td>7 threads</td>
      <td><code>(dining-philosophers 7 1000000)</code></td>
-     <td>7.06&nbsp;millions</td></tr>
+     <td>7.14&nbsp;millions</td></tr>
 
  <tr><td>8 threads</td>
      <td><code>(dining-philosophers 8 1000000)</code></td>
-     <td>7.04&nbsp;millions</td></tr>
+     <td>7.37&nbsp;millions</td></tr>
 
  <tr><td>10 threads</td>
      <td><code>(dining-philosophers 10 1000000)</code></td>
-     <td>6.94&nbsp;millions</td></tr>
+     <td>7.51&nbsp;millions</td></tr>
 
  <tr><td>15 threads</td>
      <td><code>(dining-philosophers 15 1000000)</code></td>
-     <td>7.56&nbsp;millions</td></tr>
+     <td>7.72&nbsp;millions</td></tr>
 
  <tr><td>20 threads</td>
      <td><code>(dining-philosophers 20 1000000)</code></td>
-     <td>7.36&nbsp;millions</td></tr>
+     <td>7.76&nbsp;millions</td></tr>
 
  <tr><td>30 threads</td>
      <td><code>(dining-philosophers 30 1000000)</code></td>
-     <td>7.60&nbsp;millions</td></tr>
+     <td>7.79&nbsp;millions</td></tr>
 
  <tr><td>40 threads</td>
      <td><code>(dining-philosophers 40 1000000)</code></td>
-     <td>7.45&nbsp;millions</td></tr>
+     <td>8.03&nbsp;millions</td></tr>
 
  <tr><td>50 threads</td>
      <td><code>(dining-philosophers 50 1000000)</code></td>
-     <td>7.49&nbsp;millions</td></tr>
+     <td>7.88&nbsp;millions</td></tr>
 
  <tr><td>100 threads</td>
      <td><code>(dining-philosophers 100 1000000)</code></td>
-     <td>7.44&nbsp;millions</td></tr>
+     <td>8.01&nbsp;millions</td></tr>
 
 
 </table>

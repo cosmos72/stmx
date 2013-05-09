@@ -231,23 +231,20 @@ During transactions, it uses transaction log to record the 'unbound' value."
   var)
 
 
+(declaim (inline peek-$ try-take-$ try-put-$))
 
 (defun peek-$ (var &optional default)
     "Get the value from the transactional variable VAR
 and return it and t as multiple values.
 If VAR is not bound to a value, return (values DEFAULT nil).
 
-Works both outside and inside transactions.
-During transactions, it uses transaction log to record the read
-and to check for any value stored in the log."
+Works both inside and outside transactions."
   (declare (type tvar var))
 
-  (let1 value (if (recording?)
-                  (tx-read-of var)
-                  (raw-value-of var))
+  (let1 value (if (recording?) (tx-read-of var) (raw-value-of var))
     (if (eq value +unbound-tvar+)
       (values default nil)
-      (values value t))))
+      (values value   t))))
 
 
 (defun try-take-$ (var &optional default)
@@ -255,44 +252,28 @@ and to check for any value stored in the log."
 unbind it and and return t and the original value as multiple values.
 If VAR is not bound to a value, return (values nil DEFAULT).
 
-Works both outside and inside transactions.
-During transactions, it uses transaction log to record the read and write
-and to check for any value stored in the log."
+Works only inside transactions."
   (declare (type tvar var))
 
-  (if (recording?)
-      (let1 value (tx-read-of var)
-        (if (eq value +unbound-tvar+)
-            (values nil default)
-            (progn
-              (tx-write-of var +unbound-tvar+)
-              (values t value))))
-      (let1 value (raw-value-of var)
-        (if (eq value +unbound-tvar+)
-            (values nil default)
-            (progn
-              (setf (raw-value-of var) +unbound-tvar+)
-              (values t value))))))
+  (let1 value (tx-read-of var)
+    (if (eq value +unbound-tvar+)
+        (values nil default)
+        (progn
+          (tx-write-of var +unbound-tvar+)
+          (values t value)))))
 
 
 (defun try-put-$ (var value &optional default)
     "If VAR is not bound, bind it to VALUE and return (values VALUE t)
 If VAR is already bound to a value, return (values DEFAULT nil).
 
-Works both outside and inside transactions.
-During transactions, it uses transaction log to record the read and write
-and to check for any value stored in the log."
+Works only inside transactions."
   (declare (type tvar var))
 
-  (if (recording?)
-      (let1 old-value (tx-read-of var)
-        (if (eq old-value +unbound-tvar+)
-            (values t (tx-write-of var value))
-            (values nil default)))
-      (let1 old-value (raw-value-of var)
-        (if (eq old-value +unbound-tvar+)
-            (values t (setf (raw-value-of var) value))
-            (values nil default)))))
+  (let1 old-value (tx-read-of var)
+    (if (eq old-value +unbound-tvar+)
+        (values t (tx-write-of var value))
+        (values nil default))))
 
 ;;;; ** Accessors
 

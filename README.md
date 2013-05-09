@@ -584,8 +584,8 @@ transactions per second per CPU core.
 
 Taking as a small but somewhat realistic example the [dining philosophers](example/dining-philosophers-stmx.lisp),
 with 5 reads and 5 writes to transactional memory per atomic block and
-a moderate rate of conflicts and retries (20-40%), each CPU core runs
-approximately 1.9 millions transactions per second.
+even with a significative rate of conflicts and retries (20-50%),
+each CPU core runs approximately 2 millions transactions per second.
 
 Obviously, performance in other cases will depend on the complexity of the code
 inside transactions, on the number of reads and writes to transactional memory,

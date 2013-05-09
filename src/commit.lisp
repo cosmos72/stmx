@@ -363,13 +363,13 @@ b) another TLOG is writing the same TVARs being committed
       (unlock-tvars writes locked-n locked-all?)
       (log.trace "Tlog ~A ...released locks" (~ log))
 
-
-      ;; after-commit functions run without locks
       (invoke-after-commit-macro log success
         (do-fast-vector (var) changed
           (log.trace "Tlog ~A notifying threads waiting on tvar ~A"
                      (~ log) (~ var))
           (notify-tvar-high-load var))))
+
+        ;; after-commit functions run without locks
 
     success))
                    

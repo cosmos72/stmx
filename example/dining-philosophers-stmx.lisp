@@ -64,7 +64,7 @@
             i ($ fork1) ($ fork2) (car plate))
   ;;(sb-sprof:with-profiling
   ;;  (:max-samples 1000 :sample-interval 0.001 :report :graph
-  ;;   :loop nil :show-progress t :mode :alloc)
+  ;;   :loop nil :show-progress t :mode :cpu)
 
 
   ;; NOTE: this simpler version works too, but allocates a closure at each iteration:

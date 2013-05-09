@@ -13,7 +13,7 @@
 ;; See the Lisp Lesser General Public License for more details.
 
 
-(in-package :stmx.test)
+(in-package :stmx.util)
 
 (defun least-square-fit-3 (x1 y1 x2 y2 x3 y3)
   (let* ((n 3)

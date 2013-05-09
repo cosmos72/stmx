@@ -84,21 +84,21 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.7 (x86_64), STMX 1.3.1
  <tr><td>atomic nil       </td><td><code>(atomic nil)</code>                </td><td>0.086&nbsp;microseconds</td></tr>
  <tr><td>atomic read-1    </td><td><code>(atomic (fast-$ v))</code>              </td><td>0.107&nbsp;microseconds</td></tr>
  <tr><td>atomic write-1   </td><td><code>(atomic (setf (fast-$ v) i))</code>     </td><td>0.130&nbsp;microseconds</td></tr>
- <tr><td>atomic read-write-1</td><td><code>(atomic (incf (fast-$ v)))</code>     </td><td>0.167&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-write-1</td><td><code>(atomic (incf (fast-$ v)))</code>     </td><td>0.165&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-10</td>
      <td><code>(atomic (dotimes (j 10) (incf (fast-$ v))))</code></td>
-     <td>0.330&nbsp;microseconds</td></tr>
+     <td>0.309&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-100</td>
      <td><code>(atomic (dotimes (j 100) (incf (fast-$ v))))</code></td>
-     <td>1.946&nbsp;microseconds</td></tr>
+     <td>1.718&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-1000</td>
      <td><code>(atomic (dotimes (j 1000) (incf (fast-$ v))))</code></td>
-     <td>18.071&nbsp;microseconds</td></tr>
+     <td>15.693&nbsp;microseconds</td></tr>
 
- <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(0.152+N*0.018)&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(0.159+N*0.016)&nbsp;microseconds</td></tr>
 
  <tr><td>orelse empty     </td><td><code>(atomic (orelse))</code>           </td><td>0.062&nbsp;microseconds</td></tr>
  <tr><td>orelse unary     </td><td><code>(atomic (orelse (fast-$ v)))</code>     </td><td>0.269&nbsp;microseconds</td></tr>
@@ -115,21 +115,21 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.7 (x86_64), STMX 1.3.1
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-bmap tm))<br>
               (set-bmap tm i t))</code></td>
-     <td>5.678&nbsp;microseconds</td></tr>
+     <td>5.585&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 100)</td>
      <td><code>(atomic (when (zerop (mod i  100)) (clear-bmap tm))<br>
               (set-bmap tm i t))</code></td>
-     <td>7.915&nbsp;microseconds</td></tr>
+     <td>7.782&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 1000)</td>
      <td><code>(atomic (when (zerop (mod i 1000)) (clear-bmap tm))<br>
               (set-bmap tm i t))</code></td>
-     <td>9.498&nbsp;microseconds</td></tr>
+     <td>9.324&nbsp;microseconds</td></tr>
 
  <tr><td>thash read-write-1</td>
      <td><code>(atomic (incf (get-thash th 'x)))</code></td>
-     <td>1.861&nbsp;microseconds</td></tr>
+     <td>1.779&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-thash th))<br>
@@ -163,11 +163,11 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.7 (x86_64), STMX 1.3.1
 
  <tr><td>1 thread</td>
      <td><code>(dining-philosophers 1 1000000)</code></td>
-     <td>2.84&nbsp;millions</td></tr>
+     <td>2.67&nbsp;millions</td></tr>
 
  <tr><td>2 threads</td>
      <td><code>(dining-philosophers 2 1000000)</code></td>
-     <td>4.19&nbsp;millions</td></tr>
+     <td>3.94&nbsp;millions</td></tr>
 
  <tr><td>3 threads</td>
      <td><code>(dining-philosophers 3 1000000)</code></td>

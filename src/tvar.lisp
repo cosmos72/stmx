@@ -139,7 +139,7 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
     (set-txhash (tlog-reads log) var value)))
 
 
-
+(declaim (inline tx-write-of))
 (defun tx-write-of (var value &optional (log (current-tlog)))
   "Store in transaction LOG the writing of VALUE into VAR; return VALUE.
 
@@ -231,7 +231,7 @@ During transactions, it uses transaction log to record the 'unbound' value."
   var)
 
 
-(declaim (inline peek-$ try-take-$ try-put-$))
+(declaim (inline try-take-$ try-put-$))
 
 (defun peek-$ (var &optional default)
     "Get the value from the transactional variable VAR

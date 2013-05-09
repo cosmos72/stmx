@@ -31,15 +31,14 @@ Which locks exactly must be acquired by a transaction while committing in order
 to guarantee atomicity, consistency and isolation (the A, C and I in ACID) ?
 
 
-    Tx1        Tx2     The possible dependencies between two transactions are:
-
-   reads__RR__reads    RR - they read some common memory
-     | RW\  /  |       RW - Tx1 reads some memory written by Tx2
-     |    \/   |       WR - Tx1 writes some memory read by Tx1
-     |    /\   |       WW - they write some common memory
-     v WR/  \  v       and of course all the combinations of these
-  writes/____\writes   for a total of 2^4 = 16 possibilities
-          WW
+      Tx1        Tx2     The possible dependencies between two transactions are:
+     reads__RR__reads    RR - they read some common memory
+       | RW\  /  |       RW - Tx1 reads some memory written by Tx2
+       |    \/   |       WR - Tx1 writes some memory read by Tx1
+       |    /\   |       WW - they write some common memory
+       v WR/  \  v       and of course all the combinations of these
+    writes/____\writes   for a total of 2^4 = 16 possibilities
+            WW
 
 1) no dependencies: no constraints on the implementation
 
@@ -66,31 +65,32 @@ to guarantee atomicity, consistency and isolation (the A, C and I in ACID) ?
 
          Tx1                            Tx2                         Tx3
 
-   reads A, B                  reads E, F                  reads A, B, C, D
-   writes C, D                 writes A, B                 writes G
-   commit means:               commit means:               commit means:
-   --------------------------  --------------------------  --------------------------
-   excl-lock C                                             excl-lock G
-   excl-lock D                                             (W3) = incf global-clock
-   (W1) = incf global-clock
-   check A, B (success)
-                               excl-lock A
-                               excl-lock B
-                               (W2) = incf global-clock
-                               check E, F (success)
-                               commit A: set value, (W2)
-                               commit B: set value, (W2)
-                               excl-unlock A
-                               excl-unlock B
-                               committed
-                                                           check A, B (success)
-                                                           check C, D (must fail)
-   commit C: set value, (W1)                               fail
-   commit D: set value, (W1)                               excl-unlock G
-   excl-unlock C                                           failed, must re-run
-   excl-unlock D
-   committed                   
-   --------------------------  --------------------------
+    reads A, B                  reads E, F                  reads A, B, C, D
+    writes C, D                 writes A, B                 writes G
+    commit means:               commit means:               commit means:
+    --------------------------  --------------------------  --------------------------
+    excl-lock C                                             excl-lock G
+    excl-lock D                                             (W3) = incf global-clock
+    (W1) = incf global-clock
+    check A, B (success)
+                                excl-lock A
+                                excl-lock B
+                                (W2) = incf global-clock
+                                check E, F (success)
+                                commit A: set value, (W2)
+                                commit B: set value, (W2)
+                                excl-unlock A
+                                excl-unlock B
+                                committed
+                                                            check A, B (success)
+                                                            check C, D (must fail)
+    commit C: set value, (W1)                               fail
+    commit D: set value, (W1)                               excl-unlock G
+    excl-unlock C                                           failed, must re-run
+    excl-unlock D
+    committed                   
+    --------------------------  --------------------------
+    
    No matter what checks are performed, in the above sequence both Tx1 and Tx2
    will commit. This means that Tx1 will appear to commit before Tx2 (it used
    the values of A and B before Tx2 changed them) even though it may actually
@@ -119,28 +119,28 @@ to guarantee atomicity, consistency and isolation (the A, C and I in ACID) ?
 
          Tx1                            Tx2              
 
-   reads A, B                  reads E, F                
-   writes C, D                 writes A, B               
-   commit means:               commit means:             
-   --------------------------  --------------------------
-   excl-lock C                                           
-   excl-lock D                                           
-   (W1) = incf global-clock
-                               excl-lock A
-                               excl-lock B
-                               (W2) = incf global-clock
-                               check E, F (success)
-                               commit A: set value, (W2)
-                               commit B: set value, (W2)
-                               excl-unlock A
-                               excl-unlock B
-                               committed
-   check A, B (must fail)
-   fail
-   excl-unlock C                                         
-   excl-unlock D
-   failed, must re-run                   
-   --------------------------  --------------------------
+    reads A, B                  reads E, F                
+    writes C, D                 writes A, B               
+    commit means:               commit means:             
+    --------------------------  --------------------------
+    excl-lock C                                           
+    excl-lock D                                           
+    (W1) = incf global-clock
+                                excl-lock A
+                                excl-lock B
+                                (W2) = incf global-clock
+                                check E, F (success)
+                                commit A: set value, (W2)
+                                commit B: set value, (W2)
+                                excl-unlock A
+                                excl-unlock B
+                                committed
+    check A, B (must fail)
+    fail
+    excl-unlock C                                         
+    excl-unlock D
+    failed, must re-run                   
+    --------------------------  --------------------------
 
    Consequence 2: checking the reads must fail if some other Tx has modified
    them, i.e. if the values found during checks are different from the values

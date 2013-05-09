@@ -15,8 +15,8 @@ Main features
 - Extremely intuitive to use and to write correct, thread-safe concurrent code.
 - Brings database-style transactions to Common Lisp by introducing transactional
   memory.
-- High performance implementation, benchmarked to exceed 1 million transactions
-  per CPU core per second on commodity PC hardware.
+- High performance implementation, benchmarked to reach up to 6 millions
+  transactions per CPU core per second on commodity PC hardware.
 - Removes the need for traditional locks, mutexes and conditions - writing
   correct concurrent code with them is well known to be hard.
 - Transactional code is intrinsically deadlock-free: if two transactions
@@ -34,7 +34,7 @@ Main features
 - Includes transactional data structure for multicast publish/subscribe
 - Creating new transactional data structures is easy.
 - Extensive test suite.
-- Tested on SBCL, CCL and CMUCL.
+- Tested on SBCL, CMUCL, CCL and ABCL.
 - Very simple to install with [Quicklisp](http://www.quicklisp.org/).
 
 A quick-start guide and installation instructions are provided in the file
@@ -66,10 +66,10 @@ about STMX:
   without bugs).
 - it is NOT supposed to be used for all data structures in a Common Lisp
   program. STMX is intended only for the data accessed concurrently by multiple
-  threads while being modified by at least one thread. And even in that case,
-  transactional memory is **not always** needed: for simple modifications
-  locking code is usually feasible; for complex, structural modifications
-  transactions can help greatly.
+  threads while being destructively modified by at least one thread.
+  And even in that case, transactional memory is **not always** needed:
+  for simple modifications locking code is usually feasible; for complex,
+  structural modifications STMX can help greatly.
 - it is NOT a serialization or persistence framework. Rather, messing with
   metaclasses and playing (allowed) tricks with slots contents as STMX does,
   quite likely does **not** mix well with serialization or persistence

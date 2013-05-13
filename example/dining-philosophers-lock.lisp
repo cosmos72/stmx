@@ -77,13 +77,23 @@
   ;; also keep track of failed lock attempts for demonstration purposes.
   (decf (the fixnum (cdr plate)))
 
-  (when (acquire-lock fork1)
-    (when (acquire-lock fork2)
-      (eat-from-plate plate)
-      (unlock fork2))
-    (unlock fork1))
-  
-  (the fixnum (car plate)))
+  (prog ()
+    (unless (acquire-lock fork1)
+      (go fail1))
+    (unless (acquire-lock fork2)
+      (go fail2))
+
+    (eat-from-plate plate)
+    (unlock fork2)
+    (unlock fork1)
+    (return (the fixnum (car plate)))
+
+    fail2
+    (unlock fork1)
+
+    fail1
+    (bt:thread-yield)
+    (return (the fixnum (car plate)))))
 
 
 

@@ -119,8 +119,8 @@ For pre-defined transactional classes, see the package STMX.UTIL"
        
 
 (defmacro maybe-yield-before-rerun ()
-  #-always nil
-  #+never  (thread-yield))
+  #+never nil
+  #-always  (thread-yield))
 
 
 (declaim (inline run-once))

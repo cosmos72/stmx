@@ -144,7 +144,6 @@ Otherwise return (values DEFAULT nil)."
   (the txlist
     (if-bind entry (txhash-table-pool hash)
       (progn
-        (decf (txhash-table-pool-size hash))
         (setf (txhash-table-pool hash) (txlist-next entry)
               (txlist-key   entry) key
               (txlist-value entry) value
@@ -181,48 +180,36 @@ Otherwise return (values DEFAULT nil)."
   (defun add-txlist-to-pool (hash txlist)
     (declare (type txhash-table hash)
              (type txlist txlist))
-    (let ((pool      (txhash-table-pool      hash))
-          (pool-size (txhash-table-pool-size hash)))
-      (declare (type fixnum pool-size))
-      (loop for entry = txlist then next
-         while entry
-         for next = (txlist-next entry)
-         do
-           (setf (txlist-key   entry) dummy-tvar
-                 (txlist-value entry) nil)
-           (incf pool-size)
-           (unless next
-             (setf (txlist-next entry) pool)
-             (return)))
-      (setf (txhash-table-pool      hash) txlist
-            (txhash-table-pool-size hash) pool-size))))
+    (loop for entry = txlist then next
+       for next = (txlist-next entry)
+       do
+	 (setf (txlist-key   entry) dummy-tvar
+	       (txlist-value entry) nil)
+	 (unless next
+	   (setf (txlist-next entry) (txhash-table-pool hash))
+	   (return)))
+    (setf (txhash-table-pool hash) txlist)))
             
                
 
-       
-  
-(defun clear-txhash (hash &key (min-capacity
-                                +txhash-default-capacity+))
-  "Remove all keys and values from HASH. Return HASH."
-  (declare (type txhash-table hash)
-	   (type fixnum min-capacity))
+(declaim (type fixnum +txhash-threshold-capacity+))
+(defconstant +txhash-threshold-capacity+ 64)
 
-  (unless (zerop (logand min-capacity (1- min-capacity)))
-    (error "~A invalid initial capacity ~A: expecting a power of two."
-           'txhash-table min-capacity))
+(defun clear-txhash (hash)
+  "Remove all keys and values from HASH. Return HASH."
+  (declare (type txhash-table hash))
 
   (unless (zerop (txhash-table-count hash))
     (let* ((vec (txhash-table-vec hash))
            (n (length vec)))
-      (if (<= min-capacity n (ash min-capacity 1))
+      (if (<= n +txhash-threshold-capacity+)
           (loop for i from 0 to (1- n)
              for txlist = (svref vec i)
              when txlist do
-               (when (< (txhash-table-pool-size hash) n)
-                 (add-txlist-to-pool hash txlist))
+	       (add-txlist-to-pool hash txlist)
                (setf (svref vec i) nil))
           (setf (txhash-table-vec hash)
-                (make-array min-capacity
+                (make-array +txhash-default-capacity+
                             :initial-element nil))))
     (setf (txhash-table-count hash) 0))
   hash)

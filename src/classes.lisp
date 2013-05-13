@@ -113,8 +113,7 @@ purposes. please use ($ var) instead."
   "a hash table specialized for tvar keys."
   (vec   0   :type simple-vector)
   (count 0   :type fixnum)
-  (pool  nil :type t)
-  (pool-size 0 :type fixnum))
+  (pool  nil :type t))
 
 (declaim (ftype (function (&key (:initial-capacity fixnum))
                           txhash-table) make-txhash-table))

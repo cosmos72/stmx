@@ -105,7 +105,35 @@ purposes. please use ($ var) instead."
 
 
 
-;;;; ** txhash-table, a hash table specialized for tvar keys
+;;;; * support classes for TXHASH-TABLE
+
+(declaim (inline txpair))
+
+(defstruct (txpair (:constructor txpair))
+  (key   nil :type tvar)
+  (value nil :type t)
+  (next  nil :type (or null txpair))
+  (rest  nil :type (or null txpair))) ;; used by txfifo for intrusive list
+
+
+(defstruct (txfifo (:constructor %make-txfifo))
+  (front nil :type (or null txpair))
+  (back  nil :type (or null txpair)))
+
+
+(declaim (inline make-txfifo))
+(defun make-txfifo ()
+  "Create and return a new, empty TXFIFO."
+  (the txfifo (%make-txfifo)))
+
+
+
+
+
+
+
+
+;;;; ** TXHASH-TABLE, a hash table specialized for TVAR keys
 
 (defconstant +txhash-default-capacity+ 4)
 
@@ -128,7 +156,10 @@ purposes. please use ($ var) instead."
   (the txhash-table
     (%make-txhash-table :vec (make-array initial-capacity :initial-element nil)
                         :count 0)))
-           
+
+
+
+
 
 
 
@@ -164,9 +195,9 @@ and are later committed to memory if the transaction completes successfully."
   #-tlog-hash
   (writes (make-txhash-table) :type txhash-table)
 
-  (changed (make-fast-vector +txhash-default-capacity+) :type fast-vector :read-only t)
+  (locked (make-txfifo)       :type txfifo :read-only t)
 
-  (id +invalid-version+ :type fixnum) ;; tlog-id
+  (id     +invalid-version+   :type fixnum) ;; tlog-id
 
   ;; Parent of this TLOG. Used by ORELSE for nested transactions
   (parent    nil :type (or null tlog)) ;; tlog-parent

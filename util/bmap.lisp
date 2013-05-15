@@ -80,7 +80,7 @@ If M does not contain KEY, return (values DEFAULT NIL)."))
   (:documentation "Add KEY to binary tree M if not present, and associate KEY to VALUE in M.
 Return VALUE."))
 
-
+(declaim (inline (setf get-bmap)))
 (defun (setf get-bmap) (value m key)
   "Add KEY to binary tree M if not present, and associate VALUE to KEY in M.
 Return VALUE."

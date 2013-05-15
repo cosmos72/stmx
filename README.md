@@ -409,24 +409,16 @@ features are available:
   it is some existing code that one does not wish to modify.
 
   In this case, the transaction is already committed when the forms registered with
-  AFTER-COMMIT run, and the forms are not allowed to change it further.
-  This means there are stricter limitations on what the forms can do:
+  AFTER-COMMIT run, and (since STMX 1.3.2) the forms are executed *outside* any transaction.
+  There are some limitations on what the forms can do:
 
   - If the forms signal an error when executed, the error is propagated to the caller,
     forms registered later with AFTER-COMMIT are not executed, but the transaction
     stays committed.
 
-  - The forms must not write to _any_ transactional memory: the consequences
-    are undefined.
-
-  - The forms can _only_ read from transactional memory previously read or written
-    during the same transaction. Reading from other transactional memory
-    has undefined consequences.
-
-  - The forms cannot (retry) - attempts to do so will signal an error.
-    Starting a nested transaction and retrying inside that is acceptable
-    as long as the (retry) does not propagate outside the forms themselves
-    and the nested transaction respects the two previous limitations.
+  - The forms are not executed inside a transaction: while it is certainly possible
+    to explicitly run an `(atomic)` block from them, doing so would defeat the purpose
+    of AFTER-COMMIT and it may also cause a significant performance penalty.
 
 - `CALL-BEFORE-COMMIT` is the function version of `BEFORE-COMMIT`: it accepts a single
    function and registers it to be executed before the transaction tries to commit.

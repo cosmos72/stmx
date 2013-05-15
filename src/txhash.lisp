@@ -15,19 +15,81 @@
 
 (in-package :stmx)
 
-;;;; * Hash-table specialized for TVAR keys
+;;;; * support classes for TXHASH-TABLE
 
-(declaim (inline make-txlist))
+(defun put-txfifo (fifo pair)
+   "Append PAIR as last element in txfifo F and return PAIR."
+   (declare (type txfifo fifo)
+            (type txpair pair))
+   (if-bind back (txfifo-back fifo)
+     (setf (txpair-rest  back) pair)
+     (setf (txfifo-front fifo) pair))
+   (setf (txfifo-back fifo) pair))
 
-(defstruct txlist
-  (key   nil :type tvar)
-  (value nil :type t)
-  (next  nil :type (or null txlist)))
+(defmacro do-txfifo-entries ((pair) fifo &body body)
+  "Execute BODY on each TXPAIR contained in FIFO. Return NIL."
+  (let1 next (gensym "NEXT-")
+    `(loop for ,pair = (txfifo-front ,fifo) then ,next
+        while ,pair
+        for ,next = (txpair-rest ,pair)
+        do
+          (progn ,@body))))
+
+
+(defmacro do-txfifo ((key &optional value) fifo &body body)
+  "Execute BODY on each KEY/VALUE contained in FIFO. Return NIL."
+  (let ((pair (gensym "PAIR-")))
+    `(do-txfifo-entries (,pair) ,fifo
+       (let ((,key (txpair-key ,pair))
+             ,@(when value `((,value (txpair-value ,pair)))))
+         ,@body))))
+
+
+(defmacro do-filter-txfifo-entries ((pair) fifo &body body)
+  "Execute BODY on each TXPAIR contained in FIFO. Return NIL."
+  (let ((f    (gensym "FIFO-"))
+        (prev (gensym "PREV-"))
+        (next (gensym "NEXT-")))
+    `(let1 ,f ,fifo
+       (loop for ,prev = nil then ,pair
+          for ,pair = (txfifo-front ,f) then ,next
+          while ,pair
+          for ,next = (txpair-rest ,pair)
+          do
+            (flet ((rem-current-txfifo-entry ()
+                     (if ,prev
+                         (setf (txpair-rest ,prev) ,next)
+                         (setf (txfifo-front ,f) ,next))
+                     (unless ,next
+                       (setf (txfifo-back ,f) ,prev))))
+              (progn ,@body))))))
+
+
+(defmacro do-filter-txfifo ((key &optional value) fifo &body body)
+  "Execute BODY on each KEY/VALUE contained in FIFO. Return NIL."
+  (let ((pair (gensym "PAIR-")))
+    `(do-filter-txfifo-entries (,pair) ,fifo
+       (let ((,key (txpair-key ,pair))
+             ,@(when value `((,value (txpair-value ,pair)))))
+         ,@body))))
+
+
+(declaim (inline clear-txfifo))
+(defun clear-txfifo (fifo)
+  (declare (type txfifo fifo))
+  (setf (txfifo-front fifo) nil
+        (txfifo-back  fifo) nil))
 
 
 
-(defmacro do-txhash-entries ((entry) hash &body body)
-  "Execute BODY on each TXLIST entry contained in HASH. Return NIL."
+
+;;;; ** TXHASH-TABLE, a hash table specialized for TVAR keys
+
+          
+
+
+(defmacro do-txhash-entries ((pair) hash &body body)
+  "Execute BODY on each TXPAIR pair contained in HASH. Return NIL."
   (let ((h     (gensym "HASH-"))
 	(vec   (gensym "VEC-"))
 	(i     (gensym "I-"))
@@ -45,9 +107,9 @@
          (when (zerop ,left)
            (return))
          (loop named ,loop-name
-            for ,entry = (svref ,vec ,i) then ,next
-            while ,entry
-            for ,next = (txlist-next ,entry)
+            for ,pair = (svref ,vec ,i) then ,next
+            while ,pair
+            for ,next = (txpair-next ,pair)
             do
               (decf ,left)
               ,@body)))))
@@ -56,10 +118,10 @@
 
 (defmacro do-txhash ((key &optional value) hash &body body)
   "Execute BODY on each KEY/VALUE contained in HASH. Return NIL."
-  (let ((entry (gensym "ENTRY-")))
-    `(do-txhash-entries (,entry) ,hash
-       (let ((,key (txlist-key ,entry))
-             ,@(when value `((,value (txlist-value ,entry)))))
+  (let ((pair (gensym "PAIR-")))
+    `(do-txhash-entries (,pair) ,hash
+       (let ((,key (txpair-key ,pair))
+             ,@(when value `((,value (txpair-value ,pair)))))
          ,@body))))
                 
 
@@ -89,7 +151,7 @@
 
 
 (defun find-txhash (hash key)
-  "If KEY is present in HASH, return the TXLIST containing KEY.
+  "If KEY is present in HASH, return the TXPAIR containing KEY.
 Otherwise return NIL."
   (declare (type txhash-table hash)
            (type tvar key))
@@ -98,11 +160,11 @@ Otherwise return NIL."
          (vec (txhash-table-vec hash))
          (subscript (txhash-subscript id vec)))
          
-    (the (or null txlist)
-      (loop for entry = (svref vec subscript) then (txlist-next entry)
-         while entry do
-           (when (eq key (txlist-key entry))
-             (return entry))))))
+    (the (or null txpair)
+      (loop for pair = (svref vec subscript) then (txpair-next pair)
+         while pair do
+           (when (eq key (txpair-key pair))
+             (return pair))))))
 
 
 (defun get-txhash (hash key &optional default)
@@ -110,8 +172,8 @@ Otherwise return NIL."
 Otherwise return (values DEFAULT nil)."
   (declare (type txhash-table hash)
            (type tvar key))
-  (if-bind entry (find-txhash hash key)
-    (values (txlist-value entry) t)
+  (if-bind pair (find-txhash hash key)
+    (values (txpair-value pair) t)
     (values default nil)))
 
     
@@ -123,33 +185,33 @@ Otherwise return (values DEFAULT nil)."
          (n2   (the fixnum (ash (length vec1) 1)))
          (vec2 (the simple-vector (make-array n2 :initial-element nil))))
     
-    (do-txhash-entries (entry) hash
-      (let* ((key (txlist-key entry))
+    (do-txhash-entries (pair) hash
+      (let* ((key (txpair-key pair))
              (id (tvar-id key))
              (subscript (txhash-subscript id vec2 n2))
              (head (svref vec2 subscript)))
         
-        (setf (txlist-next entry) head
-              (svref vec2 subscript) entry)))
+        (setf (txpair-next pair) head
+              (svref vec2 subscript) pair)))
 
     (setf (txhash-table-vec hash) vec2)))
         
         
       
-(declaim (inline new-txlist-from-pool))
-(defun new-txlist-from-pool (hash txlist-next key value)
+(declaim (inline new-txpair-from-pool))
+(defun new-txpair-from-pool (hash txpair-next key value)
   (declare (type txhash-table hash)
-           (type (or null txlist) txlist-next))
+           (type (or null txpair) txpair-next))
 
-  (the txlist
-    (if-bind entry (txhash-table-pool hash)
+  (the txpair
+    (if-bind pair (txhash-table-pool hash)
       (progn
-        (setf (txhash-table-pool hash) (txlist-next entry)
-              (txlist-key   entry) key
-              (txlist-value entry) value
-              (txlist-next  entry) txlist-next)
-        entry)
-      (make-txlist :key key :value value :next txlist-next))))
+        (setf (txhash-table-pool hash) (txpair-next pair)
+              (txpair-key   pair) key
+              (txpair-value pair) value
+              (txpair-next  pair) txpair-next)
+        pair)
+      (txpair :key key :value value :next txpair-next))))
 
 
 (defun set-txhash (hash key value)
@@ -162,12 +224,12 @@ Otherwise return (values DEFAULT nil)."
          (subscript (txhash-subscript id vec))
          (head (svref vec subscript)))
 
-    (loop for entry = head then (txlist-next entry)
-       while entry do
-         (when (eq key (txlist-key entry))
-           (return-from set-txhash (setf (txlist-value entry) value))))
+    (loop for pair = head then (txpair-next pair)
+       while pair do
+         (when (eq key (txpair-key pair))
+           (return-from set-txhash (setf (txpair-value pair) value))))
 
-    (setf (svref vec subscript) (new-txlist-from-pool hash head key value))
+    (setf (svref vec subscript) (new-txpair-from-pool hash head key value))
 
     (when (> (the fixnum (incf (txhash-table-count hash)))
              (length vec))
@@ -176,19 +238,22 @@ Otherwise return (values DEFAULT nil)."
     value))
 
 
-(let ((dummy-tvar (make-tvar :id -1)))
-  (defun add-txlist-to-pool (hash txlist)
-    (declare (type txhash-table hash)
-             (type txlist txlist))
-    (loop for entry = txlist then next
-       for next = (txlist-next entry)
-       do
-	 (setf (txlist-key   entry) dummy-tvar
-	       (txlist-value entry) nil)
-	 (unless next
-	   (setf (txlist-next entry) (txhash-table-pool hash))
-	   (return)))
-    (setf (txhash-table-pool hash) txlist)))
+(declaim (type tvar +dummy-tvar+))
+(defvar +dummy-tvar+ (make-tvar :id -1))
+
+(defun add-txpair-to-pool (hash txpair)
+  (declare (type txhash-table hash)
+           (type txpair txpair))
+  (loop for pair = txpair then next
+     for next = (txpair-next pair)
+     do
+       (setf (txpair-key   pair) +dummy-tvar+
+             (txpair-value pair) nil
+             (txpair-rest  pair) nil)
+       (unless next
+         (setf (txpair-next pair) (txhash-table-pool hash))
+         (return)))
+  (setf (txhash-table-pool hash) txpair))
             
                
 
@@ -204,9 +269,9 @@ Otherwise return (values DEFAULT nil)."
            (n (length vec)))
       (if (<= n +txhash-threshold-capacity+)
           (loop for i from 0 to (1- n)
-             for txlist = (svref vec i)
-             when txlist do
-	       (add-txlist-to-pool hash txlist)
+             for txpair = (svref vec i)
+             when txpair do
+	       (add-txpair-to-pool hash txpair)
                (setf (svref vec i) nil))
           (setf (txhash-table-vec hash)
                 (make-array +txhash-default-capacity+
@@ -279,14 +344,14 @@ otherwise return nil.
 ;;  9.0 nanoseconds per (clrhash h) (incf n (hash-table-count h)), empty hash table
 ;;380   nanoseconds per (incf n (hash-table-count (make-hash-table))))
 
-(defmethod print-object ((obj txlist) stream)
-  (format stream "#S(~S " 'txlist)
-  (loop for entry = obj then (txlist-next entry)
-     while entry do
-       (unless (eq entry obj)
+(defmethod print-object ((obj txpair) stream)
+  (format stream "#S(~S " 'txpair)
+  (loop for pair = obj then (txpair-next pair)
+     while pair do
+       (unless (eq pair obj)
          (format stream "~&"))
        (format stream "~S ~S ~S ~S"
-               :key (txlist-key entry) :value (txlist-value entry)))
+               :key (txpair-key pair) :value (txpair-value pair)))
   (format stream ")"))
 
 

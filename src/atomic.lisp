@@ -120,7 +120,7 @@ For pre-defined transactional classes, see the package STMX.UTIL"
 
 (defmacro maybe-yield-before-rerun ()
   #+never nil
-  #-always  (thread-yield))
+  #-always (thread-yield))
 
 
 (declaim (inline run-once))
@@ -191,7 +191,9 @@ transactional memory it read has changed."
    ;; fallthrough
 
    rerun-no-yield
+   (log.trace "before rerun tlog ~A {~A}, before (new-or-clear-tlog)" (~ log) (~ tx))
    (new-or-clear-tlog log :parent (tlog-parent log))
+   (log.trace "before rerun tlog ~A {~A}, after (new-or-clear-tlog)" (~ log) (~ tx))
    (go run)))
 
 

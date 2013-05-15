@@ -42,7 +42,7 @@ return LOG itself."
   (clear-txhash (tlog-reads log))
   (clear-txhash (tlog-writes log))
 
-  (fast-vector-clear (tlog-changed log))
+  (clear-txfifo (tlog-locked log))
 
   (awhen (tlog-before-commit log) (setf (fill-pointer it) 0))
   (awhen (tlog-after-commit log)  (setf (fill-pointer it) 0))

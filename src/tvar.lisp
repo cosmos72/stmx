@@ -128,12 +128,14 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
   (multiple-value-bind (version value) (tvar-version-and-value var)
 
     (when (> (the fixnum version) (tlog-id log))
+      #|
       ;; inconsistent data? let's check
       (multiple-value-bind (prev-value present?)
           (get-txhash (tlog-reads log) var)
         (when (and present? (eq value prev-value))
           (return-from tx-read-of value)))
-      ;; yes, inconsistent data
+      |#
+      ;; inconsistent data
       (rerun))
 
     (set-txhash (tlog-reads log) var value)))

@@ -64,15 +64,16 @@
          (is (eq 'changed ($ var)))
          (is (eq 'original (raw-value-of var)))
          (setf ($ var) 'before-commit))
-       ;; after-commit blocks are executed in forward order
+       ;; after-commit blocks are executed in forward order.
+       ;; they can read and write transactional memory,
+       ;; but they are executed OUTSIDE any transaction
        (after-commit
          (is (eq 'before-commit (raw-value-of var)))
          (is (eq 'before-commit ($ var)))
-         ;; after-commit functions MUST NOT write to transactional memory
-         ;; (setf ($ var) 'after-commit))
+         (setf ($ var) 'after-commit)
          (error 'test-error))
        (after-commit
          (fail "after-commit function unexpectedly invoked after another one signalled an error"))))
 
-    (is (eq 'before-commit ($ var)))
-    (is (eq 'before-commit (raw-value-of var)))))
+    (is (eq 'after-commit ($ var)))
+    (is (eq 'after-commit (raw-value-of var)))))

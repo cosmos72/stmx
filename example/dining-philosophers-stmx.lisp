@@ -60,7 +60,7 @@
            (type fixnum i))
   ;;(with-output-to-string (out)
   ;;  (let ((*standard-output* out))
-  (log:info "philosopher ~A: fork1=~A fork2=~A plate=~A~%"
+  (log:debug "~A: fork1=~A fork2=~A plate=~A"
             i ($ fork1) ($ fork2) (car plate))
   ;;(sb-sprof:with-profiling
   ;;  (:max-samples 1000 :sample-interval 0.001 :report :graph
@@ -114,5 +114,5 @@
 
     (loop for (plate . fails) in plates
        for i from 1 do
-         (format t "philosopher ~A: ~A successful transactions, ~A retried~%"
-                 i (- philosophers-initial-hunger ($ plate)) (- fails)))))
+         (log:info "~A: ~A tx successful, ~A retried"
+                   i (- philosophers-initial-hunger ($ plate)) (- fails)))))

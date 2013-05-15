@@ -48,59 +48,59 @@
 
 (defmethod get-bmap ((m tmap) key &optional default)
   (declare (ignore m key default))
-  (run-atomic #'call-next-method))
+  (fast-atomic (call-next-method)))
 
 (defmethod set-bmap ((m tmap) key value)
   (declare (ignore m key value))
-  (run-atomic #'call-next-method))
+  (fast-atomic (call-next-method)))
 
 (defmethod rem-bmap ((m tmap) key)
   (declare (ignore m key))
-  (run-atomic #'call-next-method))
+  (fast-atomic (call-next-method)))
 
 (defmethod clear-bmap ((m tmap))
   (declare (ignore m))
-  (run-atomic #'call-next-method))
+  (fast-atomic (call-next-method)))
 
 (defmethod add-to-bmap ((m tmap) &rest keys-and-values)
   (declare (ignore m keys-and-values))
-  (run-atomic #'call-next-method))
+  (fast-atomic (call-next-method)))
 
 (defmethod remove-from-bmap ((m tmap) &rest keys)
   (declare (ignore m keys))
-  (run-atomic #'call-next-method))
+  (fast-atomic (call-next-method)))
 
 (defmethod min-bmap ((m tmap))
   (declare (ignore m))
-  (run-atomic #'call-next-method))
+  (fast-atomic (call-next-method)))
 
 (defmethod max-bmap ((m tmap))
   (declare (ignore m))
-  (run-atomic #'call-next-method))
+  (fast-atomic (call-next-method)))
 
 (defmethod copy-bmap-into ((mcopy tmap) (m tmap))
   (declare (ignore mcopy m))
-  (run-atomic #'call-next-method))
+  (fast-atomic (call-next-method)))
 
 (defmethod map-bmap ((m tmap) func)
   (declare (ignore m func))
-  (run-atomic #'call-next-method))
+  (fast-atomic (call-next-method)))
 
 (defmethod map-bmap-from-end ((m tmap) func)
   (declare (ignore m func))
-  (run-atomic #'call-next-method))
+  (fast-atomic (call-next-method)))
 
 (defmethod bmap-keys ((m tmap) &optional to-list)
   (declare (ignore m to-list))
-  (run-atomic #'call-next-method))
+  (fast-atomic (call-next-method)))
 
 (defmethod bmap-values ((m tmap) &optional to-list)
   (declare (ignore m to-list))
-  (run-atomic #'call-next-method))
+  (fast-atomic (call-next-method)))
 
 (defmethod bmap-pairs ((m tmap) &optional to-alist)
   (declare (ignore m to-alist))
-  (run-atomic #'call-next-method))
+  (fast-atomic (call-next-method)))
 
 
 

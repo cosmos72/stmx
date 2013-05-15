@@ -104,43 +104,35 @@ tvar-id and are considered \"larger\". Returns (> (tvar-id var1) (tvar-id var2))
 
 
 
-(defmacro try-lock-tvars (txhash-vars locked-n)
+(defun try-lock-tvars (writes locked)
   "Optionally sort VARS in (tvar> ...) order,
 then non-blocking acquire their locks in such order.
 Reason: acquiring in unspecified order may cause livelock, as two transactions
 may repeatedly try acquiring the same two TVARs in opposite order.
 
-Return the number of VARS locked successfully."
-  (let ((vars (gensym "VARS-"))
-        (var  (gensym "VAR-"))
-        (blk  (gensym "BLOCK-")))
+Return T if all VARS were locked successfully.
+After return, LOCKED will contain all TXPAIR entries of locked VARS."
+  (declare (type txhash-table writes)
+           (type txfifo locked))
 
-    `(let ((,vars ,txhash-vars))
-       (declare (type txhash-table ,vars))
+  ;; (sort writes #'tvar>))
 
-       ;;(setf vars (sort vars #'tvar>))
-       
-       (block ,blk
-         (do-txhash (,var) ,vars
-           (unless (try-lock-tvar ,var)
-             (return-from ,blk nil))
-           (incf ,locked-n))
-         t))))
+  (do-txhash-entries (entry) writes
+    (let1 var (the tvar (txpair-key entry))
+      (if (try-lock-tvar var)
+          (put-txfifo locked entry)
+          (return-from try-lock-tvars nil))))
+  t)
+
 
 
 (declaim (inline unlock-tvars))
-(defun unlock-tvars (txhash-vars locked-n locked-all?)
-  "Release locked (rest VARS) in same order of acquisition."
-  (declare (type txhash-table txhash-vars)
-           (type fixnum locked-n))
+(defun unlock-tvars (locked)
+  "Release vars in LOCKED in same order of acquisition."
+  (declare (type txfifo locked))
 
-  (if locked-all?
-      (do-txhash (var) txhash-vars
-        (unlock-tvar var))
-      (do-txhash (var) txhash-vars
-        (when (= -1 (decf locked-n))
-          (return))
-        (unlock-tvar var))))
+  (do-txfifo (var) locked
+    (unlock-tvar var)))
 
 
 
@@ -256,34 +248,17 @@ and the error will be propagated to the caller"
 
 
 
-(defmacro invoke-after-commit-macro (log &optional (when-form t) &body cleanup)
-  "After committing, call in order all functions registered with (after-commit)
-If any of them signals an error, it will be propagated to the caller
-but the TLOG will remain committed.
-CLEANUP forms will be invoked after all functions registered with (after-commit),
-even if they signal an error."
-  (with-gensyms (tlog funcs)
-    `(let ((,tlog ,log)
-           (,funcs nil))
-       (declare (type tlog ,tlog))
-       (if (and ,when-form (setf ,funcs (tlog-after-commit ,tlog)))
-           (unwind-protect
-                ;; restore recording and log as the current tlog, functions may need them
-                ;; to read transactional memory
-                (with-recording-to-tlog log
-                  (loop-funcall-on-appendable-vector ,funcs))
-             ,@cleanup)
-           (progn
-             ,@cleanup))
-       t)))
-
-
+(declaim (inline invoke-after-commit))
 (defun invoke-after-commit (log)
   "After committing, call in order all functions registered with (after-commit)
 If any of them signals an error, it will be propagated to the caller
 but the TLOG will remain committed."
   (declare (type tlog log))
-  (invoke-after-commit-macro log))
+  (when-bind funcs (tlog-after-commit log)
+    ;; do NOT restore recording and log as the current tlog,
+    ;; AFTER-COMMIT functions run outside any transaction
+    ;; (with-recording-to-tlog log
+    (loop-funcall-on-appendable-vector funcs)))
 
 
 (defun commit (log)
@@ -307,17 +282,13 @@ b) another TLOG is writing the same TVARs being committed
     (return-from commit nil))
 
 
-  (let* ((writes (tlog-writes log))
-         (locked-n    0)
-         (locked-all? nil)
-         (changed     (tlog-changed log))
+  (let* ((writes     (the txhash-table (tlog-writes log)))
+         (locked     (the txfifo       (tlog-locked log)))
          (new-version +invalid-version+)
          (success     nil))
 
-    (declare (type txhash-table writes)
-             (type fixnum locked-n new-version)
-             (type fast-vector changed)
-             (type boolean locked-all? success))
+    (declare (type fixnum       new-version)
+             (type boolean      success))
 
     (when (zerop (txhash-table-count writes))
       (log.debug "Tlog ~A committed (nothing to write)" (~ log))
@@ -330,7 +301,7 @@ b) another TLOG is writing the same TVARs being committed
            ;; but needed to ensure concurrent commits do not conflict.
            (log.trace "before (try-lock-tvars)")
 
-           (unless (setf locked-all? (try-lock-tvars writes locked-n))
+           (unless (try-lock-tvars writes locked)
              (log.debug "Tlog ~A failed to lock tvars, not committed" (~ log))
              (return))
 
@@ -348,28 +319,31 @@ b) another TLOG is writing the same TVARs being committed
            (log.trace "Tlog ~A committing..." (~ log))
 
            ;; COMMIT, i.e. actually write new values into TVARs
-           (do-txhash (var val) writes
+           (do-filter-txfifo (var val) locked
              (let1 current-val (raw-value-of var)
-               (when (not (eq val current-val))
-                 (set-tvar-version-and-value var new-version val)
-                 (fast-vector-push-extend var changed)
-                 (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
-                            (~ log) (~ var) current-val val))))
+               (if (eq val current-val)
+                   ;; if TVAR did not change, remove it from LOCKED
+                   (rem-current-txfifo-entry)
+                   (progn
+                     (set-tvar-version-and-value var new-version val)
+                     (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
+                                (~ log) (~ var) current-val val)))
+               (unlock-tvar var)))
 
-           (log.debug "Tlog ~A ...committed" (~ log))
-           (setf success t))
+           (setf success t)
+           (log.debug "Tlog ~A ...committed (and released locks)" (~ log))
 
-      ;;(compare-locked-tvars writes locked locked-n)
-      (unlock-tvars writes locked-n locked-all?)
-      (log.trace "Tlog ~A ...released locks" (~ log))
+           (do-txfifo (var) locked
+             (log.trace "Tlog ~A notifying threads waiting on tvar ~A"
+                        (~ log) (~ var))
+             (notify-tvar-high-load var))
 
-
-      ;; after-commit functions run without locks
-      (invoke-after-commit-macro log success
-        (do-fast-vector (var) changed
-          (log.trace "Tlog ~A notifying threads waiting on tvar ~A"
-                     (~ log) (~ var))
-          (notify-tvar-high-load var))))
+           ;; after-commit functions run without locks
+           (invoke-after-commit log))
+      
+      (unless success
+        (unlock-tvars locked)
+        (log.trace "Tlog ~A ...released locks" (~ log))))
 
     success))
                    

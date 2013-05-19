@@ -83,16 +83,16 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.7 (x86_64), STMX 1.3.1
 
  <tr><td>atomic nil       </td><td><code>(atomic nil)</code>                </td><td>0.084&nbsp;microseconds</td></tr>
  <tr><td>atomic read-1    </td><td><code>(atomic (fast-$ v))</code>         </td><td>0.103&nbsp;microseconds</td></tr>
- <tr><td>atomic write-1   </td><td><code>(atomic (setf (fast-$ v) i))</code></td><td>0.129&nbsp;microseconds</td></tr>
- <tr><td>atomic read-write-1</td><td><code>(atomic (incf (fast-$ v)))</code></td><td>0.158&nbsp;microseconds</td></tr>
+ <tr><td>atomic write-1   </td><td><code>(atomic (setf (fast-$ v) i))</code></td><td>0.138&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-write-1</td><td><code>(atomic (incf (fast-$ v)))</code></td><td>0.152&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-10</td>
      <td><code>(atomic (dotimes (j 10) (incf (fast-$ v))))</code></td>
-     <td>0.301&nbsp;microseconds</td></tr>
+     <td>0.295&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-100</td>
      <td><code>(atomic (dotimes (j 100) (incf (fast-$ v))))</code></td>
-     <td>1.702&nbsp;microseconds</td></tr>
+     <td>1.700&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-1000</td>
      <td><code>(atomic (dotimes (j 1000) (incf (fast-$ v))))</code></td>

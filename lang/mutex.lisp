@@ -75,20 +75,32 @@ is locked by another thread or is already unlocked."
 
 
 #+stmx.have-atomic-ops
-(declaim (ftype (function (mutex) boolean) mutex-is-own-or-free?)
-         (inline
-           mutex-is-own-or-free?))
+(eval-always
+  (declaim (ftype (function (mutex) boolean) mutex-is-free? mutex-is-own-or-free?)
+	   (inline
+	     mutex-is-free? mutex-is-own-or-free?))
 
 
-#+stmx.have-atomic-ops
-(defun mutex-is-own-or-free? (mutex)
-  "Return T if MUTEX is free or locked by current thread.
+  (defun mutex-is-free? (mutex)
+    "Return T if MUTEX is free. Return NIL if MUTEX is currently locked
+by this thread or some other thread."
+    (atomic-read-barrier)
+    (let ((owner
+	   (atomic-read-barrier
+	     (mutex-owner mutex))))
+      (eq owner nil)))
+
+
+  (defun mutex-is-own-or-free? (mutex)
+    "Return T if MUTEX is free or locked by current thread.
 Return NIL if MUTEX is currently locked by some other thread."
-   (atomic-read-barrier)
-   (let ((owner
-          (atomic-read-barrier
-            (mutex-owner mutex))))
-     (or
-      (eq owner nil)
-      (eq owner *current-thread*))))
+    (atomic-read-barrier)
+    (let ((owner
+	   (atomic-read-barrier
+	     (mutex-owner mutex))))
+      (or
+       (eq owner nil)
+       (eq owner *current-thread*)))))
+
+
 

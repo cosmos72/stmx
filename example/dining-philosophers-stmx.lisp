@@ -22,7 +22,8 @@
         #:stmx
         #:stmx.util)
 
-  (:import-from #:stmx #:new))
+  (:import-from #:stmx
+                #:new #:try-take-$ #:try-put-$))
 
 
 (in-package :stmx.example1)
@@ -33,7 +34,7 @@
 (defun eat-from-plate (plate)
   "Decrease by one TVAR in plate."
   (declare (type cons plate))
-  (decf (the fixnum ($ (car plate)))))
+  (decf (the fixnum (fast-$ (car plate)))))
 
 
 (declaim (ftype (function (tvar tvar cons) fixnum) philosopher-eats))
@@ -50,6 +51,26 @@
     (prog1 (eat-from-plate plate)
       (put fork1 f1)
       (put fork2 f2))))
+
+
+(declaim (ftype (function (tvar tvar cons) fixnum) fast-philosopher-eats))
+(defun fast-philosopher-eats (fork1 fork2 plate)
+  "Eat once. return remaining hunger"
+  (declare (type tvar fork1 fork2)
+           (type cons plate))
+  ;; use a normal (non-transactional) counter to keep track
+  ;; of retried transactions for demonstration purposes.
+  (decf (the fixnum (cdr plate)))
+   
+  (let1 hunger -1 ;; unknown
+
+    (when-bind f1 (nth-value 1 (try-take-$ fork1))
+      (when-bind f2 (nth-value 1 (try-take-$ fork2))
+        (setf hunger (eat-from-plate plate))
+        (try-put-$ fork2 f2))
+      (try-put-$ fork1 f1))
+
+    hunger))
 
 
 
@@ -70,7 +91,7 @@
   ;; NOTE: this simpler version works too, but allocates a closure at each iteration:
   ;; (loop until (zerop (the fixnum (atomic (philosopher-eats fork1 fork2 plate)))))
 
-  (let1 lambda-philosopher-eats (lambda () (philosopher-eats fork1 fork2 plate)) 
+  (let1 lambda-philosopher-eats (lambda () (fast-philosopher-eats fork1 fork2 plate)) 
     (loop until (zerop (the fixnum (run-atomic lambda-philosopher-eats))))))
 
 
@@ -94,9 +115,11 @@
                      (plate (nth (1- i)         plates))
                      (j i))
 
-                 ;; make the last philospher left-handed
-                 (when (= i n)
-                   (rotatef fork1 fork2))
+                 ;; no need to make the last philospher left-handed,
+		 ;; STMX orders transactional memory locations to be locked
+                 ;; (when (= i n)
+                 ;;   (rotatef fork1 fork2))
+
 
                  (lambda ()
                    (dining-philosopher j fork1 fork2 plate))))))

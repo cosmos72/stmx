@@ -17,7 +17,7 @@
 
 (asdf:defsystem :stmx
   :name "STMX"
-  :version "1.3.1"
+  :version "1.3.2"
   :license "LLGPL"
   :author "Massimiliano Ghilardi"
   :description "Composable Software Transactional Memory"
@@ -74,7 +74,8 @@
                              (:file "rbmap"          :depends-on ("bmap"))
                              (:file "tmap"           :depends-on ("rbmap"))
 
-                             (:file "thash-table"    :depends-on ("print")))
+                             (:file "thash-table"    :depends-on ("print"))
+                             (:file "simple-tvector" :depends-on ("print")))
                 :depends-on (:lang :src))))
 
 

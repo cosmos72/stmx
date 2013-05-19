@@ -104,7 +104,7 @@ tvar-id and are considered \"larger\". Returns (> (tvar-id var1) (tvar-id var2))
 
 
 
-(defun try-lock-tvars (writes locked)
+(defun try-lock-tvars (writes locked log)
   "Optionally sort VARS in (tvar> ...) order,
 then non-blocking acquire their locks in such order.
 Reason: acquiring in unspecified order may cause livelock, as two transactions
@@ -113,15 +113,21 @@ may repeatedly try acquiring the same two TVARs in opposite order.
 Return T if all VARS were locked successfully.
 After return, LOCKED will contain all TXPAIR entries of locked VARS."
   (declare (type txhash-table writes)
-           (type txfifo locked))
+           (type txfifo locked)
+           (type tlog log))
 
   ;; (sort writes #'tvar>))
 
-  (do-txhash-entries (entry) writes
-    (let1 var (the tvar (txpair-key entry))
-      (if (try-lock-tvar var)
-          (put-txfifo locked entry)
-          (return-from try-lock-tvars nil))))
+  (let1 reads (tlog-reads log)
+    (do-txhash-entries (entry) writes
+      (let ((var (the tvar (txpair-key entry)))
+	    (write-value   (txpair-value entry)))
+	(multiple-value-bind (read-value read?) (get-txhash reads var)
+	  ;; degrade "write the same value previously read" to "read"
+	  (unless (and read? (eq read-value write-value))
+	    (if (try-lock-tvar var)
+		(put-txfifo locked entry)
+		(return-from try-lock-tvars nil)))))))
   t)
 
 
@@ -301,7 +307,7 @@ b) another TLOG is writing the same TVARs being committed
            ;; but needed to ensure concurrent commits do not conflict.
            (log.trace "before (try-lock-tvars)")
 
-           (unless (try-lock-tvars writes locked)
+           (unless (try-lock-tvars writes locked log)
              (log.debug "Tlog ~A failed to lock tvars, not committed" (~ log))
              (return))
 
@@ -320,15 +326,14 @@ b) another TLOG is writing the same TVARs being committed
 
            ;; COMMIT, i.e. actually write new values into TVARs
            (do-filter-txfifo (var val) locked
-             (let1 current-val (raw-value-of var)
-               (if (eq val current-val)
-                   ;; if TVAR did not change, remove it from LOCKED
-                   (rem-current-txfifo-entry)
-                   (progn
-                     (set-tvar-version-and-value var new-version val)
-                     (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
-                                (~ log) (~ var) current-val val)))
-               (unlock-tvar var)))
+	     (if (eq val (raw-value-of var))
+		 (rem-current-txfifo-entry)
+
+		 (progn
+		   (set-tvar-version-and-value var new-version val)
+		   (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
+			      (~ log) (~ var) current-val val)))
+	     (unlock-tvar var))
 
            (setf success t)
            (log.debug "Tlog ~A ...committed (and released locks)" (~ log))

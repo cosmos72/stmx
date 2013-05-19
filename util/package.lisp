@@ -31,7 +31,7 @@
                           #:subtypep)
 
   (:import-from #:stmx
-                #:peek-$ #:try-take-$ #:try-put-$)
+                #:+dummy-tvar+ #:peek-$ #:try-take-$ #:try-put-$)
 
   (:export #:tcons #:tlist #:tfirst #:trest #:tpush #:tpop ;; transactional CONS cell and list
 
@@ -61,7 +61,11 @@
            #:thash-table 
            #:thash-count #:thash-empty? #:clear-thash
            #:get-thash #:set-thash #:rem-thash   ;; also (setf (get-thash ... ) ... )
-           #:map-thash #:do-thash))  ;; iterate on thash-table
+           #:map-thash #:do-thash  ;; iterate on thash-table
+
+	   ;; transactional simple-vector
+	   #:simple-tvector #:simple-tvector-length
+	   #:tsvref  #:do-simple-tvector))
 
 
 

@@ -301,7 +301,7 @@ Works only inside transactions."
 
 (defun try-lock-tvar (var)
   "Return T if VAR was locked successfully, otherwise return NIL."
-  (stmx.lang::try-acquire-mutex (the mutex var)))
+  (try-acquire-mutex (the mutex var)))
   
   
 (defun unlock-tvar (var)
@@ -312,7 +312,9 @@ Works only inside transactions."
 (defun tvar-unlocked? (var log)
   "Return T if VAR is locked by current thread or unlocked.
 Return NIL if VAR is locked by some other thread."
-  (declare (ignorable log))
+  (declare (type tvar var)
+	   (type tlog log)
+	   (ignorable log))
 
   #+stmx.have-atomic-ops
   (mutex-is-own-or-free? (the mutex var))
@@ -328,6 +330,22 @@ Return NIL if VAR is locked by some other thread."
           (when (bt:acquire-lock lock nil)
             (bt:release-lock lock)
             t)))))
+  
+
+(declaim (inline tvar-really-unlocked?))
+
+(defun tvar-really-unlocked? (var)
+  "Return T if VAR unlocked.
+Return NIL if VAR is locked by this thread or some other thread."
+
+  #+stmx.have-atomic-ops
+  (mutex-is-free? (the mutex var))
+  #-stmx.have-atomic-ops
+  ;; try to acquire the lock (messy)
+  (let1 lock (mutex-lock (the mutex var))
+    (when (bt:acquire-lock lock nil)
+      (bt:release-lock lock)
+      t)))
   
 
 

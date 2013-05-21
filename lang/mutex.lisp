@@ -77,8 +77,8 @@ is locked by another thread or is already unlocked."
 #+stmx.have-atomic-ops
 (eval-always
   (declaim (ftype (function (mutex) boolean) mutex-is-free? mutex-is-own-or-free?)
-	   (inline
-	     mutex-is-free? mutex-is-own-or-free?))
+           (inline
+             mutex-is-free? mutex-is-own-or-free?))
 
 
   (defun mutex-is-free? (mutex)
@@ -86,8 +86,8 @@ is locked by another thread or is already unlocked."
 by this thread or some other thread."
     (atomic-read-barrier)
     (let ((owner
-	   (atomic-read-barrier
-	     (mutex-owner mutex))))
+           (atomic-read-barrier
+             (mutex-owner mutex))))
       (eq owner nil)))
 
 
@@ -96,8 +96,8 @@ by this thread or some other thread."
 Return NIL if MUTEX is currently locked by some other thread."
     (atomic-read-barrier)
     (let ((owner
-	   (atomic-read-barrier
-	     (mutex-owner mutex))))
+           (atomic-read-barrier
+             (mutex-owner mutex))))
       (or
        (eq owner nil)
        (eq owner *current-thread*)))))

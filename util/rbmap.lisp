@@ -209,8 +209,8 @@ Return some node in rebalanced tree and its stack as multiple values"
 
     (prog ;; replace black node X but remember his parent X and brother B.
           ((left-node? (replace-bnode node
-				      (or (_ node left) (_ node right))
-				      parent))
+                                      (or (_ node left) (_ node right))
+                                      parent))
            brother)
 
      rule-1

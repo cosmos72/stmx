@@ -21,16 +21,16 @@
 
 (defclass bheap ()
   ((vector :initarg :vector :initform *empty-vector*
-	   :type vector :accessor vector-of)
+           :type vector :accessor vector-of)
    
    (length :initform 0
-	   :type fixnum :accessor length-of)
+           :type fixnum :accessor length-of)
    
    (key    :initarg :key  :initform #'identity 
-	   :type function :reader key-of)
+           :type function :reader key-of)
 
    (pred   :initarg :pred :initform (error "missing :pred argument instantiating ~A or a subclass" 'bheap) 
-	   :type function :reader pred-of))
+           :type function :reader pred-of))
 
    (:documentation "Priority queue implemented with a binary min-heap.
 Elements that compare smaller than others will be the first (top) in the heap."))
@@ -41,17 +41,17 @@ Elements that compare smaller than others will be the first (top) in the heap.")
   "Initialize bheap Q."
   (setf (length-of q) (length (vector-of q)))
   (heapify-bheap q))
-	     
+             
 
 ;;;; ** bheap private functions
 
 (defun compare-bheap-entries (q n1 n2)
   "Compare entries at positions N1 and N2 in bqueue Q."
   (declare (type bheap q)
-	   (type fixnum n1 n2))
+           (type fixnum n1 n2))
   (with-ro-slots (vector key pred) q
     (let ((key1 (funcall key (aref vector n1)))
-	  (key2 (funcall key (aref vector n2))))
+          (key2 (funcall key (aref vector n2))))
       ;; swap key1 and key2: if pred is #'<
       ;; we want smaller elements to come first
       (funcall pred key2 key1))))
@@ -59,42 +59,42 @@ Elements that compare smaller than others will be the first (top) in the heap.")
 
 (defun sift-down-bheap (q start end)
   (declare (type bheap q)
-	   (type fixnum start end))
+           (type fixnum start end))
 
   (let ((root start)
-	(vector (vector-of q)))
+        (vector (vector-of q)))
     (declare (type fixnum root))
     (loop for lchild = (the fixnum (1+ (* 2 root)))
        for swap = root
        while (<= lchild end) do
-	 (when (compare-bheap-entries q swap lchild)
-	   (setf swap lchild))
-	 (let1 rchild (the fixnum (1+ lchild))
-	   (when (and (<= rchild end)
-		    (compare-bheap-entries q swap rchild))
-	     (setf swap rchild)))
-	 (when (= swap root)
-	   (return))
-	 (log:debug "vector = ~A, swapping index ~A with ~A" vector root swap)
-	 (rotatef (aref vector root) (aref vector swap))
-	 (setf root swap))
+         (when (compare-bheap-entries q swap lchild)
+           (setf swap lchild))
+         (let1 rchild (the fixnum (1+ lchild))
+           (when (and (<= rchild end)
+                    (compare-bheap-entries q swap rchild))
+             (setf swap rchild)))
+         (when (= swap root)
+           (return))
+         (log:debug "vector = ~A, swapping index ~A with ~A" vector root swap)
+         (rotatef (aref vector root) (aref vector swap))
+         (setf root swap))
     (log:debug "vector = ~A, done with start index = ~A" vector start)))
 
 
 (defun sift-up-bheap (q start end)
   (declare (type bheap q)
-	   (type fixnum start end))
+           (type fixnum start end))
 
   (let ((vector (vector-of q))
-	(child end))
+        (child end))
     (declare (type fixnum child))
     (loop while (< start child)
        for parent = (the fixnum (floor (1- child) 2)) do
-	 (unless (compare-bheap-entries q parent child)
-	   (return))
-	 (log:debug "vector = ~A, swapping index ~A with ~A" vector parent child)
-	 (rotatef (aref vector parent) (aref vector child))
-	 (setf child parent))
+         (unless (compare-bheap-entries q parent child)
+           (return))
+         (log:debug "vector = ~A, swapping index ~A with ~A" vector parent child)
+         (rotatef (aref vector parent) (aref vector child))
+         (setf child parent))
     (log:debug "vector = ~A, done with start index = ~A" vector start)))
 
 
@@ -106,9 +106,9 @@ Destructively modifies (vector-of Q)."
 
   (with-ro-slots (length) q
     (loop for start = (the fixnum (1- (floor length 2))) ;; index of last parent
-	 #||#        then (the fixnum (1- start)) 
+         #||#        then (the fixnum (1- start)) 
        while (>= start 0) do
-	 (sift-down-bheap q start (1- length)))
+         (sift-down-bheap q start (1- length)))
     q))
 
 (defun extend-bheap-vector (v)
@@ -120,10 +120,10 @@ This method exists to simplify the implementation of transactional
 priority queue TQUEUE: as long as bheap is concerned,
 \(vector-push-extend ...) would be fine."
   (let* ((n (length v))
-	 (vcopy (make-array (list (* 2 (1+ n)))
-			    :element-type (array-element-type v))))
+         (vcopy (make-array (list (* 2 (1+ n)))
+                            :element-type (array-element-type v))))
     (loop for i from 0 to (1- n) do
-	 (setf (aref vcopy i) (aref v i)))
+         (setf (aref vcopy i) (aref v i)))
     vcopy))
 
 ;;;; ** bheap public functions
@@ -156,11 +156,11 @@ Otherwise return (values DEFAULT nil)"
   (declare (type bheap q))
   (with-rw-slots (vector length) q
     (if (zerop (the fixnum length))
-	(values default nil)
-	(let1 value (aref vector 0)
-	  (setf (aref vector 0) (aref vector (decf length)))
-	  (sift-down-bheap q 0 (1- length))
-	  (values value t)))))
+        (values default nil)
+        (let1 value (aref vector 0)
+          (setf (aref vector 0) (aref vector (decf length)))
+          (sift-down-bheap q 0 (1- length))
+          (values value t)))))
 
 
 (defun add-bheap (q value)
@@ -182,13 +182,13 @@ Otherwise return (values DEFAULT nil)"
 (defprint-object (q bheap)
   (with-ro-slots (vector length) q
     (declare (type vector vector)
-	     (type fixnum length))
+             (type fixnum length))
     (format t "#(")
     (loop for i from 0 to (1- length) do
-	 (when (= i 100)
-	   (format t " ...")
-	   (return))
-	 (format t "~A~S" (if (zerop i) "" " ") (aref vector i)))
+         (when (= i 100)
+           (format t " ...")
+           (return))
+         (format t "~A~S" (if (zerop i) "" " ") (aref vector i)))
     (format t ")")))
 
 

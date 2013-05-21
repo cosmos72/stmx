@@ -21,19 +21,19 @@
   (vec #() :type simple-vector :read-only t))
 
 (defun simple-tvector (length &key (element-type t)
-		       (initial-element 0) initial-contents)
+                       (initial-element 0) initial-contents)
   "Create and return a new SIMPLE-TVECTOR."
   (declare (type fixnum length)
-	   (type list initial-contents)
-	   (ignore element-type))
+           (type list initial-contents)
+           (ignore element-type))
   (let1 vec (make-array length :element-type 'tvar :initial-element +dummy-tvar+)
     (if initial-contents
-	(loop for i from 0 to (1- length)
-	   for cell = initial-contents then (rest cell)
-	   for element = (first cell) do
-	     (setf (svref vec i) (tvar element)))
-	(dotimes (i length)
-	  (setf (svref vec i) (tvar initial-element))))
+        (loop for i from 0 to (1- length)
+           for cell = initial-contents then (rest cell)
+           for element = (first cell) do
+             (setf (svref vec i) (tvar element)))
+        (dotimes (i length)
+          (setf (svref vec i) (tvar initial-element))))
     
     (%make-simple-tvector :vec vec)))
 
@@ -48,13 +48,13 @@
 (defun tsvref (tvec index)
   "Return the INDEX-th element of simple-tvector TVEC."
   (declare (type simple-tvector tvec)
-	   (type fixnum index))
+           (type fixnum index))
   ($ (svref (simple-tvector-vec tvec) index)))
 
 (defun (setf tsvref) (value tvec index)
   "Set the INDEX-th element of simple-tvector TVEC to VALUE."
   (declare (type simple-tvector tvec)
-	   (type fixnum index))
+           (type fixnum index))
   (setf ($ (svref (simple-tvector-vec tvec) index)) value))
 
 
@@ -66,17 +66,17 @@ to exit early from the loop with an explicit return value."
   (with-gensyms (vec var)
     `(let1 ,vec (simple-tvector-vec ,tvec)
        (loop for ,var across ,vec
-	  for ,element = ($ ,var) do
-	    (progn ,@body)))))
+          for ,element = ($ ,var) do
+            (progn ,@body)))))
 
 
 (defprint-object (tvec simple-tvector :identity nil)
   (let1 vec (simple-tvector-vec tvec)
     (dotimes (i (length vec))
       (unless (zerop i)
-	(write-string " "))
+        (write-string " "))
       (let1 var (svref vec i)
-	(multiple-value-bind (value present?) (peek-$ var)
-	  (if present?
-	      (format t "~A" value)
-	      (write-string "unbound")))))))
+        (multiple-value-bind (value present?) (peek-$ var)
+          (if present?
+              (format t "~A" value)
+              (write-string "unbound")))))))

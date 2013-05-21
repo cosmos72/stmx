@@ -21,41 +21,41 @@
 
 (test new-simple-tvector
   (let* ((n 10)
-	 (tvec (simple-tvector n)))
+         (tvec (simple-tvector n)))
     ;; default initial-element is 0
     (is (= n (simple-tvector-length tvec)))
     (let1 count 0
       (do-simple-tvector (e) tvec
-	(is (= 0 e))
-	(incf count))
+        (is (= 0 e))
+        (incf count))
       (is (= n count)))))
 
 (test new-simple-tvector2
   (let* ((n 10)
-	 (tvec (simple-tvector n :initial-element n)))
+         (tvec (simple-tvector n :initial-element n)))
     (let1 count 0
       (do-simple-tvector (e) tvec
-	(is (= n e))
-	(incf count))
+        (is (= n e))
+        (incf count))
       (is (= n count)))))
 
 
 (test new-simple-tvector3
   (let* ((n 10)
-	 (tvec (simple-tvector n :initial-contents
-			       (loop for i from 0 to (1- n)
-				    collect i))))
+         (tvec (simple-tvector n :initial-contents
+                               (loop for i from 0 to (1- n)
+                                    collect i))))
     (let1 count 0
       (do-simple-tvector (e) tvec
-	(is (= count e))
-	(incf count))
+        (is (= count e))
+        (incf count))
       (is (= n count)))))
 
       
 
 (test svref-simple-tvector
   (let* ((n 10)
-	 (tvec (simple-tvector n)))
+         (tvec (simple-tvector n)))
     ;; default initial-element is 0
     (dotimes (i n)
       (is (= 0 (tsvref tvec i)))
@@ -66,6 +66,6 @@
 
     (let1 count 0
       (do-simple-tvector (e) tvec
-	(is (= count e))
-	(incf count))
+        (is (= count e))
+        (incf count))
       (is (= n count)))))

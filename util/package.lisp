@@ -57,15 +57,15 @@
            #:bmap-keys   #:bmap-values #:bmap-pairs ;; list all keys, values, or pairs
            #:add-to-bmap #:remove-from-bmap ;; add or remove multiple keys
 
-	   ;; transactional hash table
+           ;; transactional hash table
            #:thash-table 
            #:thash-count #:thash-empty? #:clear-thash
            #:get-thash #:set-thash #:rem-thash   ;; also (setf (get-thash ... ) ... )
            #:map-thash #:do-thash  ;; iterate on thash-table
 
-	   ;; transactional simple-vector
-	   #:simple-tvector #:simple-tvector-length
-	   #:tsvref  #:do-simple-tvector))
+           ;; transactional simple-vector
+           #:simple-tvector #:simple-tvector-length
+           #:tsvref  #:do-simple-tvector))
 
 
 

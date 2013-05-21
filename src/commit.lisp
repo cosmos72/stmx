@@ -121,13 +121,13 @@ After return, LOCKED will contain all TXPAIR entries of locked VARS."
   (let1 reads (tlog-reads log)
     (do-txhash-entries (entry) writes
       (let ((var (the tvar (txpair-key entry)))
-	    (write-value   (txpair-value entry)))
-	(multiple-value-bind (read-value read?) (get-txhash reads var)
-	  ;; degrade "write the same value previously read" to "read"
-	  (unless (and read? (eq read-value write-value))
-	    (if (try-lock-tvar var)
-		(put-txfifo locked entry)
-		(return-from try-lock-tvars nil)))))))
+            (write-value   (txpair-value entry)))
+        (multiple-value-bind (read-value read?) (get-txhash reads var)
+          ;; degrade "write the same value previously read" to "read"
+          (unless (and read? (eq read-value write-value))
+            (if (try-lock-tvar var)
+                (put-txfifo locked entry)
+                (return-from try-lock-tvars nil)))))))
   t)
 
 
@@ -326,14 +326,14 @@ b) another TLOG is writing the same TVARs being committed
 
            ;; COMMIT, i.e. actually write new values into TVARs
            (do-filter-txfifo (var val) locked
-	     (if (eq val (raw-value-of var))
-		 (rem-current-txfifo-entry)
+             (if (eq val (raw-value-of var))
+                 (rem-current-txfifo-entry)
 
-		 (progn
-		   (set-tvar-version-and-value var new-version val)
-		   (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
-			      (~ log) (~ var) current-val val)))
-	     (unlock-tvar var))
+                 (progn
+                   (set-tvar-version-and-value var new-version val)
+                   (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
+                              (~ log) (~ var) current-val val)))
+             (unlock-tvar var))
 
            (setf success t)
            (log.debug "Tlog ~A ...committed (and released locks)" (~ log))

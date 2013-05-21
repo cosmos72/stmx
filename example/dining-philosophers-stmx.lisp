@@ -116,7 +116,7 @@
                      (j i))
 
                  ;; no need to make the last philospher left-handed,
-		 ;; STMX orders transactional memory locations to be locked
+                 ;; STMX orders transactional memory locations to be locked
                  ;; (when (= i n)
                  ;;   (rotatef fork1 fork2))
 

@@ -91,11 +91,11 @@
 (defmacro do-txhash-entries ((pair) hash &body body)
   "Execute BODY on each TXPAIR pair contained in HASH. Return NIL."
   (let ((h     (gensym "HASH-"))
-	(vec   (gensym "VEC-"))
-	(i     (gensym "I-"))
-	(n     (gensym "N-"))
-	(left  (gensym "LEFT-"))
-	(next  (gensym "NEXT-"))
+        (vec   (gensym "VEC-"))
+        (i     (gensym "I-"))
+        (n     (gensym "N-"))
+        (left  (gensym "LEFT-"))
+        (next  (gensym "NEXT-"))
         (loop-name (gensym "LOOP-")))
     `(let* ((,h    (the txhash-table ,hash))
             (,vec  (the simple-vector (txhash-table-vec ,h)))
@@ -127,7 +127,7 @@
 
 
 
-	   
+           
 (declaim (inline txhash-mask))
 
 (defun txhash-mask (vec-len)
@@ -271,7 +271,7 @@ Otherwise return (values DEFAULT nil)."
           (loop for i from 0 to (1- n)
              for txpair = (svref vec i)
              when txpair do
-	       (add-txpair-to-pool hash txpair)
+               (add-txpair-to-pool hash txpair)
                (setf (svref vec i) nil))
           (setf (txhash-table-vec hash)
                 (make-array +txhash-default-capacity+

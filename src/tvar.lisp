@@ -313,8 +313,8 @@ Works only inside transactions."
   "Return T if VAR is locked by current thread or unlocked.
 Return NIL if VAR is locked by some other thread."
   (declare (type tvar var)
-	   (type tlog log)
-	   (ignorable log))
+           (type tlog log)
+           (ignorable log))
 
   #+stmx.have-atomic-ops
   (mutex-is-own-or-free? (the mutex var))

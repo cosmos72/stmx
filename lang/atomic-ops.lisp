@@ -56,5 +56,8 @@ STMX assumes it can hold at least NIL and values of type BORDEAUX-THREADS:THREAD
    `(sb-thread:barrier (:write)
       ,@before)))
 
+ (defmacro atomic-pop (place)
+   "Atomically pop one item off the front of the list PLACE and return it."
+   `(sb-ext:atomic-pop ,place))
 
 

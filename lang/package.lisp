@@ -35,7 +35,7 @@
 
            ;; atomic operations
            #:atomic-num #:atomic-incf #:atomic-decf
-           #:atomic-compare-and-swap
+           #:atomic-compare-and-swap  #:atomic-pop
            #:atomic-read-barrier #:atomic-write-barrier
 
            #:atomic-counter #:make-atomic-counter

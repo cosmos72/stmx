@@ -441,13 +441,18 @@ features are available:
    - `(setf (value-of var) value)` setter method, equivalent to `(setf ($ var) value)`
 
    For programmers that want to squeeze the last CPU cycle out of STMX, there are
-   two more functions that work **only** inside transactions:
-   - `(fast-$ var)` Get the value of VAR. Return `+unbound-tvar+` if VAR is not
+   two more functions that work **only inside** transactions:
+   - `($-tx var)` Get the value of VAR. Return `+unbound-tvar+` if VAR is not
      bound to any value.
-     Quite obviously, explicitly checking the value returned by `fast-$` against
-     `+unbound-tvar+` would negate the speed advantage: `fast-$` is intended
+     Quite obviously, explicitly checking the value returned by `$-tx` against
+     `+unbound-tvar+` would negate the speed advantage: `$-tx` is intended
      for those cases where the TVAR is known to be bound to a value.
-   - `(setf (fast-$ var) value)` Store VALUE into VAR.
+   - `(setf ($-tx var) value)` Store VALUE into VAR.
+   
+   And two that work **only outside** transactions:
+   - `($-notx var)` Analogous to `$-tx`: get the value of VAR, return
+     `+unbound-tvar+` if VAR is not bound to any value.
+   - `(setf ($-notx var) value)` Analogous to `(setf $-tx)`: store VALUE into VAR.
 
 Utilities and examples
 ---------------------

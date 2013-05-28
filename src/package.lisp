@@ -58,7 +58,7 @@
 
            ;; low-level API to use TVARs directly
            #:tvar #:+unbound-tvar+
-           #:$ #:fast-$  ;; also (setf $) and (setf fast-$)
+           #:$ #:$-tx #:$-notx ;; also (setf $), (setf $-tx) and (setf $-notx)
            #:bound-$? #:unbind-$
 
            #:fast-atomic))

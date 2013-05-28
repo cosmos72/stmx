@@ -158,7 +158,7 @@ and by writing TOBJs slots."
     "Get the value from the transactional variable VAR and return it.
 Signal an error if VAR is not bound to a value.
 
-Works both outside and inside transactions.
+Works both inside and outside transactions.
 During transactions, it uses transaction log to record the read
 and to check for any value stored in the log."
   (declare (type tvar var))
@@ -185,8 +185,8 @@ During transactions, it uses transaction log to record the value."
 
 
 
-(declaim (inline fast-$))
-(defun fast-$ (var)
+(declaim (inline $-tx))
+(defun $-tx (var)
     "Get the value from the transactional variable VAR and return it.
 Return +unbound-tvar+ if VAR is not bound to a value.
 Works ONLY inside transactions."
@@ -194,12 +194,31 @@ Works ONLY inside transactions."
   (tx-read-of var))
 
 
-(declaim (inline (setf fast-$)))
-(defun (setf fast-$) (value var)
+(declaim (inline (setf $-tx)))
+(defun (setf $-tx) (value var)
   "Store VALUE inside transactional variable VAR and return VALUE.
 Works ONLY inside transactions."
   (declare (type tvar var))
   (tx-write-of var value))
+
+
+
+
+(declaim (inline $-notx))
+(defun $-notx (var)
+    "Get the value from the transactional variable VAR and return it.
+Return +unbound-tvar+ if VAR is not bound to a value.
+Works ONLY outside transactions."
+  (declare (type tvar var))
+  (raw-value-of var))
+
+
+(declaim (inline (setf $-notx)))
+(defun (setf $-notx) (value var)
+  "Store VALUE inside transactional variable VAR and return VALUE.
+Works ONLY outside transactions."
+  (declare (type tvar var))
+  (setf (raw-value-of var) value))
 
 
 

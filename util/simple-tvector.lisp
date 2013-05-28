@@ -43,19 +43,51 @@
   (length (simple-tvector-vec tvec)))
 
 
-(declaim (inline tsvref (setf tsvref)))
+(declaim (inline tsvref (setf tsvref) tx-tsvref (setf tx-tsvref) notx-tsvref (setf notx-tsvref)))
 
 (defun tsvref (tvec index)
-  "Return the INDEX-th element of simple-tvector TVEC."
+  "Return the INDEX-th element of simple-tvector TVEC.
+Works both inside and outside transactions"
   (declare (type simple-tvector tvec)
            (type fixnum index))
   ($ (svref (simple-tvector-vec tvec) index)))
 
 (defun (setf tsvref) (value tvec index)
-  "Set the INDEX-th element of simple-tvector TVEC to VALUE."
+  "Set the INDEX-th element of simple-tvector TVEC to VALUE.
+Works both inside and outside transactions"
   (declare (type simple-tvector tvec)
            (type fixnum index))
   (setf ($ (svref (simple-tvector-vec tvec) index)) value))
+
+
+(defun tsvref-tx (tvec index)
+  "Return the INDEX-th element of simple-tvector TVEC.
+Works ONLY inside transactions"
+  (declare (type simple-tvector tvec)
+           (type fixnum index))
+  ($-tx (svref (simple-tvector-vec tvec) index)))
+
+(defun (setf tsvref-tx) (value tvec index)
+  "Set the INDEX-th element of simple-tvector TVEC to VALUE.
+Works ONLY inside transactions"
+  (declare (type simple-tvector tvec)
+           (type fixnum index))
+  (setf ($-tx (svref (simple-tvector-vec tvec) index)) value))
+
+
+(defun tsvref-notx (tvec index)
+  "Return the INDEX-th element of simple-tvector TVEC.
+Works ONLY outside transactions"
+  (declare (type simple-tvector tvec)
+           (type fixnum index))
+  ($-notx (svref (simple-tvector-vec tvec) index)))
+
+(defun (setf tsvref-notx) (value tvec index)
+  "Set the INDEX-th element of simple-tvector TVEC to VALUE.
+Works ONLY outside transactions"
+  (declare (type simple-tvector tvec)
+           (type fixnum index))
+  (setf ($-notx (svref (simple-tvector-vec tvec) index)) value))
 
 
 (defmacro do-simple-tvector ((element) tvec &body body)

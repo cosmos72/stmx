@@ -67,7 +67,7 @@ Date: 15 May 2013
 
 Hardware: Intel Core-i5 750 @4.0 GHz (quad-core), 16GB RAM
 
-Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.7 (x86_64), STMX 1.3.1
+Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.6 (x86_64), STMX 1.3.2
 
 
 <table>

@@ -29,12 +29,12 @@
 (in-package :stmx.example1)
   
 
-(declaim (ftype (function (cons) fixnum) eat-from-plate))
-(declaim (inline eat-from-plate))
+(declaim (ftype (function (cons) fixnum) eat-from-plate)
+         (inline eat-from-plate))
 (defun eat-from-plate (plate)
   "Decrease by one TVAR in plate."
   (declare (type cons plate))
-  (decf (the fixnum (fast-$ (car plate)))))
+  (decf (the fixnum (tx-$ (car plate)))))
 
 
 (declaim (ftype (function (tvar tvar cons) fixnum) philosopher-eats))

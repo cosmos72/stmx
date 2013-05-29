@@ -43,7 +43,7 @@
   (length (simple-tvector-vec tvec)))
 
 
-(declaim (inline tsvref (setf tsvref) tx-tsvref (setf tx-tsvref) notx-tsvref (setf notx-tsvref)))
+(declaim (inline tsvref (setf tsvref) tsvref-x (setf tsvref-tx) tsvref-notx (setf tsvref-notx)))
 
 (defun tsvref (tvec index)
   "Return the INDEX-th element of simple-tvector TVEC.

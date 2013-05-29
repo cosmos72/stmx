@@ -69,7 +69,7 @@ the scenes the slots will be stored in transactional memory implemented by tvars
   #+stmx.have-atomic-ops
   (version +invalid-version+ :type fixnum)
   #+stmx.have-atomic-ops
-  (value   +unbound-tvar+         :type t)
+  (value   +unbound-tvar+    :type t)
 
   #-stmx.have-atomic-ops
   (versioned-value +versioned-unbound-tvar+)         ;; tvar-versioned-value
@@ -85,9 +85,8 @@ the scenes the slots will be stored in transactional memory implemented by tvars
   (the fixnum (tvar-id var)))
 
 
-(declaim (ftype (function (  tvar) t) raw-value-of)
-         (inline
-           raw-value-of))
+(declaim (ftype (function (tvar) t) raw-value-of)
+         (inline raw-value-of))
 
 (defun raw-value-of (var)
   "return the current value of VAR, or +unbound-tvar+ if VAR is not bound to a value.

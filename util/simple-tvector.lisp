@@ -17,8 +17,11 @@
 
 ;;;; ** Transactional simple-vector: fixed-size one dimensional array
 
-(defstruct (simple-tvector (:constructor %make-simple-tvector))
-  (vec #() :type simple-vector :read-only t))
+(deftype simple-tvector (&optional length) 
+  "SIMPLE-TVECTOR is a transactional, one dimensional array.
+It is currently a deftype, not a class or struct:
+methods cannot be specialized on it."
+  `(simple-vector ,(or length '*)))
 
 (defun simple-tvector (length &key (element-type t)
                        (initial-element 0) initial-contents)
@@ -26,21 +29,21 @@
   (declare (type fixnum length)
            (type list initial-contents)
            (ignore element-type))
-  (let1 vec (make-array length :element-type 'tvar :initial-element +dummy-tvar+)
+  (let1 tvec (make-array length :element-type 'tvar :initial-element +dummy-tvar+)
     (if initial-contents
         (loop for i from 0 to (1- length)
            for cell = initial-contents then (rest cell)
            for element = (first cell) do
-             (setf (svref vec i) (tvar element)))
+             (setf (svref tvec i) (tvar element)))
         (dotimes (i length)
-          (setf (svref vec i) (tvar initial-element))))
-    
-    (%make-simple-tvector :vec vec)))
+          (setf (svref tvec i) (tvar initial-element))))
+    tvec))
 
+(declaim (inline simple-tvector-length))
 (defun simple-tvector-length (tvec)
   "Return the length of simple-tvector TVEC."
   (declare (type simple-tvector tvec))
-  (length (simple-tvector-vec tvec)))
+  (length tvec))
 
 
 (declaim (inline tsvref (setf tsvref) tsvref-x (setf tsvref-tx) tsvref-notx (setf tsvref-notx)))
@@ -50,14 +53,14 @@
 Works both inside and outside transactions"
   (declare (type simple-tvector tvec)
            (type fixnum index))
-  ($ (svref (simple-tvector-vec tvec) index)))
+  ($ (svref tvec index)))
 
 (defun (setf tsvref) (value tvec index)
   "Set the INDEX-th element of simple-tvector TVEC to VALUE.
 Works both inside and outside transactions"
   (declare (type simple-tvector tvec)
            (type fixnum index))
-  (setf ($ (svref (simple-tvector-vec tvec) index)) value))
+  (setf ($ (svref tvec index)) value))
 
 
 (defun tsvref-tx (tvec index)
@@ -65,14 +68,14 @@ Works both inside and outside transactions"
 Works ONLY inside transactions"
   (declare (type simple-tvector tvec)
            (type fixnum index))
-  ($-tx (svref (simple-tvector-vec tvec) index)))
+  ($-tx (svref tvec index)))
 
 (defun (setf tsvref-tx) (value tvec index)
   "Set the INDEX-th element of simple-tvector TVEC to VALUE.
 Works ONLY inside transactions"
   (declare (type simple-tvector tvec)
            (type fixnum index))
-  (setf ($-tx (svref (simple-tvector-vec tvec) index)) value))
+  (setf ($-tx (svref tvec index)) value))
 
 
 (defun tsvref-notx (tvec index)
@@ -80,14 +83,14 @@ Works ONLY inside transactions"
 Works ONLY outside transactions"
   (declare (type simple-tvector tvec)
            (type fixnum index))
-  ($-notx (svref (simple-tvector-vec tvec) index)))
+  ($-notx (svref tvec index)))
 
 (defun (setf tsvref-notx) (value tvec index)
   "Set the INDEX-th element of simple-tvector TVEC to VALUE.
 Works ONLY outside transactions"
   (declare (type simple-tvector tvec)
            (type fixnum index))
-  (setf ($-notx (svref (simple-tvector-vec tvec) index)) value))
+  (setf ($-notx (svref tvec index)) value))
 
 
 (defmacro do-simple-tvector ((element) tvec &body body)
@@ -95,20 +98,22 @@ Works ONLY outside transactions"
 
 Creates an implicit block named NIL, so (return ...) can be used
 to exit early from the loop with an explicit return value."
-  (with-gensyms (vec var)
-    `(let1 ,vec (simple-tvector-vec ,tvec)
-       (loop for ,var across ,vec
-          for ,element = ($ ,var) do
-            (progn ,@body)))))
+  (with-gensym var
+    `(loop for ,var across ,tvec
+        for ,element = ($ ,var) do
+          (progn ,@body))))
 
 
-(defprint-object (tvec simple-tvector :identity nil)
-  (let1 vec (simple-tvector-vec tvec)
-    (dotimes (i (length vec))
-      (unless (zerop i)
-        (write-string " "))
-      (let1 var (svref vec i)
-        (multiple-value-bind (value present?) (peek-$ var)
-          (if present?
-              (format t "~A" value)
-              (write-string "unbound")))))))
+;; simple-tvector is a deftype, not a class or struct:
+;; cannot specialize methods on it
+#|
+ (defprint-object (tvec simple-tvector :identity nil)
+  (dotimes (i (length tvec))
+    (unless (zerop i)
+      (write-string " "))
+    (let1 var (svref tvec i)
+      (multiple-value-bind (value present?) (peek-$ var)
+        (if present?
+            (format t "~A" value)
+            (write-string "unbound"))))))
+|#

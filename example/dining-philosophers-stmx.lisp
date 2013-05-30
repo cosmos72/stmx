@@ -34,7 +34,7 @@
 (defun eat-from-plate (plate)
   "Decrease by one TVAR in plate."
   (declare (type cons plate))
-  (decf (the fixnum (tx-$ (car plate)))))
+  (decf (the fixnum ($-tx (car plate)))))
 
 
 (declaim (ftype (function (tvar tvar cons) fixnum) philosopher-eats))

@@ -48,8 +48,8 @@ Setup and optimization flags:
    of the three reported elapsed times. Divide by one million to get the average
    elapsed real time per iteration.
 
-   This means for example that to run the benchmark `(atomic (fast-$ v))` one has to type
-   `(x3 (1m (atomic (fast-$ v))))`
+   This means for example that to run the benchmark `(atomic ($-tx v))` one has to type
+   `(x3 (1m (atomic ($-tx v))))`
 
 All timings reported in the next secion are the output on the author's system
 of the procedure just described, and thus for each benchmark they contain
@@ -81,36 +81,36 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.6 (x86_64), STMX 1.3.2
      <th><b>executed code</b></th>
      <th><b>average time</b></th></tr>
 
- <tr><td>atomic nil       </td><td><code>(atomic nil)</code>                </td><td>0.084&nbsp;microseconds</td></tr>
- <tr><td>atomic read-1    </td><td><code>(atomic (fast-$ v))</code>         </td><td>0.103&nbsp;microseconds</td></tr>
- <tr><td>atomic write-1   </td><td><code>(atomic (setf (fast-$ v) i))</code></td><td>0.138&nbsp;microseconds</td></tr>
- <tr><td>atomic read-write-1</td><td><code>(atomic (incf (fast-$ v)))</code></td><td>0.152&nbsp;microseconds</td></tr>
+ <tr><td>atomic nil       </td><td><code>(atomic nil)</code>              </td><td>0.084&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-1    </td><td><code>(atomic ($-tx v))</code>         </td><td>0.103&nbsp;microseconds</td></tr>
+ <tr><td>atomic write-1   </td><td><code>(atomic (setf ($-tx v) i))</code></td><td>0.130&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($-tx v)))</code></td><td>0.159&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-10</td>
-     <td><code>(atomic (dotimes (j 10) (incf (fast-$ v))))</code></td>
-     <td>0.295&nbsp;microseconds</td></tr>
+     <td><code>(atomic (dotimes (j 10) (incf ($-tx v))))</code></td>
+     <td>0.302&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-100</td>
-     <td><code>(atomic (dotimes (j 100) (incf (fast-$ v))))</code></td>
-     <td>1.700&nbsp;microseconds</td></tr>
+     <td><code>(atomic (dotimes (j 100) (incf ($-tx v))))</code></td>
+     <td>1.705&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-1000</td>
-     <td><code>(atomic (dotimes (j 1000) (incf (fast-$ v))))</code></td>
-     <td>15.679&nbsp;microseconds</td></tr>
+     <td><code>(atomic (dotimes (j 1000) (incf ($-tx v))))</code></td>
+     <td>15.675&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(0.147+N*0.016)&nbsp;microseconds</td></tr>
 
- <tr><td>orelse empty     </td><td><code>(atomic (orelse))</code>           </td><td>0.061&nbsp;microseconds</td></tr>
- <tr><td>orelse unary     </td><td><code>(atomic (orelse (fast-$ v)))</code>     </td><td>0.269&nbsp;microseconds</td></tr>
- <tr><td>orelse retry-1   </td><td><code>(atomic (orelse (retry) (fast-$ v)))</code> </td><td>0.514&nbsp;microseconds</td></tr>
- <tr><td>orelse retry-2   </td><td><code>(atomic (orelse (retry) (retry) (fast-$ v)))</code> </td><td>0.740&nbsp;microseconds</td></tr>
- <tr><td>orelse retry-4   </td><td><code>(atomic (orelse (retry) (retry) (retry) (retry) (fast-$ v)))</code></td><td>1.176&nbsp;microseconds</td></tr>
+ <tr><td>orelse empty     </td><td><code>(atomic (orelse))</code>           </td><td>0.060&nbsp;microseconds</td></tr>
+ <tr><td>orelse unary     </td><td><code>(atomic (orelse ($-tx v)))</code>     </td><td>0.270&nbsp;microseconds</td></tr>
+ <tr><td>orelse retry-1   </td><td><code>(atomic (orelse (retry) ($-tx v)))</code> </td><td>0.518&nbsp;microseconds</td></tr>
+ <tr><td>orelse retry-2   </td><td><code>(atomic (orelse (retry) (retry) ($-tx v)))</code> </td><td>0.732&nbsp;microseconds</td></tr>
+ <tr><td>orelse retry-4   </td><td><code>(atomic (orelse (retry) (retry) (retry) (retry) ($-tx v)))</code></td><td>1.170&nbsp;microseconds</td></tr>
 
  <tr><td>orelse retry-N   </td><td>best fit of the 3 runs above</td><td>(0.296+N*0.220)&nbsp;microseconds</td></tr>
 
  <tr><td>tmap read-write-1</td>
      <td><code>(atomic (incf (get-bmap tm 1)))</code></td>
-     <td>0.740&nbsp;microseconds</td></tr>
+     <td>0.746&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-bmap tm))<br>
@@ -163,63 +163,67 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.6 (x86_64), STMX 1.3.2
 
  <tr><td>1 thread</td>
      <td><code>(dining-philosophers 1 1000000)</code></td>
-     <td>2.95&nbsp;millions</td></tr> <!-- lock: 73.00 -->
+     <td>3.63&nbsp;millions</td></tr> <!-- lock: 73.00 -->
 
  <tr><td>2 threads</td>
      <td><code>(dining-philosophers 2 1000000)</code></td>
-     <td>4.56&nbsp;millions</td></tr> <!-- lock: 67.11 -->
+     <td>6.76&nbsp;millions</td></tr> <!-- lock: 67.11 -->
 
  <tr><td>3 threads</td>
      <td><code>(dining-philosophers 3 1000000)</code></td>
-     <td>5.70&nbsp;millions</td></tr> <!-- lock: 54.54 -->
+     <td>9.80&nbsp;millions</td></tr> <!-- lock: 54.54 -->
 
  <tr><td>4 threads</td>
      <td><code>(dining-philosophers 4 1000000)</code></td>
-     <td>7.05&nbsp;millions</td></tr> <!-- lock: 55.10 -->
+     <td>12.78&nbsp;millions</td></tr> <!-- lock: 55.10 -->
 
  <tr><td>5 threads</td>
      <td><code>(dining-philosophers 5 1000000)</code></td>
-     <td>7.06&nbsp;millions</td></tr> <!-- lock: 71.74 -->
+     <td>11.29&nbsp;millions</td></tr> <!-- lock: 71.74 -->
 
  <tr><td>6 threads</td>
      <td><code>(dining-philosophers 6 1000000)</code></td>
-     <td>7.70&nbsp;millions</td></tr> <!-- lock: 90.22 -->
+     <td>12.35&nbsp;millions</td></tr> <!-- lock: 90.22 -->
 
  <tr><td>7 threads</td>
      <td><code>(dining-philosophers 7 1000000)</code></td>
-     <td>8.06&nbsp;millions</td></tr> <!-- lock: 97.08 -->
+     <td>12.11&nbsp;millions</td></tr> <!-- lock: 97.08 -->
 
  <tr><td>8 threads</td>
      <td><code>(dining-philosophers 8 1000000)</code></td>
-     <td>8.24&nbsp;millions</td></tr> <!-- lock: 125.98 -->
+     <td>12.80&nbsp;millions</td></tr> <!-- lock: 125.98 -->
 
  <tr><td>10 threads</td>
      <td><code>(dining-philosophers 10 1000000)</code></td>
-     <td>8.20&nbsp;millions</td></tr> <!-- lock: 155.52 -->
+     <td>12.48&nbsp;millions</td></tr> <!-- lock: 155.52 -->
 
  <tr><td>15 threads</td>
      <td><code>(dining-philosophers 15 1000000)</code></td>
-     <td>8.16&nbsp;millions</td></tr> <!-- lock: 181.38 -->
+     <td>12.65&nbsp;millions</td></tr> <!-- lock: 181.38 -->
 
  <tr><td>20 threads</td>
      <td><code>(dining-philosophers 20 1000000)</code></td>
-     <td>8.57&nbsp;millions</td></tr> <!-- lock: 180.83 -->
+     <td>13.05&nbsp;millions</td></tr> <!-- lock: 180.83 -->
 
  <tr><td>30 threads</td>
      <td><code>(dining-philosophers 30 1000000)</code></td>
-     <td>8.37&nbsp;millions</td></tr> <!-- lock: 189.51 -->
+     <td>12.76&nbsp;millions</td></tr> <!-- lock: 189.51 -->
 
  <tr><td>40 threads</td>
      <td><code>(dining-philosophers 40 1000000)</code></td>
-     <td>8.64&nbsp;millions</td></tr> <!-- lock: 189.66 -->
+     <td>13.11&nbsp;millions</td></tr> <!-- lock: 189.66 -->
 
  <tr><td>50 threads</td>
      <td><code>(dining-philosophers 50 1000000)</code></td>
-     <td>8.36&nbsp;millions</td></tr> <!-- lock: 192.31 -->
+     <td>12.68&nbsp;millions</td></tr> <!-- lock: 192.31 -->
 
  <tr><td>100 threads</td>
      <td><code>(dining-philosophers 100 1000000)</code></td>
-     <td>8.64&nbsp;millions</td></tr> <!-- lock: 193.87 -->
+     <td>13.13&nbsp;millions</td></tr> <!-- lock: 193.87 -->
+
+ <tr><td>200 threads</td>
+     <td><code>(dining-philosophers 100 1000000)</code></td>
+     <td>13.12&nbsp;millions</td></tr> <!-- lock: ??? -->
 
 
 </table>

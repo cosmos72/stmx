@@ -581,14 +581,14 @@ transactions per second per CPU core.
 
 A small example with very short transactions is the [dining philosophers](example/dining-philosophers-stmx.lisp),
 with 5 reads and 5 writes to transactional memory per atomic block,
-where each CPU core runs approximately 2.5 millions transactions per second.
+where each CPU core runs approximately 3.2 millions transactions per second.
 
 For a more realistic benchmark, the author is currently porting
 [Lee-TM](http://apt.cs.man.ac.uk/projects/TM/LeeBenchmark/), a
 non-trivial benchmark suite for transactional memory developed in 2007
 by the University of Manchester (UK). The result is
 [Lee-STMX](https://github.com/cosmos72/lee-stmx) - as of May 2013, its
-status is "work is in progress".
+status is BETA.
 
 Obviously, performance in other cases will depend on the complexity of the code
 inside transactions, on the number of reads and writes to transactional memory,

@@ -37,8 +37,9 @@
                              (:file "atomic-ops"     :depends-on ("features"))
                              (:file "atomic-counter" :depends-on ("atomic-ops"))
                              (:file "mutex"          :depends-on ("atomic-ops"))
+                             (:file "cons"           :depends-on ("thread"))
                              (:file "fast-vector"    :depends-on ("macro"))
-                             (:file "hash-table"     :depends-on ("macro"))
+                             (:file "hash-table"     :depends-on ("cons"))
                              (:file "print"          :depends-on ("macro"))
                              (:file "class-precedence-list" :depends-on ("macro"))))
 

@@ -310,16 +310,6 @@ to TLOGs while executing BODY."
   `(setf (tlog-id ,log) (get-atomic-counter *tlog-counter*)))
 
 
-(defun ensure-thread-initial-bindings (&rest syms-and-forms)
-  (declare (type list syms-and-forms))
-  (loop for sym-and-form in syms-and-forms do
-       (unless (assoc (first sym-and-form) bt:*default-special-bindings* :test 'eq)
-         (push sym-and-form bt:*default-special-bindings*))))
-
-(defmacro save-thread-initial-bindings (&rest syms)
-  `(ensure-thread-initial-bindings
-    ,@(loop for sym in syms collect `(cons ',sym ,sym))))
-
 (eval-when (:load-toplevel :execute)
   (save-thread-initial-bindings *tlog* *record-to-tlogs* *hide-tvars*))
 

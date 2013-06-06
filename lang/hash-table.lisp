@@ -104,7 +104,7 @@ TO-LIST contents is not destructively modified."
   (declare (type hash-table src)
            (type list to-list))
   (do-hash (key) src
-    (push key to-list))
+    (push^ key to-list))
   to-list)
 
 
@@ -115,7 +115,7 @@ TO-LIST contents is not destructively modified."
   (declare (type hash-table src)
            (type list to-list))
   (loop for value being each hash-value in src
-     do (push value to-list))
+     do (push^ value to-list))
   to-list)
 
 
@@ -127,7 +127,7 @@ TO-ALIST contents is not destructively modified."
   (declare (type hash-table src)
            (type list to-alist))
   (do-hash (key value) src
-    (push (cons key value) to-alist))
+    (push^ (cons^ key value) to-alist))
   to-alist)
   
   

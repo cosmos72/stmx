@@ -17,9 +17,9 @@
 
 
 (eval-when (:compile-toplevel)
-  #-(or sbcl ccl cmucl)
+  #-(or abcl ccl cmucl sbcl)
   (warn "Untested Common Lisp implementation.
-STMX is currently tested only on SBCL, CMUCL and CCL."))
+STMX is currently tested only on ABCL, CCL, CMUCL and SBCL."))
 
 
 

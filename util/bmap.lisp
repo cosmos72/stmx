@@ -311,7 +311,7 @@ as multiple values"
          (comp nil))
      (loop while node
         for xkey = (_ node key) do
-          (push node stack)
+          (push^ node stack)
           (case (setf comp (bmap-compare-keys pred key xkey))
             (:< (setf node (_ node left)))
             (:> (setf node (_ node right)))
@@ -486,7 +486,7 @@ and removes any other key/value already present in MCOPY."
   (declare (type list to-list))
   (do-bmap (key value :from-end t) m
     (declare (ignore value))
-    (push key to-list))
+    (push^ key to-list))
   to-list)
 
 
@@ -497,7 +497,7 @@ first the value associated to the smallest key, and so on."
   (declare (type list to-list))
   (do-bmap (key value :from-end t) m
     (declare (ignore key))
-    (push value to-list))
+    (push^ value to-list))
   to-list)
 
 
@@ -506,7 +506,7 @@ first the value associated to the smallest key, and so on."
 all entries in M."
   (declare (type list to-alist))
   (do-bmap (key value :from-end t) m
-    (push (cons key value) to-alist))
+    (push^ (cons^ key value) to-alist))
   to-alist)
 
 

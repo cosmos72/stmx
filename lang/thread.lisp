@@ -16,6 +16,26 @@
 (in-package :stmx.lang)
 
 
+;;;; ** Helpers to initialize thread-local variables
+
+(eval-always
+ (defun ensure-thread-initial-binding (sym form)
+   (declare (type symbol sym)
+            (type (or atom cons) form))
+   (unless (assoc sym bt:*default-special-bindings* :test 'eq)
+     (push (cons sym form) bt:*default-special-bindings*)))
+
+ (defun ensure-thread-initial-bindings (&rest syms-and-forms)
+   (declare (type list syms-and-forms))
+   (loop for sym-and-form in syms-and-forms do
+        (unless (assoc (first sym-and-form) bt:*default-special-bindings* :test 'eq)
+          (push sym-and-form bt:*default-special-bindings*))))
+
+ (defmacro save-thread-initial-bindings (&rest syms)
+   `(ensure-thread-initial-bindings
+     ,@(loop for sym in syms collect `(cons ',sym ,sym)))))
+
+
 
 ;;;; ** Faster replacement for bordeaux-threads:with-lock-held
 
@@ -36,9 +56,7 @@
 (defvar *current-thread* (current-thread))
 
 (eval-always
-  (unless (assoc '*current-thread* bt:*default-special-bindings* :test 'eq)
-         (push (cons '*current-thread* '(current-thread))
-               bt:*default-special-bindings*)))
+ (ensure-thread-initial-bindings '(*current-thread* . (current-thread))))
 
 
 #-stmx.sane-bt.join-thread

@@ -32,6 +32,13 @@
            #:start-thread #:wait4-thread
            #:*current-thread*
            #:with-lock
+           #:ensure-thread-initial-binding
+           #:ensure-thread-initial-bindings
+           #:save-thread-initial-bindings
+
+           ;; cons pool
+           #:cons^ #:free-cons^
+           #:push^ #:pop-free-cons^
 
            ;; atomic operations
            #:atomic-num #:atomic-incf #:atomic-decf

@@ -37,7 +37,7 @@
            #:save-thread-initial-bindings
 
            ;; cons pool
-           #:cons^ #:free-cons^
+           #:cons^ #:free-cons^ #:free-list^
            #:push^ #:pop-free-cons^
 
            ;; atomic operations

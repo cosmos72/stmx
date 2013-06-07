@@ -326,23 +326,24 @@ Return VALUE."
   (multiple-value-bind (stack comp) (find-key-and-stack m key)
     (let1 node (first stack)
        
-      (when (eq := comp)
-        ;; key already present
-        (setf (_ node value) value)
-        (return-from set-bmap value))
+      (if (eq := comp)
+          ;; key already present
+          (setf (_ node value) value)
 
-      ;; no such key, create node for it
-      (let1 child (bmap/new-node m key value)
-        (incf (the fixnum (_ m count)))
-        (if node
-            (if (eq :< comp)
-                (setf (_ node left) child)
-                (setf (_ node right) child))
-            ;; bmap is empty
-            (setf (_ m root) child))
+          ;; no such key, create node for it
+          (let1 child (bmap/new-node m key value)
+            (incf (the fixnum (_ m count)))
+            (if node
+                (if (eq :< comp)
+                    (setf (_ node left) child)
+                    (setf (_ node right) child))
+                ;; bmap is empty
+                (setf (_ m root) child))
 
-        (bmap/rebalance-after-insert m child stack))))
-  value)
+            (bmap/rebalance-after-insert m child stack))))
+      
+    (free-list^ stack)
+    value))
 
 
 
@@ -355,13 +356,15 @@ Return t if KEY was removed, nil if not found."
       (return-from rem-bmap nil))
 
     (multiple-value-bind (stack comp) (find-key-and-stack m key)
+      (let1 found? (eq := comp)
+        (when found?
+          (bmap/remove-at m stack)
+          (decf (the fixnum (_ m count))))
 
-      (unless (eq := comp)
-        (return-from rem-bmap nil))
+        (free-list^ stack)
+        found?))))
 
-      (bmap/remove-at m stack)
-      (decf (the fixnum (_ m count)))
-      t)))
+
 
 
 

@@ -110,31 +110,31 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.6 (x86_64), STMX 1.3.2
 
  <tr><td>tmap read-write-1</td>
      <td><code>(atomic (incf (get-bmap tm 1)))</code></td>
-     <td>0.746&nbsp;microseconds</td></tr>
+     <td>0.834&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-bmap tm))<br>
               (set-bmap tm i t))</code></td>
-     <td>5.418&nbsp;microseconds</td></tr>
+     <td>5.120&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 100)</td>
      <td><code>(atomic (when (zerop (mod i  100)) (clear-bmap tm))<br>
               (set-bmap tm i t))</code></td>
-     <td>7.379&nbsp;microseconds</td></tr>
+     <td>7.101&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 1000)</td>
      <td><code>(atomic (when (zerop (mod i 1000)) (clear-bmap tm))<br>
               (set-bmap tm i t))</code></td>
-     <td>8.733&nbsp;microseconds</td></tr>
+     <td>8.547&nbsp;microseconds</td></tr>
 
  <tr><td>thash read-write-1</td>
      <td><code>(atomic (incf (get-thash th 'x)))</code></td>
-     <td>1.789&nbsp;microseconds</td></tr>
+     <td>1.675&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-thash th))<br>
               (set-thash th i t))</code></td>
-     <td>2.296&nbsp;microseconds</td></tr>
+     <td>2.261&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 100)</td>
      <td><code>(atomic (when (zerop (mod i  100)) (clear-thash th))<br>

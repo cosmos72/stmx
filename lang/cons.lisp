@@ -46,6 +46,19 @@
         *cons-pool*  cell)
   nil)
 
+(defun free-list^ (list)
+  "Add a list of CONS cells to free cons pool."
+  (declare (type list list))
+  (when list
+    (loop for cell = list then next
+       for next = (rest cell)
+       while next do
+         (setf (first cell) nil)
+       finally
+         (setf (first cell) nil
+               (rest cell) *cons-pool*
+               *cons-pool*  list))))
+
 
 
 (defmacro push^ (value place)

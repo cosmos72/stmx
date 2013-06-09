@@ -6,6 +6,8 @@ plagued with heated discussions. It is objectively difficult to come up with
 scientifically accurate figures as they depend on many factors, including at least
 hardware, operating system, common lisp implementation, optimization flags and usage pattern.
 
+What follows is a list of micro-benchmarks, suitable to have an initial idea
+about STMX performance for short, non-conflicting transactions.
 
 Benchmark procedure
 -------------------

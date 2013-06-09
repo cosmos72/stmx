@@ -16,16 +16,20 @@ Main features
 - Brings database-style transactions to Common Lisp by introducing transactional
   memory.
 - High performance implementation, benchmarked to reach up to 6 millions
-  transactions per CPU core per second on commodity PC hardware.
+  transactions per second per CPU core on commodity PC hardware.
 - Removes the need for traditional locks, mutexes and conditions - writing
   correct concurrent code with them is well known to be hard.
 - Transactional code is intrinsically deadlock-free: if two transactions
   conflict one of them will be re-executed.
 - Automatic commit and rollback: if a transaction completes normally it will
-  be committed, if it signals an error it will be rolled back.
+  be committed, if it exits with a non-local control transfer (signals an error,
+  throws, or calls (go ...) to exit an atomic block) it will be rolled back.
 - Transactions are composable: they can be executed in a larger transaction,
   either in sequence (all-or-nothing) or as alternatives (try them in order
   until one succeeds).
+- Guarantees a consistent view of memory during transactions: concurrent updates
+  from other threads are not visible - if the consistency cannot be guaranteed,
+  the transaction will be automatically rolled back and re-executed from scratch.
 - Offers freedom of choice between blocking and non-blocking transactional
   functions: given either behaviour, it is trivial to transform it into the
   other.
@@ -42,19 +46,19 @@ A quick-start guide and installation instructions are provided in the file
 
 License: [LLGPL](http://opensource.franz.com/preamble.html)
 
-What STMX is NOT
-----------------
+What STMX is **not**
+--------------------
 
 In order not to confuse programmers - less experienced ones in particular -
 and to avoid rising unrealistic hopes, the author states the following
 about STMX:
 
-- it is NOT a quick hack to automagically transform existing, slow,
+- it is **not** a quick hack to automagically transform existing, slow,
   single-threaded programs into fast, concurrent ones.
   No matter how much transactions can help, writing concurrent code
   still requires careful design and implementation - and testing.
   And refactoring takes time too.
-- it is NOT for optimization-focused programmers trying to squeeze the last
+- it is **not** for optimization-focused programmers trying to squeeze the last
   cycle from their Common Lisp programs. STMX records an in-memory transaction
   log containing all reads and writes from/to transactional memory, then later
   (during commit) validates the transaction log against the latest data present
@@ -64,18 +68,18 @@ about STMX:
   highly optimized locking code (but a good cross-check is to ask yourself
   how many people have the skill and patience to write such locking code
   without bugs).
-- it is NOT supposed to be used for all data structures in a Common Lisp
+- it is **not** supposed to be used for all data structures in a Common Lisp
   program. STMX is intended only for the data accessed concurrently by multiple
   threads while being destructively modified by at least one thread.
   And even in that case, transactional memory is **not always** needed:
-  for simple modifications locking code is usually feasible; for complex,
-  structural modifications STMX can help greatly.
-- it is NOT a serialization or persistence framework. Rather, messing with
+  for simple modifications, locking code is usually feasible; for complex
+  structural modifications, STMX can help greatly.
+- it is **not** a serialization or persistence framework. Rather, messing with
   metaclasses and playing (allowed) tricks with slots contents as STMX does,
   quite likely does **not** mix well with serialization or persistence
   libraries such as CL-STORE or CL-MARSHAL, because they typically need
   full control on the slots of the objects to be serialized and de-serialized.
-- it is NOT a million dollar library from some deep-pocket company. At the
+- it is **not** a million dollar library from some deep-pocket company. At the
   moment, it is the work of a single person.
 
 
@@ -96,10 +100,11 @@ In particular:
 - conflicts, i.e. multiple transactions trying to write simultaneously
   the same  memory location, are detected automatically during commit.
   In such case, one transaction will commit and all other ones will be
-  re-executed
-- thanks to the global version clock, it *cannot* happen that a transaction
-  sees an inconsistent view of transactional memory.
+  rolled back and re-executed from the beginning
+- thanks to the global version clock, it **cannot** happen that a transaction
+  sees an inconsistent view of transactional memory even if other threads
+  modify it.
   
-  The worst that can happen is an automatic re-execution of a
+  The worst that can happen is an automatic abort and re-execution of a
   transaction immediately *before* it can see an inconsistent view of
   transactional memory.

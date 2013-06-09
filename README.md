@@ -148,21 +148,21 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
           (format t "atomic method set-foo: foo now contains ~S, S~%"
                   value1 value2))
       
-  `show-foo` will atomically read the slots `value1` and `value2` of a `foo`
-  instance, then print both. Note that `format` is **outside** the atomic
+  SHOW-FOO will atomically read the slots VALUE1 and VALUE2 of a FOO
+  instance, then print both. Note that `(format t ...)` is **outside** the atomic
   block - more on this later.
 
-  `set-foo` will atomically set the slots `value1` and `value2` of a `foo`
+  SET-FOO will atomically set the slots VALUE1 and VALUE2 of a FOO
   instance.
 
   Using these two functions, STMX guarantees that multiple threads accessing
-  the same `foo` instance will always see consistent values for both slots,
-  i.e. `show-foo` will **never** see intermediate states of a transaction,
-  where for example one slot has been updated by `set-foo`, but the other slot
+  the same FOO instance will always see consistent values for both slots,
+  i.e. SHOW-FOO will **never** see intermediate states of a transaction,
+  where for example one slot has been updated by SET-FOO, but the other slot
   has not been updated yet.
 
   This is the main feature of STMX: if an atomic block completes normally,
-  it is assumed to be successful and it gets committed: and all its writes
+  it is assumed to be successful and it gets committed: all its writes
   to transactional memory become visible simultaneously to other threads.
   If instead an atomic block exits with a non-local control transfer
   (signals an error, throws, or invokes a `(go some-label)`), it is assumed
@@ -186,7 +186,7 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   Future versions may remove this convenience hack and replace it with a cleaner,
   stricter mechanism.
   In a program, **always** make sure that all code that uses transactional memory
-  is directly or indirecly executed inside an `atomic` block.
+  is directly or indirecly executed inside an `(atomic ...)` block.
 
 - `TRANSACTION` declares that a method or function is an atomic
   transaction, and is actually just a macro that wraps the body of a function
@@ -209,25 +209,25 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
                      (type string value2))
             (setf (value1-of obj) value1)
             (setf (value2-of obj) value2)
-	    obj))
+            obj))
 
 - Composing transactions
 
-  A key feature of `atomic` is its composability:
+  A key feature of `ATOMIC` is its composability:
   smaller transactions can be composed to create larger transactions.
   For example, the following three program fragments are perfectly equivalent:
 
   1) use `(atomic ...)` to wrap into a single transaction many smaller `(atomic ...)` blocks
 
         (defmethod swap-value1-of ((x foo) (y foo))
+          (format t "swapping value1 of ~S and ~S~%" x y)
           (atomic
-            (format t "swapping value1 of ~A and ~A~%" x y)
-            (rotatef (value1-of x) (value1-of y))))
+            (rotatef (slot-value x 'value1) (slot-value y 'value1))))
 
         (defmethod swap-value2-of ((x foo) (y foo))
+          (format t "swapping value2 of ~S and ~S~%" x y)
           (atomic
-            (format t "swapping value2 of ~A and ~A~%" x y)
-            (rotatef (value2-of x) (value2-of y))))
+            (rotatef (slot-value x 'value2) (slot-value y 'value2))))
 
         (defmethod swap-contents ((x foo) (y foo))
           (atomic
@@ -237,22 +237,20 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   2) write redundant `(atomic ...)` blocks
 
         (defmethod swap-contents ((x foo) (y foo))
+          (format t "swapping value1 and value2 of ~S and ~S~%" x y)
           (atomic
             (atomic
-              (format t "swapping value1 of ~A and ~A~%" x y)
-              (rotatef (value1-of x) (value1-of y)))
+              (rotatef (slot-value x 'value1) (slot-value y 'value1)))
             (atomic
-              (format t "swapping value2 of ~A and ~A~%" x y)
-              (rotatef (value2-of x) (value2-of y)))))
+              (rotatef (slot-value x 'value2) (slot-value y 'value2)))))
 
-  3) write a single (atomic ...) block
+  3) write a single `(atomic ...)` block
 
         (defmethod swap-contents ((x foo) (y foo))
+          (format t "swapping value1 and value2 of ~S and ~S~%" x y)
           (atomic
-            (format t "swapping value1 of ~A and ~A~%" x y)
-            (rotatef (value1-of x) (value1-of y))
-            (format t "swapping value2 of ~A and ~A~%" x y)
-            (rotatef (value2-of x) (value2-of y))))
+            (rotatef (slot-value x 'value1) (slot-value y 'value1))
+            (rotatef (slot-value x 'value2) (slot-value y 'value2))))
 
   This composability property has an important consequence: transactional code,
   possibly written by different people for unrelated purposes, can be combined
@@ -293,7 +291,10 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   avoid by minimizing the number of `(atomic ...)` blocks: it is enough to have
   a top-level atomic block that corresponds to the largest transaction that one
   wants to execute, and omit inner atomic blocks in the same or other functions
-  called directly or indirectly from the top-level atomic block.
+  called directly or indirectly from the top-level atomic block. In such case,
+  it is strongly recommended to insert in the documentation of the functions
+  accessing transactional memory without a direct atomic block a sentence like
+  "This function should be always invoked from inside an STMX atomic block."
 
 - `RETRY` is a function. It is more tricky to understand, but really powerful.
   As described in the summary, transactions will commit if they return normally,
@@ -338,9 +339,10 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
 
 Input/Output during transactions
 --------------------------------
-**WARNING:** since transactions will be re-executed in case of conflicts with others
-and can also rollback or retry, all non-transactional code inside an atomic block
-may be executed more times than expected, or may be executed when **not** expected.
+**WARNING:** since transactions will be re-executed in case of conflicts with
+others and can also rollback or retry, all non-transactional code inside an
+atomic block may be executed more times than expected, or may be executed when
+**not** expected.
 
 Some transactional memory implementations, especially for statically-typed
 languages, forbid performing input/output during a transaction on the ground
@@ -371,8 +373,8 @@ a transaction to atomically consume the buffer and only later,
 An alternative solution is: during a transaction, instead of performing I/O
 pass to `AFTER-COMMIT` a function that will perform I/O when executed.
 Note: `AFTER-COMMIT` is described in Advanced usage below, read it carefully
-because functions executed by `AFTER-COMMIT` have several restrictions on what they
-are allowed to do.
+because functions executed by `AFTER-COMMIT` have several restrictions on what
+they are allowed to do.
 
 Advanced usage
 --------------
@@ -403,7 +405,8 @@ features are available:
         (run-atomic #'init-foo-a-and-b)
 
 - `RUN-ORELSE` is the function version of `ORELSE`: it accepts any number
-  of functions and executes them as alternatives in separate nested transactions:
+  of functions and executes them as alternatives in separate, nested
+  transactions:
   if the first retries or is invalid, the second will be executed and so on,
   until one function either commits (returns normally) or rollbacks
   (signals an error or condition).
@@ -434,7 +437,8 @@ features are available:
     Starting a nested transaction and retrying inside that is acceptable,
     as long as the (retry) does not propagate outside the forms themselves.
 
-- `AFTER-COMMIT` is another macro that registers Lisp forms to be executed later,
+- `AFTER-COMMIT` is another macro that registers Lisp forms to be executed
+  later,
   but in this case they are executed immediately after the transaction has been
   successfully committed.
   It can be useful to notify some subsystem that for any reason cannot call
@@ -459,8 +463,8 @@ features are available:
    to commit.
 
 - `CALL-AFTER-COMMIT` is the function version of `AFTER-COMMIT`: it accepts a
-   single function and registers it to be executed after the transaction has been
-   successfully committed.
+   single function and registers it to be executed after the transaction
+   has been successfully committed.
 
 - `TVAR` is the class implementing transactional memory behind the scenes.
    It is used internally by slots of transactional classes, but can also be used
@@ -478,8 +482,8 @@ features are available:
    - `(setf (value-of var) value)` setter method, equivalent to
       `(setf ($ var) value)`
 
-   For programmers that want to squeeze the last CPU cycle out of STMX, there are
-   two more functions that work **only inside** transactions:
+   For programmers that want to squeeze the last CPU cycle out of STMX, there
+   are two more functions that work **only inside** transactions:
    - `($-tx var)` Get the value of VAR. Return `+unbound-tvar+` if VAR is not
      bound to any value.
      Quite obviously, explicitly checking the value returned by `$-tx` against
@@ -627,9 +631,9 @@ A small example with very short transactions is the [dining philosophers](exampl
 with 5 reads and 5 writes to transactional memory per atomic block,
 where each CPU core runs approximately 3.2 millions transactions per second.
 
-For a more realistic benchmark, the author is currently porting
-[Lee-TM](http://apt.cs.man.ac.uk/projects/TM/LeeBenchmark/), a
-non-trivial benchmark suite for transactional memory developed in 2007
+For a more realistic benchmark, the author has ported
+[Lee-TM](http://apt.cs.man.ac.uk/projects/TM/LeeBenchmark/),
+a non-trivial benchmark suite for transactional memory developed in 2007
 by the University of Manchester (UK). The result is
 [Lee-STMX](https://github.com/cosmos72/lee-stmx) - as of May 2013, its
 status is BETA.
@@ -651,7 +655,7 @@ The author will also try to answer support requests, but gives no guarantees.
 Status
 ------
 
-As of May 2013, STMX is being written by Massimiliano Ghilardi
+As of June 2013, STMX is being written by Massimiliano Ghilardi
 and is considered by the author to be stable.
 
 STMX is a full rewrite of CL-STM, which has been developed by Hoan Ton-That

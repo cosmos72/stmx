@@ -67,11 +67,18 @@ STMX is currently tested only on ABCL, CCL, CMUCL and SBCL."))
 
 
 (eval-always
- (defmacro compile-if (bool-expr)
-   `(cl:if ,bool-expr :stmx :never))
+ (defun compile-if (flag)
+   (declare (type boolean flag))
+   (if flag :stmx :never))
 
- (defmacro compile-if-find-symbol (pkg-name symbol-name)
-   `(compile-if (cl:find-symbol (cl:string ,symbol-name) ,pkg-name))))
+ (defun compile-find-symbol (pkg-name symbol-name)
+   (declare (type symbol pkg-name symbol-name))
+   (when-bind pkg (find-package pkg-name)
+     (find-symbol (string symbol-name) pkg)))
+
+ (defun compile-if-find-symbol (pkg-name symbol-name)
+   (declare (type symbol pkg-name symbol-name))
+   (compile-if (compile-find-symbol pkg-name symbol-name))))
 
 
 

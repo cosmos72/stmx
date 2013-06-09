@@ -66,6 +66,15 @@ STMX is currently tested only on ABCL, CCL, CMUCL and SBCL."))
    (add-features :stmx.fixnum-is-large-powerof2)))
 
 
+(eval-always
+ (defmacro compile-if (bool-expr)
+   `(cl:if ,bool-expr :stmx :never))
+
+ (defmacro compile-if-find-symbol (pkg-name symbol-name)
+   `(compile-if (cl:find-symbol (cl:string ,symbol-name) ,pkg-name))))
+
+
+
 
 
 (eval-when (:compile-toplevel)

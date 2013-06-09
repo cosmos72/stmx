@@ -26,6 +26,8 @@
            #:when-bind    #:awhen
            #:if-bind      #:aif
 
+	   #:compile-if   #:compile-if-find-symbol
+
            #:log.trace    #:log.debug   #:log.make-logger
 
            ;; bordeaux-threads helpers

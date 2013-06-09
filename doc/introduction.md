@@ -46,7 +46,7 @@ A quick-start guide and installation instructions are provided in the file
 
 License: [LLGPL](http://opensource.franz.com/preamble.html)
 
-What STMX is **not**
+What STMX is **NOT**
 --------------------
 
 In order not to confuse programmers - less experienced ones in particular -
@@ -105,6 +105,6 @@ In particular:
   sees an inconsistent view of transactional memory even if other threads
   modify it.
   
-  The worst that can happen is an automatic abort and re-execution of a
-  transaction immediately *before* it can see an inconsistent view of
+  The worst that can happen is an automatic rollback and re-execution of a
+  transaction immediately **before** it can see an inconsistent view of
   transactional memory.

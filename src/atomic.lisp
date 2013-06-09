@@ -56,13 +56,13 @@ The effect is the same as DEFUN - or DEFMETHOD - plus:
           collect form)
      
      (atomic
-      ,@(if (symbolp func-name)
-            ;; support (return-from ,func-name ...)
-            `((block ,func-name
-                ;; support (declare ...)
-                (let ()
-                  ,@body)))
-            body))))
+      ,(if (symbolp func-name)
+	   ;; support (return-from ,func-name ...)
+	   `(block ,func-name
+	      (locally ;; support (declare ...)
+                  ,@body))
+	   `(locally ;; support (declare ...)
+		,@body)))))
 
 
 

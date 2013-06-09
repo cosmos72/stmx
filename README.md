@@ -115,83 +115,105 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   
         (transactional
           (defclass foo ()
-            ((value1 :type integer :initarg :value1 :accessor value1-of)
-             (value2 :type string  :initarg :value2 :accessor value2-of)
-             ;; ...
-            )))
+            ((value1 :type integer :initarg :value1 :initform 0)
+             (value2 :type string  :initarg :value2 :initform ""))))
 
   Note: on some Common Lisp implementations (ABCL and possibly others)
   slot accessors are known to ignore by default the transactional machinery
   (implemented with MOP slot-value-using-class, if you wonder) causing all kinds
   of errors on transactional classes.
-  Even though usually this problem can be *partially* fixed with
+  Even though usually this problem can be usually at least *partially* fixed with
   implementation-specific options, it is recommended to use `slot-value`
   to read and write the slots of transactional classes or, even better, a macro
   that can be defined to use either `slot-value` or slot accessors.
 
-- `TRANSACTION` declares that a method or function is an atomic
-  transaction, and is actually just a convenience macro for `ATOMIC`.
-  Use it to wrap a function definition:
-  
-        (transaction
-          (defun show-foo (obj)
-            (declare (type foo obj))
-            (format t "atomic function show-foo: foo is ~A ~A~%"
-              (value1-of obj) (value2-of obj))
-            ;; ...
-          ))
-      
-  or a method definition:
-  
-        (transaction
-          (defmethod set-foo ((obj foo) value1 value2)
-            (declare (type integer value1)
-                     (type string value2))
-            (setf (value1-of obj) value1)
-            (setf (value2-of obj) value2)
-            (format t "atomic method set-foo: foo is now ~A ~A~%" value1 value2)
-            ;; ...
-          ))
-
 - `ATOMIC` is the main macro: it wraps Lisp forms into an atomic transaction
-  then executes them. The above functions and methods could also be written as:
-  
-        (defun show-foo (obj)
+  then executes them. For example, defining
+
+        (defun show-foo (obj &optional (stream t))
           (declare (type foo obj))
-          (atomic
-            (format t "atomic function show-foo: foo is ~A ~A~%"
-              (value1-of obj) (value2-of obj))
-            ;; ...
-          ))
+          (multiple-value-bind (value1 value2)
+              (atomic
+                (values (slot-value obj 'value1)
+                        (slot-value obj 'value2)))
+            (format stream "atomic function show-foo: foo contains ~S, ~S~%"
+                    value1 value2)))
       
         (defmethod set-foo ((obj foo) value1 value2)
           (declare (type integer value1)
                    (type string value2))
           (atomic
-            (setf (value1-of obj) value1)
-            (setf (value2-of obj) value2)
-            (format t "atomic method set-foo: foo is now ~A ~A~%" value1 value2)
-            ;; ...
-          ))
+            (setf (slot-value obj 'value1) value1)
+            (setf (slot-value obj 'value2) value2))
+          (format t "atomic method set-foo: foo now contains ~S, S~%"
+                  value1 value2))
       
-  with the difference that `atomic` is not limited to functions and
-  methods: it can be used to wrap *any* list of forms (it contains an
-  implicit `progn`).
+  `show-foo` will atomically read the slots `value1` and `value2` of a `foo`
+  instance, then print both. Note that `format` is **outside** the atomic
+  block - more on this later.
 
-  Note: STMX allows using transactional memory both inside and outside
-  transactions started with `TRANSACTION` or `ATOMIC`, but be aware that
-  accessing transactional memory from outside transactions is only intended
-  for **debugging** purposes at the REPL: in a program it would cause a lot
-  of problems, due to inconsistencies and due to other threads not being
-  notified when a transactional memory location is updated.
+  `set-foo` will atomically set the slots `value1` and `value2` of a `foo`
+  instance.
+
+  Using these two functions, STMX guarantees that multiple threads accessing
+  the same `foo` instance will always see consistent values for both slots,
+  i.e. `show-foo` will **never** see intermediate states of a transaction,
+  where for example one slot has been updated by `set-foo`, but the other slot
+  has not been updated yet.
+
+  This is the main feature of STMX: if an atomic block completes normally,
+  it is assumed to be successful and it gets committed: and all its writes
+  to transactional memory become visible simultaneously to other threads.
+  If instead an atomic block exits with a non-local control transfer
+  (signals an error, throws, or invokes a `(go some-label)`), it is assumed
+  to be failed and it gets rolled back: all its writes to transactional memory
+  are discarded.
+
+  Warning: in order to avoid deadlocks and conflicts while still reaching good
+  performance, STMX may execute more than once the contents of an atomic block.
+  Also, some instructions as `(retry)` described below, explicitly cause an
+  atomic block to be re-executed from the beginning. For this reasons,
+  atomic blocks should **not** contain irreversible operations such as
+  input/output. More details in the paragraph INPUT/OUTPUT DURING TRANSACTIONS
+  below.
+
+  Note: STMX allows using transactional memory both inside and outside atomic
+  blocks, but be aware that accessing transactional memory from outside
+  atomic transactions is only intended for **debugging** purposes at the REPL:
+  in a program it can cause a lot of problems, due to inconsistencies and due to
+  other threads not being notified when a transactional memory location is
+  updated.
   Future versions may remove this convenience hack and replace it with a cleaner,
   stricter mechanism.
-  In a program, **always** wrap with `TRANSACTION` or `ATOMIC` all code
-  that uses transactional memory.
+  In a program, **always** make sure that all code that uses transactional memory
+  is directly or indirecly executed inside an `atomic` block.
+
+- `TRANSACTION` declares that a method or function is an atomic
+  transaction, and is actually just a macro that wraps the body of a function
+  or method in an `(atomic ...)` block.
+  In the past, it was suggested as a more convenient alternative to `ATOMIC`,
+  but for various stylistic reasons the current recommendation is to avoid it.
+  The main reason is that it encourages performing too many operations inside
+  an atomic block, including irreversible ones as input/output, which has
+  unpredictable behaviour and should be **really** avoided. Examples:
+
+        (transaction
+          (defun get-foo-values (obj)
+            (declare (type foo obj))
+            (values
+              (value1-of obj) (value2-of obj))))
+      
+        (transaction
+          (defmethod set-foo-values ((obj foo) value1 value2)
+            (declare (type integer value1)
+                     (type string value2))
+            (setf (value1-of obj) value1)
+            (setf (value2-of obj) value2)
+	    obj))
 
 - Composing transactions
 
-  A key feature of `atomic` and `transaction` is their composability:
+  A key feature of `atomic` is its composability:
   smaller transactions can be composed to create larger transactions.
   For example, the following three program fragments are perfectly equivalent:
 
@@ -235,9 +257,9 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   This composability property has an important consequence: transactional code,
   possibly written by different people for unrelated purposes, can be combined
   into larger transactions without modifying it - actually, without looking at
-  the source code at all - as long as it all uses the same STM library.
+  the source code at all - as long as it all uses the same transactional library.
 
-  The STM machinery will guarantee that transactions intermediate status, where
+  The STMX machinery will guarantee that transactions intermediate status, where
   an atomic block is half-way through its job, will **never** be visible to other
   transactions.
 
@@ -263,6 +285,15 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   in the example),
   that other existing code in the program uses the same containers `a` and `b`
   but does not cooperate with `move-obj-from-a-to-b`.
+
+  Style suggestion: in order to guarantee that all transactional memory accesses
+  are performed inside an atomic block, it may be tempting to wrap each function
+  or method body inside `(atomic ...)`. While safe and correct, this approach
+  has a small performance penalty that performance-critical code may want to
+  avoid by minimizing the number of `(atomic ...)` blocks: it is enough to have
+  a top-level atomic block that corresponds to the largest transaction that one
+  wants to execute, and omit inner atomic blocks in the same or other functions
+  called directly or indirectly from the top-level atomic block.
 
 - `RETRY` is a function. It is more tricky to understand, but really powerful.
   As described in the summary, transactions will commit if they return normally,
@@ -311,16 +342,16 @@ Input/Output during transactions
 and can also rollback or retry, all non-transactional code inside an atomic block
 may be executed more times than expected, or may be executed when **not** expected.
 
-Some STM implementations, especially for statically-typed languages,
-forbid performing input/output during a transaction on the ground that
-I/O is not transactional: if a transaction sends an irreversible command
+Some transactional memory implementations, especially for statically-typed
+languages, forbid performing input/output during a transaction on the ground
+that I/O is not transactional: if a transaction sends an irreversible command
 to the outside world, there is no way to undo it in case the transaction
 rolls back, retries or conflicts.
 
 STMX does not implement such restrictions, i.e. I/O and any other irreversible
 action can also be performed inside an atomic block.
-This means you are free to launch missiles during a transaction, and blow the world
-when you shouldn't have. **You have been warned.**
+This means you are free to launch missiles during a transaction, and destroy
+the world when you shouldn't have. **You have been warned.**
 
 Despite the risk, there are at least two reasons for such a design choice:
 * Forbidding I/O operations inside transactions, if done at all, should be done
@@ -377,21 +408,23 @@ features are available:
   until one function either commits (returns normally) or rollbacks
   (signals an error or condition).
 
-  If X, Y and Z are no-argument functions, the following two lines are equivalent:
+  If X, Y and Z are no-argument functions, the following two lines are
+  equivalent:
   
         (orelse (x) (y) (z))
         (run-orelse #'x #'y #'z)
 
-- `BEFORE-COMMIT` is a macro that registers Lisp forms to be executed later, just before
-  the transaction tries to commit.
-  It can be useful to normalize or simplify some transactional data, or perform any kind
-  of bookkeeping activity. 
+- `BEFORE-COMMIT` is a macro that registers Lisp forms to be executed later,
+  just before the transaction tries to commit.
+  It can be useful to normalize or simplify some transactional data, or perform
+  any kind of bookkeeping activity. 
 
-  Be aware that the transaction is not yet committed when the forms registered with
-  BEFORE-COMMIT run. This means in particular:
+  Be aware that the transaction is not yet committed when the forms registered
+  with BEFORE-COMMIT run. This means in particular:
 
-  - If the forms signal an error when executed, the error is propagated to the caller,
-    forms registered later with BEFORE-COMMIT are not executed, and the transaction rollbacks.
+  - If the forms signal an error when executed, the error is propagated to the
+    caller, forms registered later with BEFORE-COMMIT are not executed, and the
+    transaction rolls back.
 
   - The forms can read and write normally to transactional memory,
     and in case of conflicts the whole transaction, _including_ all forms
@@ -404,41 +437,46 @@ features are available:
 - `AFTER-COMMIT` is another macro that registers Lisp forms to be executed later,
   but in this case they are executed immediately after the transaction has been
   successfully committed.
-  It can be useful to notify some subsystem that for any reason cannot call (retry)
-  to be informed of changes in transactional memory - for example because
-  it is some existing code that one does not wish to modify.
+  It can be useful to notify some subsystem that for any reason cannot call
+  `(retry)` to be informed of changes in transactional memory - for example
+  because it is some existing code that one does not wish to modify.
 
-  In this case, the transaction is already committed when the forms registered with
-  AFTER-COMMIT run, and (since STMX 1.3.2) the forms are executed *outside* any transaction.
-  There are some limitations on what the forms can do:
+  In this case, the transaction is already committed when the forms registered
+  with AFTER-COMMIT run, and (since STMX 1.3.2) the forms are executed *outside*
+  any transaction. There are some limitations on what the forms can do:
 
-  - If the forms signal an error when executed, the error is propagated to the caller,
-    forms registered later with AFTER-COMMIT are not executed, but the transaction
-    stays committed.
+  - If the forms signal an error when executed, the error is propagated to the
+    caller, forms registered later with AFTER-COMMIT are not executed, but the
+    transaction remains committed.
 
-  - The forms are not executed inside a transaction: while it is certainly possible
-    to explicitly run an `(atomic)` block from them, doing so would defeat the purpose
-    of AFTER-COMMIT and it may also cause a significant performance penalty.
+  - The forms are not executed inside a transaction: while it is certainly
+    possible to explicitly run an `(atomic)` block from them, doing so would
+    probably defeat the purpose of AFTER-COMMIT and it may also cause
+    a significant performance penalty.
 
-- `CALL-BEFORE-COMMIT` is the function version of `BEFORE-COMMIT`: it accepts a single
-   function and registers it to be executed before the transaction tries to commit.
+- `CALL-BEFORE-COMMIT` is the function version of `BEFORE-COMMIT`: it accepts a
+   single function and registers it to be executed before the transaction tries
+   to commit.
 
-- `CALL-AFTER-COMMIT` is the function version of `AFTER-COMMIT`: it accepts a single
-   function and registers it to be executed after the transaction has been
+- `CALL-AFTER-COMMIT` is the function version of `AFTER-COMMIT`: it accepts a
+   single function and registers it to be executed after the transaction has been
    successfully committed.
 
 - `TVAR` is the class implementing transactional memory behind the scenes.
    It is used internally by slots of transactional classes, but can also be used
-   directly. All its functions and methods work both inside and outside transactions
-   (remember that using transactional memory outside transactions is only
-   intended for **debugging** purposes). Functions and methods:
+   directly. Except if specified, all its functions and methods work both inside
+   and outside transactions (remember that using transactional memory outside
+   transactions is only intended for **debugging** purposes). Functions and
+   methods:
    - `(tvar [initial-value])` Create a new TVAR, optionally bound to a value.
-   - `($ var)` Get the value of VAR. Signals an error if VAR is not bound to any value.
+   - `($ var)` Get the value of VAR. Signals an error if VAR is not bound to any
+      value.
    - `(setf ($ var) value)` Store VALUE into VAR.
    - `(bound-$? var)` Return true if VAR is bound to some value.
    - `(unbind-$ var)` Unbind VAR from its value.
    - `(value-of var)` getter method, equivalent to `($ var)`
-   - `(setf (value-of var) value)` setter method, equivalent to `(setf ($ var) value)`
+   - `(setf (value-of var) value)` setter method, equivalent to
+      `(setf ($ var) value)`
 
    For programmers that want to squeeze the last CPU cycle out of STMX, there are
    two more functions that work **only inside** transactions:
@@ -452,18 +490,21 @@ features are available:
    And two that work **only outside** transactions:
    - `($-notx var)` Analogous to `$-tx`: get the value of VAR, return
      `+unbound-tvar+` if VAR is not bound to any value.
-   - `(setf ($-notx var) value)` Analogous to `(setf $-tx)`: store VALUE into VAR.
+   - `(setf ($-notx var) value)` Analogous to `(setf $-tx)`: store VALUE into
+      VAR.
 
 Utilities and examples
 ---------------------
 
-See the [example](example) and [util](util) folder, which contains several examples and utilities
-built with STMX and should be relatively straightforward to understand.
-The folder [util](util) contains the following classes with related methods and functions,
-all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` at REPL:
+See the [example](example) and [util](util) folder, which contains several
+examples and utilities built with STMX and should be relatively straightforward
+to understand. The folder [util](util) contains the following classes with
+related methods and functions, all in the STMX.UTIL package - for more details,
+use `(describe 'some-symbol)` at REPL:
 
 - `TCELL` is the simplest transactional class. It is created with
-  `(make-instance 'tcell [:value initial-value])` and it can be empty or hold a single value.
+  `(make-instance 'tcell [:value initial-value])` and it can be empty or hold a
+  single value.
 
   Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
 
@@ -517,31 +558,34 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
 
   Methods: `FULL?` `EMPTY?` `PUT` `TRY-PUT`.
 
-  `PUT` and `TRY-PUT` append values at the end, making them available to connected ports.
+  `PUT` and `TRY-PUT` append values at the end, making them available to
+  connected ports.
   `FULL?` always returns nil, since a channel can contain unlimited values.
-  `EMPTY?` always returns t, since it is not possible to get values from a channel.
+  `EMPTY?` always returns t, since it is not possible to get values from a
+  channel.
 
-  It is possible to write into the same channel from multiple threads: added elements
-  will be interleaved and made available to all connected ports.
+  It is possible to write into the same channel from multiple threads: added
+  elements will be interleaved and made available to all connected ports.
 
 - `TPORT` is a transactional reader for `TCHANNEL`. It is created with
   `(make-instance 'tport :channel some-channel)`.
-  Ports do not support putting values, they are used to retrieve values from the channel
-  they are connected to.
+  Ports do not support putting values, they are used to retrieve values from the
+  channel they are connected to.
 
   Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `TRY-TAKE`.
 
-  `PEEK` `TAKE` and `TRY-TAKE` get or consume values previously added to the connected channel.
-  All ports connected to the same channel receive all the values in the same order,
-  and they consume values independently: taking a value from a port does not consume it
-  from the other ports.
+  `PEEK` `TAKE` and `TRY-TAKE` get or consume values previously added to the
+  connected channel. All ports connected to the same channel receive all the
+  values in the same order, and they consume values independently: taking a
+  value from a port does not consume it from the other ports.
 
   `FULL?` always returns t, since it is not possible to put values in a port.
   `EMPTY?` returns t if some values are available to read or consume.
   `EMPTY!` consumes all values currently available.
 
-  It is also possible to use the same port from multiple threads: elements consumed
-  by one thread will not be available to other threads using the same port.
+  It is also possible to use the same port from multiple threads: elements
+  consumed by one thread will not be available to other threads using the same
+  port.
 
 - `THASH-TABLE` is a transactional hash table.
   It is created with `(make-instance 'thash-table [:test test-function] [other-options])`.
@@ -555,8 +599,8 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
 
 - `TMAP` is a transactional sorted map, backed by a red-black tree.
   It is created with `(make-instance 'tmap :pred compare-function)`
-  where COMPARE-FUNCTION must be a function accepting two arguments, KEY1 and KEY2,
-  and returning t if KEY1 is smaller that KEY2. For numeric keys, typical
+  where COMPARE-FUNCTION must be a function accepting two arguments, KEY1 and
+  KEY2, and returning t if KEY1 is smaller that KEY2. For numeric keys, typical
   COMPARE-FUNCTIONs are `#'<` or `#'>` and the faster `#'fixnum<` or `#'fixnum>`.
   For string keys, typical COMPARE-FUNCTIONs are `#'string<` and `#'string>`.
 
@@ -565,9 +609,9 @@ all in the STMX.UTIL package - for more details, use `(describe 'some-symbol)` a
            `MIN-BMAP` `MAX-BMAP` `MAP-BMAP` `DO-BMAP`
            `BMAP-KEYS` `BMAP-VALUES` `BMAP-PAIRS`.
 
-- `RBMAP` is the non-transactional version of `TMAP`. Not so interesting by itself,
-  as many other red-black trees implementations exist already on the net.
-  It supports exactly the same methods as `TMAP`.
+- `RBMAP` is the non-transactional version of `TMAP`. Not so interesting by
+  itself, as many other red-black trees implementations exist already on the
+  net. It supports exactly the same methods as `TMAP`.
 
 
 Performance
@@ -575,9 +619,9 @@ Performance
 See the included file [doc/benchmark.md](doc/benchmark.md) for performance
 considerations and a lot of raw numbers.
 
-The short version is: as of May 2013, on a fast consumer PC (Core i5 @ 4GHz or better)
-with a fast Common Lisp (SBCL 1.1.7 or better), STMX can execute up to 6 millions
-transactions per second per CPU core.
+The short version is: as of May 2013, on a fast consumer PC (Core i5 @ 4GHz or
+better) with a fast Common Lisp (SBCL 1.1.7 or better), STMX can execute up to
+6 millions transactions per second per CPU core.
 
 A small example with very short transactions is the [dining philosophers](example/dining-philosophers-stmx.lisp),
 with 5 reads and 5 writes to transactional memory per atomic block,

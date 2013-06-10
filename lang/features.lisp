@@ -68,15 +68,22 @@ STMX is currently tested only on ABCL, CCL, CMUCL and SBCL."))
 
 (eval-always
  (defun compile-if (flag)
-   (declare (type boolean flag))
+   "Flag is a generalized boolean.
+If flag is NIL, return a keyword _not_ present in *features* (currently returns :never)
+otherwise return a keyword present in *features* (currently returns :stmx)"
    (if flag :stmx :never))
 
  (defun compile-find-symbol (pkg-name symbol-name)
+   "Find symbol in specified package and return it.
+Return NIL if not found."
    (declare (type symbol pkg-name symbol-name))
    (when-bind pkg (find-package pkg-name)
      (find-symbol (string symbol-name) pkg)))
 
  (defun compile-if-find-symbol (pkg-name symbol-name)
+   "Find symbol in specified package and:
+if found, return a keyword present in *features* (currently returns :stmx)
+otherwise return a keyword _not_ present in *features* (currently returns :never)"
    (declare (type symbol pkg-name symbol-name))
    (compile-if (compile-find-symbol pkg-name symbol-name))))
 

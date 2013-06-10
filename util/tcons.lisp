@@ -55,14 +55,14 @@ To use TCONS cells, see the functions TCONS, TLIST, TFIRST and TREST.")))
 
 
 
-(declaim (ftype (function (tlist) t) tfirst trest)
+(declaim (ftype (function (#-ecl tlist #+ecl t) t) tfirst trest)
          (inline
            tfirst trest))
 
 (defun tfirst (tlist)
   "Return the first element in a TCONS or TLIST."
   (when tlist
-      (_ tlist first)))
+    (_ tlist first)))
   
 
 (defun trest (tlist)
@@ -74,15 +74,17 @@ To use TCONS cells, see the functions TCONS, TLIST, TFIRST and TREST.")))
 
 (declaim (ftype (function (t tcons) t) (setf tfirst) (setf trest)))
 
-(transaction
- (defun (setf tfirst) (value tcons)
-   "Set VALUE as the first element in a TCONS or non-null TLIST."
-   (setf (_ tcons first) value)))
+(defun (setf tfirst) (value tcons)
+  "Set VALUE as the first element in a TCONS or non-null TLIST.
 
-(transaction
- (defun (setf trest) (value tcons)
-   "Set VALUE as the rest element in a TCONS or non-null TLIST."
-   (setf (_ tcons rest) value)))
+This function should always be executed inside an STMX atomic block."
+  (setf (_ tcons first) value))
+
+(defun (setf trest) (value tcons)
+   "Set VALUE as the rest element in a TCONS or non-null TLIST.
+
+This function should always be executed inside an STMX atomic block."
+   (setf (_ tcons rest) value))
 
 
 

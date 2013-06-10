@@ -27,7 +27,7 @@
                            +versioned-unbound-tvar+
                            (cons +invalid-version+ value)))))
 
-(declaim (ftype (function (tvar) t) $)
+(declaim (ftype (function (#-ecl tvar #+ecl t) t) $)
          (ftype (function (t tvar) t) (setf $)))
          
 
@@ -105,8 +105,6 @@
   (set-tvar-version-and-value var
                               (incf-atomic-counter *tlog-counter*)
                               value))
-           
-
   
   
 
@@ -155,7 +153,7 @@ and by writing TOBJs slots."
 
 
 (defun $ (var)
-    "Get the value from the transactional variable VAR and return it.
+  "Get the value from the transactional variable VAR and return it.
 Signal an error if VAR is not bound to a value.
 
 Works both inside and outside transactions.
@@ -173,7 +171,7 @@ and to check for any value stored in the log."
 
 
 (defun (setf $) (value var)
-    "Store VALUE inside transactional variable VAR and return VALUE.
+  "Store VALUE inside transactional variable VAR and return VALUE.
 
 Works both outside and inside transactions.
 During transactions, it uses transaction log to record the value."

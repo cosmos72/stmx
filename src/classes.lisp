@@ -85,7 +85,7 @@ the scenes the slots will be stored in transactional memory implemented by tvars
   (the fixnum (tvar-id var)))
 
 
-(declaim (ftype (function (tvar) t) raw-value-of)
+(declaim (ftype (function (#-ecl tvar #+ecl t) t) raw-value-of)
          (inline raw-value-of))
 
 (defun raw-value-of (var)

@@ -43,66 +43,7 @@
 
 
 
-;;;; ** Public API. All methods simply wrap (call-next-method) in a transaction
-
-
-(defmethod get-bmap ((m tmap) key &optional default)
-  (declare (ignore m key default))
-  (fast-atomic (call-next-method)))
-
-(defmethod set-bmap ((m tmap) key value)
-  (declare (ignore m key value))
-  (fast-atomic (call-next-method)))
-
-(defmethod rem-bmap ((m tmap) key)
-  (declare (ignore m key))
-  (fast-atomic (call-next-method)))
-
-(defmethod clear-bmap ((m tmap))
-  (declare (ignore m))
-  (fast-atomic (call-next-method)))
-
-(defmethod add-to-bmap ((m tmap) &rest keys-and-values)
-  (declare (ignore m keys-and-values))
-  (fast-atomic (call-next-method)))
-
-(defmethod remove-from-bmap ((m tmap) &rest keys)
-  (declare (ignore m keys))
-  (fast-atomic (call-next-method)))
-
-(defmethod min-bmap ((m tmap))
-  (declare (ignore m))
-  (fast-atomic (call-next-method)))
-
-(defmethod max-bmap ((m tmap))
-  (declare (ignore m))
-  (fast-atomic (call-next-method)))
-
-(defmethod copy-bmap-into ((mcopy tmap) (m tmap))
-  (declare (ignore mcopy m))
-  (fast-atomic (call-next-method)))
-
-(defmethod map-bmap ((m tmap) func)
-  (declare (ignore m func))
-  (fast-atomic (call-next-method)))
-
-(defmethod map-bmap-from-end ((m tmap) func)
-  (declare (ignore m func))
-  (fast-atomic (call-next-method)))
-
-(defmethod bmap-keys ((m tmap) &optional to-list)
-  (declare (ignore m to-list))
-  (fast-atomic (call-next-method)))
-
-(defmethod bmap-values ((m tmap) &optional to-list)
-  (declare (ignore m to-list))
-  (fast-atomic (call-next-method)))
-
-(defmethod bmap-pairs ((m tmap) &optional to-alist)
-  (declare (ignore m to-alist))
-  (fast-atomic (call-next-method)))
-
-
+;;;; ** Public API: all functions/methods are inherited from rbmap
 
 ;;;; ** Abstract methods to be implemented by BMAP subclasses
 

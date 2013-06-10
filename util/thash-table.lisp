@@ -63,86 +63,94 @@ including any non-standard arguments supported by MAKE-HASH-TABLE implementation
   (the fixnum (_ thash count)))
 
 
-(transaction
- (defun get-thash (thash key &optional default)
-   "Find KEY in THASH and return its value and T as multiple values.
-If THASH does not contain KEY, return (values DEFAULT NIL)."
-   (declare (type thash-table thash))
+(defun get-thash (thash key &optional default)
+  "Find KEY in THASH and return its value and T as multiple values.
+If THASH does not contain KEY, return (values DEFAULT NIL).
 
-   (with-ro-slots (delta) thash
-     (when delta
-       (multiple-value-bind (value present?) (gethash key delta)
-         (when present?
-           (return-from get-thash
-             (if (eq value *thash-removed-entry*)
-                 (values default nil)   ;; key was removed
-                 (values value t))))))) ;; key was changed
+This function should always be invoked from inside an STMX atomic block."
+  (declare (type thash-table thash))
+
+  (with-ro-slots (delta) thash
+    (when delta
+      (multiple-value-bind (value present?) (gethash key delta)
+        (when present?
+          (return-from get-thash
+            (if (eq value *thash-removed-entry*)
+                (values default nil)   ;; key was removed
+                (values value t))))))) ;; key was changed
                
-   ;; forward to original hash table
-   (gethash key (_ thash original) default)))
+  ;; forward to original hash table
+  (gethash key (_ thash original) default))
 
 
-(transaction
- (defun set-thash (thash key value)
-   "Associate KEY to VALUE in THASH. Return VALUE."
-   (declare (type thash-table thash))
+(defun set-thash (thash key value)
+  "Associate KEY to VALUE in THASH. Return VALUE.
 
-   (multiple-value-bind (old-value present?) (get-thash thash key)
-     (declare (ignore old-value))
-     (unless present?
-       (incf (the fixnum (_ thash count)))))
+This function should always be invoked inside an STMX atomic block."
+  (declare (type thash-table thash))
 
-   (let1 delta (ensure-thash-delta thash)
-     (setf (gethash key delta) value))))
+  (multiple-value-bind (old-value present?) (get-thash thash key)
+    (declare (ignore old-value))
+    (unless present?
+      (incf (the fixnum (_ thash count)))))
+  
+  (let1 delta (ensure-thash-delta thash)
+    (setf (gethash key delta) value)))
      
 
 
 (declaim (inline (setf get-thash)))
 (defun (setf get-thash) (value thash key)
-  "Associate KEY to VALUE in THASH. Return VALUE."
+  "Associate KEY to VALUE in THASH. Return VALUE.
+
+This function should always be invoked inside an STMX atomic block."
   (declare (type thash-table thash))
   (set-thash thash key value))
 
 
-(transaction
- (defun rem-thash (key thash)
-   "Remove the VALUE associated to KEY in THASH.
-Return T if KEY was found in THASH, otherwise return NIL."
-   (declare (type thash-table thash))
+(defun rem-thash (key thash)
+  "Remove the VALUE associated to KEY in THASH.
+Return T if KEY was found in THASH, otherwise return NIL.
 
-   (multiple-value-bind (orig-value present?) (get-thash thash key)
-     (declare (ignore orig-value))
-     (if present?
-         (let ((delta (ensure-thash-delta thash)))
-           (decf (the fixnum (_ thash count)))
-           (setf (gethash key delta) *thash-removed-entry*)
-           t)
-         nil)))) ;; key not present in THASH
+This function should always be invoked inside an STMX atomic block."
+  (declare (type thash-table thash))
+
+  (multiple-value-bind (orig-value present?) (get-thash thash key)
+    (declare (ignore orig-value))
+    (if present?
+        (let ((delta (ensure-thash-delta thash)))
+          (decf (the fixnum (_ thash count)))
+          (setf (gethash key delta) *thash-removed-entry*)
+          t)
+        nil))) ;; key not present in THASH
 
 
-(transaction
- (defun clear-thash (thash)
-   "Remove all KEYS and VALUES in THASH. Return THASH."
-   (declare (type thash-table thash))
+(defun clear-thash (thash)
+  "Remove all KEYS and VALUES in THASH. Return THASH.
 
-   (setf (_ thash count) (the fixnum 0))
+This function should always be invoked inside an STMX atomic block."
+  (declare (type thash-table thash))
 
-   (with-ro-slots (original delta) thash
-     (when (zerop (hash-table-count original))
-       (when delta
-         (clrhash delta))
-       (return-from clear-thash thash))
+  (setf (_ thash count) (the fixnum 0))
 
-     (let ((delta (ensure-thash-delta thash)))
-       (clrhash delta)
-       (do-hash (key) original
-         (setf (gethash key delta) *thash-removed-entry*))))))
+  (with-ro-slots (original delta) thash
+    (when (zerop (hash-table-count original))
+      (when delta
+        (clrhash delta))
+      (return-from clear-thash thash))
+
+    (let ((delta (ensure-thash-delta thash)))
+      (clrhash delta)
+      (do-hash (key) original
+        (setf (gethash key delta) *thash-removed-entry*)))))
 
 
 
 (defun map-thash (thash func)
   "Invoke FUNC on each key/value pair contained in transactional hash table THASH.
-FUNC must be a function accepting two arguments: key and value."
+FUNC must be a function accepting two arguments: key and value.
+
+This function should always be invoked inside an STMX atomic block."
   (declare (type thash-table thash)
            (type function func))
   (with-ro-slots (original delta) thash
@@ -163,7 +171,9 @@ FUNC must be a function accepting two arguments: key and value."
 
 
 (defmacro do-thash ((key &optional value) thash &body body)
-  "Execute body on each key/value pair contained in transactional hash table THASH"
+  "Execute body on each key/value pair contained in transactional hash table THASH.
+
+This macro should always be invoked inside an STMX atomic block."
   (let* ((dummy (gensym))
          (func-body `(lambda (,key ,(or value dummy))
                        ,@(unless value `((declare (ignore ,dummy))))

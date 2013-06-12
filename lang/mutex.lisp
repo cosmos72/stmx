@@ -101,6 +101,9 @@ Return NIL if MUTEX is currently locked by some other thread."
     #+stmx.have-atomic-ops
     (atomic-read-barrier)
     ;; Max, 2013/06/12: do we need memory barriers also for lock-based mutex?
+    ;; on AMD64, no: loads are not reordered, and stores are not reordered.
+    ;; on Intel x86_64 and x86, probably neither.
+    ;; on other platforms, memory barriers are LIKELY needed.
 
     (let ((owner
            #+stmx.have-atomic-ops

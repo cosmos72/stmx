@@ -17,32 +17,57 @@
 
 
 (eval-when (:compile-toplevel)
-  #-(or abcl ccl cmucl sbcl)
+  #-(or abcl ccl cmucl ecl sbcl)
   (warn "Untested Common Lisp implementation.
-STMX is currently tested only on ABCL, CCL, CMUCL and SBCL."))
+STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 
 
 
 
 (eval-always
- (defun add-features (&rest list)
-   (declare (type list list))
-   (dolist (f list)
-     (pushnew (the keyword f) *features*)))
+  
+  (defvar *features-map* (make-hash-table :test 'eq))
 
+  (defun add-feature (feature &optional value)
+    (declare (type keyword feature))
+    (pushnew feature *features*)
+    (when value
+      (setf (gethash feature *features-map*) value)))
+
+  (defun add-features (&rest list)
+    (declare (type list list))
+    (dolist (pair list)
+      (let ((feature (if (consp pair) (first pair) pair))
+            (value   (if (consp pair) (rest  pair) nil)))
+
+        (add-feature feature value))))
+          
  (defun features? (&rest list)
    (declare (type list list))
    (loop for f in list
       always (member (the keyword f) *features*)
       finally (return t)))
 
+ (defun get-feature (feature)
+   (declare (type keyword feature))
+   (the symbol (gethash feature *features-map*)))
+
  (add-features :stmx)
 
  #+lispworks ;; porting still in progress
  (add-features :stmx.disable-optimize-slot-access)
 
- #+(or ccl cmucl)
- nil ;; nothing to do
+ #+abcl
+ nil ;; no special features
+
+ #+ecl
+ (add-features '(:stmx.have-mutex-owner . mp::lock-owner))
+
+ #+cmucl
+ (add-features '(:stmx.have-mutex-owner . mp::lock-process))
+
+ #+ccl
+ (add-features '(:stmx.have-mutex-owner . ccl::%%lock-owner))
 
  #+sbcl
  (add-features :stmx.have-atomic-ops :stmx.have-atomic-ops.sbcl))
@@ -52,18 +77,22 @@ STMX is currently tested only on ABCL, CCL, CMUCL and SBCL."))
 
 
 (eval-always
+  ;; stmx.have-atomic-ops implies stmx.have-mutex-owner
+  #+stmx.have-atomic-ops
+  (add-feature :stmx.have-mutex-owner)
+
  ;; (1+ most-positive-fixnum) is a power of two?
  (when (zerop (logand most-positive-fixnum (1+ most-positive-fixnum)))
-   (add-features :stmx.fixnum-is-powerof2))
+   (add-feature :stmx.fixnum-is-powerof2))
 
  ;; fixnum is large enough to count 10 million transactions
  ;; per second for at least 100 years?
  (when (>= most-positive-fixnum #x7fffffffffffff)
-   (add-features :stmx.fixnum-is-large))
+   (add-feature :stmx.fixnum-is-large))
 
  ;; both the above two features
  (when (features? :stmx.fixnum-is-large :stmx.fixnum-is-powerof2)
-   (add-features :stmx.fixnum-is-large-powerof2)))
+   (add-feature :stmx.fixnum-is-large-powerof2)))
 
 
 (eval-always
@@ -91,12 +120,3 @@ otherwise return a keyword _not_ present in *features* (currently returns :never
 
 
 
-(eval-when (:compile-toplevel)
-  (defvar *join-thread-tested* nil)
-  
-  (unless *join-thread-tested*
-    (setf *join-thread-tested* t)
-    (let ((x (gensym)))
-      (when (eq x
-                (bt:join-thread (bt:make-thread (lambda () x))))
-        (add-features :stmx.sane-bt.join-thread)))))

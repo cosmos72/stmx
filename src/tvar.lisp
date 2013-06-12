@@ -333,37 +333,23 @@ Return NIL if VAR is locked by some other thread."
            (type tlog log)
            (ignorable log))
 
-  #+stmx.have-atomic-ops
+  #+stmx.have-mutex-owner
   (mutex-is-own-or-free? (the mutex var))
-  #-stmx.have-atomic-ops
+
+  #-stmx.have-mutex-owner
   ;; check transaction log writes first
   (multiple-value-bind (value present?)
       (get-txhash (tlog-writes log) var)
     (declare (ignore value))
     (if present?
         t
-        ;; then fall back on trying to acquire the lock (messy)
+        ;; then fall back on trying to acquire the lock (VERY dirty)
         (let1 lock (mutex-lock (the mutex var))
           (when (bt:acquire-lock lock nil)
             (bt:release-lock lock)
             t)))))
   
 
-(declaim (inline tvar-really-unlocked?))
-
-(defun tvar-really-unlocked? (var)
-  "Return T if VAR unlocked.
-Return NIL if VAR is locked by this thread or some other thread."
-
-  #+stmx.have-atomic-ops
-  (mutex-is-free? (the mutex var))
-  #-stmx.have-atomic-ops
-  ;; try to acquire the lock (messy)
-  (let1 lock (mutex-lock (the mutex var))
-    (when (bt:acquire-lock lock nil)
-      (bt:release-lock lock)
-      t)))
-  
 
 
 ;;;; ** Listening and notifying

@@ -37,26 +37,29 @@
 
 
 
-;;;; ** Faster replacement for bordeaux-threads:with-lock-held
-
-(defmacro with-lock ((lock) &body body)
-  "Faster replacement for BORDEAUX-THREADS:WITH-LOCK-HELD."
-  (with-gensym lock-var
-    `(let1 ,lock-var ,lock
-       (bt:acquire-lock ,lock-var)
-       (unwind-protect
-            (progn ,@body)
-         (bt:release-lock ,lock-var)))))
   
 
 
-;;;; * Wrappers around Bordeaux Threads to capture the values returned by functions executed in threads
+;;;; * Wrappers around Bordeaux Threads to capture
+;;;; * the return value of functions executed in threads
 
 (declaim (type bt:thread *current-thread*))
 (defvar *current-thread* (current-thread))
 
 (eval-always
  (ensure-thread-initial-bindings '(*current-thread* . (current-thread))))
+
+
+(eval-when (:compile-toplevel)
+  (defvar *join-thread-tested* nil)
+  
+  (unless *join-thread-tested*
+    (setf *join-thread-tested* t)
+    
+    (let ((x (gensym)))
+      (when (eq x
+                (bt:join-thread (bt:make-thread (lambda () x))))
+        (add-features :stmx.sane-bt.join-thread)))))
 
 
 #-stmx.sane-bt.join-thread

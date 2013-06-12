@@ -83,18 +83,18 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.6 (x86_64), STMX 1.3.2
      <th><b>executed code</b></th>
      <th><b>average time</b></th></tr>
 
- <tr><td>atomic nil       </td><td><code>(atomic nil)</code>              </td><td>0.084&nbsp;microseconds</td></tr>
- <tr><td>atomic read-1    </td><td><code>(atomic ($-tx v))</code>         </td><td>0.103&nbsp;microseconds</td></tr>
- <tr><td>atomic write-1   </td><td><code>(atomic (setf ($-tx v) i))</code></td><td>0.130&nbsp;microseconds</td></tr>
+ <tr><td>atomic nil       </td><td><code>(atomic nil)</code>              </td><td>0.083&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-1    </td><td><code>(atomic ($-tx v))</code>         </td><td>0.102&nbsp;microseconds</td></tr>
+ <tr><td>atomic write-1   </td><td><code>(atomic (setf ($-tx v) 1))</code></td><td>0.126&nbsp;microseconds</td></tr>
  <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($-tx v)))</code></td><td>0.157&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-10</td>
      <td><code>(atomic (dotimes (j 10) (incf ($-tx v))))</code></td>
-     <td>0.302&nbsp;microseconds</td></tr>
+     <td>0.300&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-100</td>
      <td><code>(atomic (dotimes (j 100) (incf ($-tx v))))</code></td>
-     <td>1.705&nbsp;microseconds</td></tr>
+     <td>1.702&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-1000</td>
      <td><code>(atomic (dotimes (j 1000) (incf ($-tx v))))</code></td>
@@ -103,7 +103,7 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.6 (x86_64), STMX 1.3.2
  <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(0.147+N*0.016)&nbsp;microseconds</td></tr>
 
  <tr><td>orelse empty     </td><td><code>(atomic (orelse))</code>           </td><td>0.060&nbsp;microseconds</td></tr>
- <tr><td>orelse unary     </td><td><code>(atomic (orelse ($-tx v)))</code>     </td><td>0.270&nbsp;microseconds</td></tr>
+ <tr><td>orelse unary     </td><td><code>(atomic (orelse ($-tx v)))</code>     </td><td>0.262&nbsp;microseconds</td></tr>
  <tr><td>orelse retry-1   </td><td><code>(atomic (orelse (retry) ($-tx v)))</code> </td><td>0.518&nbsp;microseconds</td></tr>
  <tr><td>orelse retry-2   </td><td><code>(atomic (orelse (retry) (retry) ($-tx v)))</code> </td><td>0.732&nbsp;microseconds</td></tr>
  <tr><td>orelse retry-4   </td><td><code>(atomic (orelse (retry) (retry) (retry) (retry) ($-tx v)))</code></td><td>1.170&nbsp;microseconds</td></tr>

@@ -42,8 +42,8 @@
    `(bt:release-lock ,lock)))
 
 
-;; fast locks using atomic compare-and-swap. for this simple example,
-;; they are up to 10 times faster than STMX transactions
+;; fast locks using atomic compare-and-swap if available.
+;; for this simple example, they are up to 10 times faster than STMX transactions
 #-always
 (eval-always
  (deftype lock () 'stmx::mutex)

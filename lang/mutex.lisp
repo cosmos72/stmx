@@ -15,6 +15,7 @@
 
 (in-package :stmx.lang)
 
+(enable-#?-syntax)
 
 ;;;; ** Faster replacement for bordeaux-threads:with-lock-held
 
@@ -36,9 +37,9 @@
 
 
 (defstruct (mutex (:constructor %make-mutex) (:conc-name))
-  #+stmx.have-atomic-ops
+  #?+atomic-ops
   (mutex-owner nil :type atomic-t)
-  #-stmx.have-atomic-ops
+  #?-atomic-ops
   (mutex-lock (make-lock "MUTEX") :read-only t))
 
 
@@ -65,29 +66,29 @@
   "Try to acquire MUTEX. Return T if successful,
 or NIL if MUTEX was already locked."
   (declare (type mutex mutex))
-  #+stmx.have-atomic-ops
+  #?+atomic-ops
   (atomic-write-barrier
     (null
      (sb-ext:compare-and-swap (mutex-owner mutex) nil *current-thread*)))
-  #-stmx.have-atomic-ops
+  #?-atomic-ops
   (bt:acquire-lock (mutex-lock mutex) nil))
 
    
 (defun release-mutex (mutex)
   "Release MUTEX. Return NIL. Consequences are undefined if MUTEX
 is locked by another thread or is already unlocked."
-  #+stmx.have-atomic-ops
+  #?+atomic-ops
   (progn
     (atomic-write-barrier)
     (setf (mutex-owner mutex) nil))
-  #-stmx.have-atomic-ops
+  #?-atomic-ops
   (bt:release-lock (mutex-lock mutex)))
 
 
 
 
 
-#+stmx.have-mutex-owner
+#?+mutex-owner
 (eval-always
 
   (declaim (ftype (function (mutex) boolean) mutex-is-own-or-free?)
@@ -98,20 +99,17 @@ is locked by another thread or is already unlocked."
     "Return T if MUTEX is free or locked by current thread.
 Return NIL if MUTEX is currently locked by some other thread."
 
-    #+stmx.have-atomic-ops
     (atomic-read-barrier)
-    ;; Max, 2013/06/12: do we need memory barriers also for lock-based mutex?
-    ;; on AMD64, no: loads are not reordered, and stores are not reordered.
-    ;; on Intel x86_64 and x86, probably neither.
-    ;; on other platforms, memory barriers are LIKELY needed.
 
     (let ((owner
-           #+stmx.have-atomic-ops
-            (atomic-read-barrier (mutex-owner mutex))
+           (atomic-read-barrier
 
-           #-stmx.have-atomic-ops
-           (#.(stmx.lang::get-feature :stmx.have-mutex-owner) (mutex-lock mutex))))
+             #?+atomic-ops
+             (mutex-owner mutex)
 
+             #?-atomic-ops
+             (#.(stmx.lang::get-feature 'bt.lock-owner) (mutex-lock mutex)))))
+      
       (or
        (eq owner nil)
        (eq owner *current-thread*)))))

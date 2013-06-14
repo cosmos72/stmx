@@ -26,7 +26,7 @@
            #:when-bind    #:awhen
            #:if-bind      #:aif
 
-	   #:compile-if   #:compile-if-find-symbol
+           #:enable-#?-syntax
 
            #:log.trace    #:log.debug   #:log.make-logger
 

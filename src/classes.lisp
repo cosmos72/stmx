@@ -15,6 +15,8 @@
 
 (in-package :stmx)
 
+(enable-#?-syntax)
+
 ;;;; ** constants
 
 (declaim (type symbol +unbound-tvar+))
@@ -36,21 +38,16 @@
 (defun get-next-id (id)
   (declare (type fixnum id))
   (the fixnum
-    #+stmx.fixnum-is-powerof2
+    #?+fixnum-is-powerof2
     (logand most-positive-fixnum (1+ id))
 
-    #-stmx.fixnum-is-powerof2
+    #?-fixnum-is-powerof2
     (if (= id most-positive-fixnum)
         0
         (1+ id))))
 
 (defmacro next-id (place)
-  `(the fixnum
-     #+stmx.fixnum-is-powerof2
-     (logand most-positive-fixnum (incf (the fixnum ,place)))
-
-     #-stmx.fixnum-is-powerof2
-     `(setf ,place (get-next-id ,place))))
+  `(setf ,place (get-next-id ,place)))
 
 
 ;;;; ** implementation class: tvar
@@ -66,12 +63,12 @@ with a more convenient interface: you can read and write normally the slots
 of a transactional object (with slot-value, accessors ...), and behind
 the scenes the slots will be stored in transactional memory implemented by tvars."
 
-  #+stmx.have-atomic-ops
+  #?+atomic-ops
   (version +invalid-version+ :type fixnum)
-  #+stmx.have-atomic-ops
+  #?+atomic-ops
   (value   +unbound-tvar+    :type t)
 
-  #-stmx.have-atomic-ops
+  #?-atomic-ops
   (versioned-value +versioned-unbound-tvar+)         ;; tvar-versioned-value
 
 
@@ -93,9 +90,9 @@ the scenes the slots will be stored in transactional memory implemented by tvars
 this method intentionally ignores transactions and it is only useful for debugging
 purposes. please use ($ var) instead."
   (declare (type tvar var))
-  #+stmx.have-atomic-ops
+  #?+atomic-ops
   (tvar-value var)
-  #-stmx.have-atomic-ops
+  #?-atomic-ops
   (rest (tvar-versioned-value var)))
 
 
@@ -183,15 +180,9 @@ transactional objects (tobjs) or transactional variables (tvars),
 and are later committed to memory if the transaction completes successfully."
 
   ;; tlog-reads: tvars read during transaction, mapped to their read value
-  #+tlog-hash
-  (reads (make-hash-table :test 'eq) :type hash-table)
-  #-tlog-hash
   (reads (make-txhash-table) :type txhash-table)
 
   ;; tlog-writes: tvars written during transaction, mapped to their new values
-  #+tlog-hash
-  (writes (make-hash-table :test 'eq) :type hash-table)
-  #-tlog-hash
   (writes (make-txhash-table) :type txhash-table)
 
   (locked (make-txfifo)       :type txfifo :read-only t)

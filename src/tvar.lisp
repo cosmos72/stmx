@@ -15,17 +15,20 @@
 
 (in-package :stmx)
 
+(enable-#?-syntax)
+
 ;;;; ** Transactional variables
 
 (declaim (inline tvar))
 (defun tvar (&optional (value +unbound-tvar+))
-  #+stmx.have-atomic-ops
-  (the tvar (make-tvar :value value))
-  #-stmx.have-atomic-ops
-  (the tvar (make-tvar :versioned-value
-                       (if (eq value +unbound-tvar+)
-                           +versioned-unbound-tvar+
-                           (cons +invalid-version+ value)))))
+  (the tvar
+    #?+atomic-ops
+    (make-tvar :value value)
+    #?-atomic-ops
+    (make-tvar :versioned-value
+               (if (eq value +unbound-tvar+)
+                   +versioned-unbound-tvar+
+                   (cons +invalid-version+ value)))))
 
 (declaim (ftype (function (#-ecl tvar #+ecl t) t) $)
          (ftype (function (t tvar) t) (setf $)))
@@ -69,11 +72,11 @@
   (declare (type tvar var))
 
   (let*
-      #+stmx.have-atomic-ops
+    #?+atomic-ops
     ((version (progn (atomic-read-barrier) (tvar-version var)))
      (value   (progn (atomic-read-barrier) (tvar-value   var))))
 
-    #-stmx.have-atomic-ops
+    #?-atomic-ops
     ((pair (tvar-versioned-value var))
      (version (first pair))
      (value (rest pair)))
@@ -87,13 +90,13 @@
   (declare (type tvar var)
            (type fixnum version))
 
-  #+stmx.have-atomic-ops
+  #?+atomic-ops
   (progn
     (atomic-write-barrier
       (setf (tvar-version var) version))
     (atomic-write-barrier
       (setf (tvar-value   var) value)))
-  #-stmx.have-atomic-ops
+  #?-atomic-ops
   (progn
     (setf (tvar-versioned-value var) (cons version value))
     value))
@@ -314,7 +317,7 @@ Works only inside transactions."
          (ftype (function (tvar tlog) boolean) tvar-unlocked?)
          (inline
            try-lock-tvar unlock-tvar
-           #+stmx.have-atomic-ops tvar-unlocked?))
+           #?+atomic-ops tvar-unlocked?))
 
 (defun try-lock-tvar (var)
   "Return T if VAR was locked successfully, otherwise return NIL."
@@ -333,10 +336,10 @@ Return NIL if VAR is locked by some other thread."
            (type tlog log)
            (ignorable log))
 
-  #+stmx.have-mutex-owner
+  #?+mutex-owner
   (mutex-is-own-or-free? (the mutex var))
 
-  #-stmx.have-mutex-owner
+  #?-mutex-owner
   ;; check transaction log writes first
   (multiple-value-bind (value present?)
       (get-txhash (tlog-writes log) var)

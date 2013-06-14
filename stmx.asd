@@ -33,6 +33,7 @@
                 :components ((:file "package")
                              (:file "macro"          :depends-on ("package"))
                              (:file "features"       :depends-on ("macro"))
+                             (:file "reader"         :depends-on ("features"))
                              (:file "thread"         :depends-on ("features"))
                              (:file "atomic-ops"     :depends-on ("features"))
                              (:file "atomic-counter" :depends-on ("atomic-ops"))

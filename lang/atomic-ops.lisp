@@ -15,10 +15,12 @@
 
 (in-package :stmx.lang)
 
+(enable-#?-syntax)
+
 ;;;; ** atomic operations
 
 
-#+stmx.have-atomic-ops.sbcl
+#?+(eql atomic-ops :sbcl)
 (eval-always
   
   (deftype atomic-num ()
@@ -58,10 +60,10 @@ the operation completes -- the write does not occur until such time
 that no other thread modified PLACE between the read and the write.
 
 Works only on places supported by COMPARE-AND-SWAP."
-    #+#.(stmx.lang:compile-if-find-symbol 'sb-ext 'atomic-push)
+    #?+(symbol sb-ext atomic-push)
     `(sb-ext:atomic-push ,obj ,place)
 
-    #-#.(stmx.lang:compile-if-find-symbol 'sb-ext 'atomic-push)
+    #?-(symbol sb-ext atomic-push)
     (multiple-value-bind (vars vals old new cas-form read-form)
         (sb-ext:get-cas-expansion place)
       `(let* (,@(mapcar 'list vars vals)
@@ -78,10 +80,10 @@ the operation completes -- the write does not occur until such time
 that no other thread modified PLACE between the read and the write.
 
 Works only on places supported by COMPARE-AND-SWAP."
-    #+#.(stmx.lang:compile-if-find-symbol 'sb-ext 'atomic-pop)
+    #?+(symbol sb-ext atomic-pop)
     `(sb-ext:atomic-pop ,place)
 
-    #-#.(stmx.lang:compile-if-find-symbol 'sb-ext 'atomic-pop)
+    #?-(symbol sb-ext atomic-pop)
     (multiple-value-bind (vars vals old new cas-form read-form)
         (sb-ext:get-cas-expansion place)
       `(let* (,@(mapcar 'list vars vals))
@@ -89,3 +91,16 @@ Works only on places supported by COMPARE-AND-SWAP."
             for ,new = (cdr ,old)
             until (eq ,old (setf ,old ,cas-form))
             finally (return (car ,old)))))))
+
+
+#?-atomic-ops
+#?+atomic-mem-rw-barriers
+(eval-always
+  
+  (defmacro atomic-read-barrier (&body before)
+    `(#.(stmx.lang::get-feature 'atomic-mem-r-barrier)
+       ,@before))
+
+  (defmacro atomic-write-barrier (&body before)
+    `(#.(stmx.lang::get-feature 'atomic-mem-w-barrier)
+       ,@before)))

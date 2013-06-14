@@ -15,9 +15,7 @@
 
 (in-package :stmx)
 
-;(eval-always
-;  (enable-pf-reader))
-
+(enable-#?-syntax)
 
 ;;;; ** Defining
 
@@ -33,7 +31,7 @@ The effect is the same as DEFCLASS, plus:
   `(,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
      ,(adjust-transactional-slots-definitions direct-slots class-name direct-superclasses)
      ,@class-options
-     #+stmx.must-disable-optimize-slot-access (:optimize-slot-access nil)
+     #?+disable-optimize-slot-access (:optimize-slot-access nil)
      (:metaclass transactional-class)))
 
 
@@ -217,8 +215,3 @@ transactional memory it read has changed."
   (if (transaction?)
       (funcall tx)
       (%run-atomic tx)))
-
-
-
-
-

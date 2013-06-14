@@ -15,6 +15,7 @@
 
 (in-package :stmx.lang)
 
+(enable-#?-syntax)
 
 ;;;; ** Helpers to initialize thread-local variables
 
@@ -47,22 +48,22 @@
 (defvar *current-thread* (current-thread))
 
 (eval-always
- (ensure-thread-initial-bindings '(*current-thread* . (current-thread))))
+  (ensure-thread-initial-bindings '(*current-thread* . (current-thread))))
 
 
 (eval-when (:compile-toplevel)
-  (defvar *join-thread-tested* nil)
   
-  (unless *join-thread-tested*
-    (setf *join-thread-tested* t)
-    
+  (defvar *tested-join-thread* nil)
+  (unless *tested-join-thread*
+    (setf *tested-join-thread* t)
+
     (let ((x (gensym)))
-      (when (eq x
-                (bt:join-thread (bt:make-thread (lambda () x))))
-        (add-features :stmx.sane-bt.join-thread)))))
+      (when (eq x (bt:join-thread (bt:make-thread (lambda () x))))
+        (add-feature 'bt.join-thread-is-sane)))))
 
 
-#-stmx.sane-bt.join-thread
+
+#?-bt.join-thread-is-sane
 (defstruct wrapped-thread
   (result nil)
   (thread (current-thread) :type thread))
@@ -70,10 +71,10 @@
 
 (defun start-thread (function &key name (initial-bindings bt:*default-special-bindings*))
 
-  #+stmx.sane-bt.join-thread
+  #?+bt.join-thread-is-sane
   (make-thread function :name name :initial-bindings initial-bindings)
 
-  #-stmx.sane-bt.join-thread
+  #?-bt.join-thread-is-sane
   (let1 th (make-wrapped-thread)
     (setf (wrapped-thread-thread th)
           (make-thread (lambda ()
@@ -83,17 +84,16 @@
                        :initial-bindings initial-bindings))
     th))
 
-#-stmx.sane-bt.join-thread
+#?+bt.join-thread-is-sane
+(defun wait4-thread (th)
+  (declare (type thread th))
+  (join-thread th))
+
+
+#?-bt.join-thread-is-sane
 (defun wait4-thread (th)
   (declare (type wrapped-thread th))
 
   (join-thread (wrapped-thread-thread th))
   (wrapped-thread-result th))
-
-
-#+stmx.sane-bt.join-thread
-(defun wait4-thread (th)
-  (declare (type thread th))
-  (join-thread th))
-
 

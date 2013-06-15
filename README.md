@@ -38,7 +38,7 @@ Supported systems
 -----------------
 STMX is currently tested on the following Common Lisp implementations:
 
-* SBCL  version 1.1.7        (x86_64) on Debian GNU/Linux 7.0  (x86_64)
+* SBCL  version 1.1.8        (x86_64) on Debian GNU/Linux 7.0  (x86_64)
 * SBCL  version 1.0.55.0     (x86)    on Ubuntu Linux 12.04LTS (x86)
 * ABCL  version 1.1.1 with OpenJDK 6b27-1.12.5-2 (x86_64) on Debian GNU/Linux 7.0 (x86_64)
 * CCL   version 1.9-r15769   (x86_64) on Debian GNU/Linux 7.0  (x86_64)

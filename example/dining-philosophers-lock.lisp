@@ -104,8 +104,8 @@
            (type fixnum i))
   ;;(with-output-to-string (out)
   ;;  (let ((*standard-output* out))
-  (log:info "philosopher ~A: fork1=~A fork2=~A plate=~A~%"
-            i fork1 fork2 (car plate))
+  (log:trace "philosopher ~A: fork1=~A fork2=~A plate=~A~%"
+             i fork1 fork2 (car plate))
   ;;(sb-sprof:with-profiling
   ;;  (:max-samples 1000 :sample-interval 0.001 :report :graph
   ;;   :loop nil :show-progress t :mode :alloc)
@@ -140,18 +140,25 @@
                  (lambda ()
                    (dining-philosopher j fork1 fork2 plate))))))
 
-    (time
-     (let ((threads (loop for philosopher in philosophers
+    (let* ((start (get-internal-real-time))
+           (threads (loop for philosopher in philosophers
                        for i from 1
                        collect (start-thread philosopher
                                              :name (format nil "philosopher ~A" i)))))
 
-       (loop for thread in threads do
-            (let ((result (wait4-thread thread)))
-              (when result
-                (print result))))))
+      (loop for thread in threads do
+           (let ((result (wait4-thread thread)))
+             (when result
+               (print result))))
 
-    (loop for (plate . fails) in plates
-       for i from 1 do
-         (format t "philosopher ~A: ~A successful attempts, ~A failed~%"
-                 i (- philosophers-initial-hunger plate) (- fails)))))
+      (let* ((end (get-internal-real-time))
+             (elapsed-secs (/ (- end start) (float internal-time-units-per-second)))
+             (tx-per-sec (/ (* n philosophers-initial-hunger) elapsed-secs)))
+        (log:info "iterations per second: ~$ millions, elapsed time: ~3$ seconds"
+                  (/ tx-per-sec 1000000) elapsed-secs))
+
+      (when (log:debug)
+        (loop for (plate . fails) in plates
+           for i from 1 do
+             (log:debug "philosopher ~A: ~A successful attempts, ~A failed"
+                        i (- philosophers-initial-hunger plate) (- fails)))))))

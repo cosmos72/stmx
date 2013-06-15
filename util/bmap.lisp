@@ -42,8 +42,8 @@
 (let1 bmap-class (find-class 'bmap)
   (defmethod make-instance ((class (eql bmap-class)) &rest initargs &key &allow-other-keys)
     "BMAP is not supposed to be instantiated directly. For this reason,
-\(make-instance 'bmap ...) will signal an error. Most Lispers may consider this
-bad style; I prefer to be notified early if I try to do something wrong."
+\(make-instance 'bmap ...) will signal an error. Many Lispers may consider this
+bad style; I prefer to be notified early if I try to do something plainly wrong."
     (declare (ignore initargs))
     (error "Cannot instantiate abstract class ~A" class)))
 

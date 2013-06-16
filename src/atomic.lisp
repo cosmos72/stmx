@@ -110,7 +110,7 @@ For pre-defined transactional classes, see the package STMX.UTIL"
 (defmacro fast-atomic (&rest body)
   (if body
       `(if (transaction?)
-           (progn  ,@body)
+           (locally ,@body)
            (%run-atomic (lambda () ,@body)))
       `(values)))
 

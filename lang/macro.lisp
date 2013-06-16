@@ -19,11 +19,11 @@
 ;;;; * Miscellaneous macros
 
 (defmacro with-gensym (name &body body)
-  `(let ((,name (gensym (string ',name))))
+  `(let ((,name (gensym (symbol-name ',name))))
      ,@body))
 
 (defmacro with-gensyms ((&rest names) &body body)
-  `(let ,(loop for name in names collect `(,name (gensym (string ',name))))
+  `(let ,(loop for name in names collect `(,name (gensym (symbol-name ',name))))
      ,@body))
 
 

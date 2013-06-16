@@ -155,7 +155,7 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
 
  <tr><th colspan="3">
        Dining philosophers, load with<br>
-       <code>(load "stmx/examples/dining-philosophers.lisp")</code><br>
+       <code>(load "stmx/example/dining-philosophers-stmx.lisp")</code><br>
        <code>(in-package :stmx.example1)</code>
      </th></tr>
 

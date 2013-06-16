@@ -104,3 +104,10 @@ Works only on places supported by COMPARE-AND-SWAP."
   (defmacro atomic-write-barrier (&body before)
     `(#.(stmx.lang::get-feature 'atomic-mem-w-barrier)
        ,@before)))
+
+
+;; avoid "unexpected EOF" compiler errors
+;; if atomic-ops and atomic-mem-rw-barriers are both undefined
+nil
+
+

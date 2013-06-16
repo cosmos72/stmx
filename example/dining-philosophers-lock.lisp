@@ -153,12 +153,15 @@
 
       (let* ((end (get-internal-real-time))
              (elapsed-secs (/ (- end start) (float internal-time-units-per-second)))
-             (tx-per-sec (/ (* n philosophers-initial-hunger) elapsed-secs)))
-        (log:info "iterations per second: ~$ millions, elapsed time: ~3$ seconds"
-                  (/ tx-per-sec 1000000) elapsed-secs))
+             (tx-count (/ (* n philosophers-initial-hunger) elapsed-secs))
+	     (tx-unit ""))
+	(when (>= tx-count 1000000)
+	  (setf tx-count (/ tx-count 1000000)
+		tx-unit " millions"))
+        (log:info "~$~A iterations per second, elapsed time: ~3$ seconds"
+		  tx-count tx-unit elapsed-secs))
 
-      (when (log:debug)
-        (loop for (plate . fails) in plates
-           for i from 1 do
-             (log:debug "philosopher ~A: ~A successful attempts, ~A failed"
-                        i (- philosophers-initial-hunger plate) (- fails)))))))
+      (loop for (plate . fails) in plates
+	 for i from 1 do
+	   (log:info "philosopher ~A: ~A successful attempts, ~A failed"
+		     i (- philosophers-initial-hunger plate) (- fails))))))

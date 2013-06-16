@@ -15,7 +15,7 @@
 
 (in-package :stmx)
 
-;;;; ** Composing
+;;;; ** Executing multiple transactions as alternatives
 
 (define-condition orelse-error (control-error)
   ()
@@ -269,5 +269,5 @@ d) if BODY attempts to retry, immediately return NIL without waiting/sleeping.
 
 Can only be used inside an ATOMIC block."
 
-  `(orelse (multiple-value-call #'values t (progn ,@body))
+  `(orelse (multiple-value-call #'values t (locally ,@body))
            nil))

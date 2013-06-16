@@ -53,7 +53,7 @@ Setup and optimization flags:
    This means for example that to run the benchmark `(atomic ($-tx v))` one has to type
    `(x3 (1m (atomic ($-tx v))))`
 
-All timings reported in the next secion are the output on the author's system
+All timings reported in the next section are the output on the author's system
 of the procedure just described, and thus for each benchmark they contain
 the average elapsed real time per iteration,
 i.e. the total elapsed time divided by the number of iterations (one million).
@@ -65,11 +65,11 @@ Benchmark results
 What follows are some timings obtained on the authors's system, and by no means they
 claim to be exact, absolute or reproducible: your mileage may vary.
 
-Date: 15 May 2013
+Date: 16 June 2013
 
 Hardware: Intel Core-i5 750 @4.0 GHz (quad-core), 16GB RAM
 
-Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.6 (x86_64), STMX 1.3.2
+Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
 
 
 <table>

@@ -76,6 +76,7 @@
                              (:file "rbmap"          :depends-on ("bmap"))
                              (:file "tmap"           :depends-on ("rbmap"))
 
+                             (:file "ghash-table"    :depends-on ("print"))
                              (:file "thash-table"    :depends-on ("print"))
                              (:file "simple-tvector" :depends-on ("print")))
                 :depends-on (:lang :src))))
@@ -84,7 +85,7 @@
 
 (asdf:defsystem :stmx.test
   :name "STMX.TEST"
-  :version "1.3.1"
+  :version "1.3.2"
   :author "Massimiliano Ghilardi"
   :license "LLGPL"
   :description "test suite for STMX"
@@ -97,9 +98,10 @@
   :components ((:module :test
                 :components ((:file "package")
                              (:file "misc"           :depends-on ("package"))
-			     (:file "hash"           :depends-on ("misc"))
-                             (:file "txhash"         :depends-on ("hash"))
-                             (:file "rbmap"          :depends-on ("hash"))
+			     (:file "hash-table"     :depends-on ("misc"))
+                             (:file "txhash"         :depends-on ("hash-table"))
+                             (:file "ghash-table"    :depends-on ("hash-table"))
+                             (:file "rbmap"          :depends-on ("hash-table"))
                              (:file "atomic"         :depends-on ("package"))
                              (:file "on-commit"      :depends-on ("atomic"))
                              (:file "retry"          :depends-on ("package"))

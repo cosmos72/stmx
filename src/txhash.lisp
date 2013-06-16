@@ -231,8 +231,8 @@ Otherwise return (values DEFAULT nil)."
 
     (setf (svref vec subscript) (new-txpair-from-pool hash head key value))
 
-    (when (> (the fixnum (incf (txhash-table-count hash)))
-             (length vec))
+    (when (>= (the fixnum (incf (txhash-table-count hash)))
+              (length vec))
       (rehash-txhash hash))
 
     value))

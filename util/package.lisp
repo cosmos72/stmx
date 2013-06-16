@@ -57,6 +57,16 @@
            #:bmap-keys   #:bmap-values #:bmap-pairs ;; list all keys, values, or pairs
            #:add-to-bmap #:remove-from-bmap ;; add or remove multiple keys
 
+
+           ;; generic hash table
+           #:ghash-table
+           #:ghash-table-count #:ghash-table-empty? #:clear-ghash
+           #:get-ghash #:set-ghash #:rem-ghash   ;; also (setf (get-thash ... ) ... )
+           #:map-thash #:do-ghash  ;; iterate on ghash-table
+           ;; list all keys, values, or pairs:
+           #:ghash-table-keys #:ghash-table-values #:ghash-table-pairs
+           
+
            ;; transactional hash table
            #:thash-table 
            #:thash-count #:thash-empty? #:clear-thash

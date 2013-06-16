@@ -211,6 +211,7 @@ to the same value. Problematic classes containing slot ~A: ~{~A ~}"
 
 (defmethod slot-boundp-using-class ((class transactional-class) instance
                                     (slot transactional-effective-slot))
+
   (if (and (transactional-slot? slot)
            (or (recording?) (hide-tvars?)))
 

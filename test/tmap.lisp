@@ -23,22 +23,22 @@
 
 (defun test-tmap-rollback ()
   (let* ((m1 (new 'tmap :pred #'fixnum<))
-         (m2 (copy-bmap m1)))
+         (m2 (copy-gmap m1)))
 
-    (add-to-bmap m1 1 "x" 2 "y")
-    (copy-bmap-into m1 m2)
+    (add-to-gmap m1 1 "x" 2 "y")
+    (copy-gmap-into m1 m2)
 
     (signals rollback-error
       (atomic
-       (add-to-bmap m1 1 "z" 3 "w")
-       (rem-bmap m1 2)
+       (add-to-gmap m1 1 "z" 3 "w")
+       (rem-gmap m1 2)
        ;;(format t "~&-------------~%")
-       ;;(print-bmap t m1)
+       ;;(print-gmap t m1)
        (error 'rollback-error)))
 
     ;;(format t "~&-------------~%")
-    ;;(print-bmap t m1)
-    (is-equal-bmap m1 m2)
+    ;;(print-gmap t m1)
+    (is-equal-gmap m1 m2)
     t))
 
       

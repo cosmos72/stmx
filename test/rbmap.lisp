@@ -86,91 +86,91 @@ bmap-count must be the actual nodes count, root must be black."
 
 (test new-rbmap
   (let1 m (new 'rbmap :pred #'fixnum<)
-    (is-true (bmap-empty? m))
-    (is (= 0 (bmap-count m)))
-    (do-bmap (key value) m
+    (is-true (gmap-empty? m))
+    (is (= 0 (gmap-count m)))
+    (do-gmap (key value) m
       (fail "unexpected entry ~A = ~A in empty rbmap" key value))))
 
 
 
-(defun build-bmap (class-name pred &optional list)
+(defun build-gmap (class-name pred &optional list)
   (declare (type function pred)
            (type list list))
 
   (let1 m (new class-name :pred pred)
     (labels ((to-bnode (list)
                (declare (type list list))
-               (let1 node (bmap/new-node m (first list) (second list))
+               (let1 node (gmap/new-node m (first list) (second list))
                  (setf (_ node color) (if (third list) +red+ +black+))
                  node))
              (list-children (list)
                (declare (type list list))
                (cdddr list))
-             (%build-bmap (list)
+             (%build-gmap (list)
                (declare (type list list))
                (unless list
-                 (return-from %build-bmap nil))
+                 (return-from %build-gmap nil))
                (let* ((node (to-bnode list))
                       (children (list-children list)))
-                 (setf (_ node left)  (%build-bmap (first children)))
-                 (setf (_ node right) (%build-bmap (second children)))
+                 (setf (_ node left)  (%build-gmap (first children)))
+                 (setf (_ node right) (%build-gmap (second children)))
                  node)))
 
-      (setf (_ m root) (%build-bmap list))
+      (setf (_ m root) (%build-gmap list))
       m)))
     
 (defun build-rbmap (pred &optional list)
-  (build-bmap 'rbmap pred list))
+  (build-gmap 'rbmap pred list))
 
            
 
-(defun is-equal-bmap-and-hash-table (m hash)
-  (declare (type bmap m)
+(defun is-equal-gmap-and-hash-table (m hash)
+  (declare (type gmap m)
            (type hash-table hash))
-  (let1 pred (bmap-pred m)
-    (is (equal (bmap-keys  m)
+  (let1 pred (gmap-pred m)
+    (is (equal (gmap-keys  m)
                (hash-table-to-sorted-keys hash pred)))
-    (is (equal (bmap-values  m)
+    (is (equal (gmap-values  m)
                (hash-table-to-sorted-values hash pred)))
-    (is (equal (bmap-pairs m)
+    (is (equal (gmap-pairs m)
                (hash-table-to-sorted-pairs hash pred)))))
 
 
-(defun is-equal-bmap (m1 m2)
-  (is (equal (bmap-pairs m1)
-             (bmap-pairs m2))))
+(defun is-equal-gmap (m1 m2)
+  (is (equal (gmap-pairs m1)
+             (gmap-pairs m2))))
   
 
 (defun test-rbmap-class (class-name &key (count 100))
   (declare (type symbol class-name)
            (type fixnum count))
   (let* ((m1    (new class-name :pred #'fixnum<))
-         (m2    (copy-bmap m1))
+         (m2    (copy-gmap m1))
          (hash  (make-hash-table :test 'eql)))
     (dotimes (i count)
       (let* ((key (random count))
              (value (- key)))
-        (set-bmap m1 key value)
+        (set-gmap m1 key value)
         (set-hash hash key value)
-        (is-equal-bmap-and-hash-table m1 hash)
+        (is-equal-gmap-and-hash-table m1 hash)
         (fsck-rbmap m1 m2)
-        (set-bmap m2 key value)))
+        (set-gmap m2 key value)))
         
     (dotimes (i (* 2 count))
       (let1 key (random count)
-        (is (eql (hash-table-count hash) (bmap-count m1)))
-        (is-equal-bmap-and-hash-table m1 hash)
-        (is (eql (rem-hash hash key) (rem-bmap m1 key)))
+        (is (eql (hash-table-count hash) (gmap-count m1)))
+        (is-equal-gmap-and-hash-table m1 hash)
+        (is (eql (rem-hash hash key) (rem-gmap m1 key)))
         (fsck-rbmap m1 m2)
-        (rem-bmap m2 key)))
+        (rem-gmap m2 key)))
 
     (let1 keys (hash-table-keys hash)
       (loop for key in keys do
-           (is-true (rem-bmap m1 key))
+           (is-true (rem-gmap m1 key))
            (is-true (rem-hash hash key))
-           (is-equal-bmap-and-hash-table m1 hash)
+           (is-equal-gmap-and-hash-table m1 hash)
            (fsck-rbmap m1 m2)
-           (rem-bmap m2 key)))))
+           (rem-gmap m2 key)))))
 
 (test rbmap
   (test-rbmap-class 'rbmap))

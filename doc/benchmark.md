@@ -31,13 +31,13 @@ Setup and optimization flags:
         (defvar v (tvar 0))
         (defvar m  (new 'rbmap :pred #'fixnum<)) 
         (defvar tm (new 'tmap  :pred #'fixnum<)) 
-        (defvar h  (make-hash-table))  
-        (defvar th (new 'thash-table)) 
+        (defvar h  (new 'ghash-table :test #'fixnum= :hash #'identity)) 
+        (defvar th (new 'thash-table :test #'fixnum= :hash #'identity)) 
         ;; some initial values
-        (set-bmap m 1 0)
-        (set-bmap tm 1 0)
-        (setf (gethash   'x h)  0)
-        (setf (get-thash th 'x) 0)
+        (setf (get-gmap m 1) 0)
+        (setf (get-gmap tm 1) 0)
+        (setf (get-ghash h 1) 0)
+        (setf (get-ghash th 1) 0)
 
 3. to warm-up STMX and the common-lisp process before starting the benchmarks,
    it is also recommended to run first the test suite with:
@@ -111,42 +111,42 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.6 (x86_64), STMX 1.3.2
  <tr><td>orelse retry-N   </td><td>best fit of the 3 runs above</td><td>(0.296+N*0.220)&nbsp;microseconds</td></tr>
 
  <tr><td>tmap read-write-1</td>
-     <td><code>(atomic (incf (get-bmap tm 1)))</code></td>
+     <td><code>(atomic (incf (get-gmap tm 1)))</code></td>
      <td>0.686&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
-     <td><code>(atomic (when (zerop (mod i   10)) (clear-bmap tm))<br>
-              (set-bmap tm i t))</code></td>
-     <td>5.468&nbsp;microseconds</td></tr>
+     <td><code>(atomic (when (zerop (mod i   10)) (clear-gmap tm))<br>
+              (set-gmap tm i t))</code></td>
+     <td>5.373&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 100)</td>
-     <td><code>(atomic (when (zerop (mod i  100)) (clear-bmap tm))<br>
-              (set-bmap tm i t))</code></td>
-     <td>7.450&nbsp;microseconds</td></tr>
+     <td><code>(atomic (when (zerop (mod i  100)) (clear-gmap tm))<br>
+              (set-gmap tm i t))</code></td>
+     <td>7.376&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 1000)</td>
-     <td><code>(atomic (when (zerop (mod i 1000)) (clear-bmap tm))<br>
-              (set-bmap tm i t))</code></td>
+     <td><code>(atomic (when (zerop (mod i 1000)) (clear-gmap tm))<br>
+              (set-gmap tm i t))</code></td>
      <td>8.707&nbsp;microseconds</td></tr>
 
  <tr><td>thash read-write-1</td>
-     <td><code>(atomic (incf (get-thash th 'x)))</code></td>
-     <td>1.876&nbsp;microseconds</td></tr>
+     <td><code>(atomic (incf (get-ghash th 1)))</code></td>
+     <td>0.977&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 10)</td>
-     <td><code>(atomic (when (zerop (mod i   10)) (clear-thash th))<br>
-              (set-thash th i t))</code></td>
-     <td>2.255&nbsp;microseconds</td></tr>
+     <td><code>(atomic (when (zerop (mod i   10)) (clear-ghash th))<br>
+              (set-ghash th i t))</code></td>
+     <td>2.891&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 100)</td>
-     <td><code>(atomic (when (zerop (mod i  100)) (clear-thash th))<br>
-              (set-thash th i t))</code></td>
-     <td>7.474&nbsp;microseconds</td></tr>
+     <td><code>(atomic (when (zerop (mod i  100)) (clear-ghash th))<br>
+              (set-ghash th i t))</code></td>
+     <td>2.734&nbsp;microseconds</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 1000)</td>
-     <td><code>(atomic (when (zerop (mod i  1000)) (clear-thash th))<br>
-              (set-thash th i t))</code></td>
-     <td>57.980&nbsp;microseconds</td></tr>
+     <td><code>(atomic (when (zerop (mod i  1000)) (clear-ghash th))<br>
+              (set-ghash th i t))</code></td>
+     <td>2.732&nbsp;microseconds</td></tr>
 
  <tr><th colspan="3">
        Concurrent benchmarks on a 4-core CPU. They already iterate

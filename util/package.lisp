@@ -45,33 +45,28 @@
            #:fixnum< #:fixnum>
            #:fixnum= #:fixnum/=
            
-           #:bmap  ;; generic binary tree
+           #:gmap  ;; abstract, generic sorted binary map - see rbmap and tmap implementations
            #:rbmap ;; sorted map, implemented with red-black trees
            #:tmap  ;; transactional sorted map, implemented with red-black trees
 
-           #:bmap-pred   #:bmap-count  #:bmap-empty?
-           #:clear-bmap  #:copy-bmap   #:copy-bmap-into
-           #:get-bmap    #:set-bmap    #:rem-bmap  ;; also (setf (get-bmap ...) ...)
-           #:min-bmap    #:max-bmap         ;; get smallest and largest key/value
-           #:map-bmap    #:do-bmap          ;; iterate on bmap
-           #:bmap-keys   #:bmap-values #:bmap-pairs ;; list all keys, values, or pairs
-           #:add-to-bmap #:remove-from-bmap ;; add or remove multiple keys
+           #:gmap-pred   #:gmap-count  #:gmap-empty?
+           #:clear-gmap  #:copy-gmap   #:copy-gmap-into
+           #:get-gmap    #:set-gmap    #:rem-gmap  ;; also (setf (get-gmap ...) ...)
+           #:min-gmap    #:max-gmap         ;; get smallest and largest key/value
+           #:map-gmap    #:do-gmap          ;; iterate on gmap or tmap
+           #:gmap-keys   #:gmap-values #:gmap-pairs ;; list all keys, values, or pairs
+           #:add-to-gmap #:remove-from-gmap ;; add or remove multiple keys
 
 
-           ;; generic hash table
-           #:ghash-table
+           #:ghash-table ;; generic hash table - can be used directly, see thash-table for a transactional implementation
+           #:thash-table ;; transactional hash table (extends ghash-table)
+
            #:ghash-table-count #:ghash-table-empty? #:clear-ghash
-           #:get-ghash #:set-ghash #:rem-ghash   ;; also (setf (get-thash ... ) ... )
-           #:map-thash #:do-ghash  ;; iterate on ghash-table
+           #:get-ghash #:set-ghash #:rem-ghash   ;; also (setf (get-ghash ... ) ... )
+           #:map-ghash #:do-ghash  ;; iterate on ghash-table or thash-table
            ;; list all keys, values, or pairs:
-           #:ghash-table-keys #:ghash-table-values #:ghash-table-pairs
+           #:ghash-keys #:ghash-values #:ghash-pairs
            
-
-           ;; transactional hash table
-           #:thash-table 
-           #:thash-count #:thash-empty? #:clear-thash
-           #:get-thash #:set-thash #:rem-thash   ;; also (setf (get-thash ... ) ... )
-           #:map-thash #:do-thash  ;; iterate on thash-table
 
            ;; transactional simple-vector
            #:simple-tvector #:simple-tvector-length

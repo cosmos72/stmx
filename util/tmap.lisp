@@ -36,7 +36,7 @@
  (defclass tmap (rbmap)
    ;; override inherited slots to make them transactional
    ((root :type (or null tnode))
-    ;; inherited slot pred is immutable -> no need to make it transactional
+    ;; inherited slot PRED is immutable -> no need to make it transactional
     ;; -> no need to override it
     (count))
    (:documentation "Transactional sorted map, implemented with red-black tree")))
@@ -45,9 +45,9 @@
 
 ;;;; ** Public API: all functions/methods are inherited from rbmap
 
-;;;; ** Abstract methods to be implemented by BMAP subclasses
+;;;; ** Abstract methods to be implemented by GMAP subclasses
 
-(defmethod bmap/new-node ((m tmap) key value)
+(defmethod gmap/new-node ((m tmap) key value)
   (new 'tnode :key key :value value))
 
 

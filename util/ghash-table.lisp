@@ -24,118 +24,86 @@
    (next  :initform nil :initarg :next :type (or null ghash-pair tvar))))
 
 
-(declaim (type (or null ghash-pair) *ghash-pair-pool*))
-(defvar *ghash-pair-pool* nil "Thread-local pool of free GHASH-PAIRs.")
-
-(declaim (type fixnum +ghash-pair-pool-max-size+ *ghash-pair-pool-size*))
-(defconstant +ghash-pair-pool-max-size+ 16384)
-(defvar *ghash-pair-pool-size* 0)
-
-(eval-always
-  (ensure-thread-initial-bindings '(*ghash-pair-pool* . nil)
-                                  '(*ghash-pair-pool-size* . 0)))
-
-(declaim (inline new-ghash-pair-from-pool))
-(defun new-ghash-pair-from-pool (key value next)
-  (declare (type (or null ghash-pair) next))
-
-  (the ghash-pair
-    (if-bind pair *ghash-pair-pool*
-      (progn
-        (setf *ghash-pair-pool* (_ pair next)
-              (_ pair key  ) key
-              (_ pair value) value
-              (_ pair next ) next)
-        (decf (the fixnum *ghash-pair-pool-size*))
-        pair)
-      (new 'ghash-pair :key key :value value :next next))))
-
-
-(defun free-ghash-pair-to-pool (pair)
-  "Free a single GHASH-PAIR and add it to the pool.
-Return NIL if pool is full after adding pair."
-  (declare (type ghash-pair pair))
-  (let1 pool-size *ghash-pair-pool-size*
-    (when (< pool-size +ghash-pair-pool-max-size+)
-        (setf (_ pair key  ) nil
-              (_ pair value) nil
-              (_ pair next ) *ghash-pair-pool*
-              *ghash-pair-pool-size* (the fixnum (incf pool-size))
-              *ghash-pair-pool*      pair)
-        (return-from free-ghash-pair-to-pool (/= pool-size +ghash-pair-pool-max-size+))))
-  nil)
-
-(defun free-ghash-pairs-to-pool (pairs)
-  "Free a list of GHASH-PAIR and add them to the pool.
-Return NIL if pool is full after adding pairs."
-  (declare (type ghash-pair pairs))
-
-  (let1 initial-pool-size *ghash-pair-pool-size*
-    (when (< initial-pool-size +ghash-pair-pool-max-size+)
-
-      (loop for pair = pairs then next
-         for next = (_ pair next)
-         for pool-size from (1+ initial-pool-size)
-         while (progn
-                 (setf (_ pair key  ) nil
-                       (_ pair value) nil)
-                 next)
-         for space-left = (< pool-size +ghash-pair-pool-max-size+)
-         while space-left
-         finally
-           (setf (_ pair next) *ghash-pair-pool*
-                 *ghash-pair-pool-size* pool-size
-                 *ghash-pair-pool* pairs)
-           (return space-left)))))
-
-
-
-
-
-
 ;;;; ** GHASH-TABLE
 
-(declaim (type fixnum +ghash-default-capacity+ +ghash-max-capacity+))
+(eval-always
+  (declaim (type fixnum +ghash-default-capacity+ +ghash-max-capacity+))
 
-(defconstant +ghash-default-capacity+ 4
-  "Default initial capacity of a GHASH-TABLE.")
+  (defconstant +ghash-default-capacity+ 4
+    "Default initial capacity of a GHASH-TABLE.")
+  
+  (defconstant +ghash-max-capacity+  (ash 1 (1- (integer-length most-positive-fixnum)))
+    "Maximum capacity of a GHASH-TABLE.
+Equal to MOST-POSITIVE-FIXNUM rounded down to nearest power of 2."))
 
-(defconstant +ghash-max-capacity+  (ash 1 (1- (integer-length most-positive-fixnum)))
-  "Maximum capacity of a GHASH-TABLE.
-Equal to MOST-POSITIVE-FIXNUM rounded down to nearest power of 2.")
+
+(deftype ghash-vector       () '(or simple-vector simple-tvector))
+
+(deftype ghash-test-fun     () '(function (t t) boolean))
+(deftype ghash-hash-fun     () '(function (t)   fixnum))
+(deftype ghash-aref-fun     () '(function (ghash-vector fixnum) t))
+(deftype ghash-set-aref-fun () '(function (t ghash-vector fixnum) t))
 
 
-(defun ghash-error-missing-arg (arg-name)
-  (error "cannot instantiate ~S or a subclass: missing ~S argument"
-         'ghash-table arg-name))
+
+
+(defgeneric ghash/new-pair (hash key value next)
+  (:documentation "Allocate a GHASH-PAIR, initialize it with KEY, VALUE and NEXT and return it."))
+
+(defgeneric ghash/new-vec  (hash capacity)
+  (:documentation "Allocate a new GHASH-VECTOR with length = CAPACITY,
+initialize all its elements to NIL and return it."))
+
+
+
+
+#-(or sbcl cmucl)
+(defun %setf-svref (value vec subscript)
+  "On several CL implementations, (setf svref) is not a function."
+  (declare (type ghash-vector vec)
+           (type fixnum subscript))
+  (setf (svref vec subscript) value))
+
 
 
 (defclass ghash-table ()
-  ((vec      :type (or simple-vector simple-tvector tvar))
-
-   (test-fun :type (function (t t) boolean) :initarg :test-fun
-             :initform (ghash-error-missing-arg :test-fun))
-
-   (hash-fun :type (function (t) fixnum) :initarg :hash-fun
-             :initform (ghash-error-missing-arg :hash-fun))
-
-   (count    :type (or fixnum tvar)      :initform 0))
+  ((vec          :type (or ghash-vector tvar))
+   (test-fun     :type ghash-test-fun  :initarg :test  :initform #'eql)
+   (hash-fun     :type ghash-hash-fun  :initarg :hash)
+   (aref-fun     :type ghash-aref-fun     :initform #'svref)
+   (set-aref-fun :type ghash-set-aref-fun :initform #+(or sbcl cmucl) #'(setf svref)
+                                                    #-(or sbcl cmucl) #'%setf-svref)
+   (count        :type (or fixnum tvar)   :initform 0))
 
   (:documentation
-   "Generic hash-table. Requires explicit :test-fun and :hash-fun arguments at creation."))
+   "Generic hash-table. Requires explicit :test argument at creation.
+If :test is not one of #'eq #'eql or #'equal,
+also requires explicit :hash argument at creation"))
 
 
 
-(defmethod initialize-instance :after ((hash ghash-table) &key
+(defmethod initialize-instance :after ((hash ghash-table) &rest other-keys &key
                                        (initial-capacity +ghash-default-capacity+))
 
-  (declare (type (integer #.+ghash-default-capacity+ #.+ghash-max-capacity+) initial-capacity))
+  (declare (ignore other-keys)
+           (type (integer #.+ghash-default-capacity+ #.+ghash-max-capacity+) initial-capacity))
 
   (unless (zerop (logand (1- initial-capacity) initial-capacity))
     ;; initial-capacity is not a power of 2: round up to nearset power of 2
     (setf initial-capacity (ash 1 (integer-length initial-capacity))))
 
-  (setf (_ hash vec) (make-array initial-capacity :initial-element nil)))
+  (unless (slot-boundp hash 'hash-fun)
+    ;; provide default hash-fun when test-fun is #'eq #'eql or #'equal
+    (let1 test-fun (_ hash test-fun)
+      (if (or (eq test-fun #'eq)
+              (eq test-fun #'eql)
+              (eq test-fun #'equal))
+          (setf (_ hash hash-fun) #'sxhash)
+          (error "missing ~S argument, cannot instantiate ~S with custom ~S"
+                 :hash (type-of hash) :test))))
+
+  (setf (_ hash vec) (ghash/new-vec hash initial-capacity)))
+        
 
 
 (defun ghash-table-count (hash)
@@ -146,23 +114,25 @@ Equal to MOST-POSITIVE-FIXNUM rounded down to nearest power of 2.")
 (defun ghash-table-empty? (hash)
   "Return T if GHASH-TABLE is empty, i.e. if it contains no entries."
   (declare (type ghash-table hash))
-  (zerop (_ hash count)))
+  (zerop (the fixnum (_ hash count))))
+
 
 
 (defmacro do-ghash-pairs ((pair) hash &body body)
   "Execute BODY on each GHASH-PAIR pair contained in HASH. Return NIL."
-  (with-gensyms (h vec i n left next loop-name)
+  (with-gensyms (h vec i n left aref-fun next loop-name)
     `(let* ((,h    (the ghash-table ,hash))
-            (,vec  (the simple-vector (_ ,h vec)))
+            (,vec  (the ghash-vector (_ ,h vec)))
             (,n    (the fixnum (length ,vec)))
-            (,left (ghash-table-count ,h)))
+            (,left (ghash-table-count ,h))
+            (,aref-fun (the function (_ ,h aref-fun))))
        (declare (type fixnum ,left))
            
        (dotimes (,i ,n)
          (when (zerop ,left)
            (return))
          (loop named ,loop-name
-            for ,pair = (svref ,vec ,i) then ,next
+            for ,pair = (funcall ,aref-fun ,vec ,i) then ,next
             while ,pair
             for ,next = (_ ,pair next)
             do
@@ -193,85 +163,105 @@ Equal to MOST-POSITIVE-FIXNUM rounded down to nearest power of 2.")
   "Return the array subscript in HASH corresponding to HASH-CODE."
   (declare (type simple-vector vec)
            (type fixnum hash-code vec-len))
-  (the fixnum (logand
-               (ghash-mask vec-len)
-               (logxor hash-code
-                       (ash hash-code -10)))))
+  (let1 unsigned-hash-code (logand most-positive-fixnum hash-code)
+    (the fixnum (logand
+                 (ghash-mask vec-len)
+                 (logxor unsigned-hash-code
+                       (ash unsigned-hash-code -10))))))
 
-
+(declaim (inline find-ghash-pair))
 (defun find-ghash-pair (hash key)
   "If KEY is present in HASH, return the GHASH-PAIR containing KEY.
 Otherwise return NIL."
   (declare (type ghash-table hash))
 
-  (let* ((test-fun (_ hash test-fun))
-         (hash-fun (_ hash hash-fun))
-         (hash-code (the fixnum (funcall hash-fun key)))
-         (vec       (the simple-vector (_ hash vec)))
-         (subscript (ghash-subscript hash-code vec))
-         (head      (svref vec subscript)))
+  (let* ((test-fun  (the function (_ hash test-fun)))
+         (aref-fun  (the function (_ hash aref-fun)))
+         (hash-fun  (the function (_ hash hash-fun)))
+         (hash-code (the fixnum         (funcall hash-fun key)))
+         (vec       (the ghash-vector   (_ hash vec)))
 
-    (the (or null ghash-pair)
+         (subscript (ghash-subscript hash-code vec))
+         (head      (funcall aref-fun vec subscript)))
+
+    ;; (the (or null ghash-pair)
       (loop for pair = head then (_ pair next)
          while pair do
            (when (funcall test-fun key (_ pair key))
-             (return pair))))))
+             (return pair)))))
 
+(declaim (ftype (function (ghash-table t &optional t) (values t boolean)) get-ghash)
+         (notinline get-ghash))
 
 (defun get-ghash (hash key &optional default)
   "If KEY is associated to VALUE in HASH, return (values VALUE t)
 Otherwise return (values DEFAULT nil)."
   (declare (type ghash-table hash))
 
-  (if-bind pair (find-ghash-pair hash key)
-    (values (_ pair value) t)
-    (values default nil)))
+  (let1 pair (find-ghash-pair hash key)
+    (if pair
+        (values (_ pair value) t)
+        (values default nil))))
 
     
-  
 (defun rehash-ghash (hash)
   (declare (type ghash-table hash))
 
-  (let* ((vec1 (the simple-vector (_ hash vec)))
-         (n2   (the fixnum (ash (length vec1) 1)))
-         (vec2 (the simple-vector (make-array n2 :initial-element nil)))
-         (hash-fun (_ hash hash-fun)))
+  (let* ((vec1 (the ghash-vector (_ hash vec)))
+         (n2   (the fixnum       (ash (length vec1) 1)))
+         (vec2 (the ghash-vector (ghash/new-vec hash n2)))
+         (hash-fun     (the function (_ hash hash-fun)))
+         (aref-fun     (the function (_ hash aref-fun)))
+         (set-aref-fun (the function (_ hash set-aref-fun))))
 
     (do-ghash-pairs (pair) hash
       (let* ((key (_ pair key))
-             (hash-code (funcall hash-fun key))
-             (subscript (ghash-subscript hash-code vec2 n2))
-             (head (svref vec2 subscript)))
+             (hash-code (the fixnum (funcall hash-fun key)))
+             (subscript (the fixnum (ghash-subscript hash-code vec2 n2)))
+             (head (funcall aref-fun vec2 subscript)))
         
-        (setf (_ pair next) head
-              (svref vec2 subscript) pair)))
+        (setf (_ pair next) head)
+        (funcall set-aref-fun pair vec2 subscript)))
 
     (setf (_ hash vec) vec2)))
         
         
+
+
+
+
+
+
+
+
+
+
        
 
 (defun set-ghash (hash key value)
   "Add KEY to HASH, associating it to VALUE. Return VALUE."
   (declare (type ghash-table hash))
 
-  (let* ((test-fun (_ hash test-fun))
-         (hash-fun (_ hash hash-fun))
-         (hash-code (funcall hash-fun key))
-         (vec (the simple-vector (_ hash vec)))
-         (subscript (ghash-subscript hash-code vec))
-         (head (svref vec subscript)))
+  (let* ((aref-fun     (the function     (_ hash aref-fun)))
+         (set-aref-fun (the function     (_ hash set-aref-fun)))
+         (hash-fun     (the function     (_ hash hash-fun)))
+         (hash-code    (the fixnum       (funcall hash-fun key)))
+         (vec          (the ghash-vector (_ hash vec)))
+         (subscript    (ghash-subscript hash-code vec))
+         (head         (funcall aref-fun vec subscript))
+         (test-fun     (the function     (_ hash test-fun))))
 
     (loop for pair = head then (_ pair next)
        while pair do
          (when (funcall test-fun key (_ pair key))
            (return-from set-ghash (setf (_ pair value) value))))
 
-    (setf (svref vec subscript) (new-ghash-pair-from-pool key value head))
+    (let1 pair (ghash/new-pair hash key value head)
+      (funcall set-aref-fun pair vec subscript))
 
-    (when (>= (the fixnum (incf (_ hash count)))
-              (length vec))
-      (rehash-ghash hash))
+    (let1 count (incf (the fixnum (_ hash count)))
+      (when (<= (length vec) count (ash +ghash-max-capacity+ -1))
+        (rehash-ghash hash)))
 
     value))
 
@@ -291,12 +281,14 @@ Otherwise return (values DEFAULT nil)."
 Return T if KEY was present in HASH, otherwise return NIL."
   (declare (type ghash-table hash))
 
-  (let* ((test-fun (_ hash test-fun))
-         (hash-fun (_ hash hash-fun))
-         (hash-code (funcall hash-fun key))
-         (vec (the simple-vector (_ hash vec)))
-         (subscript (ghash-subscript hash-code vec))
-         (head (svref vec subscript)))
+  (let* ((aref-fun     (the function     (_ hash aref-fun)))
+         (set-aref-fun (the function     (_ hash set-aref-fun)))
+         (hash-fun     (the function     (_ hash hash-fun)))
+         (hash-code    (the fixnum       (funcall hash-fun key)))
+         (vec          (the ghash-vector (_ hash vec)))
+         (subscript    (ghash-subscript hash-code vec))
+         (head         (funcall aref-fun vec subscript))
+         (test-fun     (the function     (_ hash test-fun))))
 
     (loop for prev = nil then pair
        for pair = head then next
@@ -306,8 +298,7 @@ Return T if KEY was present in HASH, otherwise return NIL."
          (when (funcall test-fun key (_ pair key))
            (if prev
                (setf (_ prev next) next)
-               (setf (svref vec subscript) next))
-           (free-ghash-pair-to-pool pair)
+               (funcall set-aref-fun next vec subscript))
            (decf (the fixnum (_ hash count)))
            (return t)))))
                
@@ -319,30 +310,28 @@ Return T if KEY was present in HASH, otherwise return NIL."
   "Remove all keys and values from HASH. Return HASH."
   (declare (type ghash-table hash))
 
-  (unless (zerop (_ hash count))
+  (unless (ghash-table-empty? hash)
     (let* ((vec (the simple-vector (_ hash vec)))
-           (n (length vec)))
+           (n (length vec))
+           (set-aref-fun (the function (_ hash set-aref-fun))))
       (dotimes (i n)
-        (let1 pair (svref vec i)
-          (when pair
-            (free-ghash-pairs-to-pool pair)
-            (setf (svref vec i) nil)))))
+        (funcall set-aref-fun nil vec i)))
     (setf (_  hash count) 0))
   hash)
 
 
 
+(defun copy-ghash (hash)
+  "Return a copy of ghash-table HASH.
+The copy will have the same class, test and hash functions, and elements."
+  (declare (type ghash-table hash))
+  (let1 copy (new (class-of hash) :test (_ hash test-fun) :hash (_ hash hash-fun))
+    (do-ghash (key value) hash
+      (set-ghash copy key value))
+    copy))
 
-(defun copy-ghash-table-into (dst src)
-  "Clear DST, then copy SRC contents into it. Return NIL."
-  (declare (type ghash-table src dst))
-  (clear-ghash dst)
-  (do-ghash (k v) src
-    (set-ghash dst k v)))
 
-
-
-(defun ghash-table-keys (src &optional to-list)
+(defun ghash-keys (src &optional to-list)
   "Return a list containing the keys in ghash-table SRC.
 If TO-LIST is not nil, it will be appended to the returned list.
 TO-LIST contents is not destructively modified."
@@ -353,19 +342,18 @@ TO-LIST contents is not destructively modified."
   to-list)
 
 
-(defun ghash-table-values (src &optional to-list)
+(defun ghash-values (src &optional to-list)
   "Return a list containing the values in ghash-table SRC.
 If TO-LIST is not nil, it will be appended to the returned list.
 TO-LIST contents is not destructively modified."
   (declare (type ghash-table src)
            (type list to-list))
-  (do-ghash (key value) src
-    (declare (ignore key))
-    (push value to-list))
+  (do-ghash-pairs (pair) src
+    (push (_ pair value) to-list))
   to-list)
 
 
-(defun ghash-table-pairs (src &optional to-alist)
+(defun ghash-pairs (src &optional to-alist)
   "Return an alist containing a (key . value) pair for each entry
 in ghash-table SRC.
 If TO-ALIST is not nil, it will be appended to the returned alist.
@@ -385,5 +373,22 @@ TO-ALIST contents is not destructively modified."
          (format t "~&"))
        (format t "~S ~S ~S ~S"
                :key (_ pair key) :value (_ pair value))))
+
+
+
+(defmethod ghash/new-pair ((hash ghash-table) key value next)
+  ;; Allocate a GHASH-PAIR, initialize it with KEY, VALUE and NEXT and return it.
+  (declare (ignore hash)
+           (type (or null ghash-pair) next))
+  (new 'ghash-pair :key key :value value :next next))
+
+
+(defmethod ghash/new-vec ((hash ghash-table) capacity)
+  ;; Allocate a new GHASH-VECTOR with length = CAPACITY,
+  ;; initialize all its elements to NIL and return it.
+  (declare (ignore hash)
+           (type fixnum capacity))
+
+  (make-array capacity :initial-element nil))
 
 

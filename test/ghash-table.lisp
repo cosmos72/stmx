@@ -21,7 +21,7 @@
 
 
 (test new-ghash-table
-  (let1 h (new 'ghash-table :test-fun #'= :hash-fun #'identity)
+  (let1 h (new 'ghash-table :test #'= :hash #'identity)
     (is (= 0 (ghash-table-count h)))
     (do-ghash (key value) h
       (fail "unexpected entry ~A = ~A in empty ghash-table" key value))))
@@ -31,13 +31,13 @@
 (defun ghash-table-to-sorted-keys (ghash pred)
   (declare (type ghash-table ghash)
            (type function pred))
-  (sort (ghash-table-keys ghash) pred))
+  (sort (ghash-keys ghash) pred))
 
 
 (defun ghash-table-to-sorted-pairs (ghash pred)
   (declare (type ghash-table ghash)
            (type function pred))
-  (sort (ghash-table-pairs ghash) pred :key #'first))
+  (sort (ghash-pairs ghash) pred :key #'first))
 
 
 (defun ghash-table-to-sorted-values (ghash pred)
@@ -52,6 +52,8 @@
   (declare (type ghash-table ghash)
            (type hash-table hash)
            (type function pred))
+  (is (eq (zerop (hash-table-count hash))
+          (ghash-table-empty? ghash)))
   (is (= (hash-table-count hash)
          (ghash-table-count ghash)))
   (is (equal (ghash-table-to-sorted-keys ghash pred)
@@ -69,10 +71,11 @@
              (ghash-table-to-sorted-pairs ghash2 pred))))
   
 
-(defun test-ghash-table (pred &key (count 16))
-  (declare (type fixnum count))
-  (let ((ghash (new 'ghash-table :test-fun #'eql :hash-fun #'identity))
-        (hash  (make-hash-table :test 'eq)))
+(defun test-ghash-table (ghash pred &key (count 16))
+  (declare (type ghash-table ghash)
+           (type function pred)
+           (type fixnum count))
+  (let1 hash (make-hash-table :test 'eql)
     (dotimes (i count)
       (let ((key   (random count))
             (value i))
@@ -84,12 +87,25 @@
         (rem-ghash ghash key)
         (rem-hash  hash  key)
         (is-equal-ghash-and-hash-table ghash hash pred)))))
+
+
+(defun test-new-ghash-table (pred &key (count 16))
+  (dolist (ghash
+            (list
+             (new 'ghash-table :test #'eql)
+             (new 'ghash-table :test #'eql     :hash #'identity)
+             (new 'ghash-table :test #'equal)
+             (new 'ghash-table :test #'equal   :hash #'identity)
+             (new 'ghash-table :test #'=       :hash #'sxhash)
+             (new 'ghash-table :test #'=       :hash #'identity)
+             (new 'ghash-table :test #'fixnum= :hash #'sxhash)
+             (new 'ghash-table :test #'fixnum= :hash #'identity)))
+    (test-ghash-table ghash pred :count count)))
+
       
 
-           
-
 (test ghash-table
-  (test-ghash-table #'fixnum<))
+  (test-new-ghash-table #'fixnum<))
 
 
            

@@ -50,9 +50,9 @@
 
   (:import-from #:stmx.util
                 #:print-object-contents
-                #:print-bmap
-                #:bnode #:rbnode #:tnode #:color-of
-                #:bmap/new-node
+                #:print-gmap
+                #:gmap-node #:rbnode #:tnode #:color-of
+                #:gmap/new-node
                 #:+red+ #:+black+
                 #:red? #:black?)
 

@@ -25,7 +25,7 @@
       "Use slot names defined in package STMX.UTIL"
       `(slot-value ,obj ',(intern (symbol-name slot-name) pkg)))
 
-#+never
+    #+never
     (defmacro _ (obj slot-name)
       "Use slot accessors defined in package STMX.UTIL"
       (let1 accessor (intern (concatenate 'string (symbol-name slot-name) of) pkg)

@@ -72,13 +72,14 @@
 
 			     (:file "bheap"          :depends-on ("container"))
 
-                             (:file "bmap"           :depends-on ("misc" "print"))
-                             (:file "rbmap"          :depends-on ("bmap"))
+                             (:file "gmap"           :depends-on ("misc" "print"))
+                             (:file "rbmap"          :depends-on ("gmap"))
                              (:file "tmap"           :depends-on ("rbmap"))
 
+                             (:file "simple-tvector" :depends-on ("print"))
+
                              (:file "ghash-table"    :depends-on ("print"))
-                             (:file "thash-table"    :depends-on ("print"))
-                             (:file "simple-tvector" :depends-on ("print")))
+                             (:file "thash-table"    :depends-on ("ghash-table" "simple-tvector")))
                 :depends-on (:lang :src))))
 
 
@@ -101,6 +102,7 @@
 			     (:file "hash-table"     :depends-on ("misc"))
                              (:file "txhash"         :depends-on ("hash-table"))
                              (:file "ghash-table"    :depends-on ("hash-table"))
+                             (:file "thash-table"    :depends-on ("hash-table"))
                              (:file "rbmap"          :depends-on ("hash-table"))
                              (:file "atomic"         :depends-on ("package"))
                              (:file "on-commit"      :depends-on ("atomic"))

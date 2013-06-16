@@ -593,14 +593,23 @@ use `(describe 'some-symbol)` at REPL:
   port.
 
 - `THASH-TABLE` is a transactional hash table.
-  It is created with `(make-instance 'thash-table [:test test-function] [other-options])`.
-  An interesting feature: it accepts the same options as MAKE-HASH-TABLE
-  including any non-standard option supported by the underlying MAKE-HASH-TABLE
-  implementation, except :weak and :weakness.
+  It is created with
+  `(make-instance 'thash-table :test #'some-test-function [:hash #'some-hash-function])`.
 
-  Methods: `THASH-COUNT` `THASH-EMPTY?` `CLEAR-THASH`
-           `GET-THASH` `(SETF GET-THASH)` `SET-THASH` `REM-THASH` 
-           `MAP-THASH` `DO-THASH`.
+  Two differences from standard Common Lisp HASH-TABLE:
+  - :test argument must be an actual function, not a symbol
+  - a hash function can be specified explicitly with `:hash #'some-hash-function`
+  For the usual test functions, i.e. `#'eq` `#'eql` and `#'equal` if the hash function
+  is not specified, a safe default (usually `#'sxhash`) will be used.
+  For other test functions, the hash function becomes mandatory.
+
+  Methods: `GHASH-TABLE-COUNT` `GHASH-TABLE-EMPTY?` `CLEAR-GHASH`
+           `GET-GHASH` `(SETF GET-GHASH)` `SET-GHASH` `REM-GHASH` 
+           `MAP-GHASH` `DO-GHASH` `COPY-GHASH`
+           `GHASH-KEYS` `GHASH-VALUES` `GHASH-PAIRS`.
+
+  Note: THASH-TABLE has been completely rewritten in STMX 1.3.3, previous methods
+  had different names.
 
 - `TMAP` is a transactional sorted map, backed by a red-black tree.
   It is created with `(make-instance 'tmap :pred compare-function)`
@@ -609,10 +618,17 @@ use `(describe 'some-symbol)` at REPL:
   COMPARE-FUNCTIONs are `#'<` or `#'>` and the faster `#'fixnum<` or `#'fixnum>`.
   For string keys, typical COMPARE-FUNCTIONs are `#'string<` and `#'string>`.
 
-  Methods: `BMAP-PRED` `BMAP-COUNT` `BMAP-EMPTY?` `CLEAR-BMAP`
-           `GET-BMAP` `(SETF GET-BMAP)` `SET-BMAP` `REM-BMAP` 
-           `MIN-BMAP` `MAX-BMAP` `MAP-BMAP` `DO-BMAP`
-           `BMAP-KEYS` `BMAP-VALUES` `BMAP-PAIRS`.
+  Methods: `GMAP-PRED` `GMAP-COUNT` `GMAP-EMPTY?` `CLEAR-GMAP`
+           `GET-GMAP` `(SETF GET-GMAP)` `SET-GMAP` `REM-GMAP` 
+           `MIN-GMAP` `MAX-GMAP` `MAP-GMAP` `DO-GMAP`
+           `GMAP-KEYS` `GMAP-VALUES` `GMAP-PAIRS`.
+
+  Note: TMAP methods were renamed in STMX 1.3.3, they previously contained `BMAP` instead of `GMAP`
+  in their names.
+
+- `GHASH-TABLE` is the non-transactional version of `THASH-TABLE`. Not so interesting by
+  itself, as Common Lisp offers a standard (and usually slightly faster) HASH-TABLE implementation.
+  It supports exactly the same methods as `THASH-TABLE`.
 
 - `RBMAP` is the non-transactional version of `TMAP`. Not so interesting by
   itself, as many other red-black trees implementations exist already on the

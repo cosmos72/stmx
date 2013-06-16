@@ -594,10 +594,10 @@ use `(describe 'some-symbol)` at REPL:
 
 - `THASH-TABLE` is a transactional hash table.
   It is created with
-  `(make-instance 'thash-table :test #'some-test-function [:hash #'some-hash-function])`.
+  `(make-instance 'thash-table [:test #'some-test-function] [:hash #'some-hash-function])`.
 
   Two differences from standard Common Lisp HASH-TABLE:
-  - :test argument must be an actual function, not a symbol
+  - :test argument must be an actual function, not a symbol. The default is #'eql.
   - a hash function can be specified explicitly with `:hash #'some-hash-function`
   For the usual test functions, i.e. `#'eq` `#'eql` and `#'equal` if the hash function
   is not specified, a safe default (usually `#'sxhash`) will be used.
@@ -608,8 +608,8 @@ use `(describe 'some-symbol)` at REPL:
            `MAP-GHASH` `DO-GHASH` `COPY-GHASH`
            `GHASH-KEYS` `GHASH-VALUES` `GHASH-PAIRS`.
 
-  Note: THASH-TABLE has been completely rewritten in STMX 1.3.3, previous methods
-  had different names.
+  Note: THASH-TABLE has been completely rewritten in STMX 1.3.3, previously
+  its methods contained `THASH` instead of `GHASH` in their names.
 
 - `TMAP` is a transactional sorted map, backed by a red-black tree.
   It is created with `(make-instance 'tmap :pred compare-function)`
@@ -623,12 +623,12 @@ use `(describe 'some-symbol)` at REPL:
            `MIN-GMAP` `MAX-GMAP` `MAP-GMAP` `DO-GMAP`
            `GMAP-KEYS` `GMAP-VALUES` `GMAP-PAIRS`.
 
-  Note: TMAP methods were renamed in STMX 1.3.3, they previously contained `BMAP` instead of `GMAP`
-  in their names.
+  Note: TMAP methods were renamed in STMX 1.3.3, they previously contained
+  `BMAP` instead of `GMAP` in their names.
 
-- `GHASH-TABLE` is the non-transactional version of `THASH-TABLE`. Not so interesting by
-  itself, as Common Lisp offers a standard (and usually slightly faster) HASH-TABLE implementation.
-  It supports exactly the same methods as `THASH-TABLE`.
+- `GHASH-TABLE` is the non-transactional version of `THASH-TABLE`. Not so
+  interesting by itself, as Common Lisp offers a standard (and usually faster)
+  HASH-TABLE implementation. It supports exactly the same methods as `THASH-TABLE`.
 
 - `RBMAP` is the non-transactional version of `TMAP`. Not so interesting by
   itself, as many other red-black trees implementations exist already on the

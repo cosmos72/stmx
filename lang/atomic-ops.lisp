@@ -92,21 +92,37 @@ Works only on places supported by COMPARE-AND-SWAP."
             until (eq ,old (setf ,old ,cas-form))
             finally (return (car ,old)))))))
 
-
 #?-atomic-ops
-#?+atomic-mem-rw-barriers
+#?+(eql atomic-mem-rw-barriers t)
+;; feature 'atomic-mem-rw-barriers = t tells to use the generic implementation,
+;; as the features 'atomic-mem-r-barrier and 'atomic-mem-w-barrier
+;; will contain the macros that actually implement the read and write barriers.
 (eval-always
-  
+
+  (declaim (notinline identity-notinline))
+  (defun identity-notinline (arg)
+    arg)
+
+  (defmacro atomic-mem-barrier-trivial (&body before)
+    "Trivial implementation of memory read/write barriers.
+Used for those CPUs that intrinsically guarantee ordering
+of read-after-read and write-after-write."
+    `(identity-notinline
+         (progn
+           ,@before)))
+ 
+  ;; generic implementation of memory read barrier
   (defmacro atomic-read-barrier (&body before)
     `(#.(stmx.lang::get-feature 'atomic-mem-r-barrier)
        ,@before))
 
+  ;; generic implementation of memory read barrier
   (defmacro atomic-write-barrier (&body before)
     `(#.(stmx.lang::get-feature 'atomic-mem-w-barrier)
        ,@before)))
 
 
-;; avoid "unexpected EOF" compiler errors
+;; avoid "unexpected EOF" compiler error
 ;; if atomic-ops and atomic-mem-rw-barriers are both undefined
 nil
 

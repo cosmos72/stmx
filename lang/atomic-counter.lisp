@@ -68,32 +68,28 @@
 
   #?-(and atomic-ops fixnum-is-large-powerof2)
   ;; locking version
-  (let ((lock (atomic-counter-lock counter)))
-    (acquire-lock lock)
-    (unwind-protect
-         (the counter-num
-           #?+fixnum-is-large-powerof2
-           ;; fast modulus arithmetic
-           (setf (atomic-counter-version counter)
-                 (logand most-positive-fixnum
-                         (1+ (atomic-counter-version counter))))
+  (with-lock ((atomic-counter-lock counter))
+    (the counter-num
+      #?+fixnum-is-large-powerof2
+      ;; fast modulus arithmetic
+      (setf (atomic-counter-version counter)
+            (logand most-positive-fixnum
+                    (1+ (atomic-counter-version counter))))
+      
+      #?-fixnum-is-large-powerof2
+      (progn
+        #?+fixnum-is-large
+        ;; fixnum arithmetic
+        (setf (atomic-counter-version counter)
+              (let ((n (atomic-counter-version counter)))
+                (the fixnum
+                  (if (= n most-positive-fixnum)
+                      0
+                      (1+ n)))))
 
-           #?-fixnum-is-large-powerof2
-           (progn
-             #?+fixnum-is-large
-             ;; fixnum arithmetic
-             (setf (atomic-counter-version counter)
-                   (let ((n (atomic-counter-version counter)))
-                     (the fixnum
-                       (if (= n most-positive-fixnum)
-                           0
-                           (1+ n)))))
-
-             #?-fixnum-is-large
-             ;; general version: slow bignum arithmetic
-             (incf (atomic-counter-version counter))))
-                
-      (release-lock lock))))
+        #?-fixnum-is-large
+        ;; general version: slow bignum arithmetic
+        (incf (atomic-counter-version counter))))))
 
 
 (declaim (ftype (function (atomic-counter) counter-num) get-atomic-counter))
@@ -103,8 +99,7 @@
   (declare (type atomic-counter counter))
        
   #?+(and atomic-ops fixnum-is-large-powerof2)
-  (progn
-    (atomic-read-barrier)
+  (let ((counter (atomic-read-barrier counter)))
     (the fixnum
       (logand most-positive-fixnum
               (atomic-counter-version counter))))
@@ -112,8 +107,5 @@
   #?-(and atomic-ops fixnum-is-large-powerof2)
   ;; locking version
   (the counter-num
-    (let ((lock (atomic-counter-lock counter)))
-      (acquire-lock lock)
-      (unwind-protect
-           (atomic-counter-version counter)
-        (release-lock lock)))))
+    (with-lock ((atomic-counter-lock counter))
+      (atomic-counter-version counter))))

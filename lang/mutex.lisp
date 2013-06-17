@@ -23,9 +23,10 @@
   "Faster replacement for BORDEAUX-THREADS:WITH-LOCK-HELD."
   (with-gensym lock-var
     `(let1 ,lock-var ,lock
-       (bt:acquire-lock ,lock-var)
        (unwind-protect
-            (progn ,@body)
+            (progn
+              (bt:acquire-lock ,lock-var)
+              ,@body)
          (bt:release-lock ,lock-var)))))
 
 
@@ -58,7 +59,7 @@
 
 
 (declaim (ftype (function (mutex) boolean)  try-acquire-mutex)
-         (ftype (function (mutex) null)     release-mutex)
+         (ftype (function (mutex) t)        release-mutex)
           (inline
             try-acquire-mutex release-mutex))
 
@@ -78,8 +79,7 @@ or NIL if MUTEX was already locked."
   "Release MUTEX. Return NIL. Consequences are undefined if MUTEX
 is locked by another thread or is already unlocked."
   #?+atomic-ops
-  (progn
-    (atomic-write-barrier)
+  (let ((mutex (atomic-write-barrier mutex)))
     (setf (mutex-owner mutex) nil))
   #?-atomic-ops
   (bt:release-lock (mutex-lock mutex)))
@@ -99,19 +99,17 @@ is locked by another thread or is already unlocked."
     "Return T if MUTEX is free or locked by current thread.
 Return NIL if MUTEX is currently locked by some other thread."
 
-    (atomic-read-barrier)
+    (let* ((mutex (atomic-read-barrier mutex))
 
-    (let ((owner
-           (atomic-read-barrier
+           (owner
+            (atomic-read-barrier
 
-             #?+atomic-ops
-             (mutex-owner mutex)
+              #?+atomic-ops
+              (mutex-owner mutex)
 
-             #?-atomic-ops
-             (#.(stmx.lang::get-feature 'bt.lock-owner) (mutex-lock mutex)))))
+              #?-atomic-ops
+              (#.(stmx.lang::get-feature 'bt.lock-owner) (mutex-lock mutex)))))
       
       (or
        (eq owner nil)
        (eq owner *current-thread*)))))
-  
-  

@@ -22,9 +22,9 @@
 (declaim (inline tvar))
 (defun tvar (&optional (value +unbound-tvar+))
   (the tvar
-    #?+atomic-ops
+    #?+atomic-mem-rw-barriers
     (make-tvar :value value)
-    #?-atomic-ops
+    #?-atomic-mem-rw-barriers
     (make-tvar :versioned-value
                (if (eq value +unbound-tvar+)
                    +versioned-unbound-tvar+
@@ -72,11 +72,13 @@
   (declare (type tvar var))
 
   (let*
-    #?+atomic-ops
-    ((version (progn (atomic-read-barrier) (tvar-version var)))
-     (value   (progn (atomic-read-barrier) (tvar-value   var))))
+    #?+atomic-mem-rw-barriers
+    ;; read value first, then version
+    ((var     (atomic-read-barrier var))
+     (value   (atomic-read-barrier (tvar-value var)))
+     (version (tvar-version var)))
 
-    #?-atomic-ops
+    #?-atomic-mem-rw-barriers
     ((pair (tvar-versioned-value var))
      (version (first pair))
      (value (rest pair)))
@@ -90,13 +92,15 @@
   (declare (type tvar var)
            (type fixnum version))
 
-  #?+atomic-ops
+  #?+atomic-mem-rw-barriers
   (progn
+    ;; write version first, then value
     (atomic-write-barrier
       (setf (tvar-version var) version))
     (atomic-write-barrier
       (setf (tvar-value   var) value)))
-  #?-atomic-ops
+
+  #?-atomic-mem-rw-barriers
   (progn
     (setf (tvar-versioned-value var) (cons version value))
     value))
@@ -317,7 +321,7 @@ Works only inside transactions."
          (ftype (function (tvar tlog) boolean) tvar-unlocked?)
          (inline
            try-lock-tvar unlock-tvar
-           #?+atomic-ops tvar-unlocked?))
+           #?+mutex-owner tvar-unlocked?))
 
 (defun try-lock-tvar (var)
   "Return T if VAR was locked successfully, otherwise return NIL."

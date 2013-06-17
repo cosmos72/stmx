@@ -63,12 +63,12 @@ with a more convenient interface: you can read and write normally the slots
 of a transactional object (with slot-value, accessors ...), and behind
 the scenes the slots will be stored in transactional memory implemented by tvars."
 
-  #?+atomic-ops
+  #?+atomic-mem-rw-barriers
   (version +invalid-version+ :type fixnum)
-  #?+atomic-ops
+  #?+atomic-mem-rw-barriers
   (value   +unbound-tvar+    :type t)
 
-  #?-atomic-ops
+  #?-atomic-mem-rw-barriers
   (versioned-value +versioned-unbound-tvar+)         ;; tvar-versioned-value
 
 
@@ -90,9 +90,9 @@ the scenes the slots will be stored in transactional memory implemented by tvars
 this method intentionally ignores transactions and it is only useful for debugging
 purposes. please use ($ var) instead."
   (declare (type tvar var))
-  #?+atomic-ops
+  #?+atomic-mem-rw-barriers
   (tvar-value var)
-  #?-atomic-ops
+  #?-atomic-mem-rw-barriers
   (rest (tvar-versioned-value var)))
 
 

@@ -76,9 +76,12 @@ initialize all its elements to NIL and return it."))
    (count        :type (or fixnum tvar)   :initform 0))
 
   (:documentation
-   "Generic hash-table. Requires explicit :test argument at creation.
-If :test is not one of #'eq #'eql or #'equal,
-also requires explicit :hash argument at creation"))
+   "Generic hash-table. Allows custom :test argument at creation - default is #'eql.
+If :test is not one of #'eq #'eql or #'equal, also requires explicit :hash
+argument at creation.
+
+Not so useful by itself (standard CL:HASH-TABLE is usually faster),
+it is the base for transactional hash-table implementation THASH-TABLE."))
 
 
 

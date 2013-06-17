@@ -92,24 +92,39 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
  (add-features '(bt.lock-owner . ccl::%%lock-owner))
 
  #+sbcl
- (add-features '(atomic-ops . :sbcl)))
+ (add-features '(atomic-ops . :sbcl)
+               ;; strictly speaking, defining bt.lock-owner it not necessary:
+               ;; atomic-ops provide the preferred implementation of mutex-owner
+               '(bt.lock-owner . sb-thread::mutex-owner)))
 
 
 
 
 
 (eval-always
-  ;; on x86 and x86_64, memory {read,write} barriers are NOP
-  ;; (well, technically except for SSE)
-  (unless (feature? 'atomic-ops)
-    #+(or :x86 :x8664 :x86-64 :x86_64)
-    (add-features 'atomic-mem-rw-barriers
-                  '(atomic-mem-r-barrier . cl:progn)
-                  '(atomic-mem-w-barrier . cl:progn)))
+  (if (feature? 'atomic-ops)
+      ;; atomic-ops includes memory barriers
+      ;; and also provides the preferred implementation of mutex-owner
+      (add-features 'atomic-mem-rw-barriers
+                    'mutex-owner)
 
-  ;; stmx.have-atomic-ops provides the preferred implementation of mutex-owner
-  (when (feature? 'atomic-ops)
-    (add-feature 'mutex-owner))
+      ;; on x86 and x86_64, memory read-after-read and write-after-write barriers
+      ;; are NOP (well, technically except for SSE)
+      ;;
+      ;; Unluckily, if the underlying Lisp does know about them,
+      ;; trying to implement them at application level requires
+      ;; finding a way to stop the compiler from reordering assembler instructions.
+      ;;
+      ;; While more-or-less feasible by implementing barriers as a non-inline identity function,
+      ;; on most CL implementations the result is slower than the default solution
+      ;; that conses but does not require barriers.
+      ;;
+      ;; For this reason, "trivial" memory read and write barriers are currently disabled
+      
+      #-stmx ;; #+(or x86 x8664 x86-64 x86_64)
+      (add-features 'atomic-mem-rw-barriers
+                    '(atomic-mem-r-barrier . stmx.lang::atomic-mem-barrier-trivial)
+                    '(atomic-mem-w-barrier . stmx.lang::atomic-mem-barrier-trivial)))
 
   ;; if at least read/write barriers are available, bt:lock-owner can be used
   ;; as concurrency-safe mutex-owner even if _full_ atomic ops are not available

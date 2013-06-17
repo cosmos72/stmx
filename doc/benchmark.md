@@ -88,6 +88,32 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
  <tr><td>atomic write-1   </td><td><code>(atomic (setf ($-tx v) 1))</code></td><td>0.125&nbsp;microseconds</td></tr>
  <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($-tx v)))</code></td><td>0.156&nbsp;microseconds</td></tr>
 
+<!-- sbcl64, speed 3, mem-rw-barriers=trivial
+    nil               0.124
+    ($-tx v)          0.149
+    (setf ($-tx v) 1) 0.240
+    (incf ($-tx v))   0.297     -->
+
+<!-- sbcl64, speed 3
+    nil               0.126
+    ($-tx v)          0.146
+    (setf ($-tx v) 1) 0.239
+    (incf ($-tx v))   0.276     -->
+
+
+<!-- ccl64, speed 3, mem-rw-barriers=trivial
+    nil               0.274
+    ($-tx v)          0.441
+    (setf ($-tx v) 1) 0.839
+    (incf ($-tx v))   1.324     -->
+
+<!-- ccl64, speed 3
+    nil               0.271
+    ($-tx v)          0.341
+    (setf ($-tx v) 1) 0.688
+    (incf ($-tx v))   0.802     -->
+
+
  <tr><td>atomic read-write-10</td>
      <td><code>(atomic (dotimes (j 10) (incf ($-tx v))))</code></td>
      <td>0.300&nbsp;microseconds</td></tr>

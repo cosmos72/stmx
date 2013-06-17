@@ -53,53 +53,99 @@ log4cl, closer-mop, bordeaux-threads and trivial-garbage, but the author gives n
 
 Installation and loading
 ------------------------
-STMX is packaged with asdf. The simplest way to install it is to first
-install [Quicklisp](http://www.quicklisp.org), as it can automatically
-resolve and download STMX dependencies.
 
-Once quicklisp is installed, download STMX from GitHub and save it
-into your Quicklisp local-projects folder with the commands:
+### Stable version - from [Quicklisp](http://www.quicklisp.org)
 
-    $ cd ~/quicklisp/local-projects
-    $ git clone git://github.com/cosmos72/stmx.git
-
-then load a REPL and run:
+STMX is now available from Quicklisp. The simplest way to obtain it is to first
+install [Quicklisp](http://www.quicklisp.org) then run these commands from REPL:
 
     CL-USER> (ql:quickload "stmx")
     ;; lots of output...
     CL-USER> (use-package :stmx)
      
-If all goes well, it will automatically download and install STMX dependencies:
+If all goes well, this will automatically download and install the
+**stable** branch of STMX and its dependencies:
 
 - `log4cl`
 - `closer-mop`
 - `bordeaux-threads`
 - `trivial-garbage`
 
-then it will load STMX and be ready to use.
+Since STMX was added to QuickLisp quite recently (15 June 2013), it
+may happen that your Quicklisp installation can't find it. In such
+case, you need to first update your QuickLisp installation as
+described [here](http://www.quicklisp.org/beta) - search for "To get updated
+software" in the page.
+  
+
+### Latest version - from GIT
+
+In case you want to use the "latest and greatest" version directly
+from the author, which may contain new features, improvements, bug
+fixes (and occasionally, new bugs), you need to download it
+into your Quicklisp local-projects folder with the commands:
+
+    $ cd ~/quicklisp/local-projects
+    $ git clone git://github.com/cosmos72/stmx.git
+
+then proceed as before: load a REPL and run
+
+    CL-USER> (ql:quickload "stmx")
+    ;; lots of output...
+    CL-USER> (use-package :stmx)
+     
+If all goes well, it will automatically load STMX and its dependencies.
+
+
+### Troubleshooting
 
 In case you get errors:
 
-- check that quicklisp is installed correctly, for example by executing at REPL
+- check that Quicklisp is installed correctly, for example by executing at REPL
 
         CL-USER> (ql:quickload "closer-mop")
 
-- check that you downloaded STMX creating an `stmx/` folder inside
+- if you tried to download the stable version from Quicklisp,
+  check that your quicklisp is updated and knows about STMX:
+  
+        CL-USER> (ql:system-apropos "stmx")
+        
+  should print something like
+  
+        #<SYSTEM stmx / stmx-stable-7e68763b-git / quicklisp 2013-06-15>
+        #<SYSTEM stmx.test / stmx-stable-7e68763b-git / quicklisp 2013-06-15>
+     
+  If it doesn't, you need to update Quicklisp as described
+  [here](http://www.quicklisp.org/beta) - search for "To get updated
+  software" in the page.
+  
+- if you tried to download the latest version from GIT,
+  check that you downloaded STMX creating an `stmx/` folder inside
   your Quicklisp local-projects folder, usually `~/quicklisp/local-projects`
 
-After loading STMX, the test suite can be executed with:
+
+### Testing that it works
+
+After loading STMX for the first time, it is recommended to run the
+test suite to check that everything works as expected:
 
     CL-USER> (ql:quickload "stmx.test")
     ;; lots of output...
     CL-USER> (fiveam:run! 'stmx.test:suite)
-
+    ;; even more output...
+     Did 4585 checks.    
+        Pass: 4585 (100%)
+        Skip: 0 ( 0%)
+        Fail: 0 ( 0%)
+        
 Note: `(ql:quickload "stmx.test")` intentionally works only *after*
 `(ql:quickload "stmx")` has completed successfuly.
 
+There should be zero "Skip" and zero "Fail"; the number of "Pass" may vary.
 You are welcome to report any failure you get while running the test suite,
 please include in the report:
 - operating system name and version (example: Debian GNU/Linux x86_64 version 7.0)
-- Common Lisp implementation and version (example: SBCL 1.0.57.0.debian, 64bit)
+- Common Lisp implementation and version (example: SBCL 1.0.57.0.debian, x86_64)
 - EXACT output produced by the test suite
 - any other relevant information
 
@@ -108,6 +154,7 @@ See "Contacts, help, discussion" below for the preferred method to send the repo
 
 Basic usage
 -----------
+
 STMX offers the following Lisp macros and functions, also heavily documented
 in the sources - remember `(describe 'some-symbol)` at REPL.
 

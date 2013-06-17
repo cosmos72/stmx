@@ -82,13 +82,14 @@ software" in the page.
 
 In case you want to use the "latest and greatest" version directly
 from the author, which may contain new features, improvements, bug
-fixes (and occasionally, new bugs), you need to download it
-into your Quicklisp local-projects folder with the commands:
+fixes (and occasionally new bugs), you need to download it
+into your Quicklisp local-projects folder. Open a shell and run the
+commands:
 
     $ cd ~/quicklisp/local-projects
     $ git clone git://github.com/cosmos72/stmx.git
 
-then proceed as before: load a REPL and run
+then proceed as before - load a REPL and run:
 
     CL-USER> (ql:quickload "stmx")
     ;; lots of output...
@@ -101,7 +102,8 @@ If all goes well, it will automatically load STMX and its dependencies.
 
 In case you get errors:
 
-- check that Quicklisp is installed correctly, for example by executing at REPL
+- check that Quicklisp is installed correctly, for example by
+  executing at REPL:
 
         CL-USER> (ql:quickload "closer-mop")
 
@@ -127,7 +129,8 @@ In case you get errors:
 ### Testing that it works
 
 After loading STMX for the first time, it is recommended to run the
-test suite to check that everything works as expected:
+test suite to check that everything works as expected. From the REPL,
+run:
 
     CL-USER> (ql:quickload "stmx.test")
     ;; lots of output...
@@ -138,10 +141,10 @@ test suite to check that everything works as expected:
         Skip: 0 ( 0%)
         Fail: 0 ( 0%)
         
-Note: `(ql:quickload "stmx.test")` intentionally works only *after*
+Note: `(ql:quickload "stmx.test")` intentionally works only **after**
 `(ql:quickload "stmx")` has completed successfuly.
 
-There should be zero "Skip" and zero "Fail"; the number of "Pass" may vary.
+The test suite should report zero Skip and zero Fail; the number of Pass may vary.
 You are welcome to report any failure you get while running the test suite,
 please include in the report:
 - operating system name and version (example: Debian GNU/Linux x86_64 version 7.0)
@@ -168,12 +171,13 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
 
   Note: on some Common Lisp implementations (ABCL and possibly others)
   slot accessors are known to ignore by default the transactional machinery
-  (implemented with MOP slot-value-using-class, if you wonder) causing all kinds
-  of errors on transactional classes.
-  Even though usually this problem can be usually at least *partially* fixed with
-  implementation-specific options, it is recommended to use `slot-value`
-  to read and write the slots of transactional classes or, even better, a macro
-  that can be defined to use either `slot-value` or slot accessors.
+  (implemented with MOP slot-value-using-class, if you wonder) causing all
+  kind of errors on transactional classes.
+  Even though usually this problem can be usually at least *partially* fixed
+  with implementation-specific options, it is recommended to use `slot-value`
+  instead of slot accessors to read and write the slots of transactional
+  classes or, even better, a macro that can be defined to use either
+  `slot-value` or slot accessors.
 
 - `ATOMIC` is the main macro: it wraps Lisp forms into an atomic transaction
   then executes them. For example, defining

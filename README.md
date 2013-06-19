@@ -692,13 +692,13 @@ Performance
 See the included file [doc/benchmark.md](doc/benchmark.md) for performance
 considerations and a lot of raw numbers.
 
-The short version is: as of May 2013, on a fast consumer PC (Core i5 @ 4GHz or
-better) with a fast Common Lisp (SBCL 1.1.7 or better), STMX can execute up to
-6 millions transactions per second per CPU core.
+The short version is: as of June 2013, on a fast consumer PC (Core i7 4770 @ 3.5GHz or
+better) with a fast Common Lisp (SBCL 1.1.8 or better), STMX can execute up to
+7.5 millions transactions per second per CPU core.
 
 A small example with very short transactions is the [dining philosophers](example/dining-philosophers-stmx.lisp),
 with 5 reads and 5 writes to transactional memory per atomic block,
-where each CPU core runs approximately 3.3 millions transactions per second.
+where each CPU core runs approximately 4 millions transactions per second - hyperthreading has very limited effects.
 
 For a more realistic benchmark, the author has ported
 [Lee-TM](http://apt.cs.man.ac.uk/projects/TM/LeeBenchmark/),

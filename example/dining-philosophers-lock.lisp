@@ -163,5 +163,5 @@
 
       (loop for (plate . fails) in plates
 	 for i from 1 do
-	   (log:info "philosopher ~A: ~A successful attempts, ~A failed"
+	   (log:debug "philosopher ~A: ~A successful attempts, ~A failed"
 		     i (- philosophers-initial-hunger plate) (- fails))))))

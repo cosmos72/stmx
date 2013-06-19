@@ -2,19 +2,19 @@ TO DO:
 
 14) implement pools of RBNODE and TNODE - check if benchmarks improve or not
 
-13) optimize THASH-TABLE. The current implementation is quite naive,
-   before committing it makes a full copy of the original hash table.
-
 8) optimize ORELSE. The current implementation is quite naive,
    it makes a full copy of the current transaction log
 
 DONE:
 
+13) optimize THASH-TABLE. The old implementation was very slow,
+    before committing it made a full copy of the original hash table.
+
 12) reduce consing in (commit): add changed TVARs to a TXPAIR list,
     replace versioned-value cons with two TVAR slots - when writing,
     update the version first, then the value - when reading, get the value first,
-    then the version. Beware of reordering, memory barriers are be needed.
-    
+    then the version. Beware of reordering, memory barriers are needed.
+
 11) use global transaction counters to guarantee consistent memory reads.
     This solved a big problem that plagues many STM implementations:
     a transaction can see an inconsistent view of transactional memory

@@ -32,15 +32,16 @@
 
 
 
-;;;; ** nowait mutex - uses fast atomic ops if available,
+;;;; ** nowait mutex
+;;;;    uses fast atomic ops and read/write memory barriers if available,
 ;;;;    otherwise falls back on bordeaux-threads locks
 
 
 
 (defstruct (mutex (:constructor %make-mutex) (:conc-name))
-  #?+atomic-ops
+  #?+fast-mutex
   (mutex-owner nil :type atomic-t)
-  #?-atomic-ops
+  #?-fast-mutex
   (mutex-lock (make-lock "MUTEX") :read-only t))
 
 
@@ -67,21 +68,22 @@
   "Try to acquire MUTEX. Return T if successful,
 or NIL if MUTEX was already locked."
   (declare (type mutex mutex))
-  #?+atomic-ops
-  (atomic-write-barrier
+  #?+fast-mutex
+  (mem-write-barrier
     (null
-     (sb-ext:compare-and-swap (mutex-owner mutex) nil *current-thread*)))
-  #?-atomic-ops
+     (atomic-compare-and-swap (mutex-owner mutex) nil *current-thread*)))
+  #?-fast-mutex
   (bt:acquire-lock (mutex-lock mutex) nil))
 
    
 (defun release-mutex (mutex)
   "Release MUTEX. Return NIL. Consequences are undefined if MUTEX
 is locked by another thread or is already unlocked."
-  #?+atomic-ops
-  (let ((mutex (atomic-write-barrier mutex)))
+  #?+fast-mutex
+  (progn
+    (mem-write-barrier)
     (setf (mutex-owner mutex) nil))
-  #?-atomic-ops
+  #?-fast-mutex
   (bt:release-lock (mutex-lock mutex)))
 
 
@@ -99,15 +101,14 @@ is locked by another thread or is already unlocked."
     "Return T if MUTEX is free or locked by current thread.
 Return NIL if MUTEX is currently locked by some other thread."
 
-    (let* ((mutex (atomic-read-barrier mutex))
-
+    (let* ((mutex (mem-read-barrier mutex))
            (owner
-            (atomic-read-barrier
+            (mem-read-barrier
 
-              #?+atomic-ops
+              #?+fast-mutex
               (mutex-owner mutex)
 
-              #?-atomic-ops
+              #?-fast-mutex
               (#.(stmx.lang::get-feature 'bt.lock-owner) (mutex-lock mutex)))))
       
       (or

@@ -92,9 +92,11 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
  (add-features '(bt.lock-owner . ccl::%%lock-owner))
 
  #+sbcl
- (add-features '(atomic-ops . :sbcl)
-               ;; strictly speaking, defining bt.lock-owner it not necessary:
-               ;; atomic-ops provide the preferred implementation of mutex-owner
+ (add-features #+compare-and-swap-vops '(atomic-ops . :sbcl)
+               #+memory-barrier-vops   '(mem-rw-barriers . :sbcl)
+               ;; usually, bt.lock-owner it not needed on SBCL:
+               ;; the combination 'atomic-ops plus 'mem-rw-barriers
+               ;; provide fast-mutex, which does not use bt.lock-owner
                '(bt.lock-owner . sb-thread::mutex-owner)))
 
 
@@ -102,33 +104,32 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 
 
 (eval-always
-  (if (feature? 'atomic-ops)
-      ;; atomic-ops includes memory barriers
-      ;; and also provides the preferred implementation of mutex-owner
-      (add-features 'atomic-mem-rw-barriers
-                    'mutex-owner)
+  (if (all-features? 'atomic-ops 'mem-rw-barriers)
+      ;; the combination 'atomic-ops plus 'mem-rw-barriers
+      ;; provide fast-mutex (which does not use bt.lock-owner)
+      (add-features 'fast-mutex 'mutex-owner))
 
-      ;; on x86 and x86_64, memory read-after-read and write-after-write barriers
-      ;; are NOP (well, technically except for SSE)
-      ;;
-      ;; Unluckily, if the underlying Lisp does know about them,
-      ;; trying to implement them at application level requires
-      ;; finding a way to stop the compiler from reordering assembler instructions.
-      ;;
-      ;; While more-or-less feasible by implementing barriers as a non-inline identity function,
-      ;; on most CL implementations the result is slower than the default solution
-      ;; that conses but does not require barriers.
-      ;;
-      ;; For this reason, "trivial" memory read and write barriers are currently disabled
-      
-      #-stmx ;; #+(or x86 x8664 x86-64 x86_64)
-      (add-features 'atomic-mem-rw-barriers
-                    '(atomic-mem-r-barrier . stmx.lang::atomic-mem-barrier-trivial)
-                    '(atomic-mem-w-barrier . stmx.lang::atomic-mem-barrier-trivial)))
 
-  ;; if at least read/write barriers are available, bt:lock-owner can be used
-  ;; as concurrency-safe mutex-owner even if _full_ atomic ops are not available
-  (when (all-features? 'atomic-mem-r-barrier 'bt.lock-owner)
+  ;; on x86 and x86_64, memory read-after-read and write-after-write barriers
+  ;; are NOP (well, technically except for SSE)
+  ;;
+  ;; Unluckily, if the underlying Lisp does know about them,
+  ;; trying to implement them at application level requires
+  ;; finding a way to stop the compiler from reordering assembler instructions.
+  ;;
+  ;; While more-or-less feasible by implementing barriers as a non-inline identity function,
+  ;; on most CL implementations the result is slower than the default solution
+  ;; that conses but does not require barriers.
+  ;;
+  ;; For this reason, "trivial" memory read and write barriers are currently disabled
+  #-stmx ;; #+(or x86 x8664 x86-64 x86_64)
+  (unless (feature? mem-rw-barriers)
+    (add-feature 'mem-rw-barriers :trivial))
+
+
+  ;; if at least memory read/write barriers are available, bt.lock-owner
+  ;; can be used as concurrency-safe mutex-owner even without atomic-ops
+  (when (all-features? 'mem-rw-barriers 'bt.lock-owner)
     (add-feature 'mutex-owner))
 
   ;; (1+ most-positive-fixnum) is a power of two?

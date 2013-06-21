@@ -99,7 +99,7 @@
   (declare (type atomic-counter counter))
        
   #?+(and atomic-ops fixnum-is-large-powerof2)
-  (let ((counter (atomic-read-barrier counter)))
+  (let ((counter (mem-read-barrier counter)))
     (the fixnum
       (logand most-positive-fixnum
               (atomic-counter-version counter))))

@@ -74,8 +74,8 @@
   (let*
     #?+atomic-mem-rw-barriers
     ;; read value first, then version
-    ((var     (atomic-read-barrier var))
-     (value   (atomic-read-barrier (tvar-value var)))
+    ((var     (mem-read-barrier var))
+     (value   (mem-read-barrier (tvar-value var)))
      (version (tvar-version var)))
 
     #?-atomic-mem-rw-barriers
@@ -95,9 +95,9 @@
   #?+atomic-mem-rw-barriers
   (progn
     ;; write version first, then value
-    (atomic-write-barrier
+    (mem-write-barrier
       (setf (tvar-version var) version))
-    (atomic-write-barrier
+    (mem-write-barrier
       (setf (tvar-value   var) value)))
 
   #?-atomic-mem-rw-barriers

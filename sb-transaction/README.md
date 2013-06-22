@@ -41,7 +41,7 @@ is technically possibile but this version currently supports only native 64-bit 
 Installation and loading
 ------------------------
 
-SB-TRANSACTION is currently packaged together with (STMX)[https://github.com/cosmos72/stmx.git],
+SB-TRANSACTION is currently packaged together with [STMX](https://github.com/cosmos72/stmx.git),
 a high-performance Common Lisp library that implements transactional memory in software.
 
 It can be used by itself, yet the author's objective is to provide
@@ -147,7 +147,7 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   has undefined consequences - usually *bad* consequences like unhandled memory faults.
 
 - `TRANSACTION-BEGIN` starts a new transaction. It returns a fixnum
-  equal to +transaction-started+ if the transaction started successfully,
+  equal to `+transaction-started+` if the transaction started successfully,
   otherwise returns the code of the error that caused the transaction to abort.
 
   Invoking `(transaction-begin)` while there is already a running transaction
@@ -167,7 +167,7 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   has undefined consequences - usually *bad* consequences like unhandled memory faults.
 
 - `TRANSACTION-ABORT` immediately aborts a transaction with an error-code equal to
-  +transaction-user-abort+. Note that transactions may abort spontaneouly
+  `+transaction-user-abort+`. Note that transactions may abort spontaneouly
   for a number of reasons, usually including but not limited to:
   * another CPU core writing to the same memory locations
   * hardware limitations - there are a lot of them: for example, transactions usually
@@ -180,7 +180,7 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
 
   If a transaction is aborted, it is the programmer's responsibility to implement
   alternative solutions: depending on the error code, re-running it may be useful or not -
-  see (official RTM and HLE reference manual from Intel)[http://software.intel.com/sites/default/files/m/9/2/3/41604]
+  see the [official RTM and HLE reference manual from Intel](http://software.intel.com/sites/default/files/m/9/2/3/41604)
   for the possibile error codes and their meaning.
 
 - `TRANSACTION-RUNNING-P` returns T if a hardware memory transaction

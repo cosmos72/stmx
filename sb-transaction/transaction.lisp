@@ -59,16 +59,16 @@ has undefined consequences."
 
 
 
-(declaim (type fixnum +transaction-abort+))
+(declaim (type fixnum +transaction-user-abort+))
 
-(defconstant +transaction-abort+ #x1000001
+(defconstant +transaction-user-abort+ #x1000001
   "Value returned by (transaction-begin) if the transaction was manually aborted
 by calling (transaction-abort).
 It is an implementation-dependent fixnum, different from +transaction-started+
 and from all error codes indicating a spontaneous abort.")
 
 
-(defmacro transaction-abort-macro (&optional (err-code (ash +transaction-abort+ -24)))
+(defmacro transaction-abort-macro (&optional (err-code (ash +transaction-user-abort+ -24)))
   "Immediately abort a hardware memory transaction with a user-specified
 ERR-CODE, which must be a constant between 0 and 255 (default: 1).
 Note: the value returned by (transaction-begin) will also contain \"somewhere\"
@@ -92,7 +92,7 @@ with an implementation-dependent value."
 
 (defun transaction-abort ()
   "Voluntarily abort a hardware memory transaction
-with an error-code equal to +transaction-abort+.
+with an error-code equal to +transaction-user-abort+.
 
 If a transaction is in progress, TRANSACTION-ABORT does not return normally:
 execution is resumed at the instruction immediately after the outermost

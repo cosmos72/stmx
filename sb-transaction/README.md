@@ -157,11 +157,11 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   It returns normally (with an implementation-dependent value) if commit is successful,
   otherwise aborts the transaction.
 
-  In case the transaction is aborted, **all** effects of code between TRANSACTION-BEGIN
-  and TRANSACTION-END are rolled back (undone):
+  In case the transaction is aborted for any reason, **all** effects of code
+  between TRANSACTION-BEGIN and TRANSACTION-END are rolled back (undone):
   execution resumes at the instruction immediately after TRANSACTION-BEGIN,
   in such a way that TRANSACTION-BEGIN will appear to have returned
-  a non-zero error code (that describes the abort reason).
+  an error code (that describes the abort reason).
 
   Invoking `(transaction-end)` without a running hardware memory transaction
   has undefined consequences - usually *bad* consequences like unhandled memory faults.

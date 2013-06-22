@@ -29,6 +29,15 @@
 
   :components ((:static-file "stmx.asd")
 
+               
+               (:module :sbcl-transaction
+                :components #-(and sbcl x86-64)
+                            ()
+                            #+(and sbcl x86-64)
+                            ((:file "package")
+                             (:file "cpuid"        :depends-on ("package"))
+                             #+never (:file "transaction"  :depends-on ("cpuid"))))
+
                (:module :lang
                 :components ((:file "package")
                              (:file "macro"          :depends-on ("package"))
@@ -42,7 +51,8 @@
                              (:file "fast-vector"    :depends-on ("macro"))
                              (:file "hash-table"     :depends-on ("cons"))
                              (:file "print"          :depends-on ("macro"))
-                             (:file "class-precedence-list" :depends-on ("macro"))))
+                             (:file "class-precedence-list" :depends-on ("macro")))
+                :depends-on (:sbcl-transaction))
 
                (:module :src
                 :components ((:file "package")

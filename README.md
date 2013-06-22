@@ -17,8 +17,21 @@ are re-executed from the beginning in case of conflicts or if consistent reads
 cannot be guaranteed, and effects of a transaction are not visible from other
 threads until it commits.
 
-STM gives freedom from deadlocks, automatic roll-back on failure,
+Transactional memory gives freedom from deadlocks, automatic roll-back on failure,
 and it aims at resolving the tension between granularity and concurrency.
+
+### Latest news
+
+While STMX is currently a software-only implementation, work is in progress
+to add support for hardware-assisted memory transactions (RTM) available on the following
+Intel x86-64 processors released in June 2013:
+* Intel Core i5 4570
+* Intel Core i5 4670
+* Intel Core i7 4770
+
+In the meantime SB-TRANSACTION, a library that implements hardware-only memory transactions
+on such CPUs, is already available and packaged in the [sb-transaction](sb-transaction) subfolder
+of STMX. It only works on SBCL running on those CPUs in native 64-bit mode.
 
 
 General documentation

@@ -1,6 +1,6 @@
 ;; -*- lisp -*-
 
-;; This file is part of STMX.
+;; This file is part of SB-TRANSACTION.
 ;; Copyright (c) 2013 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or

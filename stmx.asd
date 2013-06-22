@@ -30,13 +30,14 @@
   :components ((:static-file "stmx.asd")
 
                
-               (:module :sbcl-transaction
+               (:module :sb-transaction
                 :components #-(and sbcl x86-64)
                             ()
                             #+(and sbcl x86-64)
                             ((:file "package")
-                             (:file "cpuid"        :depends-on ("package"))
-                             #+never (:file "transaction"  :depends-on ("cpuid"))))
+                             (:file "defknown")
+                             (:file "cpuid"        :depends-on ("defknown"))
+                             (:file "transaction"  :depends-on ("defknown"))))
 
                (:module :lang
                 :components ((:file "package")
@@ -52,7 +53,7 @@
                              (:file "hash-table"     :depends-on ("cons"))
                              (:file "print"          :depends-on ("macro"))
                              (:file "class-precedence-list" :depends-on ("macro")))
-                :depends-on (:sbcl-transaction))
+                :depends-on (:sb-transaction))
 
                (:module :src
                 :components ((:file "package")

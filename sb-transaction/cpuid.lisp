@@ -13,64 +13,59 @@
 ;; See the Lisp Lesser General Public License for more details.
 
 
-;;;; * SBCL-TRANSACTION
+;;;; * SB-TRANSACTION
 
 ;; this code is VERY non-portable: it requires SBCL running on x86-64
 
-(in-package :sbcl-transaction)
+(in-package :sb-transaction)
 
-(eval-when (:compile-toplevel :load-toplevel)
-
-  (sb-c:defknown %cpuid
-      ;;arg-types
-      ((unsigned-byte 32) (unsigned-byte 32))
-      ;;result-type
-      (values (unsigned-byte 32) (unsigned-byte 32)
-              (unsigned-byte 32) (unsigned-byte 32))
-      ())
+(defknown %cpuid
+    ;;arg-types
+    ((unsigned-byte 32) (unsigned-byte 32))
+    ;;result-type
+    (values (unsigned-byte 32) (unsigned-byte 32)
+            (unsigned-byte 32) (unsigned-byte 32))
+    ())
 
 
-  (sb-c:define-vop (%cpuid)
-    (:policy :fast-safe)
-    (:args (eax-val :scs (sb-vm::unsigned-reg) :target eax)
-           (ecx-val :scs (sb-vm::unsigned-reg) :target ecx))
-    (:arg-types sb-vm::positive-fixnum sb-vm::positive-fixnum)
-    (:translate %cpuid)
+(sb-c:define-vop (%cpuid)
+  (:policy :fast-safe)
+  (:args (eax-val :scs (sb-vm::unsigned-reg) :target eax)
+         (ecx-val :scs (sb-vm::unsigned-reg) :target ecx))
+  (:arg-types sb-vm::positive-fixnum sb-vm::positive-fixnum)
+  (:translate %cpuid)
 
-    (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::eax-offset :target r1 :from (:argument 0)) eax)
-    (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::ebx-offset :target r2) ebx)
-    (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::ecx-offset :target r3 :from (:argument 1)) ecx)
-    (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::edx-offset :target r4) edx)
-    (:results
-     (r1 :scs (sb-vm::unsigned-reg))
-     (r2 :scs (sb-vm::unsigned-reg))
-     (r3 :scs (sb-vm::unsigned-reg))
-     (r4 :scs (sb-vm::unsigned-reg)))
-    (:result-types sb-vm::positive-fixnum sb-vm::positive-fixnum
-                   sb-vm::positive-fixnum sb-vm::positive-fixnum)
-    (:generator 8
-     (sb-c:move eax eax-val)
-     (sb-c:move ecx ecx-val)
+  (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::eax-offset :target r1 :from (:argument 0)) eax)
+  (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::ebx-offset :target r2) ebx)
+  (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::ecx-offset :target r3 :from (:argument 1)) ecx)
+  (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::edx-offset :target r4) edx)
+  (:results
+   (r1 :scs (sb-vm::unsigned-reg))
+   (r2 :scs (sb-vm::unsigned-reg))
+   (r3 :scs (sb-vm::unsigned-reg))
+   (r4 :scs (sb-vm::unsigned-reg)))
+  (:result-types sb-vm::positive-fixnum sb-vm::positive-fixnum
+                 sb-vm::positive-fixnum sb-vm::positive-fixnum)
+  (:generator 8
+   (sb-c:move eax eax-val)
+   (sb-c:move ecx ecx-val)
 
-     (sb-assem:inst cpuid)
+   (sb-assem:inst cpuid)
 
-     (sb-c:move r1 eax)
-     (sb-c:move r2 ebx)
-     (sb-c:move r3 ecx)
-     (sb-c:move r4 edx))))
+   (sb-c:move r1 eax)
+   (sb-c:move r2 ebx)
+   (sb-c:move r3 ecx)
+   (sb-c:move r4 edx)))
 
    
+(declaim (ftype (function ((unsigned-byte 32) &optional (unsigned-byte 32))
+                          (values (unsigned-byte 32) (unsigned-byte 32)
+                                  (unsigned-byte 32) (unsigned-byte 32) &optional))
+                 cpuid)
+         (inline cpuid))
 
-
-(defun %cpuid (eax ecx)
-  (%cpuid eax ecx))
-
-(declaim (inline cpuid))
 (defun cpuid (eax &optional (ecx 0))
-  (declare (type (unsigned-byte 32) eax ecx))
-  (the (values (unsigned-byte 32) (unsigned-byte 32)
-               (unsigned-byte 32) (unsigned-byte 32) &optional)
-    (sb-c::%primitive %cpuid eax ecx)))
+  (%cpuid eax ecx))
 
 
 #|
@@ -122,6 +117,6 @@ Intel Core i7 4770K, do **NOT** support RTM."
         (not (zerop (logand ebx #x800)))))))
 
 
-;(eval-when (:compile-toplevel :load-toplevel :execute)
-;  (when (cpuid-transaction-supported-p)
-;    (pushnew :memory-transaction-vops *features*)))
+;;(eval-when (:compile-toplevel :load-toplevel :execute)
+;;  (when (cpuid-transaction-supported-p)
+;;    (pushnew :memory-transaction-vops *features*)))

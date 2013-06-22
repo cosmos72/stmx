@@ -26,7 +26,7 @@
 ;; * Intel Core i7 4770
 
 
-(in-package :sbcl-transaction)
+(in-package :sb-transaction)
 
 ;; utilities copy-pasted from sbcl/src/compiler/x86-64/insts.lisp
 ;; DISPLACEMENT, TWO-BYTES, THREE-BYTES
@@ -73,20 +73,21 @@
 
 (defun emit-dword-displacement-backpatch (segment target)
   (sb-vm::emit-back-patch segment
-                   4
-                   (lambda (segment posn)
-                     (let ((disp (- (sb-vm::label-position target) (+ 4 posn))))
-                       (sb-int:aver (<= #x-80000000 disp #x7fffffff))
-                       (sb-vm::emit-byte segment (logand #xff disp))
-                       (sb-vm::emit-byte segment (logand #xff (ash disp -8)))
-                       (sb-vm::emit-byte segment (logand #xff (ash disp -16)))
-                       (sb-vm::emit-byte segment (logand #xff (ash disp -24)))))))
+     4
+     (lambda (segment posn)
+       (let ((disp (- (sb-vm::label-position target) (+ 4 posn))))
+         (sb-int:aver (<= #x-80000000 disp #x7fffffff))
+         (let ((disp (the (integer #x-80000000 #x7fffffff) disp)))
+           (sb-vm::emit-byte segment (ldb (byte 8  0) disp))
+           (sb-vm::emit-byte segment (ldb (byte 8  8) disp))
+           (sb-vm::emit-byte segment (ldb (byte 8 16) disp))
+           (sb-vm::emit-byte segment (ldb (byte 8 24) disp)))))))
                        
 
 
 
 (sb-vm::define-instruction xbegin (segment &optional where)
-  (:printer xbegin ()) ;; (op '(#xc7 #xf8))
+  (:printer xbegin ())
   (:emitter
    (sb-vm::emit-byte segment #xc7)
    (sb-vm::emit-byte segment #xf8)
@@ -129,17 +130,21 @@
 ;;;; ** medium-level: define vops
 
 
-(sb-c:defknown %transaction-begin () (unsigned-byte 32)
-    ())
+(defknown %transaction-begin () (unsigned-byte 32)
+    (sb-c::important-result sb-c::always-translatable))
 
-(sb-c:defknown %transaction-end () (values)
-    ())
+(defknown %transaction-end () (values)
+    (sb-c::always-translatable))
 
-(sb-c:defknown %transaction-abort ((unsigned-byte 8)) (values)
-    ())
+(defknown %transaction-abort ((unsigned-byte 8)) (values)
+    (sb-c::always-translatable))
 
-(sb-c:defknown transaction-running-p () (boolean)
-    ())
+(defknown %transaction-running-p () boolean
+    ;; do NOT add the sb-c::movable and sb-c:foldable attributes: either of them
+    ;; would declare that %transaction-running-p result only depends on its arguments,
+    ;; which is NOT true: it also depends on HW state.
+    (sb-c:flushable sb-c::important-result sb-c::always-translatable))
+
 
 
 (sb-c:define-vop (%xbegin)
@@ -158,11 +163,8 @@
 (sb-c:define-vop (%xend)
   (:policy :fast-safe)
   (:translate %transaction-end)
-  ;;(:results   (res :scs (sb-vm::unsigned-reg)))
-  ;;(:result-types sb-vm::positive-fixnum)
   (:generator 8
-   (sb-assem:inst xend)
-   #+never (sb-vm::zeroize res)))
+   (sb-assem:inst xend)))
 
    
 (sb-c:define-vop (%xabort)
@@ -175,7 +177,7 @@
 
 (sb-c:define-vop (%xtest)
   (:policy :fast-safe)
-  (:translate transaction-running-p)
+  (:translate %transaction-running-p)
   (:conditional :ne)
   (:generator 8
    (sb-assem:inst xtest)))
@@ -186,29 +188,32 @@
 
 (declaim (ftype (function () (unsigned-byte 32)) transaction-begin)
          (ftype (function () (integer 0 0))      transaction-end)
-         (ftype (function () (integer -1 -1))    transaction-abort)
+         (ftype (function () (integer 0 0))      transaction-abort)
+         (ftype (function () boolean)            transaction-running-p)
          (inline transaction-begin
                  transaction-end
-                 transaction-abort))
+                 transaction-abort
+                 transaction-running-p))
 
 (defun transaction-begin ()
   "Start a hardware-assisted memory transaction.
 Return zero if transaction started successfully,
 otherwise return code of the error that caused the transaction to abort."
   (the (values (unsigned-byte 32) &optional)
-    (sb-c::%primitive %xbegin)))
+    (%transaction-begin)))
 
 
 (defun transaction-end ()
   "Commit a hardware-assisted memory transaction.
-Return 0 if commit is successful, otherwise abort the transaction.
+Return normally (with an implementation-dependent value) if commit is successful,
+otherwise abort the transaction.
 
 In case the transaction is aborted, all effects of code between the outermost
 TRANSACTION-BEGIN and the TRANSACTION-END will be rolled back (undone):
 execution will resume at the instruction immediately after the outermost
 TRANSACTION-BEGIN, in such a way that TRANSACTION-BEGIN will appear to have
 returned a non-zero error code (that describes the abort reason)."
-  (sb-c::%primitive %xend)
+  (%transaction-end)
   0)
 
 
@@ -229,7 +234,7 @@ with an implementation-dependent value."
            :expected-type '(unsigned-byte 8) :datum err-code))
   `(progn
      (sb-c::%primitive %xabort ,err-code)
-     -1))
+     0))
 
 (defun transaction-abort ()
   "Voluntarily abort a hardware-assisted memory transaction
@@ -247,10 +252,13 @@ with an implementation-dependent value."
 
 
 
+(defun %transaction-running-p ()
+  (%transaction-running-p))
+
 (defun transaction-running-p ()
   "Return T if a hardware-assisted memory transaction
 is currently in progress, otherwise return NIL."
-  (transaction-running-p))
+  (%transaction-running-p))
 
 
 

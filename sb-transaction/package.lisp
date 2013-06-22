@@ -17,9 +17,10 @@
 
 (in-package :cl-user)
 
-(defpackage #:sbcl-transaction
+(defpackage #:sb-transaction
   (:use #:cl)
 
+  #+x86-64
   (:export #:cpuid  #:cpuid-transaction-supported-p
 
            #:transaction-begin #:transaction-end

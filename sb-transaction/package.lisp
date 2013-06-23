@@ -30,7 +30,11 @@
 (defpackage #:sb-transaction
   (:use #:cl)
 
-  (:export #:cpuid  #:transaction-supported-p      #:+transaction-started+
+  (:export #:cpuid
 
+           #:transaction-supported-p
            #:transaction-begin #:transaction-end
-           #:transaction-abort #:transaction-running-p))
+           #:transaction-abort #:transaction-running-p
+
+           #:+transaction-started+ #:+transaction-user-abort+))
+

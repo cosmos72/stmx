@@ -90,30 +90,17 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
 
 <!-- Intel Core-i5 750 @4GHz (quad-core), 16GB RAM -->
 
-<!-- sbcl64, speed 3, atomic-ops
+<!-- sbcl64, speed 3, atomic-ops (default)
     nil               0.083
     ($-tx v)          0.102
     (setf ($-tx v) 1) 0.125
     (incf ($-tx v))   0.156     -->
-
-<!-- sbcl64, speed 3, mem-rw-barriers=trivial
-    nil               0.124
-    ($-tx v)          0.149
-    (setf ($-tx v) 1) 0.240
-    (incf ($-tx v))   0.297     -->
 
 <!-- sbcl64, speed 3
     nil               0.126
     ($-tx v)          0.146
     (setf ($-tx v) 1) 0.239
     (incf ($-tx v))   0.276     -->
-
-
-<!-- ccl64, speed 3, mem-rw-barriers=trivial
-    nil               0.274
-    ($-tx v)          0.441
-    (setf ($-tx v) 1) 0.839
-    (incf ($-tx v))   1.324     -->
 
 <!-- ccl64, speed 3
     nil               0.271
@@ -186,82 +173,86 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
        Concurrent benchmarks on a 4-core CPU. They already iterate
        one million times, do not wrap them in <code>(1m ...)</code>.
      </th></tr>
+ </table>
 
+
+ <table>
  <tr><th colspan="3">
        Dining philosophers, load with<br>
        <code>(load "stmx/example/dining-philosophers-stmx.lisp")</code><br>
        <code>(in-package :stmx.example1)</code>
      </th></tr>
 
- <tr><th><b>number of threads</b></th>
-     <th><b>executed code</b></th>
-     <th><b>total transactions per second</b></th></tr>
+ <tr><th rowspan="2"><b>number of threads</b></th>
+     <th rowspan="2"><b>executed code</b></th>
+     <th><b>STMX</b></th>
+     <th><b>LOCK based</b></th>
+     <th><b>RTM (hw transactions)</b></th></tr>
+
+ <tr><th colspan="3"><b>millions transactions per second</b></th></tr>
 
  <tr><td>1 thread</td>
-     <td><code>(dining-philosophers 1 1000000)</code></td>
-     <td>4.72&nbsp;millions</td></tr> <!-- lock: 68.97 -->
+     <td><code>(dining-philosophers 1)</code></td>
+     <td>4.72</td><td>69.06</td><td>51.55</td></tr>
 
  <tr><td>2 threads</td>
-     <td><code>(dining-philosophers 2 1000000)</code></td>
-     <td>8.44&nbsp;millions</td></tr> <!-- lock: 54.79 -->
+     <td><code>(dining-philosophers 2)</code></td>
+     <td>8.44</td><td>55.71</td><td>38.10</td></tr>
 
  <tr><td>3 threads</td>
-     <td><code>(dining-philosophers 3 1000000)</code></td>
-     <td>12.35&nbsp;millions</td></tr> <!-- lock: 44.31 -->
+     <td><code>(dining-philosophers 3)</code></td>
+     <td>12.35</td><td>49.02</td><td>30.90</td></tr>
 
  <tr><td>4 threads</td>
-     <td><code>(dining-philosophers 4 1000000)</code></td>
-     <td>16.39&nbsp;millions</td></tr> <!-- lock: 45.77 -->
+     <td><code>(dining-philosophers 4)</code></td>
+     <td>16.39</td><td>47.11</td><td>32.50</td></tr>
 
  <tr><td>5 threads</td>
-     <td><code>(dining-philosophers 5 1000000)</code></td>
-     <td>13.70&nbsp;millions</td></tr> <!-- lock: 61.12 -->
+     <td><code>(dining-philosophers 5)</code></td>
+     <td>13.70</td><td>61.35</td><td>40.02</td></tr>
 
  <tr><td>6 threads</td>
-     <td><code>(dining-philosophers 6 1000000)</code></td>
-     <td>15.38&nbsp;millions</td></tr> <!-- lock: 74.53 -->
+     <td><code>(dining-philosophers 6)</code></td>
+     <td>15.71</td><td>75.66</td><td>42.85</td></tr>
 
  <tr><td>7 threads</td>
-     <td><code>(dining-philosophers 7 1000000)</code></td>
-     <td>15.80&nbsp;millions</td></tr> <!-- lock: 80.18 -->
+     <td><code>(dining-philosophers 7)</code></td>
+     <td>16.17</td><td>90.09</td><td>49.66</td></tr>
 
  <tr><td>8 threads</td>
-     <td><code>(dining-philosophers 8 1000000)</code></td>
-     <td>17.24&nbsp;millions</td></tr> <!-- lock: 99.50 -->
+     <td><code>(dining-philosophers 8)</code></td>
+     <td>17.24</td><td>102.70</td><td>65.40</td></tr>
 
  <tr><td>10 threads</td>
-     <td><code>(dining-philosophers 10 1000000)</code></td>
-     <td>16.67&nbsp;millions</td></tr> <!-- lock: 113.51 -->
+     <td><code>(dining-philosophers 10)</code></td>
+     <td>16.67</td><td>121.51</td><td>72.67</td></tr>
 
  <tr><td>15 threads</td>
-     <td><code>(dining-philosophers 15 1000000)</code></td>
-     <td>16.63&nbsp;millions</td></tr> <!-- lock: 152.28 -->
+     <td><code>(dining-philosophers 15)</code></td>
+     <td>16.63</td><td>156.09</td><td>128.47</td></tr>
 
  <tr><td>20 threads</td>
-     <td><code>(dining-philosophers 20 1000000)</code></td>
-     <td>17.20&nbsp;millions</td></tr> <!-- lock: 193.99 -->
+     <td><code>(dining-philosophers 20)</code></td>
+     <td>17.20</td><td>202.84</td><td>176.65</td></tr>
 
  <tr><td>30 threads</td>
-     <td><code>(dining-philosophers 30 1000000)</code></td>
-     <td>17.06&nbsp;millions</td></tr> <!-- lock: 227.45 -->
+     <td><code>(dining-philosophers 30)</code></td>
+     <td>17.06</td><td>231.84</td><td>227.74</td></tr>
 
  <tr><td>40 threads</td>
-     <td><code>(dining-philosophers 40 1000000)</code></td>
-     <td>17.23&nbsp;millions</td></tr> <!-- lock: 242.72 -->
+     <td><code>(dining-philosophers 40)</code></td>
+     <td>17.23</td><td>242.72</td><td>251.51</td></tr>
 
  <tr><td>50 threads</td>
-     <td><code>(dining-philosophers 50 1000000)</code></td>
-     <td>17.21&nbsp;millions</td></tr> <!-- lock: 232.99 -->
+     <td><code>(dining-philosophers 50)</code></td>
+     <td>17.21</td><td>232.99</td><td>257.19</td></tr>
 
  <tr><td>100 threads</td>
-     <td><code>(dining-philosophers 100 1000000)</code></td>
-     <td>17.40&nbsp;millions</td></tr> <!-- lock: 225.94 -->
+     <td><code>(dining-philosophers 100)</code></td>
+     <td>17.40</td><td>232.99</td><td>272.31</td></tr>
 
  <tr><td>200 threads</td>
-     <td><code>(dining-philosophers 200 1000000)</code></td>
-     <td>17.38&nbsp;millions</td></tr> <!-- lock: 248.69 -->
-
+     <td><code>(dining-philosophers 200)</code></td>
+     <td>17.38</td><td>248.69</td><td>278.75</td></tr>
 
 </table>
-
-

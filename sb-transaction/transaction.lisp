@@ -36,7 +36,7 @@ otherwise return code of the error that caused the transaction to abort.
 Invoking TRANSACTION-BEGIN while there is already a running hardware
 memory transaction has implementation-dependent effects."
   (the (values fixnum  &optional)
-    ;; (%transaction-begin)
+    #+never (%transaction-begin)
     (sb-c::%primitive %xbegin)))
 
 
@@ -105,7 +105,7 @@ with an implementation-dependent value."
 
 
 
-
+#+never
 (defun %transaction-running-p ()
   (%transaction-running-p))
 

@@ -63,17 +63,16 @@ abort error codes.")
   (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::eax-offset :target r1) eax)
   (:results   (r1 :scs (sb-vm::unsigned-reg)))
   (:result-types sb-vm::positive-fixnum)
-  (:generator 8
-   ;;(sb-vm::zeroize eax)
+  (:generator 0
    (sb-vm::move-immediate eax +transaction-started+)
    (sb-assem:inst xbegin)
    (sb-c:move r1 eax)))
 
-   
+
 (sb-c:define-vop (%xend)
   (:policy :fast-safe)
   (:translate %transaction-end)
-  (:generator 8
+  (:generator 0
    (sb-assem:inst xend)))
 
    
@@ -81,7 +80,7 @@ abort error codes.")
   (:policy :fast-safe)
   (:translate %transaction-abort)
   (:info err-code)
-  (:generator 8
+  (:generator 0
    (sb-assem:inst xabort err-code)))
 
 
@@ -89,6 +88,6 @@ abort error codes.")
   (:policy :fast-safe)
   (:translate %transaction-running-p)
   (:conditional :ne)
-  (:generator 8
+  (:generator 1
    (sb-assem:inst xtest)))
 

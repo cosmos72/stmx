@@ -72,6 +72,9 @@
    start
    (decf (the fixnum (rest plate)))
 
+   ;; On a 3.5GHz Intel Core i7 4770, the overhead of each
+   ;; hardware transaction is approximately 11 nanoseconds.
+   ;; Fast, but definitely not zero.
    (when (= (transaction-begin) +transaction-started+)
      (when (acquire-lock fork1)
        (when (acquire-lock fork2)

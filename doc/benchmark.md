@@ -182,7 +182,9 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
  <tr><th colspan="5">
        Dining philosophers, load with<br>
        <code>(load "stmx/example/dining-philosophers-stmx.lisp")</code><br>
-       <code>(in-package :stmx.example1)</code>
+       <code>(load "stmx/example/dining-philosophers-lock.lisp")</code><br>
+       <code>(load "stmx/example/dining-philosophers-rtm.lisp")</code><br>
+       <code>(in-package :stmx.example{1|2|3})</code>
      </th></tr>
 
  <tr><th rowspan="2"><b>number of threads</b></th>

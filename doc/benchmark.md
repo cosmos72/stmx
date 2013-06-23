@@ -169,15 +169,17 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
               (set-ghash th i t))</code></td>
      <td>1.881&nbsp;microseconds</td></tr>
 
- <tr><th colspan="3">
-       Concurrent benchmarks on a 4-core CPU. They already iterate
-       one million times, do not wrap them in <code>(1m ...)</code>.
-     </th></tr>
  </table>
 
 
  <table>
- <tr><th colspan="3">
+ 
+ <tr><th colspan="5">
+       Concurrent benchmarks on a 4-core CPU. They already iterate
+       one million times, do not wrap them in <code>(1m ...)</code>.
+     </th></tr>
+
+ <tr><th colspan="5">
        Dining philosophers, load with<br>
        <code>(load "stmx/example/dining-philosophers-stmx.lisp")</code><br>
        <code>(in-package :stmx.example1)</code>
@@ -185,7 +187,7 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
 
  <tr><th rowspan="2"><b>number of threads</b></th>
      <th rowspan="2"><b>executed code</b></th>
-     <th><b>STMX</b></th>
+     <th><b>STMX (sw transactions)</b></th>
      <th><b>LOCK based</b></th>
      <th><b>RTM (hw transactions)</b></th></tr>
 

@@ -174,89 +174,90 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
 
  <table>
  
- <tr><th colspan="5">
+ <tr><th colspan="6">
        Concurrent benchmarks on a 4-core CPU. They already iterate
        one million times, do not wrap them in <code>(1m ...)</code>.
      </th></tr>
 
- <tr><th colspan="5">
+ <tr><th colspan="6">
        Dining philosophers, load with<br>
        <code>(load "stmx/example/dining-philosophers-stmx.lisp")</code><br>
-       <code>(load "stmx/example/dining-philosophers-lock.lisp")</code><br>
        <code>(load "stmx/example/dining-philosophers-rtm.lisp")</code><br>
+       <code>(load "stmx/example/dining-philosophers-lock.lisp")</code><br>
        <code>(in-package :stmx.example{1|2|3})</code>
      </th></tr>
 
  <tr><th rowspan="2"><b>number of threads</b></th>
      <th rowspan="2"><b>executed code</b></th>
      <th><b>STMX (sw transactions)</b></th>
-     <th><b>LOCK based</b></th>
-     <th><b>RTM (hw transactions)</b></th></tr>
+     <th><b>RTM (hw transactions)</b></th>
+     <th><b>LOCK (atomic compare-and-swap)</b></th>
+     <th><b>LOCK (bordeaux-threads mutex)</b></th></tr>
 
- <tr><th colspan="3"><b>millions transactions per second</b></th></tr>
+ <tr><th colspan="4"><b>millions transactions per second</b></th></tr>
 
  <tr><td>1 thread</td>
      <td><code>(dining-philosophers 1)</code></td>
-     <td>4.72</td><td>69.06</td><td>51.55</td></tr>
+     <td>4.85</td><td>50.00</td><td>71.43</td><td>15.67</td></tr>
 
  <tr><td>2 threads</td>
      <td><code>(dining-philosophers 2)</code></td>
-     <td>8.44</td><td>55.71</td><td>38.10</td></tr>
+     <td>8.66</td><td>39.18</td><td>60.42</td><td>11.80</td></tr>
 
  <tr><td>3 threads</td>
      <td><code>(dining-philosophers 3)</code></td>
-     <td>12.35</td><td>49.02</td><td>30.90</td></tr>
+     <td>12.55</td><td>31.51</td><td>49.02</td><td>10.25</td></tr>
 
  <tr><td>4 threads</td>
      <td><code>(dining-philosophers 4)</code></td>
-     <td>16.39</td><td>47.11</td><td>32.50</td></tr>
+     <td>16.60</td><td>32.73</td><td>48.60</td><td>15.17</td></tr>
 
  <tr><td>5 threads</td>
      <td><code>(dining-philosophers 5)</code></td>
-     <td>13.70</td><td>61.35</td><td>40.02</td></tr>
+     <td>14.01</td><td>39.06</td><td>61.35</td><td>18.01</td></tr>
 
  <tr><td>6 threads</td>
      <td><code>(dining-philosophers 6)</code></td>
-     <td>15.71</td><td>75.66</td><td>42.85</td></tr>
+     <td>16.17</td><td>45.91</td><td>75.66</td><td>21.03</td></tr>
 
  <tr><td>7 threads</td>
      <td><code>(dining-philosophers 7)</code></td>
-     <td>16.17</td><td>90.09</td><td>49.66</td></tr>
+     <td>16.32</td><td>55.56</td><td>90.09</td><td>24.30</td></tr>
 
  <tr><td>8 threads</td>
      <td><code>(dining-philosophers 8)</code></td>
-     <td>17.24</td><td>102.70</td><td>65.40</td></tr>
+     <td>18.02</td><td>72.86</td><td>102.70</td><td>25.56</td></tr>
 
  <tr><td>10 threads</td>
      <td><code>(dining-philosophers 10)</code></td>
-     <td>16.67</td><td>121.51</td><td>72.67</td></tr>
+     <td>17.04</td><td>76.75</td><td>121.51</td><td>32.39</td></tr>
 
  <tr><td>15 threads</td>
      <td><code>(dining-philosophers 15)</code></td>
-     <td>16.63</td><td>156.09</td><td>128.47</td></tr>
+     <td>17.58</td><td>135.75</td><td>164.84</td><td>51.62</td></tr>
 
  <tr><td>20 threads</td>
      <td><code>(dining-philosophers 20)</code></td>
-     <td>17.20</td><td>202.84</td><td>176.65</td></tr>
+     <td>17.84</td><td>205.55</td><td>205.55</td><td>57.95</td></tr>
 
  <tr><td>30 threads</td>
      <td><code>(dining-philosophers 30)</code></td>
-     <td>17.06</td><td>231.84</td><td>227.74</td></tr>
+     <td>17.93</td><td>249.58</td><td>240.38</td><td>59.48</td></tr>
 
  <tr><td>40 threads</td>
      <td><code>(dining-philosophers 40)</code></td>
-     <td>17.23</td><td>242.72</td><td>251.51</td></tr>
+     <td>18.00</td><td>242.72</td><td>250.78</td><td>57.97</td></tr>
 
  <tr><td>50 threads</td>
      <td><code>(dining-philosophers 50)</code></td>
-     <td>17.21</td><td>232.99</td><td>257.19</td></tr>
+     <td>17.78</td><td>262.33</td><td>244.38</td><td>55.43</td></tr>
 
  <tr><td>100 threads</td>
      <td><code>(dining-philosophers 100)</code></td>
-     <td>17.40</td><td>232.99</td><td>272.31</td></tr>
+     <td>17.87</td><td>269.91</td><td>234.25</td><td>50.12</td></tr>
 
  <tr><td>200 threads</td>
      <td><code>(dining-philosophers 200)</code></td>
-     <td>17.38</td><td>248.69</td><td>278.75</td></tr>
+     <td>17.90</td><td>278.20</td><td>254.58</td><td>51.68</td></tr>
 
 </table>

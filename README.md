@@ -711,7 +711,8 @@ better) with a fast Common Lisp (SBCL 1.1.8 or better), STMX can execute up to
 
 A small example with very short transactions is the [dining philosophers](example/dining-philosophers-stmx.lisp),
 with 5 reads and 5 writes to transactional memory per atomic block,
-where each CPU core runs approximately 4 millions transactions per second - hyperthreading has very limited effects.
+where each CPU core runs approximately 4.5 millions transactions per second -
+hyperthreading has very limited effects.
 
 For a more realistic benchmark, the author has ported
 [Lee-TM](http://apt.cs.man.ac.uk/projects/TM/LeeBenchmark/),

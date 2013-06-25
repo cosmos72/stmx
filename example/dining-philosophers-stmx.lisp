@@ -37,7 +37,10 @@
   (decf (the fixnum ($-tx (car plate)))))
 
 
-(declaim (ftype (function (tvar tvar cons) fixnum) philosopher-eats))
+(declaim (ftype (function (tvar tvar cons) fixnum) philosopher-eats fast-philosopher-eats)
+         (inline philosopher-eats
+                 fast-philosopher-eats))
+
 (defun philosopher-eats (fork1 fork2 plate)
   "Eat once. return remaining hunger"
   (declare (type tvar fork1 fork2)
@@ -53,7 +56,6 @@
       (put fork2 f2))))
 
 
-(declaim (ftype (function (tvar tvar cons) fixnum) fast-philosopher-eats))
 (defun fast-philosopher-eats (fork1 fork2 plate)
   "Eat once. return remaining hunger"
   (declare (type tvar fork1 fork2)
@@ -62,13 +64,17 @@
   ;; of retried transactions for demonstration purposes.
   (decf (the fixnum (cdr plate)))
    
-  (let1 hunger -1 ;; unknown
+  (let ((hunger -1) ;; unknown
+        (free t)
+        (busy +unbound-tvar+))
 
-    (when-bind f1 (nth-value 1 (try-take-$ fork1))
-      (when-bind f2 (nth-value 1 (try-take-$ fork2))
+    (when (eq free ($-tx fork1))
+      (setf ($-tx fork1) busy)
+      (when (eq free ($-tx fork2))
+        (setf ($-tx fork2) busy)
         (setf hunger (eat-from-plate plate))
-        (try-put-$ fork2 f2))
-      (try-put-$ fork1 f1))
+        (setf ($-tx fork2) free))
+      (setf ($-tx fork1) free))
 
     hunger))
 
@@ -104,7 +110,7 @@
 
   (let* ((n philosophers-count)
          (nforks (max n 2))
-         (forks (loop for i from 1 to nforks collect (tvar i)))
+         (forks (loop for i from 1 to nforks collect (tvar t)))
          (plates (loop for i from 1 to n collect
                       (cons (tvar philosophers-initial-hunger)
                             philosophers-initial-hunger)))

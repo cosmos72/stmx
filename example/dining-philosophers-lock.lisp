@@ -59,7 +59,6 @@
    `(stmx.lang::release-mutex ,lock)))
 
 
-
 (declaim (ftype (function (cons) fixnum) eat-from-plate)
          (inline eat-from-plate))
 (defun eat-from-plate (plate)
@@ -68,7 +67,8 @@
   (decf (the fixnum (car plate))))
 
 
-(declaim (ftype (function (lock lock cons) fixnum) philosopher-eats fast-philosopher-eats))
+(declaim (ftype (function (lock lock cons) fixnum) philosopher-eats)
+         (inline philosopher-eats))
 
 (defun philosopher-eats (fork1 fork2 plate)
   "Try to eat once. return remaining hunger"
@@ -91,35 +91,6 @@
     hunger))
 
 
-(defun fast-philosopher-eats (fork1 fork2 plate)
-  "Eat once. return remaining hunger"
-  (declare (type lock fork1 fork2)
-           (type cons plate))
-
-  ;; also keep track of failed lock attempts for demonstration purposes.
-  (prog ((attempts 0)
-         (hunger -1)) ;; unknown
-
-     (declare (type fixnum attempts hunger))
-     
-     start
-     (decf (the fixnum (rest plate)))
-
-     (when (acquire-lock fork1)
-       (when (acquire-lock fork2)
-         (setf hunger (eat-from-plate plate))
-         (release-lock fork2))
-       (release-lock fork1))
-    
-     (when (= -1 hunger)
-       (incf attempts)
-       (cond
-         ((<= attempts 3) (sb-ext:spin-loop-hint))
-         ;;((=  attempts 6) (sb-thread:thread-yield))
-         (t               (bt:thread-yield)))
-       (go start))
-   
-     (return hunger)))
 
 
 

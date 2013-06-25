@@ -56,7 +56,9 @@
   (decf (the fixnum (first plate))))
 
 
-(declaim (ftype (function (lock lock plate) fixnum) philosopher-eats))
+(declaim (ftype (function (lock lock plate) fixnum) philosopher-eats)
+         (inline philosopher-eats))
+                
 (defun philosopher-eats (fork1 fork2 plate)
   "Try to eat once. Return remaining hunger."
   (declare (type lock fork1 fork2)
@@ -86,8 +88,8 @@
    (when (= -1 hunger)
      (incf attempts)
      (cond
-       ((<= attempts 3) (sb-ext:spin-loop-hint))
-       ;;((=  attempts 6) (sb-thread:thread-yield))
+       #+sbcl
+       ((<= attempts 4) (sb-ext:spin-loop-hint))
        (t               (bt:thread-yield)))
      (go start))
    
@@ -155,18 +157,22 @@ Note: the default initial hunger is 10 millions,
              (when result
                (print result))))
 
-      (let* ((end (get-internal-real-time))
-             (elapsed-secs (/ (- end start) (float internal-time-units-per-second)))
-             (tx-count (if (zerop elapsed-secs) most-positive-single-float
-                           (/ (* n philosophers-initial-hunger) elapsed-secs)))
-	     (tx-unit ""))
-	(when (>= tx-count 1000000)
-	  (setf tx-count (/ tx-count 1000000)
-		tx-unit " millions"))
-        (log:info "~$~A iterations per second, elapsed time: ~3$ seconds"
-		  tx-count tx-unit elapsed-secs))
+      (let ((end (get-internal-real-time)))
 
-      (loop for (plate . fails) in plates
-	 for i from 1 do
-	   (log:debug "philosopher ~A: ~A successful attempts, ~A failed"
-		     i (- philosophers-initial-hunger plate) (- fails))))))
+        (loop for (plate . attempts) in plates
+           for i from 1 do
+             (let* ((commits (- philosophers-initial-hunger plate))
+                    (fails   (- attempts))
+                    (aborts% (* 100 (/ (float fails) commits))))
+               (log:debug "philosopher ~A: aborts = ~2$%" i aborts%)))
+
+        (let* ((elapsed-secs (/ (- end start) (float internal-time-units-per-second)))
+               (tx-count (if (zerop elapsed-secs) most-positive-single-float
+                             (/ (* n philosophers-initial-hunger) elapsed-secs)))
+               (tx-unit ""))
+          (when (>= tx-count 1000000)
+            (setf tx-count (/ tx-count 1000000)
+                  tx-unit " millions"))
+          (log:info "~$~A iterations per second, elapsed time: ~3$ seconds"
+                    tx-count tx-unit elapsed-secs))))))
+

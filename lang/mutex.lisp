@@ -56,13 +56,13 @@
   (the mutex (%make-mutex)))
     
 
-
-
-
 (declaim (ftype (function (mutex) boolean)  try-acquire-mutex)
          (ftype (function (mutex) t)        release-mutex)
-          (inline
-            try-acquire-mutex release-mutex))
+         (inline
+           try-acquire-mutex release-mutex))
+
+;;(eval-always
+;; (setf sb-vm::*lock-elision* t))
 
 (defun try-acquire-mutex (mutex)
   "Try to acquire MUTEX. Return T if successful,
@@ -71,21 +71,26 @@ or NIL if MUTEX was already locked."
   #?+fast-mutex
   (mem-write-barrier
     (null
+     ;;(sb-transaction:lock-elision-acquire)
      (atomic-compare-and-swap (mutex-owner mutex) nil *current-thread*)))
   #?-fast-mutex
   (bt:acquire-lock (mutex-lock mutex) nil))
 
-   
+
 (defun release-mutex (mutex)
   "Release MUTEX. Return NIL. Consequences are undefined if MUTEX
 is locked by another thread or is already unlocked."
   #?+fast-mutex
   (progn
-    (mem-write-barrier)
+    ;; (mem-write-barrier)
+    ;; (sb-transaction:lock-elision-release)
     (setf (mutex-owner mutex) nil))
   #?-fast-mutex
   (bt:release-lock (mutex-lock mutex)))
 
+   
+;;(eval-always
+;; (setf sb-vm::*lock-elision* nil))
 
 
 

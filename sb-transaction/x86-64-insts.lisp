@@ -26,11 +26,15 @@
              (sb-disassem:maybe-note-assembler-routine value nil dstate)
              (sb-vm::print-label value stream dstate)))
 
+(sb-disassem:define-instruction-format (byte 8 :default-printer '(:name))
+  (op :field (byte 8 0)))
+
 (sb-disassem:define-instruction-format (two-bytes   16 :default-printer '(:name))
   (op :fields (list (byte 8 0) (byte 8 8))))
 
 (sb-disassem:define-instruction-format (three-bytes 24 :default-printer '(:name))
   (op :fields (list (byte 8 0) (byte 8 8) (byte 8 16))))
+
 
 
 
@@ -73,6 +77,20 @@
                        
 
 
+
+;;; ** HLE - hardware lock elision
+
+(sb-vm::define-instruction xacquire (segment) ;; same byte as repne/repnz
+  (:emitter
+   (sb-vm::emit-byte segment #xf2)))
+
+(sb-vm::define-instruction xrelease (segment) ;; same byte as rep/repe/repz
+  (:emitter
+   (sb-vm::emit-byte segment #xf3)))
+
+
+
+;;; ** RTM - restricted memory transaction
 
 (sb-vm::define-instruction xbegin (segment &optional where)
   (:printer xbegin ())

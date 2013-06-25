@@ -121,5 +121,5 @@ Arguments are: package-name symbol-name."
     (set-dispatch-macro-character #\# #\? #'compile-if-transformer))
 
   (defmacro enable-#?-syntax ()
-    `(eval-always
+    `(eval-when (:compile-toplevel)
        (%enable-#?-syntax))))

@@ -16,6 +16,7 @@
 (in-package :sb-transaction)
 
 
+;;;; new compiler intrinsic functions
 
 (defconstant +defknown-has-overwrite-fndb-silently+
   (dolist (arg (second (sb-kernel:type-specifier (sb-int:info :function :type 'sb-c::%defknown))))
@@ -28,7 +29,7 @@
        ,@(if +defknown-has-overwrite-fndb-silently+ '(:overwrite-fndb-silently t) ())))
 
 
-
+;;; cpuid intrinsic
 
 (defknown %cpuid
     ;;arg-types
@@ -38,6 +39,9 @@
             (unsigned-byte 32) (unsigned-byte 32))
     (sb-c::always-translatable))
 
+
+
+;;; RTM (restricted transactional memory) intrinsics
 
 (defknown %transaction-begin () (unsigned-byte 32)
     (sb-c::always-translatable))

@@ -30,9 +30,8 @@
 (defpackage #:sb-transaction
   (:use #:cl)
 
-  (:export #:cpuid
+  (:export #:cpuid  #:lock-elision-supported-p  #:transaction-supported-p
 
-           #:transaction-supported-p
            #:transaction-begin #:transaction-end
            #:transaction-abort #:transaction-running-p
 

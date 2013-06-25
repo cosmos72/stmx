@@ -18,6 +18,8 @@
 
 ;;;; ** medium-level: define vops
 
+;;; cpuid VOP
+
 (sb-c:define-vop (%cpuid)
   (:policy :fast-safe)
   (:args (eax-val :scs (sb-vm::unsigned-reg) :target eax)
@@ -47,6 +49,13 @@
    (sb-c:move r3 ecx)
    (sb-c:move r4 edx)))
 
+
+;;; HLE vops - hardware lock elision
+
+
+
+
+;;; RTM vops - restricted memory transaction
    
 (declaim (type fixnum +transaction-started+))
 

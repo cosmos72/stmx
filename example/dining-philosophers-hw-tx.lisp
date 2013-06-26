@@ -16,7 +16,7 @@
 (in-package :cl-user)
 
 
-;; This version of the dining-philosophers problem uses SB-TRANSACTION
+;; This version of the dining-philosophers uses SB-TRANSACTION
 ;; to take advantage of hardware transactional memory.
 
 (defpackage #:stmx.example3

@@ -182,7 +182,7 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
  <tr><th colspan="6">
        Dining philosophers, load with<br>
        <code>(load "stmx/example/dining-philosophers-stmx.lisp")</code><br>
-       <code>(load "stmx/example/dining-philosophers-rtm.lisp")</code><br>
+       <code>(load "stmx/example/dining-philosophers-hw-tx.lisp")</code><br>
        <code>(load "stmx/example/dining-philosophers-lock.lisp")</code><br>
        <code>(in-package :stmx.example{1|2|3})</code>
      </th></tr>
@@ -190,7 +190,7 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
  <tr><th rowspan="2"><b>number of threads</b></th>
      <th rowspan="2"><b>executed code</b></th>
      <th><b>STMX (sw transactions)</b></th>
-     <th><b>RTM (hw transactions)</b></th>
+     <th><b>HW-TX (hw transactions)</b></th>
      <th><b>LOCK (atomic compare-and-swap)</b></th>
      <th><b>LOCK (bordeaux-threads mutex)</b></th></tr>
 

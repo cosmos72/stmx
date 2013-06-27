@@ -35,7 +35,6 @@
 
   (declaim (ftype (function (t t) boolean) compile-if-eval))
 
-  
   (defun compile-if-and (ch args)
     "Return T if all the features in ARGS are present in *FEATURE-LIST*, otherwise return NIL."
     (declare (type list args))
@@ -84,22 +83,23 @@ Arguments are: package-name symbol-name."
            (symbol-name (pop args)))
       (declare (type symbol pkg-name symbol-name))
       (when-bind pkg (find-package pkg-name)
-        (if (nth-value 1 (find-symbol (symbol-name symbol-name) pkg))
-            t
-            nil))))
+                 (if (nth-value 1 (find-symbol (symbol-name symbol-name) pkg))
+                     t
+                     nil))))
 
 
   (defun compile-if-eval (ch args)
-    (cond
-      ((symbolp args)            (feature? args))
-      ((not (listp args))        (compile-if-error  ch args))
-      ((eq 'and    (first args)) (compile-if-and    ch args))
-      ((eq 'or     (first args)) (compile-if-or     ch args))
-      ((eq 'not    (first args)) (compile-if-not    ch args))
-      ((eq 'eql    (first args)) (compile-if-eql    ch args))
-      ((eq 'symbol (first args)) (compile-if-symbol ch args))
-      (t                         (compile-if-error  ch args))))
-  
+    (the (values boolean &optional)
+      (cond
+        ((symbolp args)            (feature? args))
+        ((not (listp args))        (compile-if-error  ch args))
+        ((eq 'and    (first args)) (compile-if-and    ch args))
+        ((eq 'or     (first args)) (compile-if-or     ch args))
+        ((eq 'not    (first args)) (compile-if-not    ch args))
+        ((eq 'eql    (first args)) (compile-if-eql    ch args))
+        ((eq 'symbol (first args)) (compile-if-symbol ch args))
+        (t                         (compile-if-error  ch args)))))
+
 
   (defun compile-if-transformer (stream subchar arg)
     (declare (ignore subchar arg))
@@ -121,5 +121,5 @@ Arguments are: package-name symbol-name."
     (set-dispatch-macro-character #\# #\? #'compile-if-transformer))
 
   (defmacro enable-#?-syntax ()
-    `(eval-when (:compile-toplevel)
+    `(eval-when (:compile-toplevel :load-toplevel :execute)
        (%enable-#?-syntax))))

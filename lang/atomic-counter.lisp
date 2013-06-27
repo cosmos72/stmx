@@ -51,20 +51,23 @@
   (%make-atomic-counter))
     
 
+(deftype positive-fixnum () '(and fixnum (integer 1)))
 
-(declaim (ftype (function (atomic-counter) counter-num) incf-atomic-counter))
+(declaim (ftype (function (atomic-counter &optional positive-fixnum) counter-num)
+                incf-atomic-counter))
 
-(defun incf-atomic-counter (counter)
-  "Increase atomic COUNTER by one and return its new value."
-  (declare (type atomic-counter counter))
+(defun incf-atomic-counter (counter &optional (delta 1))
+  "Increase atomic COUNTER by DELTA and return its new value."
+  (declare (type atomic-counter counter)
+           (type positive-fixnum delta))
 
 
   #?+(and atomic-ops fixnum-is-large-powerof2)
   (the fixnum
     (logand most-positive-fixnum
-            (1+
-             (logand most-positive-fixnum
-                     (atomic-incf (atomic-counter-version counter))))))
+            (+ delta ;; atomic-incf returns the OLD value!
+               (logand most-positive-fixnum
+                       (atomic-incf (atomic-counter-version counter) delta)))))
 
   #?-(and atomic-ops fixnum-is-large-powerof2)
   ;; locking version
@@ -74,7 +77,7 @@
       ;; fast modulus arithmetic
       (setf (atomic-counter-version counter)
             (logand most-positive-fixnum
-                    (1+ (atomic-counter-version counter))))
+                    (+ (atomic-counter-version counter) delta)))
       
       #?-fixnum-is-large-powerof2
       (progn
@@ -83,13 +86,13 @@
         (setf (atomic-counter-version counter)
               (let ((n (atomic-counter-version counter)))
                 (the fixnum
-                  (if (= n most-positive-fixnum)
+                  (if (> n (the fixnum (- most-positive-fixnum delta)))
                       0
-                      (1+ n)))))
+                      (+ delta n)))))
 
         #?-fixnum-is-large
         ;; general version: slow bignum arithmetic
-        (incf (atomic-counter-version counter))))))
+        (incf (atomic-counter-version counter) delta)))))
 
 
 (declaim (ftype (function (atomic-counter) counter-num) get-atomic-counter))

@@ -32,7 +32,7 @@
 
   (:import-from #:stmx
                 #:+invalid-version+
-                #:tvar-version-and-value #:set-tvar-version-and-value
+                #:tvar-value-and-version    #:set-tvar-value-and-version
                 #:raw-value-of #:tx-read-of #:tx-write-of
 
                 #:tlog  #:make-tlog

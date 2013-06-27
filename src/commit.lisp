@@ -45,17 +45,14 @@ by other threads."
 
   (log.trace "Tlog ~A valid-and-unlocked?.." (~ log))
   (do-txhash (var val) (tlog-reads log)
-    (if (eq val (raw-value-of var))
+    (if (tvar-valid-and-unlocked? var val log)
+
+        (log.trace "Tlog ~A tvar ~A is up-to-date and unlocked" (~ log) (~ var))
+        
         (progn
-          (log.trace "Tlog ~A tvar ~A is up-to-date" (~ log) (~ var))
-          (unless (tvar-unlocked? var log)
-            (log.debug "Tlog ~A tvar ~A is locked!" (~ log) (~ var))
-            (return-from valid-and-unlocked? nil)))
-        (progn
-          (log.trace "Tlog ~A conflict for tvar ~A: expecting ~A, found ~A"
-                     (~ log) (~ var) val (raw-value-of var))
-          (log.debug "Tlog ~A ..not valid" (~ log))
+          (log.debug "Tlog ~A tvar ~A conflict or locked: not valid" (~ log) (~ var))
           (return-from valid-and-unlocked? nil))))
+
   (log.trace "Tlog ~A ..is valid and unlocked" (~ log))
   t)
 
@@ -313,7 +310,7 @@ b) another TLOG is writing the same TVARs being committed
 
            (log.trace "Tlog ~A acquired locks..." (~ log))
 
-           (setf new-version (incf-atomic-counter *tlog-counter*))
+           (setf new-version (incf-tlog-counter))
 
            ;; check for log validity one last time, with locks held.
            ;; Also ensure that TVARs in (tlog-reads log) are not locked
@@ -324,16 +321,19 @@ b) another TLOG is writing the same TVARs being committed
 
            (log.trace "Tlog ~A committing..." (~ log))
 
-           ;; COMMIT, i.e. actually write new values into TVARs
+           ;; COMMIT, i.e. actually write new values into TVARs.
+           ;; Also unlock all TVARs.
            (do-filter-txfifo (var val) locked
              (if (eq val (raw-value-of var))
-                 (rem-current-txfifo-entry)
+                 (progn
+                   (unlock-tvar var)
+                   (rem-current-txfifo-entry))
 
                  (progn
-                   (set-tvar-version-and-value var new-version val)
+                   ;; this also unlocks VAR.
+                   (set-tvar-value-and-version var val new-version)
                    (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
-                              (~ log) (~ var) current-val val)))
-             (unlock-tvar var))
+                              (~ log) (~ var) current-val val))))
 
            (setf success t)
            (log.debug "Tlog ~A ...committed (and released locks)" (~ log))

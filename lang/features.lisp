@@ -105,9 +105,12 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 
 (eval-always
   (if (all-features? 'atomic-ops 'mem-rw-barriers)
-      ;; the combination 'atomic-ops plus 'mem-rw-barriers
-      ;; provide fast-mutex (which does not use bt.lock-owner)
-      (add-features 'fast-mutex 'mutex-owner))
+      ;; fast-mutex and fast-tvar both require
+      ;;   compare-and-swap and memory barriers.
+      ;; fast-mutex provides the preferred implementation of mutex-owner,
+      ;;   which does not use bt.lock-owner
+      ;; while fast-tvar has its own implementation of 'tvar-...-unlocked?'
+      (add-features 'fast-tvar 'fast-mutex 'mutex-owner))
 
 
   ;; on x86 and x86_64, memory read-after-read and write-after-write barriers

@@ -1,10 +1,12 @@
 KNOWN BUGS
 
-5) consistent reads are not fully guaranteed. The current implementation allows
-   a transaction to read locked TVARs, which opens a narrow race condition
-   that can result in inconsistent reads in some circumstances.
+none :)
 
 FIXED BUGS:
+
+5) consistent reads were not fully guaranteed. The implementation was allowing
+   transaction to read locked TVARs, which opened a narrow race condition
+   that could result in inconsistent reads in some circumstances.
 
 4) initargs of transactional classes were wrapped in TVARs multiple times,
    depending on the length of list returned by (closer-mop:slot-definition-initargs slot)

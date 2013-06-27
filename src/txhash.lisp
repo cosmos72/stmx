@@ -143,10 +143,12 @@
   "Return the array subscript in HASH corresponding to TXHASH."
   (declare (type simple-vector vec)
            (type fixnum hash-code vec-len))
-  (the fixnum (logand
-               (txhash-mask vec-len)
-               (logxor hash-code
-                       (ash hash-code -10)))))
+  (the (and fixnum (integer 0))
+    (logand
+     (txhash-mask vec-len)
+     (logxor hash-code
+             (ash (logand hash-code most-positive-fixnum)
+                  -10)))))
                
 
 

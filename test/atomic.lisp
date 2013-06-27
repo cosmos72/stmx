@@ -41,7 +41,7 @@
     (signals rerun-error
       (tx-read-of var log))
     (is-false (valid? log))
-    (set-tvar-version-and-value var +invalid-version+ 1)
+    (set-tvar-value-and-version var 1 +invalid-version+)
     (is-true (valid? log))))
     
 (test commit
@@ -104,7 +104,7 @@
       ;; is for some other thread to commit and restore the original value
       ;; and version initially seen by the invalid one.
       ;; Not really possible in the wild because of the version counter.
-      (set-tvar-version-and-value var +invalid-version+ 0)
+      (set-tvar-value-and-version var 0 +invalid-version+)
 
       (is-true (valid? (current-tlog)))
       (setf ($ var) 2))
@@ -127,16 +127,13 @@
         (setf first-run nil
               (raw-value-of a) 2
               (raw-value-of b) 2)
-
         (is-false (valid? (current-tlog)))
-
-        ;; reading from a must return the value written during transaction
+        ;; reading from a must return the value written during the transaction
         (is (= 1 ($ a)))
-
         ;; but reading from b must detect the inconsistency and rerun
         (signals rerun-error (incf ($ b))))
 
-      ;; read b again: in first-run it will re-run, in second-run it will succeed
+      ;; read b: in first-run it will re-run, in second-run it will succeed
       ;; and restore the invariant (= ($ a) ($ b))
       (incf ($ b)))
 

@@ -19,14 +19,30 @@
 
 ;;;; ** constants
 
+(defconstant +tlog-counter-delta+ 2
+  "*tlog-counter* is incremented by 2 each time: the lowest bit is used
+as \"locked\" flag in TVARs versioning.")
+
 (declaim (type symbol +unbound-tvar+))
 (defvar +unbound-tvar+ (gensym (symbol-name 'unbound-tvar-)))
 
 (declaim (type fixnum +invalid-version+))
-(defconstant +invalid-version+ -1)
+(defconstant +invalid-version+ (- +tlog-counter-delta+))
 
 (declaim (type cons +versioned-unbound-tvar+))
 (defvar +versioned-unbound-tvar+ (cons +invalid-version+ +unbound-tvar+))
+
+
+;;;; ** tlog global versioning - exact, atomic counter
+
+(declaim (type atomic-counter *tlog-counter*))
+(defvar *tlog-counter* (make-atomic-counter))
+
+(declaim (inline incf-tlog-counter))
+
+(defun incf-tlog-counter ()
+  "Atomically increment the global versioning counter and return its new value."
+  (incf-atomic-counter *tlog-counter* 2))
 
 
 ;;;; ** tvar approximate counter (fast but not fully exact in multi-threaded usage)
@@ -53,7 +69,7 @@
 ;;;; ** implementation class: tvar
 
 
-(defstruct (tvar (:include mutex))
+(defstruct (tvar #?-fast-tvar (:include mutex))
   "a transactional variable (tvar) is the smallest unit of transactional memory.
 it contains a single value that can be read or written during a transaction
 using ($ var) and (setf ($ var) value).
@@ -63,12 +79,12 @@ with a more convenient interface: you can read and write normally the slots
 of a transactional object (with slot-value, accessors ...), and behind
 the scenes the slots will be stored in transactional memory implemented by tvars."
 
-  #?+atomic-mem-rw-barriers
+  #?+fast-tvar
   (version +invalid-version+ :type fixnum)
-  #?+atomic-mem-rw-barriers
+  #?+fast-tvar
   (value   +unbound-tvar+    :type t)
 
-  #?-atomic-mem-rw-barriers
+  #?-fast-tvar
   (versioned-value +versioned-unbound-tvar+)         ;; tvar-versioned-value
 
 
@@ -90,9 +106,9 @@ the scenes the slots will be stored in transactional memory implemented by tvars
 this method intentionally ignores transactions and it is only useful for debugging
 purposes. please use ($ var) instead."
   (declare (type tvar var))
-  #?+atomic-mem-rw-barriers
+  #?+fast-tvar
   (tvar-value var)
-  #?-atomic-mem-rw-barriers
+  #?-fast-tvar
   (rest (tvar-versioned-value var)))
 
 
@@ -161,11 +177,6 @@ purposes. please use ($ var) instead."
 
 
 
-
-;;;; ** tlog global versioning - exact, atomic counter
-
-(declaim (type atomic-counter *tlog-counter*))
-(defvar *tlog-counter* (make-atomic-counter))
 
 ;;;; ** implementation class: tlog
 

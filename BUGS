@@ -1,7 +1,8 @@
 KNOWN BUGS
 
-none :)
-
+5) consistent reads are not fully guaranteed. The current implementation allows
+   a transaction to read locked TVARs, which opens a narrow race condition
+   that can result in inconsistent reads in some circumstances.
 
 FIXED BUGS:
 

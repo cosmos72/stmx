@@ -251,7 +251,7 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   Future versions may remove this convenience hack and replace it with a cleaner,
   stricter mechanism.
   In a program, **always** make sure that all code that uses transactional memory
-  is directly or indirecly executed inside an `(atomic ...)` block.
+  is directly or indirectly executed inside an `(atomic ...)` block.
 
 - `TRANSACTION` declares that a method or function is an atomic
   transaction, and is actually just a macro that wraps the body of a function
@@ -702,11 +702,20 @@ use `(describe 'some-symbol)` at REPL:
 
 Performance
 -----------
+For several reasons, STMX will reach highest performance on SBCL by a large
+margin - possibly by a factor between 10 and 20 with respect to other systems.
+The reasons are that SBCL is the author's primary development system,
+that SBCL both produces very optimized code (at least compared to
+non-commercial Lisp compilers) and that STMX is heavily optimized to exploit
+the low-level concurrency primitives compare-and-swap, atomic-incf and
+memory-barrier exposed by SBCL.
+
 See the included file [doc/benchmark.md](doc/benchmark.md) for performance
-considerations and a lot of raw numbers.
+considerations and a lot of raw numbers produced by running
+micro-benchmarks.
 
 The short version is: as of June 2013, on a fast consumer PC (Core i7 4770 @ 3.5GHz or
-better) with a fast Common Lisp (SBCL 1.1.8 or better), STMX can execute up to
+better) with a fast Common Lisp compiler (SBCL 1.1.8 or better), STMX can execute up to
 7.5 millions transactions per second per CPU core.
 
 A small example with very short transactions is the [dining philosophers](example/dining-philosophers-stmx.lisp),
@@ -725,6 +734,10 @@ Obviously, performance in other cases will depend on the complexity of the code
 inside transactions, on the number of reads and writes to transactional memory,
 and the rate of conflicts and retries.
 
+In particular, on systems different from SBCL, STMX allocates significant
+amounts of memory while running, to the point that when increasing the number
+of threads running transactions, the bottleneck may become the efficiency of
+the underlying Lisp multi-threaded allocation and garbage collection.
 
 Contacts, help, discussion
 --------------------------

@@ -105,6 +105,7 @@ for debugging purposes. please use ($ var) instead."
             (progn (mem-read-barrier) (tvar-version var)))
         
     #?-mem-rw-barriers
+    ;; no way to guarantee the order
     (values (tvar-value var) (tvar-version var)))
     
   #?-unwrapped-tvar

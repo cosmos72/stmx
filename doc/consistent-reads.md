@@ -153,3 +153,254 @@ to guarantee atomicity, consistency and isolation (the A, C and I in ACID) ?
 
 6) multiple dependencies: RW+WR, RW+WW (same as WR+WW) or RW+WR+WW -
    just apply simultaneously the constraints coming from each single dependency
+
+
+
+Real memory barriers with atomic compare-and-swap
+---------------------------------------------------
+
+Suppose an application gives the transactional guarantee than A = B, i.e. all
+transactions either don't modify A and B or modify them so that at commit it
+will be A = B. Can we guarantee that all transactions will SEE A = B while
+running, provided they didn't (yet) modify them?
+
+Suppose we have real memory barriers and also atomic compare-and-swap.
+How can we guarantee consistent reads?
+
+First attempt: do not wrap TVARs value and version in a CONS.
+Embed TVARs lock as a bit inside their version, and set it with compare-and-swap.
+When reading a TVARs, get value first then version+lock.
+When committing, set lock first, then set value, finally set version with lock bit cleared,
+which implies an unlock.
+
+         Tx1                            Tx2                            Tx3
+
+    start transaction              start transaction              start transaction
+    (R1) = global-clock                                           
+    write new A to Tx log                                        
+    write new B to Tx log                                         (R3) = global-clock < (W1)     
+    commit                                                       
+      commit means:                                               
+    --------------------------                                    read B: get version
+    excl-lock A                                                     -> either old + unlocked (ok)
+    excl-lock B                                                     -> or old + lock (DANGER)
+    (W1) = incf global-clock
+                                  (R2) = global-clock = (W1)
+    set value first,            
+      then version:               
+    commit A: set value           
+              set (W1, unlocked)                                          
+                                  read B: get version             
+    commit B: set value             -> either old + lock          read B: get value
+                                       (DANGER)                     -> either old (ok)
+              set (W1, unlocked)    -> or new + unlocked,           -> or new (DANGER)
+                                       then guarantees new value
+                                                                  read B: get version again
+                                  read B: get value                 -> either old + lock (rerun)
+                                    -> old or new if old version    -> or new (rerun)
+                                    -> surely new if new version
+
+    committed                     read B: get version again     
+                                    -> either old + lock
+                                    -> or new + unlocked
+
+                                  if the two B versions+lock,
+                                  are different or the second
+                                  is locked, rerun. Ensures
+                                  that old value is avoided.
+
+                                  read A: new value & version
+                                          & unlocked
+                                  ok, got A = B                   ok, always (rerun)
+    ----------------------------  -----------------------------   ----------------------------  
+
+
+
+
+Real memory barriers but no atomic compare-and-swap
+---------------------------------------------------
+
+Same as previous paragraph, but without a lock bit embedded in the version:
+
+We have real memory barriers but no atomic compare-and-swap.
+How can we guarantee consistent reads?
+
+First of all, notice that the lock bit in the version read the first time is not
+actually used, such "before" read of version is only to detect version number
+changes. Only the lock bit in the second read of the version is actually used.
+
+From this, we deduce that we can split the lock bit and the version and omit
+reading the lock bit the first time, provided that we use a pessimistic approach
+by guaranteeing that the lock bit will be found = 1 at least as often as previously.
+
+To get such behaviour, we test the lock (now a standard bordeaux-threads lock)
+before reading the version for the second time.
+
+Let's see if it works: do not wrap TVARs value and version in a CONS, and
+read TVARs in this order: version (1st time), value, lock, version (2nd time).
+
+         Tx1                            Tx2                            Tx3
+
+    start transaction              start transaction              start transaction
+    (R1) = global-clock                                           
+    write new A to Tx log                                        
+    write new B to Tx log                                         (R3) = global-clock < (W1)     
+    commit                                                       
+      commit means:                                               read A: old value, old version,
+    --------------------------                                            unlocked
+    excl-lock A                                                   
+    excl-lock B 
+    (W1) = incf global-clock                                      read B: get version
+                                                                    -> old version
+    set value first,            
+      then version:               
+    commit A: set value           
+              set (W1, unlocked)
+                                  (R2) = global-clock = (W1)
+                                  read B: get version             
+    commit B: set value             -> either old (DANGER),       read B: get value
+                                       allows to get old value      -> either old (ok)
+              set (W1, unlocked)    -> or new,                      -> or new (DANGER), guarantees
+                                       guarantees new value            2nd version will be new
+                                                                  
+                                  read B: get value               
+                                    -> old or new if old version  
+                                    -> surely new if new version  
+    unlock A                                                      
+    unlock B                      check-lock B                    check-lock B
+                                    -> if unlocked, guarantees      -> result does not matter
+                                       2nd version will be new
+                                    -> if locked, no guarantees
+                                  
+    committed                     read B: get version again       read B: get version again
+                                    -> either old (lock detected)  -> either old, value must be old
+                                    -> or new (lock may be         -> or new, value may be new
+                                               undetected)            but too high version, (rerun)
+
+                                  if the two B versions,
+                                  are different or the lock
+                                  is locked, rerun. Ensures
+                                  that old value is avoided.
+
+                                  read A: new value & version
+                                          & unlocked
+                                  ok, got A = B (new values)      ok, either A = B (old values)
+                                      or rerun                        or rerun
+    ----------------------------  -----------------------------   ----------------------------  
+
+It works.
+
+
+Trivial memory barriers and no atomic compare-and-swap
+------------------------------------------------------
+
+Same example as previous section, but without real memory barriers.
+
+On a CPU that guarantees ordered reads and writes - in other words, assembler
+instructions for read and write barriers are NO-OP - but without compiler support
+for them, i.e. no way to stop the compiler from reordering the assembler instructions
+it produces, can we still guarantee consistent Reads in such case? And how / at what price?
+
+This is a very common case: just take an ordinary Lisp (or any other compiler)
+on x86 or x86-64, without special compiler extensions.
+
+Critical to the reasoning is that locking primitives are available,
+and that "obtaining the owner of a lock" is NOT an inline function,
+so that the compiler cannot optimize/reorder it.
+
+First attempt: same technique as real memory barriers.
+We just need to re-analize the last diagram above,
+which reveals a critical step no longer guaranteed:
+Tx2 may read B in either order: version 1, value, lock, version 2
+or value, version 1, lock, version 2. Reading value as first
+is obviously wrong: it may be the old value, and no way to detect it.
+
+Second attempt: still do not wrap TVARs value and version in a CONS,
+but read TVARs value & version twice: once _before_ and once _after_ checking their lock.
+
+         Tx1                               Tx2                               Tx3
+
+    start transaction              start transaction              start transaction
+    (R1) = global-clock                                           (R3) = global-clock  < (W1)
+    write new A to Tx log                                        
+    write new B to Tx log       
+    commit                                                        read B means:
+      commit means:                                               get B value & version
+    --------------------------                                    got old value & version
+    excl-lock A                                                   check-lock B: unlocked, ok
+    excl-lock B                                                   
+    (W1) = incf global-clock
+                                  (R2) = global-clock = (W1)
+                                 
+    no compiler memory barriers,
+    cannot tell if value or
+    version will be set first!
+                                  
+    commit A: set value, (W2)     
+                                  read B means:
+    commit B: set value, (W2)     get B value & version           get B value & version again.
+                                                                  if we get old value & version,
+                                  no compiler memory barriers:    => success. otherwise we detect
+                                  may get new value & old version the mismatch and try again or rerun
+                                  or vice-versa, or both new,
+                                  or both old. danger...
+    excl-unlock A                                         
+    excl-unlock B
+    committed                     check-lock B: unlocked, ok.
+                                  get B value & version again.
+                                  got new value & version
+                                  
+                                  compare with previous ones:
+                                  if new version is too high, rerun.
+                                  otherwise if values/versions don't
+                                  match, try again or rerun.
+    ----------------------------  ----------------------------  ----------------------------
+
+It works.
+
+
+
+
+Consistent Reads summary
+------------------------
+
+
+<table>
+
+ <tr><th colspan="2" rowspan="2">&nbsp;</th>
+     <th colspan="2">atomic compare-and-swap</th></tr>
+
+ <tr><th>no</th>
+     <th>yes</th></tr>
+
+ <tr><th rowspan="3">mem R/W barriers</th>
+     <th>no</th>
+     <td>Slow. We must lock TVARs to read them, use bordeaux-threads locks.
+         We can unwrap TVARs.</td>
+     <td>Same as case on the left, replace locks with fast atomic compare-and-swap.</td></tr>
+
+ <tr><th>trivial</th>
+     <td>Unwrap TVARs, use bordeaux-threads locks.
+         Read TVARs in this order: value and version (no way to force the order),
+         then check lock, then value and version again.
+         Rerun if locked, of if values or version differ.
+         When committing: lock, then write value and version (no way to force the order),
+         finally unlock.
+     <td>Same as case on the left, replace locks with fast atomic compare-and-swap.</td></tr>
+
+ <tr><th>yes</th>
+     <td>Use a standard bordeaux-threads lock.
+         When reading a TVAR: get version first, then value, then check the lock,
+         then get the version again. If locked, or versions mismatch, or the new version
+         is too high, rerun.
+         When committing: lock, then set value first then version, finally unlock.</td>
+     <td>Unwrap TVARs, embed lock bit in version.
+         When reading a TVAR get version first, then value finally version again;
+         rerun if the two versions are different, or are equal but locked,
+         or are equal but too high.
+         When committing: to lock use compare-and-swap,
+         to actually write set value first then version (which also unlocks).</td></tr>
+
+</table>
+
+

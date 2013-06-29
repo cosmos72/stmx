@@ -124,17 +124,19 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
   (unless (eql (get-feature 'mem-rw-barriers) :trivial)
 
     (if (all-features? 'atomic-ops 'mem-rw-barriers)
-        ;; fast-lock requires atomic compare-and-swap plus memory barriers.
+        ;; fast-lock requires atomic compare-and-swap plus real memory barriers.
         ;; Also, fast-lock provides the preferred implementation of mutex-owner,
         ;;   which does not use bt.lock-owner
         ;; 
         ;; Finally, with so rich primitives we do not need to wrap
         ;; TVAR value and version in a CONS, so add feature unwrapped-tvar
-        (add-features 'fast-lock 'mutex-owner 'unwrapped-tvar))
+        (add-features 'fast-lock 'mutex-owner 'unwrapped-tvar)))
 
-    (when (feature? 'mem-rw-barriers)
-      ;; real memory barriers. no need to wrap TVAR value and version in a CONS
-      (add-feature 'unwrapped-tvar)))
+
+  (when (feature? 'mem-rw-barriers)
+    ;; real - or fake - memory barriers.
+    ;; no need to wrap TVAR value and version in a CONS
+    (add-feature 'unwrapped-tvar)))
 
 
   (unless (any-feature? 'fast-lock 'mem-rw-barriers)

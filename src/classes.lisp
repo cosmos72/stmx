@@ -17,20 +17,6 @@
 
 (enable-#?-syntax)
 
-;;;; ** constants
-
-(defconstant +tlog-counter-delta+ 2
-  "*tlog-counter* is incremented by 2 each time: the lowest bit is used
-as \"locked\" flag in TVARs versioning.")
-
-(declaim (type symbol +unbound-tvar+))
-(defvar +unbound-tvar+ (gensym (symbol-name 'unbound-tvar-)))
-
-(declaim (type fixnum +invalid-version+))
-(defconstant +invalid-version+ (- +tlog-counter-delta+))
-
-(declaim (type cons +versioned-unbound-tvar+))
-(defvar +versioned-unbound-tvar+ (cons +invalid-version+ +unbound-tvar+))
 
 
 ;;;; ** tlog global versioning - exact, atomic counter
@@ -64,55 +50,6 @@ as \"locked\" flag in TVARs versioning.")
 
 (defmacro next-id (place)
   `(setf ,place (get-next-id ,place)))
-
-
-;;;; ** implementation class: tvar
-
-
-(defstruct (tvar #?-fast-tvar (:include mutex))
-  "a transactional variable (tvar) is the smallest unit of transactional memory.
-it contains a single value that can be read or written during a transaction
-using ($ var) and (setf ($ var) value).
-
-tvars are seldom used directly, since transactional objects (tobjs) wrap them
-with a more convenient interface: you can read and write normally the slots
-of a transactional object (with slot-value, accessors ...), and behind
-the scenes the slots will be stored in transactional memory implemented by tvars."
-
-  #?+fast-tvar
-  (version +invalid-version+ :type fixnum)
-  #?+fast-tvar
-  (value   +unbound-tvar+    :type t)
-
-  #?-fast-tvar
-  (versioned-value +versioned-unbound-tvar+)         ;; tvar-versioned-value
-
-
-  (id (next-id *tvar-id*) :type fixnum :read-only t)    ;; tvar-id
-
-  (waiting-for nil :type (or null hash-table))           ;; tvar-waiting-for
-  (waiting-lock (make-lock "tvar-waiting") :read-only t));; tvar-waiting-lock
-
-
-(defmethod id-of ((var tvar))
-  (the fixnum (tvar-id var)))
-
-
-(declaim (ftype (function (#-ecl tvar #+ecl t) t) raw-value-of)
-         (inline raw-value-of))
-
-(defun raw-value-of (var)
-  "return the current value of VAR, or +unbound-tvar+ if VAR is not bound to a value.
-this method intentionally ignores transactions and it is only useful for debugging
-purposes. please use ($ var) instead."
-  (declare (type tvar var))
-  #?+fast-tvar
-  (tvar-value var)
-  #?-fast-tvar
-  (rest (tvar-versioned-value var)))
-
-
-
 
 
 

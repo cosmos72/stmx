@@ -88,7 +88,7 @@
 
 
 (test retry
-  (let* ((n 1000)
+  (let* ((n 1)
          (expected (+ 0.5 (* 2 n))))
 
     (multiple-value-bind (xs cs) (retry-thread4-test :two-tokens nil :iterations n)

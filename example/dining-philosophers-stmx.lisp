@@ -71,9 +71,9 @@
     (when (eq free ($-tx fork1))
       (setf ($-tx fork1) busy)
       (when (eq free ($-tx fork2))
-        (setf ($-tx fork2) busy)
-        (setf hunger (eat-from-plate plate))
-        (setf ($-tx fork2) free))
+        (setf ($-tx fork2) busy
+              hunger (eat-from-plate plate)
+              ($-tx fork2) free))
       (setf ($-tx fork1) free))
 
     hunger))
@@ -87,7 +87,7 @@
            (type fixnum i))
   ;;(with-output-to-string (out)
   ;;  (let ((*standard-output* out))
-  (log:debug "~A: fork1=~A fork2=~A plate=~A"
+  (log:trace "~A: fork1=~A fork2=~A plate=~A"
             i ($ fork1) ($ fork2) (car plate))
   ;;(sb-sprof:with-profiling
   ;;  (:max-samples 1000 :sample-interval 0.001 :report :graph
@@ -101,7 +101,7 @@
     (loop until (zerop (the fixnum (run-atomic lambda-philosopher-eats))))))
 
 
-(defun dining-philosophers (philosophers-count &optional (philosophers-initial-hunger 1000000))
+(defun dining-philosophers (philosophers-count &optional (philosophers-initial-hunger 10000000))
   "Prepare the table, sit the philosophers, let them eat."
   (declare (type fixnum philosophers-count philosophers-initial-hunger))
 

@@ -17,6 +17,12 @@
 
 (enable-#?-syntax)
 
+
+;; CMUCL: fix some buggy bordeaux-threads type declarations
+#+cmucl (declaim (ftype (function (t)   t) bt:join-thread))
+#+cmucl (declaim (ftype (function (t t) t) bt:condition-wait))
+
+
 ;;;; ** Helpers to initialize thread-local variables
 
 (eval-always

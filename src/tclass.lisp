@@ -366,7 +366,7 @@ add TVARs as one of the slot allowed types.
               class-name slot-name super-type slot-name class-name))
 
       (when type?
-        (setf (getf plist :type) (if (or (not type?) (eq t type)) t `(or ,type tvar))))
+        (setf (getf plist :type) (if (or (eq nil type) (eq t type)) t `(or ,type tvar))))
       
       (cons slot-name plist))))
     

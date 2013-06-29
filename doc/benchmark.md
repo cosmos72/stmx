@@ -65,7 +65,7 @@ Benchmark results
 What follows are some timings obtained on the authors's system, and by no means they
 claim to be exact, absolute or reproducible: your mileage may vary.
 
-Date: 18 June 2013
+Date: 28 June 2013
 
 Hardware: Intel Core-i7 4770 @3.5 GHz (quad-core w/ hyper-threading), 16GB RAM
 
@@ -83,7 +83,7 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
      <th><b>executed code</b></th>
      <th><b>average time</b></th></tr>
 
- <tr><td>atomic nil       </td><td><code>(atomic nil)</code>              </td><td>0.069&nbsp;microseconds</td></tr>
+ <tr><td>atomic nil       </td><td><code>(atomic nil)</code>              </td><td>0.068&nbsp;microseconds</td></tr>
  <tr><td>atomic read-1    </td><td><code>(atomic ($-tx v))</code>         </td><td>0.081&nbsp;microseconds</td></tr>
  <tr><td>atomic write-1   </td><td><code>(atomic (setf ($-tx v) 1))</code></td><td>0.103&nbsp;microseconds</td></tr>
  <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($-tx v)))</code></td><td>0.127&nbsp;microseconds</td></tr>
@@ -115,25 +115,25 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
 
  <tr><td>atomic read-write-100</td>
      <td><code>(atomic (dotimes (j 100) (incf ($-tx v))))</code></td>
-     <td>1.100&nbsp;microseconds</td></tr>
+     <td>1.116&nbsp;microseconds</td></tr>
 
  <tr><td>atomic read-write-1000</td>
      <td><code>(atomic (dotimes (j 1000) (incf ($-tx v))))</code></td>
-     <td>9.807&nbsp;microseconds</td></tr>
+     <td>9.918&nbsp;microseconds</td></tr>
 
- <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(0.135+N*0.0097)&nbsp;microseconds</td></tr>
+ <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(0.137+N*0.0098)&nbsp;microseconds</td></tr>
 
  <tr><td>orelse empty     </td><td><code>(atomic (orelse))</code>           </td><td>0.045&nbsp;microseconds</td></tr>
  <tr><td>orelse unary     </td><td><code>(atomic (orelse ($-tx v)))</code>     </td><td>0.230&nbsp;microseconds</td></tr>
  <tr><td>orelse retry-1   </td><td><code>(atomic (orelse (retry) ($-tx v)))</code> </td><td>0.428&nbsp;microseconds</td></tr>
  <tr><td>orelse retry-2   </td><td><code>(atomic (orelse (retry) (retry) ($-tx v)))</code> </td><td>0.596&nbsp;microseconds</td></tr>
- <tr><td>orelse retry-4   </td><td><code>(atomic (orelse (retry) (retry) (retry) (retry) ($-tx v)))</code></td><td>0.951&nbsp;microseconds</td></tr>
+ <tr><td>orelse retry-4   </td><td><code>(atomic (orelse (retry) (retry) (retry) (retry) ($-tx v)))</code></td><td>0.947&nbsp;microseconds</td></tr>
 
- <tr><td>orelse retry-N   </td><td>best fit of the 3 runs above</td><td>(0.251+N*0.175)&nbsp;microseconds</td></tr>
+ <tr><td>orelse retry-N   </td><td>best fit of the 3 runs above</td><td>(0.253+N*0.173)&nbsp;microseconds</td></tr>
 
  <tr><td>tmap read-write-1</td>
      <td><code>(atomic (incf (get-gmap tm 1)))</code></td>
-     <td>0.518&nbsp;microseconds</td></tr>
+     <td>0.528&nbsp;microseconds</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-gmap tm))<br>
@@ -176,7 +176,7 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
  
  <tr><th colspan="6">
        Concurrent benchmarks on a 4-core CPU. They already iterate
-       one million times, do not wrap them in <code>(1m ...)</code>.
+       ten million times, do not wrap them in <code>(1m ...)</code>.
      </th></tr>
 
  <tr><th colspan="6">
@@ -202,62 +202,62 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
 
  <tr><td>2 threads</td>
      <td><code>(dining-philosophers 2)</code></td>
-     <td>8.66</td><td>39.18</td><td>60.42</td><td>11.80</td></tr>
+     <td>8.55</td><td>39.18</td><td>60.42</td><td>11.80</td></tr>
 
  <tr><td>3 threads</td>
      <td><code>(dining-philosophers 3)</code></td>
-     <td>12.55</td><td>31.51</td><td>49.02</td><td>10.25</td></tr>
+     <td>12.49</td><td>31.51</td><td>49.02</td><td>10.25</td></tr>
 
  <tr><td>4 threads</td>
      <td><code>(dining-philosophers 4)</code></td>
-     <td>16.60</td><td>32.73</td><td>48.60</td><td>15.17</td></tr>
+     <td>16.33</td><td>32.73</td><td>48.60</td><td>15.17</td></tr>
 
  <tr><td>5 threads</td>
      <td><code>(dining-philosophers 5)</code></td>
-     <td>14.01</td><td>39.06</td><td>61.35</td><td>18.01</td></tr>
+     <td>14.96</td><td>39.06</td><td>61.35</td><td>18.01</td></tr>
 
  <tr><td>6 threads</td>
      <td><code>(dining-philosophers 6)</code></td>
-     <td>16.17</td><td>45.91</td><td>75.66</td><td>21.03</td></tr>
+     <td>16.54</td><td>45.91</td><td>75.66</td><td>21.03</td></tr>
 
  <tr><td>7 threads</td>
      <td><code>(dining-philosophers 7)</code></td>
-     <td>16.32</td><td>55.56</td><td>90.09</td><td>24.30</td></tr>
+     <td>16.92</td><td>55.56</td><td>90.09</td><td>24.30</td></tr>
 
  <tr><td>8 threads</td>
      <td><code>(dining-philosophers 8)</code></td>
-     <td>18.02</td><td>72.86</td><td>102.70</td><td>25.56</td></tr>
+     <td>17.91</td><td>72.86</td><td>102.70</td><td>25.56</td></tr>
 
  <tr><td>10 threads</td>
      <td><code>(dining-philosophers 10)</code></td>
-     <td>17.04</td><td>76.75</td><td>121.51</td><td>32.39</td></tr>
+     <td>17.32</td><td>76.75</td><td>121.51</td><td>32.39</td></tr>
 
  <tr><td>15 threads</td>
      <td><code>(dining-philosophers 15)</code></td>
-     <td>17.58</td><td>135.75</td><td>164.84</td><td>51.62</td></tr>
+     <td>17.53</td><td>135.75</td><td>164.84</td><td>51.62</td></tr>
 
  <tr><td>20 threads</td>
      <td><code>(dining-philosophers 20)</code></td>
-     <td>17.84</td><td>205.55</td><td>205.55</td><td>57.95</td></tr>
+     <td>17.75</td><td>205.55</td><td>205.55</td><td>57.95</td></tr>
 
  <tr><td>30 threads</td>
      <td><code>(dining-philosophers 30)</code></td>
-     <td>17.93</td><td>249.58</td><td>240.38</td><td>59.48</td></tr>
+     <td>17.86</td><td>249.58</td><td>240.38</td><td>59.48</td></tr>
 
  <tr><td>40 threads</td>
      <td><code>(dining-philosophers 40)</code></td>
-     <td>18.00</td><td>242.72</td><td>250.78</td><td>57.97</td></tr>
+     <td>17.91</td><td>242.72</td><td>250.78</td><td>57.97</td></tr>
 
  <tr><td>50 threads</td>
      <td><code>(dining-philosophers 50)</code></td>
-     <td>17.78</td><td>262.33</td><td>244.38</td><td>55.43</td></tr>
+     <td>17.88</td><td>262.33</td><td>244.38</td><td>55.43</td></tr>
 
  <tr><td>100 threads</td>
      <td><code>(dining-philosophers 100)</code></td>
-     <td>17.87</td><td>269.91</td><td>234.25</td><td>50.12</td></tr>
+     <td>17.92</td><td>269.91</td><td>234.25</td><td>50.12</td></tr>
 
  <tr><td>200 threads</td>
      <td><code>(dining-philosophers 200)</code></td>
-     <td>17.90</td><td>278.20</td><td>254.58</td><td>51.68</td></tr>
+     <td>17.95</td><td>278.20</td><td>254.58</td><td>51.68</td></tr>
 
 </table>

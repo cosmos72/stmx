@@ -39,9 +39,9 @@
 
 
 (defstruct (mutex (:constructor %make-mutex) (:conc-name))
-  #?+fast-mutex
+  #?+fast-lock
   (mutex-owner nil :type atomic-t)
-  #?-fast-mutex
+  #?-fast-lock
   (mutex-lock (make-lock "MUTEX") :read-only t))
 
 
@@ -61,36 +61,46 @@
          (inline
            try-acquire-mutex release-mutex))
 
-;;(eval-always
-;; (setf sb-vm::*lock-elision* t))
 
 (defun try-acquire-mutex (mutex)
   "Try to acquire MUTEX. Return T if successful,
 or NIL if MUTEX was already locked."
   (declare (type mutex mutex))
-  #?+fast-mutex
+  #?+fast-lock
   (mem-write-barrier
     (null
-     ;;(sb-transaction:lock-elision-acquire)
      (atomic-compare-and-swap (mutex-owner mutex) nil *current-thread*)))
-  #?-fast-mutex
+  #?-fast-lock
   (bt:acquire-lock (mutex-lock mutex) nil))
 
 
 (defun release-mutex (mutex)
   "Release MUTEX. Return NIL. Consequences are undefined if MUTEX
 is locked by another thread or is already unlocked."
-  #?+fast-mutex
+  #?+fast-lock
   (progn
-    ;; (mem-write-barrier)
-    ;; (sb-transaction:lock-elision-release)
+    (mem-write-barrier)
     (setf (mutex-owner mutex) nil))
-  #?-fast-mutex
-  (bt:release-lock (mutex-lock mutex)))
+  #?-fast-lock
+  (progn
+    (bt:release-lock (mutex-lock mutex))
+    nil))
 
    
-;;(eval-always
-;; (setf sb-vm::*lock-elision* nil))
+
+
+#?-fast-lock #?+mutex-owner
+(eval-always
+
+ (declaim (ftype (function (mutex) t) mutex-owner)
+          (inline mutex-owner))
+
+ #?-(eql bt.lock-owner :abcl) ;; ABCL needs its own magic
+ (defun mutex-owner (mutex)
+   "Return the thread that locked a mutex, or NIL if mutex is free."
+   (declare (type mutex mutex))
+   
+   (#.(stmx.lang::get-feature 'bt.lock-owner) (mutex-lock mutex))))
 
 
 
@@ -98,24 +108,67 @@ is locked by another thread or is already unlocked."
 #?+mutex-owner
 (eval-always
 
-  (declaim (ftype (function (mutex) boolean) mutex-is-own-or-free?)
+  (declaim (ftype (function (mutex) boolean) mutex-is-free? mutex-is-own-or-free?)
            (inline
-             mutex-is-own-or-free?))
+             mutex-is-free? mutex-is-own-or-free?))
+
+  #?-(eql bt.lock-owner :abcl) ;; ABCL needs its own magic
+  (defun mutex-is-free? (mutex)
+    "Return T if MUTEX is free. Return NIL if MUTEX
+is currently locked by current thread or some other thread."
+    
+    (mem-read-barrier)
+    (let1 owner (mutex-owner mutex)
+      (mem-read-barrier)
+      (eq owner nil)))
+
+  #?-(eql bt.lock-owner :abcl) ;; ABCL needs its own magic
+  (defun mutex-is-own-or-free? (mutex)
+    "Return T if MUTEX is free or locked by current thread.
+Return NIL if MUTEX is currently locked by some other thread."
+
+    (mem-read-barrier)
+    (let1 owner (mutex-owner mutex)
+      (mem-read-barrier)
+      (or
+       (eq owner nil)
+       (eq owner *current-thread*)))))
+
+
+
+
+#?+(and mutex-owner (eql bt.lock-owner :abcl)) ;; ABCL needs its own magic
+(eval-always
+
+  (defconstant +bt-lock-is-locked+ 
+    (java:jmethod "java.util.concurrent.locks.ReentrantLock" "isLocked"))
+
+  (defconstant +bt-lock-is-locked-by-current-thread+ 
+    (java:jmethod "java.util.concurrent.locks.ReentrantLock" "isHeldByCurrentThread"))
+
+
+  (defun mutex-is-free? (mutex)
+    "Return T if MUTEX is free. Return NIL if MUTEX
+is currently locked by current thread or some other thread."
+
+    (let ((jlock (bt::mutex-lock (mutex-lock mutex))))
+      (mem-read-barrier)
+      (not (java:jcall +bt-lock-is-locked+ jlock))))
+  
 
   (defun mutex-is-own-or-free? (mutex)
     "Return T if MUTEX is free or locked by current thread.
 Return NIL if MUTEX is currently locked by some other thread."
 
-    (let* ((mutex (mem-read-barrier mutex))
-           (owner
-            (mem-read-barrier
-
-              #?+fast-mutex
-              (mutex-owner mutex)
-
-              #?-fast-mutex
-              (#.(stmx.lang::get-feature 'bt.lock-owner) (mutex-lock mutex)))))
-      
+    (let ((jlock (bt::mutex-lock (mutex-lock mutex))))
+      (mem-read-barrier)
       (or
-       (eq owner nil)
-       (eq owner *current-thread*)))))
+       (java:jcall +bt-lock-is-locked-by-current-thread+ jlock)
+       (not (java:jcall +bt-lock-is-locked+ jlock))))))
+
+
+
+
+;; avoid "unexpected end-of-file" compile errors
+;; if none of the above conditional features is present
+nil

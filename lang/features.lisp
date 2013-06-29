@@ -80,7 +80,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
  (add-features 'disable-optimize-slot-access)
 
  #+abcl
- nil ;; no special features
+ (add-features '(bt.lock-owner . :abcl))
 
  #+ecl
  (add-features '(bt.lock-owner . mp::lock-owner))
@@ -95,8 +95,8 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
  (add-features #+compare-and-swap-vops '(atomic-ops . :sbcl)
                #+memory-barrier-vops   '(mem-rw-barriers . :sbcl)
                ;; usually, bt.lock-owner it not needed on SBCL:
-               ;; the combination 'atomic-ops plus 'mem-rw-barriers
-               ;; provide fast-mutex, which does not use bt.lock-owner
+               ;; the combo atomic-ops + mem-rw-barriers provide fast-lock,
+               ;; which has mutex-owner, a faster replacement for bt.lock-owner
                '(bt.lock-owner . sb-thread::mutex-owner)))
 
 
@@ -104,33 +104,48 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 
 
 (eval-always
-  (if (all-features? 'atomic-ops 'mem-rw-barriers)
-      ;; fast-mutex and fast-tvar both require
-      ;;   compare-and-swap and memory barriers.
-      ;; fast-mutex provides the preferred implementation of mutex-owner,
-      ;;   which does not use bt.lock-owner
-      ;; while fast-tvar has its own implementation of 'tvar-...-unlocked?'
-      (add-features 'fast-tvar 'fast-mutex 'mutex-owner))
-
-
   ;; on x86 and x86_64, memory read-after-read and write-after-write barriers
   ;; are NOP (well, technically except for SSE)
   ;;
   ;; Unluckily, if the underlying Lisp does know about them,
-  ;; trying to implement them at application level requires
-  ;; finding a way to stop the compiler from reordering assembler instructions.
+  ;; so there is no way to stop the compiler from reordering assembler instructions.
   ;;
-  ;; While more-or-less feasible by implementing barriers as a non-inline identity function,
-  ;; on most CL implementations the result is slower than the default solution
-  ;; that conses but does not require barriers.
+  ;; Luckily, the compiler cannot reorder memory-accessing assembler instructions
+  ;; with function calls, which is the only guarantee we need to use bt.lock-owner
+  ;; as long as we keep TVAR value and version in a CONS.
   ;;
-  ;; For this reason, "trivial" memory read and write barriers are currently disabled
-  #-stmx ;; #+(or x86 x8664 x86-64 x86_64)
-  (unless (feature? mem-rw-barriers)
+  ;; note that in this case the memory barrier functions/macros do NOT
+  ;; stop the compiler from reordering...
+  #+(or x86 x8664 x86-64 x86_64)
+  (unless (feature? 'mem-rw-barriers)
     (add-feature 'mem-rw-barriers :trivial))
 
 
-  ;; if at least memory read/write barriers are available, bt.lock-owner
+  (unless (eql (get-feature 'mem-rw-barriers) :trivial)
+
+    (if (all-features? 'atomic-ops 'mem-rw-barriers)
+        ;; fast-lock requires atomic compare-and-swap plus memory barriers.
+        ;; Also, fast-lock provides the preferred implementation of mutex-owner,
+        ;;   which does not use bt.lock-owner
+        ;; 
+        ;; Finally, with so rich primitives we do not need to wrap
+        ;; TVAR value and version in a CONS, so add feature unwrapped-tvar
+        (add-features 'fast-lock 'mutex-owner 'unwrapped-tvar))
+
+    (when (feature? 'mem-rw-barriers)
+      ;; real memory barriers. no need to wrap TVAR value and version in a CONS
+      (add-feature 'unwrapped-tvar)))
+
+
+  (unless (any-feature? 'fast-lock 'mem-rw-barriers)
+    ;; no fast-lock, and no memory barriers - not even no-op fake ones.
+    ;; we will need to lock at each TVAR read :(
+    ;; at least, unwrap TVAR version and value...
+    (add-feature 'unwrapped-tvar))
+
+
+
+  ;; if at least fake memory read/write barriers are available, bt.lock-owner
   ;; can be used as concurrency-safe mutex-owner even without atomic-ops
   (when (all-features? 'mem-rw-barriers 'bt.lock-owner)
     (add-feature 'mutex-owner))

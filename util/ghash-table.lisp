@@ -193,7 +193,7 @@ Otherwise return NIL."
            (when (funcall test-fun key (_ pair key))
              (return pair)))))
 
-(declaim (ftype (function (ghash-table t &optional t) (values t boolean)) get-ghash)
+(declaim (ftype (function (#-ecl ghash-table #+ecl t t &optional t) (values t boolean)) get-ghash)
          (notinline get-ghash))
 
 (defun get-ghash (hash key &optional default)
@@ -240,6 +240,8 @@ Otherwise return (values DEFAULT nil)."
 
 
        
+(declaim (ftype (function (ghash-table t t) t) set-ghash)
+         (notinline set-ghash))
 
 (defun set-ghash (hash key value)
   "Add KEY to HASH, associating it to VALUE. Return VALUE."

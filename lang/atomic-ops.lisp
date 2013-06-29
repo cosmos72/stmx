@@ -87,10 +87,12 @@ Works only on places supported by COMPARE-AND-SWAP."
 #?+(eql mem-rw-barriers :sbcl)
 (progn
   (defmacro mem-read-barrier (&body before)
+    "Memory read barrier. Execute BEFORE, then put the barrier."
     `(sb-thread:barrier (:read)
        ,@before))
 
   (defmacro mem-write-barrier (&body before)
+    "Memory write barrier. Execute BEFORE, then put the barrier."
     `(sb-thread:barrier (:write)
        ,@before)))
 
@@ -98,19 +100,18 @@ Works only on places supported by COMPARE-AND-SWAP."
 
 #?+(eql mem-rw-barriers :trivial)
 (progn
-
   (defmacro mem-read-barrier (&body before)
-    "Generic implementation of memory read barrier.
-Unused, as it cannot work by itself: we would need a way to prevent the compiler
-from reordering generated assembler instructions."
+    "Trivial implementation of memory read barrier. It does nothing.
+Note: it does not even prevent the compiler from reordering generated
+assembler instructions, so use with EXTREME care."
     `(progn
        ,@before))
 
   ;; generic implementation of memory read barrier
   (defmacro mem-write-barrier (&body before)
-    "Generic implementation of memory write barrier.
-Unused, as it cannot work by itself: we would need a way to prevent the compiler
-from reordering generated assembler instructions."
+    "Trivial implementation of memory write barrier. It does nothing.
+Note: it does not even prevent the compiler from reordering generated
+assembler instructions, so use with EXTREME care."
     `(progn
        ,@before)))
 

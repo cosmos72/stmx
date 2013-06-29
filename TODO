@@ -3,7 +3,7 @@ TO DO:
 14) implement pools of RBNODE and TNODE - check if benchmarks improve or not
 
 8) optimize ORELSE. The current implementation is quite naive,
-   it makes a full copy of the current transaction log
+   it makes a full copy of the current transaction's read and write sets.
 
 DONE:
 

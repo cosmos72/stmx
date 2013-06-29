@@ -59,7 +59,8 @@
 
                (:module :src
                 :components ((:file "package")
-                             (:file "classes"        :depends-on ("package"))
+                             (:file "tvar-fwd"       :depends-on ("package"))
+                             (:file "classes"        :depends-on ("tvar-fwd"))
                              (:file "txhash"         :depends-on ("classes"))
                              (:file "tlog"           :depends-on ("txhash"))
                              (:file "tvar"           :depends-on ("tlog"))

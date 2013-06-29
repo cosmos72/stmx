@@ -15,6 +15,8 @@
 
 (in-package :stmx)
 
+(enable-#?-syntax)
+
 ;;;; ** Validating
 
 
@@ -326,14 +328,22 @@ b) another TLOG is writing the same TVARs being committed
            (do-filter-txfifo (var val) locked
              (if (eq val (raw-value-of var))
                  (progn
+                   ;; fast-lock? then this is the only manual unlock
+                   #?+fast-lock
                    (unlock-tvar var)
                    (rem-current-txfifo-entry))
 
                  (progn
-                   ;; this also unlocks VAR.
+                   ;; if fast-lock, this also unlocks VAR.
                    (set-tvar-value-and-version var val new-version)
+                   
                    (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
-                              (~ log) (~ var) current-val val))))
+                              (~ log) (~ var) current-val val)))
+
+             ;; no fast-lock? then unlock manually in all cases
+             #?-fast-lock
+             (unlock-tvar var))
+
 
            (setf success t)
            (log.debug "Tlog ~A ...committed (and released locks)" (~ log))

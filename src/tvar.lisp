@@ -22,13 +22,14 @@
 (declaim (inline tvar))
 (defun tvar (&optional (value +unbound-tvar+))
   (the tvar
-    #?+fast-tvar
-    (make-tvar :value value)
-    #?-fast-tvar
+    #?+unwrapped-tvar
+    (make-tvar :value value :id (next-id *tvar-id*))
+    #?-unwrapped-tvar
     (make-tvar :versioned-value
                (if (eq value +unbound-tvar+)
                    +versioned-unbound-tvar+
-                   (cons +invalid-version+ value)))))
+                   (cons +invalid-version+ value))
+               :id (next-id *tvar-id*))))
 
 (declaim (ftype (function (#-ecl tvar #+ecl t) t) $)
          (ftype (function (t tvar) t) (setf $)))
@@ -59,55 +60,14 @@
 
 
 
-(declaim (ftype (function (tvar) (values t fixnum)) tvar-value-and-version)
-         (ftype (function (tvar t fixnum) t)    set-tvar-value-and-version)
-         (ftype (function (t tvar) t)           (setf raw-value-of))
+(declaim (ftype (function (t tvar) t)           (setf raw-value-of))
          (inline
-           tvar-value-and-version set-tvar-value-and-version (setf raw-value-of)))
-
-(defun tvar-value-and-version (var)
-  "return as multiple values:
-1) the current value of VAR, or +unbound-tvar+ if VAR is not bound to a value.
-2) the current version of VAR, including the lock bit."
-  (declare (type tvar var))
-
-  (let*
-    #?+fast-tvar
-    ;; read value first, then version
-    ((var     (mem-read-barrier var))
-     (value   (mem-read-barrier (tvar-value var)))
-     (version (tvar-version var)))
-
-    #?-fast-tvar
-    ((pair (tvar-versioned-value var))
-     (version (first pair))
-     (value (rest pair)))
-
-    (values value version)))
-
-
-
-(defun set-tvar-value-and-version (var value version)
-  "Set the VALUE and VERSION of VAR, including the lock bit. Return VALUE."
-  (declare (type tvar var)
-           (type fixnum version))
-
-  #?+fast-tvar
-  (progn
-    ;; write version first, then value
-    (mem-write-barrier
-      (setf (tvar-version var) version))
-    (mem-write-barrier
-      (setf (tvar-value   var) value)))
-
-  #?-fast-tvar
-  (progn
-    (setf (tvar-versioned-value var) (cons version value))
-    value))
-
+           (setf raw-value-of)))
 
 (defun (setf raw-value-of) (value var)
-  "Set the VALUE of VAR. Return VALUE."
+  "Set the VALUE of VAR. Return VALUE.
+This function intentionally ignores transactions and it is only useful
+for debugging purposes. please use (setf ($ var) value) instead."
   (declare (type tvar var))
   (set-tvar-value-and-version var value
                               (incf-tlog-counter)))
@@ -130,12 +90,13 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
     (when present?
       (return-from tx-read-of value)))
 
-  (multiple-value-bind (value version) (tvar-value-and-version var)
+  (multiple-value-bind (value version lock) (tvar-value-version-and-lock var)
 
-    (declare (type fixnum version))
+    (declare (type fixnum version)
+             (type bit lock))
 
-    (when (or (/= 0 (logand version 1)) ;; TVAR is locked
-              (> version (tlog-id log))) ;; TVAR changed after this TX started
+    (when (or (not (eql 0 lock)) ;; TVAR is locked?
+              (> version (tlog-id log))) ;; TVAR changed after this TX started?
       ;; inconsistent data
       (rerun))
 
@@ -297,50 +258,28 @@ Works only inside transactions."
         (values t (tx-write-of var value))
         (values nil default))))
 
+
+
 ;;;; ** Accessors
 
 
 (defmethod value-of ((var tvar))
-  "Return the value inside a TVAR. Works both outside and inside transactions."
+  "Return the value inside a TVAR. Works both outside and inside transactions.
+Equivalent to ($ var)"
   ($ var))
 
 (defmethod (setf value-of) (value (var tvar))
-  "Set the value inside a TVAR. Works both outside and inside transactions."
+  "Set the value inside a TVAR. Works both outside and inside transactions.
+Equivalent to (setf ($ var) value)"
   (setf ($ var) value))
 
 
 
 ;;;; ** Locking and unlocking
 
-(declaim (ftype (function (tvar)        boolean) try-lock-tvar)
-         (ftype (function (tvar)        null)    unlock-tvar)
-         (ftype (function (tvar t tlog) boolean) tvar-valid-and-unlocked?)
+(declaim (ftype (function (tvar t tlog) boolean) tvar-valid-and-unlocked?)
          (inline
-           try-lock-tvar unlock-tvar tvar-valid-and-unlocked?))
-
-(defun try-lock-tvar (var)
-  "Return T if VAR was locked successfully, otherwise return NIL."
-  #?+fast-tvar
-  (let1 version (tvar-version var) 
-    (declare (type fixnum version))
-    (when (zerop (logand version 1))
-      (let1 old-version (atomic-compare-and-swap (tvar-version var)
-                                                 version (logior version 1))
-        (= version old-version))))
-
-  #?-fast-tvar
-  (try-acquire-mutex (the mutex var)))
-  
-  
-(defun unlock-tvar (var)
-  "Unlock VAR, always return NIL."
-  #?+fast-tvar
-  (let1 version (logand (tvar-version var) (lognot 1))
-    (mem-write-barrier)
-    (setf (tvar-version var) version)
-    nil)
-  #?-fast-tvar
-  (release-mutex (the mutex var)))
+           tvar-valid-and-unlocked?))
 
 
 (defun tvar-valid-and-unlocked? (var expected-value log)
@@ -355,24 +294,23 @@ Return NIL if VAR has different value, or is locked by some other thread."
     (unless (eq value expected-value)
       (return-from tvar-valid-and-unlocked? nil))
 
-    #?+(and mutex-owner (not fast-tvar))
+    #?+(and mutex-owner (not fast-lock))
     (mutex-is-own-or-free? (the mutex var))
 
-    #?-(and mutex-owner (not fast-tvar))
+    #?-(and mutex-owner (not fast-lock))
     ;; check transaction log writes first
     (let1 present? (nth-value 1 (get-txhash (tlog-writes log) var))
       (when present?
         (return-from tvar-valid-and-unlocked? t))
         
-      #?+fast-tvar
+      #?+fast-lock
       (zerop (logand version 1))
 
-      #?-fast-tvar
+      #?-fast-lock
       ;; fall back on trying to acquire and release the lock (VERY dirty)
-      (let1 lock (mutex-lock (the mutex var))
-        (when (bt:acquire-lock lock nil)
-          (bt:release-lock lock)
-          t)))))
+      (when (try-acquire-mutex (the mutex var))
+        (release-mutex (the mutex var))
+        t))))
     
 
 

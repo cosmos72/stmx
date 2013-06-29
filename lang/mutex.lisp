@@ -105,31 +105,36 @@ is locked by another thread or is already unlocked."
 
 
 
-#?+mutex-owner
+#?+(and mutex-owner (not (eql bt.lock-owner :abcl))) ;; ABCL needs its own magic
 (eval-always
 
-  (declaim (ftype (function (mutex) boolean) mutex-is-free? mutex-is-own-or-free?)
+  (declaim (ftype (function (mutex) boolean) mutex-is-free? mutex-is-own? mutex-is-own-or-free?)
            (inline
-             mutex-is-free? mutex-is-own-or-free?))
+             mutex-is-free? mutex-is-own? mutex-is-own-or-free?))
 
-  #?-(eql bt.lock-owner :abcl) ;; ABCL needs its own magic
   (defun mutex-is-free? (mutex)
     "Return T if MUTEX is free. Return NIL if MUTEX
 is currently locked by current thread or some other thread."
     
     (mem-read-barrier)
     (let1 owner (mutex-owner mutex)
-      (mem-read-barrier)
       (eq owner nil)))
 
-  #?-(eql bt.lock-owner :abcl) ;; ABCL needs its own magic
+
+  (defun mutex-is-own? (mutex)
+    "Return T if MUTEX is locked by current thread."
+
+    (mem-read-barrier)
+    (let1 owner (mutex-owner mutex)
+      (eq owner *current-thread*)))
+
+
   (defun mutex-is-own-or-free? (mutex)
     "Return T if MUTEX is free or locked by current thread.
 Return NIL if MUTEX is currently locked by some other thread."
 
     (mem-read-barrier)
     (let1 owner (mutex-owner mutex)
-      (mem-read-barrier)
       (or
        (eq owner nil)
        (eq owner *current-thread*)))))
@@ -147,6 +152,10 @@ Return NIL if MUTEX is currently locked by some other thread."
     (java:jmethod "java.util.concurrent.locks.ReentrantLock" "isHeldByCurrentThread"))
 
 
+  (declaim (ftype (function (mutex) boolean) mutex-is-free? mutex-is-own? mutex-is-own-or-free?)
+           (inline
+             mutex-is-free? mutex-is-own? mutex-is-own-or-free?))
+
   (defun mutex-is-free? (mutex)
     "Return T if MUTEX is free. Return NIL if MUTEX
 is currently locked by current thread or some other thread."
@@ -155,6 +164,14 @@ is currently locked by current thread or some other thread."
       (mem-read-barrier)
       (not (java:jcall +bt-lock-is-locked+ jlock))))
   
+
+  (defun mutex-is-own? (mutex)
+    "Return T if MUTEX is locked by current thread."
+
+    (let ((jlock (bt::mutex-lock (mutex-lock mutex))))
+      (mem-read-barrier)
+      (java:jcall +bt-lock-is-locked-by-current-thread+ jlock)))
+
 
   (defun mutex-is-own-or-free? (mutex)
     "Return T if MUTEX is free or locked by current thread.
@@ -165,7 +182,6 @@ Return NIL if MUTEX is currently locked by some other thread."
       (or
        (java:jcall +bt-lock-is-locked-by-current-thread+ jlock)
        (not (java:jcall +bt-lock-is-locked+ jlock))))))
-
 
 
 

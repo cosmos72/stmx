@@ -1,12 +1,12 @@
 KNOWN BUGS
 
-5) consistent reads are still not fully guaranteed. The implementation allows
+FIXED BUGS:
+
+5) consistent reads were not fully guaranteed. The implementation allowed
    transactions to read inconsistent TVARs in some circumstances.
    Reason: when reading TVARs, version must be read twice (and depending on the compiler/CPU,
    other things are needed as well).
-   See doc/consistent-reads.md for a full solution, which is being implemented.
-
-FIXED BUGS:
+   See doc/consistent-reads.md for a full solution, which has been implemented.
 
 4) initargs of transactional classes were wrapped in TVARs multiple times,
    depending on the length of list returned by (closer-mop:slot-definition-initargs slot)

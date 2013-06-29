@@ -22,14 +22,7 @@
 (declaim (inline tvar))
 (defun tvar (&optional (value +unbound-tvar+))
   (the tvar
-    #?+unwrapped-tvar
-    (make-tvar :value value :id (next-id *tvar-id*))
-    #?-unwrapped-tvar
-    (make-tvar :versioned-value
-               (if (eq value +unbound-tvar+)
-                   +versioned-unbound-tvar+
-                   (cons +invalid-version+ value))
-               :id (next-id *tvar-id*))))
+    (make-tvar :value value :id (next-id *tvar-id*))))
 
 (declaim (ftype (function (#-ecl tvar #+ecl t) t) $)
          (ftype (function (t tvar) t) (setf $)))
@@ -90,12 +83,12 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
     (when present?
       (return-from tx-read-of value)))
 
-  (multiple-value-bind (value version lock) (tvar-value-version-and-lock var)
+  (multiple-value-bind (value version fail) (tvar-value-and-version-or-fail var)
 
     (declare (type fixnum version)
-             (type bit lock))
+             (type bit fail))
 
-    (when (or (not (eql 0 lock)) ;; TVAR is locked?
+    (when (or (not (eql 0 fail)) ;; TVAR is locked or could not be read?
               (> version (tlog-id log))) ;; TVAR changed after this TX started?
       ;; inconsistent data
       (rerun))
@@ -290,27 +283,24 @@ Return NIL if VAR has different value, or is locked by some other thread."
            (type tlog log)
            (ignorable log))
   
-  (multiple-value-bind (value version) (tvar-value-and-version var)
+  (multiple-value-bind (value version fail) (tvar-value-and-version-or-fail var)
+    (declare (ignore version)
+             (type bit fail))
+
     (unless (eq value expected-value)
       (return-from tvar-valid-and-unlocked? nil))
 
+    (when (eql fail 0)
+      (return-from tvar-valid-and-unlocked? t))
+
     #?+(and mutex-owner (not fast-lock))
-    (mutex-is-own-or-free? (the mutex var))
+    (mutex-is-own? (the mutex var))
 
     #?-(and mutex-owner (not fast-lock))
-    ;; check transaction log writes first
+    ;; check transaction log to detect if we're the ones that locked VAR
     (let1 present? (nth-value 1 (get-txhash (tlog-writes log) var))
-      (when present?
-        (return-from tvar-valid-and-unlocked? t))
-        
-      #?+fast-lock
-      (zerop (logand version 1))
+      present?)))
 
-      #?-fast-lock
-      ;; fall back on trying to acquire and release the lock (VERY dirty)
-      (when (try-acquire-mutex (the mutex var))
-        (release-mutex (the mutex var))
-        t))))
     
 
 
@@ -371,7 +361,8 @@ if VAR changes."
 (defprint-object (var tvar :identity nil)
 
   (let ((value +unbound-tvar+)
-        (present? nil))
+        (present? nil)
+        (id (~ var)))
 
     (when (recording?)
       ;; extract transactional value without triggering a (rerun):
@@ -383,8 +374,8 @@ if VAR changes."
                 present? tx-present?))))
 
     (unless present?
-      (setf value (tvar-value-and-version var)))
+      (setf value (tvar-value var)))
 
     (if (eq value +unbound-tvar+)
-        (format t "~A [~A]" (~ var) value)
-        (format t "~A unbound" (~ var)))))
+        (format t "~A unbound" id)
+        (format t "~A [~A]" id value))))

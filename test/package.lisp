@@ -31,8 +31,7 @@
                           #:subtypep)
 
   (:import-from #:stmx
-                #:+invalid-version+
-                #:tvar-value-and-version    #:set-tvar-value-and-version
+                #:+invalid-version+  #:set-tvar-value-and-version
                 #:raw-value-of #:tx-read-of #:tx-write-of
 
                 #:tlog  #:make-tlog

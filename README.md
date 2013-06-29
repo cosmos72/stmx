@@ -702,43 +702,57 @@ use `(describe 'some-symbol)` at REPL:
 
 Performance
 -----------
-For several reasons, STMX will reach the highest performance on SBCL by a large
-margin - possibly by a factor from 10 to 20 with respect to other systems.
-The reasons include:
-- SBCL is the author's primary development system
-- SBCL produces very fast code, at least compared to other non-commercial
-  Lisp compilers 
-- STMX is heavily optimized to exploit the low-level concurrency primitives
-  compare-and-swap, atomic-incf and memory-barrier exposed by SBCL.
 
-See the included file [doc/benchmark.md](doc/benchmark.md) for performance
-considerations and a lot of raw numbers produced by running
-micro-benchmarks.
+In order for STMX to reach its peak performance, three requirements need to be satisfied
+by the Lisp compiler being used:
+- it must produce fast, highly optimized code
+- it must have good multi-threading support
+- it must expose atomic compare-and-swap operations - and possibly also memory barrier operations
+
+Among the non-commercial Lisp compilers, SBCL is the only one known to STMX author
+that satisfies all the three requirements. Actually, all the other tested free Lisp compilers
+(ABCL, CCL, CMUCL, ECL) are quite lacking in the first area, and none of them offers
+atomic compare-and-swap operations at all. One - CMUCL - produces relatively fast code,
+but does not support native threads.
+STMX is not tested on any commercial Lisp compiler, so performance on them is simply unknown.
+
+For these reasons, STMX will reach the highest known performance on SBCL by a large
+margin - possibly by a factor from 10 to 100 with respect to other tested systems.
+
+For performance considerations and a lot of raw numbers produced by running micro-benchmarks,
+see the included files
+[doc/benchmark.md](doc/benchmark.md)
+[doc/benchmark.md](doc/benchmark-abcl.md)
+[doc/benchmark.md](doc/benchmark-ccl64.md)
+[doc/benchmark.md](doc/benchmark-cmucl.md)
 
 The short version is: as of June 2013, on a fast consumer PC (Core i7 4770 @ 3.5GHz or
-better) with a fast Common Lisp compiler (SBCL 1.1.8 or better), STMX can execute up to
-7.5 millions transactions per second per CPU core.
+better) with SBCL 1.1.8 or better, STMX can execute more than 7 millions transactions
+per second per CPU core. The second platform in terms of performance is CCL (x64_64),
+that reaches 1.1 millions transactions per second per CPU core using two threads,
+but STMX performance quickly decreases with more threads.
 
 A small example with very short transactions is the [dining philosophers](example/dining-philosophers-stmx.lisp),
 with 5 reads and 5 writes to transactional memory per atomic block,
-where each CPU core runs approximately 4.5 millions transactions per second -
+where each CPU core runs approximately 4.4 millions transactions per second -
 hyperthreading has very limited effects.
 
-For a more realistic benchmark, the author has ported
+Obviously, performance in other usage scenarios will depend on the complexity of the code
+inside transactions, on the number of reads and writes to transactional memory,
+and the rate of conflicts and retries.
+
+### Note
+These result are **not** absolute performance considerations of the tested Lisp systems.
+They are simply the outcome of running micro-benchmarks of a particular library optimized for SBCL
+(see the atomic compare-and-swap point) on some other Lisp systems.
+Do **not** try to construct these results as STMX author's opinions on the mentioned Lisp systems.
+
+For a less artificial and hopefully more realistic benchmark, the author has ported
 [Lee-TM](http://apt.cs.man.ac.uk/projects/TM/LeeBenchmark/),
 a non-trivial benchmark suite for transactional memory developed in 2007
 by the University of Manchester (UK). The result is
 [Lee-STMX](https://github.com/cosmos72/lee-stmx) - as of June 2013, its
 status is BETA.
-
-Obviously, performance in other cases will depend on the complexity of the code
-inside transactions, on the number of reads and writes to transactional memory,
-and the rate of conflicts and retries.
-
-In particular, on systems different from SBCL, STMX allocates significant
-amounts of memory while running, to the point that when increasing the number
-of threads running transactions, the bottleneck may become the efficiency of
-the underlying Lisp multi-threaded allocation and garbage collection.
 
 Contacts, help, discussion
 --------------------------

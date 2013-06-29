@@ -154,10 +154,10 @@ Note: the default initial hunger is 10 millions,
              (elapsed-secs (/ (- end start) (float internal-time-units-per-second)))
              (tx-count (/ (* n philosophers-initial-hunger) elapsed-secs))
 	     (tx-unit ""))
-	(when (>= tx-count 1000000)
+	(when (>= tx-count 100000)
 	  (setf tx-count (/ tx-count 1000000)
 		tx-unit " millions"))
-        (log:info "~$~A iterations per second, elapsed time: ~3$ seconds"
+        (log:info "~3$~A iterations per second, elapsed time: ~3$ seconds"
 		  tx-count tx-unit elapsed-secs))
 
       (loop for (plate . fails) in plates

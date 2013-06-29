@@ -217,7 +217,7 @@ finally set version with lock bit cleared, which implies an unlock.
                                       or rerun                        or rerun
     ----------------------------  -----------------------------   ----------------------------  
 
-
+It works.
 
 
 Real memory barriers but no atomic compare-and-swap

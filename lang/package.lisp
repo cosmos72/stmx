@@ -53,7 +53,8 @@
            #:mutex             #:make-mutex
            #:mutex-owner       #:mutex-lock
            #:try-acquire-mutex #:release-mutex
-           #:mutex-is-free?    #:mutex-is-own-or-free?
+           #:mutex-is-free?    #:mutex-is-own?
+           #:mutex-is-own-or-free?
 
            #:fast-vector        #:make-fast-vector
            #:fast-vector-length #:fast-vector-capacity

@@ -47,13 +47,8 @@ with a more convenient interface: you can read and write normally the slots
 of a transactional object (with slot-value, accessors ...), and behind
 the scenes the slots will be stored in transactional memory implemented by tvars."
 
-  #?+unwrapped-tvar
   (version +invalid-version+ :type fixnum)
-  #?+unwrapped-tvar
   (value   +unbound-tvar+    :type t)
-
-  #?-unwrapped-tvar
-  (versioned-value +versioned-unbound-tvar+)             ;; tvar-versioned-value
 
   (id +invalid-version+ :type fixnum :read-only t)       ;; tvar-id
 
@@ -77,44 +72,110 @@ the scenes the slots will be stored in transactional memory implemented by tvars
 This finction intentionally ignores transactions and it is only useful
 for debugging purposes. please use ($ var) instead."
   (declare (type tvar var))
-  #?+unwrapped-tvar
-  (tvar-value var)
-  #?-unwrapped-tvar
-  (rest (tvar-versioned-value var)))
+  (tvar-value var))
 
 
 
 
 
 
-(declaim (ftype (function (tvar) (values t fixnum))     tvar-value-and-version)
+(declaim (ftype (function (tvar) (values fixnum t)) %tvar-version-and-value)
          (inline
-           tvar-value-and-version))
+           %tvar-version-and-value))
 
-(defun tvar-value-and-version (var)
+(defun %tvar-version-and-value (var)
   "Internal function used only by TVAR-VALUE-VERSION-AND-LOCK."
   (declare (type tvar var))
   
-  #?+unwrapped-tvar
-  (progn
-    ;; if we have memory barriers, we MUST use them
-    ;; and read value first, then version
-    ;; otherwise we VIOLATE read consistency!
-    #?+mem-rw-barriers
-    (values (progn (mem-read-barrier) (tvar-value var))
-            (progn (mem-read-barrier) (tvar-version var)))
+  ;; if we have memory barriers, we MUST use them
+  ;; and read version first, then value
+  ;; otherwise we VIOLATE read consistency!
+  ;; see doc/consistent-reads.md for the gory details
+  #?+mem-rw-barriers
+  (values (progn (mem-read-barrier) (tvar-version var))
+          (progn (mem-read-barrier) (tvar-value var)))
         
-    #?-mem-rw-barriers
-    ;; no way to guarantee the order
-    (values (tvar-value var) (tvar-version var)))
-    
-  #?-unwrapped-tvar
-  (let* ((pair    (tvar-versioned-value var))
-         (version (first pair))
-         (value   (rest pair)))
-    (values value version)))
+  #?-mem-rw-barriers
+  ;; no way to guarantee the order
+  (values (tvar-version var) (tvar-value var)))
+   
 
 
+
+
+
+(declaim (ftype (function (tvar) (values t fixnum bit)) tvar-value-and-version-or-fail)
+         (inline
+           tvar-value-and-version-or-fail))
+
+(defun tvar-value-and-version-or-fail (var)
+  "return as multiple values:
+1) the current value of VAR, or +unbound-tvar+ if VAR is not bound to a value.
+2) the current version of VAR, excluding any lock bit.
+3) 0 if VAR is if free, or 1 if it's locked or could not be read reliably
+   - for example because the version changed while reading."
+  (declare (type tvar var))
+
+  #?+fast-lock
+  ;; lock is lowest bit of tvar-version. extract and check it.
+  ;; we must get version, value and version again EXACTLY in this order.
+  ;; see doc/consistent-reads.md for the gory details
+  (multiple-value-bind (version0+lock value) (%tvar-version-and-value var)
+    (let1 version1+lock (progn (mem-read-barrier) (tvar-version var))
+      
+      (declare (type fixnum version0+lock version1+lock))
+
+      (let* ((version1 (logand version1+lock (lognot 1)))
+             (lock1    (logand version1+lock 1))
+             (fail     (logior lock1
+                               (if (= version0+lock version1+lock) 0 1))))
+        (values value version1 fail))))
+
+  #?-fast-lock
+  (progn
+    #?+(and mutex-owner mem-rw-barriers (not (eql mem-rw-barriers :trivial)))
+    ;; this case is tricky. we can get away with unlocked reads
+    ;; by reading in order: TVAR version, value, lock status, version again.
+    ;; again, see doc/consistent-reads.md for the gory details
+    (multiple-value-bind (version0 value) (%tvar-version-and-value var)
+      (let ((free? (mutex-is-free? (the mutex var)))
+            (version1 (tvar-version var)))
+        
+        (declare (type boolean free?)
+                 (type fixnum version0 version1))
+
+        (let1 fail (if (and free? (= version0 version1)) 0 1)
+
+          (values value version1 fail))))
+
+    #?+(and mutex-owner mem-rw-barriers (eql mem-rw-barriers :trivial))
+    ;; trivial memory barriers are even more tricky. we cannot guarantee
+    ;; the order while reading TVAR value and version, so we must read both twice
+    ;; as usual, see doc/consistent-reads.md for the gory details
+    (multiple-value-bind (version0 value0) (%tvar-version-and-value var)
+      (let1 free? (mutex-is-free? (the mutex var))
+        (multiple-value-bind (version1 value1) (%tvar-version-and-value var)
+
+          (declare (type boolean free?)
+                   (type fixnum version0 version1))
+
+          (let1 fail (if (and free?
+                              (eq value0 value1)
+                              (= version0 version1))
+                         0 1)
+
+            (values value1 version1 fail)))))
+
+    #?-(and mutex-owner mem-rw-barriers)
+    ;; no mutex owner, or no memory barriers - not even trivial ones.
+    ;; resort to locking TVAR... Horrible and slow
+    (if (try-acquire-mutex (the mutex var))
+
+        (multiple-value-bind (value version) (%tvar-value-and-version var)
+          (release-mutex (the mutex var))
+          (values value version 0))
+
+        (values nil +invalid-version+ 1))))
 
 
 
@@ -128,7 +189,6 @@ also set it (which may unlock VAR!). Return VALUE."
   (declare (type tvar var)
            (type fixnum version))
 
-  #?+unwrapped-tvar
   (progn
     ;; if we have memory barriers, we MUST use them
     ;; and write value first, then version
@@ -143,75 +203,7 @@ also set it (which may unlock VAR!). Return VALUE."
     ;; no memory barriers. easy here, but guaranteeing read consistency
     ;; will be painful
     (setf (tvar-version var) version
-          (tvar-value   var) value))
-    
-  #?-unwrapped-tvar
-  (progn
-    (setf (tvar-versioned-value var) (cons version value))
-    value))
-
-
-
-
-(declaim (ftype (function (tvar) (values t fixnum bit)) tvar-value-version-and-lock)
-         (inline
-           tvar-value-version-and-lock))
-
-(defun tvar-value-version-and-lock (var)
-  "return as multiple values:
-1) the current value of VAR, or +unbound-tvar+ if VAR is not bound to a value.
-2) the current version of VAR, excluding the lock bit.
-3) 0 if VAR is if free, or 1 if it's locked."
-  (declare (type tvar var))
-
-  #?+fast-lock
-  ;; lock is lowest bit of tvar-version
-  (multiple-value-bind (value version+lock) (tvar-value-and-version var)
-    (declare (type fixnum version+lock))
-
-    (let ((version (logand version+lock (lognot 1)))
-          (lock    (logand version+lock 1)))
-    
-      (values value version lock)))
-
-  #?-fast-lock
-  (progn
-    #?+(and mem-rw-barriers mutex-owner)
-    ;; this case is tricky. we can get away with unlocked reads
-    ;; by checking for lock owner BEFORE reading tvar and still guarantee
-    ;; read consistency in every transaction. Demonstration:
-    ;;
-    ;; if A and B are TVARs being committed by a transaction TX1,
-    ;; even if another transaction TX2 has the same TX counter,
-    ;; in order to get the old value of one TVAR (say B)
-    ;; and the new value of the other (say A), i.e. to violate read consistency,
-    ;; TX2 will check for B lock owner BEFORE reading B
-    ;; but after getting the TX counter.
-    ;;
-    ;; Then, if B is found locked -> the old value may have been read, but lock on B
-    ;;                               causes a (rerun) exactly to avoid inconsistencies
-    ;; if B is found unlocked -> the NEW value and version will be already in B
-    ;;                           (thus read by TX2 since memory barriers are used or no-op)
-    ;;                           not the OLD one, so no inconsistencies: in the worst
-    ;;                           case, a too-high version will trigger a (rerun)
-    ;;
-    ;; So read lock first, then value and version
-    (let1 free? (mutex-is-free? (the mutex var))
-      (multiple-value-bind (value version) (tvar-value-and-version var)
-        (values value version (if free? 0 1))))
-
-    #?-(and mem-rw-barriers mutex-owner)
-    ;; general case: acquire lock around EVERY read of a TVAR.
-    ;; works, but it's horribly slow.
-    ;; Without memory barriers (even fake ones) or mutex-owner,
-    ;; we cannot do better :(
-    (if (try-acquire-mutex (the mutex var))
-
-        (multiple-value-bind (value version) (tvar-value-and-version var)
-          (release-mutex (the mutex var))
-          (values value version 0))
-
-        (values nil +invalid-version+ 1))))
+          (tvar-value   var) value)))
 
 
 

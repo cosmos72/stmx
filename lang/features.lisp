@@ -122,30 +122,11 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 
 
   (unless (eql (get-feature 'mem-rw-barriers) :trivial)
-
+    ;; fast-lock requires atomic compare-and-swap plus real memory barriers.
+    ;; Also, fast-lock provides the preferred implementation of mutex-owner,
+    ;;   which does not use bt.lock-owner
     (if (all-features? 'atomic-ops 'mem-rw-barriers)
-        ;; fast-lock requires atomic compare-and-swap plus real memory barriers.
-        ;; Also, fast-lock provides the preferred implementation of mutex-owner,
-        ;;   which does not use bt.lock-owner
-        ;; 
-        ;; Finally, with so rich primitives we do not need to wrap
-        ;; TVAR value and version in a CONS, so add feature unwrapped-tvar
-        (add-features 'fast-lock 'mutex-owner 'unwrapped-tvar)))
-
-
-  (when (feature? 'mem-rw-barriers)
-    ;; real - or fake - memory barriers.
-    ;; no need to wrap TVAR value and version in a CONS
-    (add-feature 'unwrapped-tvar)))
-
-
-  (unless (any-feature? 'fast-lock 'mem-rw-barriers)
-    ;; no fast-lock, and no memory barriers - not even no-op fake ones.
-    ;; we will need to lock at each TVAR read :(
-    ;; at least, unwrap TVAR version and value...
-    (add-feature 'unwrapped-tvar))
-
-
+        (add-features 'fast-lock 'mutex-owner)))
 
   ;; if at least fake memory read/write barriers are available, bt.lock-owner
   ;; can be used as concurrency-safe mutex-owner even without atomic-ops

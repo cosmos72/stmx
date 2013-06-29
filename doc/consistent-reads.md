@@ -161,25 +161,27 @@ Real memory barriers with atomic compare-and-swap
 
 Suppose an application gives the transactional guarantee than A = B, i.e. all
 transactions either don't modify A and B or modify them so that at commit it
-will be A = B. Can we guarantee that all transactions will SEE A = B while
+will be A = B. Can we guarantee that all transactions will **see** A = B while
 running, provided they didn't (yet) modify them?
 
 Suppose we have real memory barriers and also atomic compare-and-swap.
-How can we guarantee consistent reads?
+How can we guarantee such consistent reads?
 
 First attempt: do not wrap TVARs value and version in a CONS.
 Embed TVARs lock as a bit inside their version, and set it with compare-and-swap.
-When reading a TVARs, get value first then version+lock.
-When committing, set lock first, then set value, finally set version with lock bit cleared,
-which implies an unlock.
+When reading a TVARs get version + lock bit, then value, finally version + lock bit again;
+rerun if the two version + lock bit are different, or if (they are equal but) the second is locked.
+When committing, set lock first (with atomic compare-and-swap), then set value,
+finally set version with lock bit cleared, which implies an unlock.
 
          Tx1                            Tx2                            Tx3
 
     start transaction              start transaction              start transaction
     (R1) = global-clock                                           
-    write new A to Tx log                                        
-    write new B to Tx log                                         (R3) = global-clock < (W1)     
-    commit                                                       
+    write new A to Tx log                                         (R3) = global-clock < (W1)
+    write new B to Tx log                                         
+                                                                  read A: old value, old version,
+    commit                                                                unlocked
       commit means:                                               
     --------------------------                                    read B: get version
     excl-lock A                                                     -> either old + unlocked (ok)
@@ -196,10 +198,10 @@ which implies an unlock.
               set (W1, unlocked)    -> or new + unlocked,           -> or new (DANGER)
                                        then guarantees new value
                                                                   read B: get version again
-                                  read B: get value                 -> either old + lock (rerun)
-                                    -> old or new if old version    -> or new (rerun)
-                                    -> surely new if new version
-
+                                  read B: get value                 -> either old + unlocked,
+                                    -> old or new if old version       ok, value must be old
+                                    -> surely new if new version    -> either old + lock (rerun)
+                                                                    -> or new (rerun)
     committed                     read B: get version again     
                                     -> either old + lock
                                     -> or new + unlocked
@@ -211,7 +213,8 @@ which implies an unlock.
 
                                   read A: new value & version
                                           & unlocked
-                                  ok, got A = B                   ok, always (rerun)
+                                  ok, got A = B (new values)      ok, got A = B (old values)
+                                      or rerun                        or rerun
     ----------------------------  -----------------------------   ----------------------------  
 
 
@@ -220,18 +223,18 @@ which implies an unlock.
 Real memory barriers but no atomic compare-and-swap
 ---------------------------------------------------
 
-Same as previous paragraph, but without a lock bit embedded in the version:
+Same problem as previous paragraph. We have real memory barriers
+but no atomic compare-and-swap, so without a lock bit embedded in the version.
 
-We have real memory barriers but no atomic compare-and-swap.
-How can we guarantee consistent reads?
+How can we still guarantee consistent reads?
 
 First of all, notice that the lock bit in the version read the first time is not
-actually used, such "before" read of version is only to detect version number
+actually used, such "early" version read is only to detect version number
 changes. Only the lock bit in the second read of the version is actually used.
 
 From this, we deduce that we can split the lock bit and the version and omit
 reading the lock bit the first time, provided that we use a pessimistic approach
-by guaranteeing that the lock bit will be found = 1 at least as often as previously.
+by guaranteeing that the lock will be found locked at least as often as previously.
 
 To get such behaviour, we test the lock (now a standard bordeaux-threads lock)
 before reading the version for the second time.
@@ -373,31 +376,31 @@ Consistent Reads summary
  <tr><th>no</th>
      <th>yes</th></tr>
 
- <tr><th rowspan="3">mem R/W barriers</th>
+ <tr><th rowspan="3">memory read/write barriers</th>
      <th>no</th>
      <td>Slow. We must lock TVARs to read them, use bordeaux-threads locks.
          We can unwrap TVARs.</td>
      <td>Same as case on the left, replace locks with fast atomic compare-and-swap.</td></tr>
 
  <tr><th>trivial</th>
-     <td>Unwrap TVARs, use bordeaux-threads locks.
+     <td>Unwrap TVARs, use bordeaux-threads locks.<br/>
          Read TVARs in this order: value and version (no way to force the order),
-         then check lock, then value and version again.
-         Rerun if locked, of if values or version differ.
+         then check lock, then value and version again;<br/>
+         rerun if locked, of if values or version differ.<br/>
          When committing: lock, then write value and version (no way to force the order),
          finally unlock.
      <td>Same as case on the left, replace locks with fast atomic compare-and-swap.</td></tr>
 
  <tr><th>yes</th>
-     <td>Use a standard bordeaux-threads lock.
+     <td>Use a standard bordeaux-threads lock, unwrap TVARs.<br/>
          When reading a TVAR: get version first, then value, then check the lock,
-         then get the version again. If locked, or versions mismatch, or the new version
-         is too high, rerun.
+         then get the version again.<br/>
+         If locked, or versions mismatch, or the new version is too high, rerun.<br/>
          When committing: lock, then set value first then version, finally unlock.</td>
-     <td>Unwrap TVARs, embed lock bit in version.
-         When reading a TVAR get version first, then value finally version again;
+     <td>Unwrap TVARs, embed lock bit in version.<br/>
+         When reading a TVAR get version first, then value finally version again;<br/>
          rerun if the two versions are different, or are equal but locked,
-         or are equal but too high.
+         or are equal but too high.<br/>
          When committing: to lock use compare-and-swap,
          to actually write set value first then version (which also unlocks).</td></tr>
 

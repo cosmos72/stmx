@@ -702,13 +702,14 @@ use `(describe 'some-symbol)` at REPL:
 
 Performance
 -----------
-For several reasons, STMX will reach highest performance on SBCL by a large
-margin - possibly by a factor between 10 and 20 with respect to other systems.
-The reasons are that SBCL is the author's primary development system,
-that SBCL both produces very optimized code (at least compared to
-non-commercial Lisp compilers) and that STMX is heavily optimized to exploit
-the low-level concurrency primitives compare-and-swap, atomic-incf and
-memory-barrier exposed by SBCL.
+For several reasons, STMX will reach the highest performance on SBCL by a large
+margin - possibly by a factor from 10 to 20 with respect to other systems.
+The reasons include:
+- SBCL is the author's primary development system
+- SBCL produces very fast code, at least compared to other non-commercial
+  Lisp compilers 
+- STMX is heavily optimized to exploit the low-level concurrency primitives
+  compare-and-swap, atomic-incf and memory-barrier exposed by SBCL.
 
 See the included file [doc/benchmark.md](doc/benchmark.md) for performance
 considerations and a lot of raw numbers produced by running
@@ -727,7 +728,7 @@ For a more realistic benchmark, the author has ported
 [Lee-TM](http://apt.cs.man.ac.uk/projects/TM/LeeBenchmark/),
 a non-trivial benchmark suite for transactional memory developed in 2007
 by the University of Manchester (UK). The result is
-[Lee-STMX](https://github.com/cosmos72/lee-stmx) - as of May 2013, its
+[Lee-STMX](https://github.com/cosmos72/lee-stmx) - as of June 2013, its
 status is BETA.
 
 Obviously, performance in other cases will depend on the complexity of the code

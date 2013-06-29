@@ -720,11 +720,8 @@ For these reasons, STMX will reach the highest known performance on SBCL by a la
 margin - possibly by a factor from 10 to 100 with respect to other tested systems.
 
 For performance considerations and a lot of raw numbers produced by running micro-benchmarks,
-see the included files
-[doc/benchmark.md](doc/benchmark.md)
-[doc/benchmark.md](doc/benchmark-abcl.md)
-[doc/benchmark.md](doc/benchmark-ccl64.md)
-[doc/benchmark.md](doc/benchmark-cmucl.md)
+see the included files [doc/benchmark.md](doc/benchmark.md), [doc/benchmark-abcl.md](doc/benchmark-abcl.md),
+[doc/benchmark-ccl64.md](doc/benchmark-ccl64.md) and [doc/benchmark-cmucl.md](doc/benchmark-cmucl.md).
 
 The short version is: as of June 2013, on a fast consumer PC (Core i7 4770 @ 3.5GHz or
 better) with SBCL 1.1.8 or better, STMX can execute more than 7 millions transactions
@@ -747,6 +744,7 @@ They are simply the outcome of running micro-benchmarks of a particular library 
 (see the atomic compare-and-swap point) on some other Lisp systems.
 Do **not** try to construct these results as STMX author's opinions on the mentioned Lisp systems.
 
+### Lee-STMX
 For a less artificial and hopefully more realistic benchmark, the author has ported
 [Lee-TM](http://apt.cs.man.ac.uk/projects/TM/LeeBenchmark/),
 a non-trivial benchmark suite for transactional memory developed in 2007

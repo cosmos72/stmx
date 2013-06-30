@@ -97,7 +97,12 @@
         (incf (atomic-counter-version counter) delta)))))
 
 
-(declaim (ftype (function (atomic-counter) counter-num) get-atomic-counter))
+(declaim (ftype (function (atomic-counter) counter-num) get-atomic-counter)
+         (ftype (function (atomic-counter counter-num) counter-num) set-atomic-counter)
+
+         #?+(and atomic-ops fixnum-is-large-powerof2)
+         (inline get-atomic-counter set-atomic-counter))
+
 
 (defun get-atomic-counter (counter)
   "Return current value of atomic COUNTER."
@@ -114,3 +119,19 @@
   (the counter-num
     (with-lock ((atomic-counter-lock counter))
       (atomic-counter-version counter))))
+
+
+(defun set-atomic-counter (counter value)
+  "Set and return value of atomic COUNTER."
+  (declare (type atomic-counter counter)
+           (type counter-num value))
+       
+  #?+(and atomic-ops fixnum-is-large-powerof2)
+  (the counter-num
+    (setf (atomic-counter-version counter) value))
+
+  #?-(and atomic-ops fixnum-is-large-powerof2)
+  ;; locking version
+  (the counter-num
+    (with-lock ((atomic-counter-lock counter))
+      (setf (atomic-counter-version counter) value))))

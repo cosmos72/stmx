@@ -24,7 +24,7 @@
 (declaim (type atomic-counter *tlog-counter*))
 (defvar *tlog-counter* (make-atomic-counter))
 
-(declaim (inline get-tlog-counter incf-tlog-counter))
+(declaim (inline incf-tlog-counter get-tlog-counter set-tlog-counter))
 
 (defun incf-tlog-counter ()
   "Atomically increment the global versioning counter and return its new value."
@@ -33,6 +33,11 @@
 (defun get-tlog-counter ()
   "Return the current value of the global versioning counter."
   (the atomic-counter-num (get-atomic-counter *tlog-counter*)))
+
+(defun set-tlog-counter (new-value)
+  (declare (type atomic-counter-num new-value))
+  "Set the global versioning counter to NEW-VALUE and return NEW-VALUE."
+  (set-atomic-counter *tlog-counter* new-value))
 
 ;;;; ** tvar approximate counter (fast but not fully exact in multi-threaded usage)
 
@@ -259,17 +264,26 @@ to TLOGs while executing BODY."
 
 ;;;; ** Hardware memory transactions: current transaction log id
 
-(declaim (type atomic-counter-num *hw-tlog-id*))
+(declaim (type atomic-counter-num *hw-tlog-id* *last-hw-tlog-id*))
 (defvar *hw-tlog-id* +invalid-version+
   "Current transaction log id, used by hardware memory transactions
 instead of the full TLOG structure.")
 
 
+(defvar *last-hw-tlog-id* +invalid-version+
+  "Transaction log id of the last hardware memory transactions
+that committed successfully.")
+
+
+(defconstant +max-sw-transactions-during-hw-one+ 512)
+
 (defmacro with-hw-tlog-id ((hw-tlog-id) &body body)
   "Execute BODY with HW-TLOG-ID and *hw-tlog-id* dynamically bound
 to value of (get-tlog-counter) plus some safety margin.
 Used by hardware memory transactions."
-  `(let* ((,hw-tlog-id (the atomic-counter-num (+ 1024 (get-tlog-counter))))
+  `(let* ((,hw-tlog-id (the atomic-counter-num (+ (get-tlog-counter)
+                                                  (* +tlog-counter-delta+
+                                                     +max-sw-transactions-during-hw-one+))))
           (*hw-tlog-id* ,hw-tlog-id))
      ,@body))
 

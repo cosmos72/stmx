@@ -44,11 +44,14 @@
 
            ;; hardware memory transactions
            #:hw-transaction-supported?
-           #:+hw-transaction-supported+ ;; result of (hw-transaction-supported?)
            #:hw-transaction-begin
            #:hw-transaction-running?
            #:hw-transaction-abort
            #:hw-transaction-end
+           ;; cached result of (hw-transaction-supported?)
+           #:+hw-transaction-supported+
+           ;; equivalent to (and +hw-transaction-supported+ (hw-transaction-running?))
+           #:hw-transaction-supported-and-running?
 
            ;; atomic operations
            #:atomic-num #:atomic-incf #:atomic-decf
@@ -57,7 +60,8 @@
 
            #:atomic-counter-num
            #:atomic-counter #:make-atomic-counter
-           #:get-atomic-counter #:incf-atomic-counter
+           #:get-atomic-counter #:set-atomic-counter
+           #:incf-atomic-counter
 
            #:mutex             #:make-mutex
            #:mutex-owner       #:mutex-lock

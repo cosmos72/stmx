@@ -93,6 +93,8 @@ at (hw-transaction-begin) by returning NIL."
   (defconstant +hw-transaction-supported+ nil))
 
 
+(defmacro hw-transaction-supported-and-running? ()
+  `(and +hw-transaction-supported+ (hw-transaction-running?)))
 
 
 ;; avoid "unexpected EOF" compiler error

@@ -129,46 +129,81 @@ Works ONLY inside software memory transactions."
 
 
 
-(declaim (notinline $-notx))
-(defun $-notx (var)
+(declaim (notinline $-hwtx))
+(defun $-hwtx (var)
     "Get the value from the transactional variable VAR and return it.
 Return +unbound-tvar+ if VAR is not bound to a value.
-Works ONLY outside software memory transactions."
+Works ONLY inside hardware memory transactions."
   (declare (type tvar var))
 
-  (if (and +hw-transaction-supported+ (hw-transaction-running?))
-      (multiple-value-bind (value version fail) (tvar-value-and-version-or-fail var)
-        (declare (type fixnum version)
-                 (type bit fail))
+  (multiple-value-bind (value version fail) (tvar-value-and-version-or-fail var)
+    (declare (type fixnum version)
+             (type bit fail))
 
-        (if (and (eql 0 fail) ;; TVAR is unlocked and could not be read?
-                 (<= version *hw-tlog-id*)) ;; TVAR unchanged after this TX started?
-            ;; consistent data
-            value
-            ;; inconsistent data
-            (hw-transaction-abort)))
-
-      ;; No transaction. Return raw value for debuggin purposes,
-      ;; ignoring any lock or inconsistency
-      (raw-value-of var)))
+    (if (and (eql 0 fail) ;; TVAR is unlocked and could not be read?
+             (<= version *hw-tlog-id*)) ;; TVAR unchanged after this TX started?
+        ;; consistent data
+        value
+        ;; inconsistent data
+        (hw-transaction-abort))))
 
 
-(declaim (notinline (setf $-notx)))
-(defun (setf $-notx) (value var)
+(declaim (inline (setf $-hwtx)))
+(defun (setf $-hwtx) (value var)
   "Store VALUE inside transactional variable VAR and return VALUE.
-Works ONLY outside software memory transactions."
+Works ONLY inside hardware memory transactions."
   (declare (type tvar var))
 
   ;; no need for memory barriers
-  (setf (tvar-value var) value)
-  (setf (tvar-version var)
-        (if (and +hw-transaction-supported+ (hw-transaction-running?))
-            *hw-tlog-id*
-            (incf-tlog-counter))))
+  (setf (tvar-version var) *hw-tlog-id*
+        (tvar-value var) value))
 
 
 
+(declaim (inline $-notx))
+(defun $-notx (var)
+    "Get the value from the transactional variable VAR and return it.
+Return +unbound-tvar+ if VAR is not bound to a value.
+Works ONLY outside memory transactions."
+  (declare (type tvar var))
 
+  ;; No transaction. Return raw value for debugging purposes,
+  ;; ignoring any lock or inconsistency
+  (raw-value-of var))
+
+
+(declaim (inline (setf $-notx)))
+(defun (setf $-notx) (value var)
+  "Store VALUE inside transactional variable VAR and return VALUE.
+Works ONLY outside memory transactions."
+  (declare (type tvar var))
+
+  (setf (raw-value-of var) value))
+
+
+
+(defmacro use-$-hwtx? ()
+  "Return T if $-hwtx and (setf $-hwtx) should be used, otherwise return NIL."
+  `(hw-transaction-supported-and-running?))
+
+
+(defmacro use-$-tx? ()
+  "Return T if $-tx and (setf $-tx) should be used, otherwise return NIL."
+  `(recording?))
+
+
+(declaim (inline $-noerror))
+(defun $-noerror (var)
+  "Get the value from the transactional variable VAR and return it.
+Return +unbound-tvar+ if VAR is not bound to a value.
+
+Works both inside and outside transactions.
+During transactions, it uses transaction log to record the read
+and to check for any value stored in the log."
+
+  (if (use-$-hwtx?) ($-hwtx var)
+      (if (use-$-tx?) ($-tx var)
+          ($-notx var))))
 
                
 (defun $ (var)
@@ -180,9 +215,7 @@ During transactions, it uses transaction log to record the read
 and to check for any value stored in the log."
   (declare (type tvar var))
 
-  (let1 value (if (recording?)
-                  ($-tx var)
-                  ($-notx var))
+  (let1 value ($-noerror var)
     (unless (eq value +unbound-tvar+)
       (return-from $ value))
     (unbound-tvar-error var)))
@@ -196,9 +229,10 @@ Works both outside and inside transactions.
 During transactions, it uses transaction log to record the value."
   (declare (type tvar var))
 
-  (if (recording?)
-      (setf ($-tx var) value)
-      (setf ($-notx var) value)))
+  (if (use-$-hwtx?) (setf ($-hwtx var) value)
+      (if (use-$-tx?) (setf ($-tx var) value)
+          (setf ($-notx var) value))))
+
 
 
   
@@ -210,10 +244,7 @@ During transactions, it uses transaction log to record the read
 and to check for any value stored in the log."
   (declare (type tvar var))
 
-  (not (eq +unbound-tvar+
-           (if (recording?)
-               ($-tx var)
-               ($-notx var)))))
+  (not (eq +unbound-tvar+ ($-noerror var))))
 
 
 (defun unbind-$ (var)
@@ -223,9 +254,7 @@ Works both outside and inside transactions.
 During transactions, it uses transaction log to record the 'unbound' value."
   (declare (type tvar var))
 
-  (if (recording?)
-      (setf ($-tx var) +unbound-tvar+)
-      (setf ($-notx var) +unbound-tvar+))
+  (setf ($ var) +unbound-tvar+)
   var)
 
 
@@ -239,7 +268,7 @@ If VAR is not bound to a value, return (values DEFAULT nil).
 Works both inside and outside transactions."
   (declare (type tvar var))
 
-  (let1 value (if (recording?) ($-tx var) ($-notx var))
+  (let1 value ($-noerror var)
     (if (eq value +unbound-tvar+)
       (values default nil)
       (values value   t))))
@@ -250,7 +279,7 @@ Works both inside and outside transactions."
 unbind it and and return t and the original value as multiple values.
 If VAR is not bound to a value, return (values nil DEFAULT).
 
-Works only inside transactions."
+Works only inside software transactions."
   (declare (type tvar var))
 
   (let1 value ($-tx var)
@@ -265,7 +294,7 @@ Works only inside transactions."
     "If VAR is not bound, bind it to VALUE and return (values VALUE t)
 If VAR is already bound to a value, return (values DEFAULT nil).
 
-Works only inside transactions."
+Works only inside software transactions."
   (declare (type tvar var))
 
   (let1 old-value ($-tx var)

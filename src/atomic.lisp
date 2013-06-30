@@ -221,41 +221,62 @@ transactional memory it read has changed."
 
 
 
-(defun %hw-run-atomic (tx)
+(defun %hw-run-atomic (tx fallback-tx)
   "Run the function TX inside a hardware memory transaction.
-If the hardware memory transaction aborts, try again
-using a software memory transaction."
+If the hardware memory transaction aborts, run FALLBACK-TX
+inside a software memory transaction."
 
-  (declare (type function tx))
+  (declare (type function tx)
+           (type function fallback-tx))
 
-  (with-hw-tlog-id (initial-hw-tlog-id)
+  (with-hw-tlog-id (my-hw-tlog-id)
     (when (hw-transaction-begin)
       (return-from %hw-run-atomic
         (multiple-value-prog1 (funcall tx)
             
-          (if (> initial-hw-tlog-id (get-tlog-counter))
-              (hw-transaction-end)
+          (if (> my-hw-tlog-id (get-tlog-counter))
+              (progn
+                (hw-transaction-end)
+                (set-tlog-counter my-hw-tlog-id))
               (hw-transaction-abort))))))
             
-  (log:debug "hw-transaction aborted, trying software transaction")
-  (run-atomic tx))
+  (run-atomic fallback-tx))
 
 
-(declaim (inline hw-run-atomic))
 
-(defun hw-run-atomic (tx)
+(declaim (inline hw-run-atomic1 hw-run-atomic2))
+
+(defun hw-run-atomic1 (tx)
   (declare (type function tx))
 
-  (if (= *hw-tlog-id* +invalid-version+)
-      (%hw-run-atomic tx)
-
+  (if (hw-transaction-running?)
       ;; already inside a HW transaction
-      (funcall tx)))
+      (funcall tx)
+      ;; start a HW transaction
+      (%hw-run-atomic tx tx)))
 
 
-(defmacro hw-atomic (&rest body)
+(defun hw-run-atomic2 (tx fallback-tx)
+  (declare (type function tx)
+           (type function fallback-tx))
+
+  (if (hw-transaction-running?)
+      ;; already inside a HW transaction
+      (funcall tx)
+      ;; start a HW transaction
+      (%hw-run-atomic tx fallback-tx)))
+
+
+
+(defmacro hw-atomic (&body body)
   "Run BODY in a memory transaction. Try a hardware transaction first,
 and if it fails fall back on a software transaction."
   (if body
-      `(hw-run-atomic (lambda () ,@body))
+      `(hw-run-atomic1 (lambda () ,@body))
       `(values)))
+
+
+(defmacro hw-atomic2 (hw-tx-body sw-tx-body)
+  "Run HW-TX-BODY in a hardware memory transaction.
+If it aborts and SW-TX-BODY is not NIL, run SW-TX-BODY in a software transaction."
+  `(hw-run-atomic (lambda () ,hw-tx-body) (lambda () ,sw-tx-body)))

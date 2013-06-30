@@ -141,6 +141,9 @@ using LOG as its transaction log."
      (funcall tx)))
 
 
+
+
+
 (defun %run-atomic (tx)
   "Function equivalent of the ATOMIC macro.
 
@@ -195,7 +198,6 @@ transactional memory it read has changed."
    (go run)))
 
 
-
 (declaim (inline run-atomic))
 
 (defun run-atomic (tx)
@@ -215,3 +217,45 @@ transactional memory it read has changed."
   (if (transaction?)
       (funcall tx)
       (%run-atomic tx)))
+
+
+
+
+(defun %hw-run-atomic (tx)
+  "Run the function TX inside a hardware memory transaction.
+If the hardware memory transaction aborts, try again
+using a software memory transaction."
+
+  (declare (type function tx))
+
+  (with-hw-tlog-id (initial-hw-tlog-id)
+    (when (hw-transaction-begin)
+      (return-from %hw-run-atomic
+        (multiple-value-prog1 (funcall tx)
+            
+          (if (> initial-hw-tlog-id (get-tlog-counter))
+              (hw-transaction-end)
+              (hw-transaction-abort))))))
+            
+  (log:debug "hw-transaction aborted, trying software transaction")
+  (run-atomic tx))
+
+
+(declaim (inline hw-run-atomic))
+
+(defun hw-run-atomic (tx)
+  (declare (type function tx))
+
+  (if (= *hw-tlog-id* +invalid-version+)
+      (%hw-run-atomic tx)
+
+      ;; already inside a HW transaction
+      (funcall tx)))
+
+
+(defmacro hw-atomic (&rest body)
+  "Run BODY in a memory transaction. Try a hardware transaction first,
+and if it fails fall back on a software transaction."
+  (if body
+      `(hw-run-atomic (lambda () ,@body))
+      `(values)))

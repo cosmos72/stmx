@@ -24,6 +24,8 @@
   #?+fixnum-is-large 'fixnum
   #?-fixnum-is-large 'integer)
 
+;; public alias for 'counter-num type
+(deftype atomic-counter-num () 'counter-num)
 
 #?+(and atomic-ops fixnum-is-large-powerof2)
 (eval-always

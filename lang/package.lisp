@@ -42,11 +42,20 @@
            #:cons^ #:free-cons^ #:free-list^
            #:push^ #:pop-free-cons^
 
+           ;; hardware memory transactions
+           #:hw-transaction-supported?
+           #:+hw-transaction-supported+ ;; result of (hw-transaction-supported?)
+           #:hw-transaction-begin
+           #:hw-transaction-running?
+           #:hw-transaction-abort
+           #:hw-transaction-end
+
            ;; atomic operations
            #:atomic-num #:atomic-incf #:atomic-decf
            #:atomic-compare-and-swap  #:atomic-pop
            #:mem-read-barrier #:mem-write-barrier
 
+           #:atomic-counter-num
            #:atomic-counter #:make-atomic-counter
            #:get-atomic-counter #:incf-atomic-counter
 

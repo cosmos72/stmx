@@ -15,71 +15,131 @@
 
 (in-package :stmx.test)
 
+(def-suite conflict-suite :in suite)
+(in-suite conflict-suite)
 
-(defun make-locks (n)
-  (declare (type fixnum n))
-  (let1 locks (make-array n)
-    (dotimes (i n)
-      (setf (aref locks i) (make-lock (format nil "~A" i))))
-    (the simple-vector locks)))
+(test conflict
+  (let ((var (tvar 5))
+        (counter 0))
+    
+    (atomic
+      (log:debug "($ var) is ~A" ($ var))
+      (incf ($ var))
+      (log:debug "($ var) set to ~A" ($ var))
 
-(defun copy-shuffle-vector (vec)
-  (declare (type simple-vector vec))
-  (let* ((n (length vec))
-         (copy (the simple-array (make-array n :initial-contents vec))))
-    (loop for i from (1- n) downto 0 do
-      (let1 rand (random (1+ i))
-
-        (unless (= rand i)
-          (rotatef (aref copy rand) (aref copy i)))))
-    copy))
-
-(defun run-with-locks (locks)
-  (declare (type simple-vector locks))
-  (let* ((acquired 0)
-         (n (length locks)))
-    (unwind-protect
-         (progn
-           (loop for i from 0 to (1- n)
-              while (acquire-lock (aref locks i) nil)
-              do (setf acquired (1+ i)))
-                
-           (let1 success (= n acquired)
-             (if success
-                 (log:debug "success")
-                 (progn
-                   (log:debug "failure at step ~A, cannot acquire lock ~A"
-                              acquired (aref locks acquired))))
-
-             success))
-
-      (loop for i from 0 to (1- acquired)
-         do (release-lock (aref locks i))))))
+      (if (= 1 (incf counter))
+          (progn
+            ;; simulate another thread writing into VAR
+            (setf (raw-value-of var) 10)
+            (log:debug "simulated another thread setting (raw-value-of var) to ~A"
+                       (raw-value-of var))
+            (is-false (valid? (current-tlog))))
+          ;; else
+          (is-true (valid? (current-tlog)))))
+          
+    (is (= 11 ($ var))))) ;; 10 for "(setf (raw-value-of var) 10)" plus 1 for "(incf ($ var))"
 
 
-(defun retry-with-locks (locks)
-  "Repeat calling run-with-locks until it succeeds"
-  (dotimes (i 10)
-    (loop for j from 0 do
-         (if (run-with-locks locks)
-             (progn
-               (log:info "success after ~A retries" j)
-               (return t))
-             (sleep 0.001)))))
+(test conflict-1
+  (let ((var (tvar 0)))
+
+    (atomic
+      (is (= 0 (raw-value-of var)))
+      (is (= 0 ($ var)))
+      (setf ($ var) 1)
+      (is-true (valid? (current-tlog)))
+
+      ;; simulate another thread committing tvar:
+      ;; the current transaction log must become invalid
+      (setf (raw-value-of var) -1)
+      (is-false (valid? (current-tlog)))
+      ;; but reading from tvar must return the value written during transaction
+      (is (= 1 ($ var)))
+      
+      ;; an invalid transaction cannot become valid again
+      ;; by writing into its vars. test it.
+      (setf ($ var) (raw-value-of var))
+      (is-false (valid? (current-tlog)))
+
+      ;; the only way for an invalid transaction to become valid again
+      ;; is for some other thread to commit and restore the original value
+      ;; and version initially seen by the invalid one.
+      ;; Not really possible in the wild because of the version counter.
+      (set-tvar-value-and-version var 0 +invalid-version+)
+
+      (is-true (valid? (current-tlog)))
+      (setf ($ var) 2))
+
+    (is (= 2 ($ var)))))
 
 
-(defun run-threads-with-locks (n-threads &key shuffle (n-locks 100) (locks (make-locks n-locks))
-                               (function #'run-with-locks))
-  (let* ((shuffled-locks (loop for i from 1 to n-threads collect
-                              (if shuffle
-                                  (copy-shuffle-vector locks)
-                                  locks)))
-         (threads (loop for i from 1 to n-threads collect
-                       (let1 my-locks (pop shuffled-locks)
-                         (make-thread (lambda () (funcall function my-locks))
-                                      :name (format nil "~A" (1- i)))))))
+(test conflict-2
+  (let ((a (tvar 0)) ;; transactions in this example maintain
+        (b (tvar 0)) ;; the invariant (= ($ a) ($ b))
+        (first-run t))
 
-    (loop for thread in threads do
-         (join-thread thread))))
+    (atomic
+      (incf ($ a))
+      (is-true (valid? (current-tlog)))
 
-                     
+      ;; simulate another thread changing a and b:
+      ;; the current transaction will become invalid because it read a
+      (when first-run
+        (setf first-run nil
+              (raw-value-of a) 2
+              (raw-value-of b) 2)
+        (is-false (valid? (current-tlog)))
+        ;; reading from a must return the value written during the transaction
+        (is (= 1 ($ a)))
+        ;; but reading from b must detect the inconsistency and rerun
+        (signals rerun-error (incf ($ b))))
+
+      ;; read b: in first-run it will re-run, in second-run it will succeed
+      ;; and restore the invariant (= ($ a) ($ b))
+      (incf ($ b)))
+
+    (is (= 3 ($ a)))
+    (is (= 3 ($ b)))))
+
+
+
+
+(test conflict-locked
+  (let ((a (tvar 0)) ;; transactions in this example maintain
+        (b (tvar 0)) ;; the invariant (= ($ a) ($ b))
+        (first-run t))
+
+    (atomic
+     (unless first-run
+        ;; on second run, unlock B before proceeding
+       (unlock-tvar b))
+
+     (setf ($ a) ($ b))
+     (incf ($ a))
+     (is-true (valid? (current-tlog)))
+
+     ;; simulate another thread locking b:
+     ;; the current transaction will fail to commit,
+     ;; and further read/writes on b will (rerun)
+     (when first-run
+       (setf first-run nil)
+
+       (is-true (try-lock-tvar b))
+
+       ;; transaction is still valid
+       (is-true (valid? (current-tlog)))
+       ;; but there is a lock in the way
+       (is-false (valid-and-unlocked? (current-tlog)))
+       
+       ;; reading from a must return the value set during the transaction
+       (is (= 1 ($ a)))
+       ;; but reading from B must detect the lock and rerun
+       (signals rerun-error (incf ($ b))))
+
+     ;; this will (rerun) on the first run, and succeed on the second
+     (incf ($ b)))
+
+    (is (= 1 ($ a)))
+    (is (= 1 ($ b)))))
+
+

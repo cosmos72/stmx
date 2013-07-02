@@ -79,66 +79,6 @@
     (is (= 1 ($ var)))))
 
 
-(test atomic-invalid-1
-  (let ((var (tvar 0)))
-
-    (atomic
-      (is (= 0 (raw-value-of var)))
-      (is (= 0 ($ var)))
-      (setf ($ var) 1)
-      (is-true (valid? (current-tlog)))
-
-      ;; simulate another thread committing tvar:
-      ;; the current transaction log must become invalid
-      (setf (raw-value-of var) -1)
-      (is-false (valid? (current-tlog)))
-      ;; but reading from tvar must return the value written during transaction
-      (is (= 1 ($ var)))
-      
-      ;; an invalid transaction cannot become valid again
-      ;; by writing into its vars. test it.
-      (setf ($ var) (raw-value-of var))
-      (is-false (valid? (current-tlog)))
-
-      ;; the only way for an invalid transaction to become valid again
-      ;; is for some other thread to commit and restore the original value
-      ;; and version initially seen by the invalid one.
-      ;; Not really possible in the wild because of the version counter.
-      (set-tvar-value-and-version var 0 +invalid-version+)
-
-      (is-true (valid? (current-tlog)))
-      (setf ($ var) 2))
-
-    (is (= 2 ($ var)))))
-
-
-(test atomic-invalid-2
-  (let ((a (tvar 0)) ;; transactions in this example maintain
-        (b (tvar 0)) ;; the invariant (= ($ a) ($ b))
-        (first-run t))
-
-    (atomic
-      (incf ($ a))
-      (is-true (valid? (current-tlog)))
-
-      ;; simulate another thread changing a and b:
-      ;; the current transaction will become invalid because it read a
-      (when first-run
-        (setf first-run nil
-              (raw-value-of a) 2
-              (raw-value-of b) 2)
-        (is-false (valid? (current-tlog)))
-        ;; reading from a must return the value written during the transaction
-        (is (= 1 ($ a)))
-        ;; but reading from b must detect the inconsistency and rerun
-        (signals rerun-error (incf ($ b))))
-
-      ;; read b: in first-run it will re-run, in second-run it will succeed
-      ;; and restore the invariant (= ($ a) ($ b))
-      (incf ($ b)))
-
-    (is (= 3 ($ a)))
-    (is (= 3 ($ b)))))
 
 
 
@@ -157,28 +97,6 @@
 
     (is (= (raw-value-of var) 1))
     (is (= ($ var) 1))))
-
-
-(test invalid
-  (let ((var (tvar 5))
-        (counter 0))
-    
-    (atomic
-      (log:debug "($ var) is ~A" ($ var))
-      (incf ($ var))
-      (log:debug "($ var) set to ~A" ($ var))
-
-      (if (= 1 (incf counter))
-          (progn
-            ;; simulate another thread writing into VAR
-            (setf (raw-value-of var) 10)
-            (log:debug "simulated another thread setting (raw-value-of var) to ~A"
-                       (raw-value-of var))
-            (is-false (valid? (current-tlog))))
-          ;; else
-          (is-true (valid? (current-tlog)))))
-          
-    (is (= 11 ($ var))))) ;; 10 for "(setf (raw-value-of var) 10)" plus 1 for "(incf ($ var))"
 
 
 (transaction

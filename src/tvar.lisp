@@ -201,7 +201,7 @@ Works both inside and outside transactions.
 During transactions, it uses transaction log to record the read
 and to check for any value stored in the log."
 
-  (if (use-$-hwtx?) ($-hwtx var)
+  (if t ;;(use-$-hwtx?) ($-hwtx var)
       (if (use-$-tx?) ($-tx var)
           ($-notx var))))
 
@@ -229,7 +229,7 @@ Works both outside and inside transactions.
 During transactions, it uses transaction log to record the value."
   (declare (type tvar var))
 
-  (if (use-$-hwtx?) (setf ($-hwtx var) value)
+  (if t ;;(use-$-hwtx?) (setf ($-hwtx var) value)
       (if (use-$-tx?) (setf ($-tx var) value)
           (setf ($-notx var) value))))
 

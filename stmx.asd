@@ -121,6 +121,7 @@
                              (:file "thash-table"    :depends-on ("hash-table"))
                              (:file "rbmap"          :depends-on ("hash-table"))
                              (:file "atomic"         :depends-on ("package"))
+                             (:file "conflict"       :depends-on ("package"))
                              (:file "on-commit"      :depends-on ("atomic"))
                              (:file "retry"          :depends-on ("package"))
                              (:file "orelse"         :depends-on ("package"))

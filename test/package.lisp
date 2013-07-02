@@ -38,11 +38,11 @@
                 #:rerun-error #:rerun
                 #:retry-error #:retry
                 #:commit
-                #:valid?
+                #:valid? #:valid-and-unlocked?
                 #:current-tlog
                 #:with-recording-to-tlog
 
-                #:tvar>
+                #:tvar> #:try-lock-tvar #:unlock-tvar
                 #:txhash-table #:make-txhash-table
                 #:txhash-table-count
                 #:get-txhash #:set-txhash #:do-txhash)

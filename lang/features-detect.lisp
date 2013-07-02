@@ -47,14 +47,9 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
                ;; usually, bt.lock-owner it not needed on SBCL:
                ;; the combo atomic-ops + mem-rw-barriers provide fast-lock,
                ;; which has mutex-owner, a faster replacement for bt.lock-owner
-               '(bt.lock-owner . sb-thread::mutex-owner))
+               '(bt.lock-owner . sb-thread::mutex-owner)))
 
- ;; do we have the sb-transaction package exposing CPU hardware transactions?
- #?+(symbol sb-transaction transaction-supported-p)
- ;; good, and does the current CPU actually support hardware transactions?
- (when (sb-transaction:transaction-supported-p)
-   ;; yes.
-   (add-features '(hw-transactions . :sb-transaction))))
+
 
 
 
@@ -91,6 +86,21 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
   ;; can be used as concurrency-safe mutex-owner even without atomic-ops
   (when (all-features? 'mem-rw-barriers 'bt.lock-owner)
     (add-feature 'mutex-owner))
+
+
+
+  (when (feature? 'fast-lock)
+    ;; do we have the sb-transaction package exposing CPU hardware transactions?
+    #?+(symbol sb-transaction transaction-supported-p)
+    ;; good, and does the current CPU actually support hardware transactions?
+    (when (sb-transaction:transaction-supported-p) 
+      ;; yes.
+      (add-features '(hw-transactions . :sb-transaction))))
+
+
+
+
+
 
   ;; (1+ most-positive-fixnum) is a power of two?
   (when (zerop (logand most-positive-fixnum (1+ most-positive-fixnum)))

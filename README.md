@@ -20,18 +20,33 @@ threads until it commits.
 Transactional memory gives freedom from deadlocks, automatic roll-back on failure,
 and it aims at resolving the tension between granularity and concurrency.
 
-### Latest news
+### Latest news, 1st July 2013
 
-While STMX is currently a software-only implementation, work is in progress
-to add support for hardware-assisted memory transactions (RTM) available on the following
-Intel x86-64 processors released in June 2013:
+STMX now has initial support for hardware transactions using hardware-assisted
+memory transactions (RTM) available on the following Intel x86-64 processors
+released in June 2013:
 * Intel Core i5 4570
 * Intel Core i5 4670
 * Intel Core i7 4770
 
-In the meantime SB-TRANSACTION, a library that implements hardware-only memory transactions
-on such CPUs, is already available and packaged in the [sb-transaction](sb-transaction) subfolder
-of STMX. It only works on SBCL running on those CPUs in native 64-bit mode.
+The current implementation is still quite simple and only accelerates the commit
+phase, not the actual memory reads and writes. Under low to moderate contention,
+it shows a small but measurable performance improvement between 1% and 7%.
+The worst observed case is 0% i.e. same performance, found for few cases
+under high contention.
+
+Extending the use of hardware transaction to the actual memory reads and writes
+is expected to give much higher performance improvements... it's easy to demonstrate
+(see SB-TRANSACTION below), but providing compatibility between hardware
+and software transactions while retaining performance is difficult.
+
+The implementation is based on [SB-TRANSACTION](sb-transaction), a library
+packaged with STMX that implements hardware-only memory transactions on such
+CPUs. SB-TRANSACTION can also be used as a standalone library and in such case
+the performance is **much** higher, as it avoids the overhead and the software
+compatibility requirements of STMX. At the moment, SB-TRANSACTION only works
+on SBCL running in native 64-bit mode on a CPU with hardware transaction support
+(see the list above).
 
 
 General documentation

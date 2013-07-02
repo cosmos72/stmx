@@ -22,8 +22,8 @@ and it aims at resolving the tension between granularity and concurrency.
 
 ### Latest news, 1st July 2013
 
-STMX now has initial support for hardware transactions using hardware-assisted
-memory transactions (RTM) available on the following Intel x86-64 processors
+STMX now has initial support for hardware transactions using Restricted
+Memory Transactions (RTM) available on the following Intel x86-64 processors
 released in June 2013:
 * Intel Core i5 4570
 * Intel Core i5 4670
@@ -36,18 +36,20 @@ The worst observed case is 0% i.e. same performance, found for few cases
 under high contention.
 
 Extending the use of hardware transaction to the actual memory reads and writes
-is expected to give much higher performance improvements... it's easy to demonstrate
-(see SB-TRANSACTION below and its benchmark results in
-[doc/benchmark.md](doc/benchmark.md)), but providing compatibility between hardware
+is expected to give much higher performance improvements (see
+SB-TRANSACTION below), but providing compatibility between hardware
 and software transactions while retaining performance is difficult.
 
 The implementation is based on [SB-TRANSACTION](sb-transaction), a library
-packaged with STMX that implements hardware-only memory transactions on such
-CPUs. SB-TRANSACTION can also be used as a standalone library and in such case
-the performance is **much** higher, as it avoids the overhead and the software
-compatibility requirements of STMX. At the moment, SB-TRANSACTION only works
-on SBCL running in native 64-bit mode on a CPU with hardware transaction support
-(see the list above).
+packaged with STMX that provides hardware-only memory transactions on CPUs from
+the list above. SB-TRANSACTION can also be used as a standalone library. In
+such case the performance is **much** higher than STMX and even higher than
+hand-optimized compare-and-swap fine grained locking code (see benchmark
+results in [doc/benchmark.md](doc/benchmark.md)). The reason is that it avoids
+the overhead and the software compatibility requirements of STMX, providing
+only the raw features - and the limitations - of the underlying CPU.
+At the moment, SB-TRANSACTION only works on SBCL running in native 64-bit mode
+on a CPU with hardware transaction support (see the list above).
 
 
 General documentation

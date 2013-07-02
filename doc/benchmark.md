@@ -126,7 +126,8 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
  <tr><td>orelse retry-2   </td><td><code>(atomic (orelse (retry) (retry) ($-tx v)))</code></td>
      <td>0.601</td><td>0.598</td></tr>
 
- <tr><td>orelse retry-4   </td><td><code>(atomic (orelse (retry) (retry) (retry) (retry) ($-tx v)))</code></td>
+ <tr><td>orelse retry-4   </td><td><code>(atomic (orelse (retry)<br/>
+                                         (retry) (retry) (retry) ($-tx v)))</code></td>
      <td>0.963</td><td>0.944</td></tr>
 
  <tr><td>orelse retry-N   </td><td>best fit of the 3 runs above</td><td>(0.248+N*0.178)</td></tr>
@@ -137,7 +138,7 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-gmap tm))<br>
-              (set-gmap tm i t))</code></td>
+               (set-gmap tm i t))</code></td>
      <td>3.882</td><td>3.849</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 100)</td>
@@ -189,8 +190,8 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
 
  <tr><th rowspan="2"><b>number of threads</b></th>
      <th rowspan="2"><b>executed code</b></th>
-     <th><b>STMX (sw transactions)</b></th>
-     <th><b>STMX+ (sw transactions + hw-assisted commit)</b></th>
+     <th><b>old STMX (sw transactions)</b></th>
+     <th><b>STMX (sw transactions + hw-assisted commit)</b></th>
      <th><b>HW-TX (hw transactions)</b></th>
      <th><b>LOCK (atomic compare-and-swap)</b></th>
      <th><b>LOCK (bordeaux-threads mutex)</b></th></tr>
@@ -223,7 +224,7 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
 
  <tr><td>7 threads</td>
      <td><code>(dining-philosophers 7)</code></td>
-     <td>16.85</td><td>17.46</td><td></td><td>55.56</td><td>90.09</td><td>24.30</td></tr>
+     <td>16.85</td><td>17.46</td><td>55.56</td><td>90.09</td><td>24.30</td></tr>
 
  <tr><td>8 threads</td>
      <td><code>(dining-philosophers 8)</code></td>

@@ -37,7 +37,8 @@ under high contention.
 
 Extending the use of hardware transaction to the actual memory reads and writes
 is expected to give much higher performance improvements... it's easy to demonstrate
-(see SB-TRANSACTION below), but providing compatibility between hardware
+(see SB-TRANSACTION below and its benchmark results in
+[doc/benchmark.md](doc/benchmark.md)), but providing compatibility between hardware
 and software transactions while retaining performance is difficult.
 
 The implementation is based on [SB-TRANSACTION](sb-transaction), a library

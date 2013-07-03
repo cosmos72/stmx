@@ -22,7 +22,7 @@
 (defmacro with-lock ((lock) &body body)
   "Faster replacement for BORDEAUX-THREADS:WITH-LOCK-HELD."
   (with-gensym lock-var
-    `(let1 ,lock-var ,lock
+    `(let ((,lock-var ,lock))
        (unwind-protect
             (progn
               (bt:acquire-lock ,lock-var)

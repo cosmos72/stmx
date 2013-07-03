@@ -102,17 +102,87 @@
     (is (= 3 ($ b)))))
 
 
+(defstruct ipc
+  (command  t   :type (or (member t nil) function))
+  (args     nil :type list)
+  (ret-list t   :type (or (member t) list))
+  (lock     (bt:make-lock))
+  (wait-cmd (bt:make-condition-variable))
+  (wait-ret (bt:make-condition-variable)))
 
 
-(test conflict-locked
+(defun ipc-run (ipc)
+  (declare (type ipc ipc))
+
+  (let ((lock     (ipc-lock     ipc))
+        (wait-cmd (ipc-wait-cmd ipc))
+        (wait-ret (ipc-wait-ret ipc)))
+    (loop
+       (with-lock (lock)
+         (log:trace "ipc thread ready")
+
+         (loop while (eq t (ipc-command ipc))
+            do (bt:condition-wait wait-cmd lock))
+
+         (let ((command (ipc-command ipc))
+               (args    (ipc-args    ipc)))
+
+           (setf (ipc-command  ipc) t)
+
+           (log:trace "running command ~A ~S" command args)
+           (let ((ret-list
+                  (when command
+                    (multiple-value-list (apply command args)))))
+             (cond
+               ((null ret-list)        (log:trace "command returned no values"))
+               ((null (rest ret-list)) (log:trace "command returned: ~S" (first ret-list)))
+               (t                      (log:trace "command returned values: ~{~S~^ ~}" ret-list)))
+                
+             (setf (ipc-ret-list ipc) ret-list))
+
+           (bt:condition-notify wait-ret)
+
+           (unless command
+             (return))))))
+
+  (log:trace "ipc thread exiting"))
+
+
+
+(defun ipc-call (ipc command &rest args)
+  (declare (type ipc ipc)
+           (type (or null function) command))
+
+  (let ((lock     (ipc-lock     ipc))
+        (wait-cmd (ipc-wait-cmd ipc))
+        (wait-ret (ipc-wait-ret ipc)))
+    (with-lock (lock)
+      (setf (ipc-command  ipc) command
+            (ipc-args     ipc) args
+            (ipc-ret-list ipc) t)
+      
+      (bt:condition-notify wait-cmd)
+
+      (loop for ret-list = (ipc-ret-list ipc)
+         while (eq t ret-list)
+         do (bt:condition-wait wait-ret lock)
+         finally (return (values-list ret-list))))))
+
+        
+(defun ipc-start-thread (ipc)
+  (bt:make-thread (lambda () (ipc-run ipc))))
+
+(defun ipc-stop-thread (ipc)
+  (ipc-call ipc nil))
+
+
+            
+
+(defun conflict-locked-test ()
   (let ((a (tvar 0)) ;; transactions in this example maintain
         (b (tvar 0)) ;; the invariant (= ($ a) ($ b))
-	(wait-to-lock (bt:make-lock))
-	(wait-to-unlock (bt:make-lock))
+	(ipc (make-ipc))
         (first-run t))
-
-    (bt:acquire-lock wait-to-lock)
-    (bt:acquire-lock wait-to-unlock)
 
     ;; have another thread locking b:
     ;; the current transaction will fail to commit,
@@ -121,30 +191,13 @@
     ;; we *really* need to lock b in another thread,
     ;; otherwise on some implementations (valid-and-unlocked?)
     ;; may not detect the conflict...
-    (bt:make-thread
-     (lambda ()
-       (log:trace "helper thread ready to lock B")
-       (unwind-protect
-	    (with-lock (wait-to-lock)
-	      (log:trace "locking TVAR B...")
-	      (loop until (try-lock-tvar b) do
-		   (sleep 0.1))
-	      (log:trace "...TVAR B locked"))
-
-	 (log:trace "helper thread ready to unlock B")
-	 (with-lock (wait-to-unlock)
-	   (log:trace "unlocking TVAR B...")
-	   (unlock-tvar b)
-	   (log:trace "...TVAR B unlocked")))))
-
+    (ipc-start-thread ipc)
 
     (atomic
      (unless first-run
        ;; on second run, tell the other thread to unlock B before proceeding
-       (bt:release-lock wait-to-unlock)
-       ;; wait until actually unlocked
-       (loop until (try-lock-tvar b) do
-	    (sleep 0.1))
+       (is-false (ipc-call ipc #'unlock-tvar b))
+       (is-true (try-lock-tvar b))
        (unlock-tvar b))
 	    
 
@@ -152,18 +205,10 @@
      (incf ($ a))
      (is-true (valid? (current-tlog)))
 
+     ;; on first run, tell the other thread to lock B before proceeding
      (when first-run
        (setf first-run nil)
-
-
-       ;; on first run, tell the other thread to lock B before proceeding
-       (bt:release-lock wait-to-lock)
-       ;; wait until actually locked
-       (loop while (try-lock-tvar b) do
-	    (unlock-tvar b)
-	    (sleep 0.1))
-       (is-false (try-lock-tvar b))
-
+       (is-true (ipc-call ipc #'try-lock-tvar b))
 
        ;; transaction is still valid
        (is-true (valid? (current-tlog)))
@@ -180,6 +225,13 @@
      (incf ($ b)))
 
     (is (= 1 ($ a)))
-    (is (= 1 ($ b)))))
+    (is (= 1 ($ b)))
+
+    (ipc-stop-thread ipc)))
 
 
+
+;; CMUCL currently does not have native threads
+#-cmucl
+(test conflict-locked
+  (conflict-locked-test))

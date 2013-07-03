@@ -171,7 +171,7 @@ for debugging purposes. please use ($ var) instead."
     ;; resort to locking TVAR... Horrible and slow
     (if (try-acquire-mutex (the mutex var))
 
-        (multiple-value-bind (value version) (%tvar-value-and-version var)
+        (multiple-value-bind (version value) (%tvar-version-and-value var)
           (release-mutex (the mutex var))
           (values value version 0))
 

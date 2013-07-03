@@ -107,27 +107,67 @@
 (test conflict-locked
   (let ((a (tvar 0)) ;; transactions in this example maintain
         (b (tvar 0)) ;; the invariant (= ($ a) ($ b))
+	(wait-to-lock (bt:make-lock))
+	(wait-to-unlock (bt:make-lock))
         (first-run t))
+
+    (bt:acquire-lock wait-to-lock)
+    (bt:acquire-lock wait-to-unlock)
+
+    ;; have another thread locking b:
+    ;; the current transaction will fail to commit,
+    ;; and further read/writes on b will (rerun)
+    ;;
+    ;; we *really* need to lock b in another thread,
+    ;; otherwise on some implementations (valid-and-unlocked?)
+    ;; may not detect the conflict...
+    (bt:make-thread
+     (lambda ()
+       (log:trace "helper thread ready to lock B")
+       (unwind-protect
+	    (with-lock (wait-to-lock)
+	      (log:trace "locking TVAR B...")
+	      (loop until (try-lock-tvar b) do
+		   (sleep 0.1))
+	      (log:trace "...TVAR B locked"))
+
+	 (log:trace "helper thread ready to unlock B")
+	 (with-lock (wait-to-unlock)
+	   (log:trace "unlocking TVAR B...")
+	   (unlock-tvar b)
+	   (log:trace "...TVAR B unlocked")))))
+
 
     (atomic
      (unless first-run
-        ;; on second run, unlock B before proceeding
+       ;; on second run, tell the other thread to unlock B before proceeding
+       (bt:release-lock wait-to-unlock)
+       ;; wait until actually unlocked
+       (loop until (try-lock-tvar b) do
+	    (sleep 0.1))
        (unlock-tvar b))
+	    
 
      (setf ($ a) ($ b))
      (incf ($ a))
      (is-true (valid? (current-tlog)))
 
-     ;; simulate another thread locking b:
-     ;; the current transaction will fail to commit,
-     ;; and further read/writes on b will (rerun)
      (when first-run
        (setf first-run nil)
 
-       (is-true (try-lock-tvar b))
+
+       ;; on first run, tell the other thread to lock B before proceeding
+       (bt:release-lock wait-to-lock)
+       ;; wait until actually locked
+       (loop while (try-lock-tvar b) do
+	    (unlock-tvar b)
+	    (sleep 0.1))
+       (is-false (try-lock-tvar b))
+
 
        ;; transaction is still valid
        (is-true (valid? (current-tlog)))
+
        ;; but there is a lock in the way
        (is-false (valid-and-unlocked? (current-tlog)))
        

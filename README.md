@@ -720,17 +720,20 @@ use `(describe 'some-symbol)` at REPL:
 Performance
 -----------
 
-In order for STMX to reach its peak performance, three requirements need to be satisfied
+In order for STMX to reach its peak performance, four requirements need to be satisfied
 by the Lisp compiler being used:
-- it must produce fast, highly optimized code
 - it must have good multi-threading support
-- it must expose atomic compare-and-swap operations - and possibly also memory barrier operations
+- it must produce fast, highly optimized code
+- it must expose atomic compare-and-swap operations or, as slower alternative,
+  a function to retrieve the thread owning a lock
+- on unordered CPUs (i.e. on most CPUs except x86 and x86-86) it must expose
+  memory barrier operations
 
 Among the non-commercial Lisp compilers, SBCL is the only one known to STMX author
-that satisfies all the three requirements. Actually, all the other tested free Lisp compilers
-(ABCL, CCL, CMUCL, ECL) are quite lacking in the first area, and none of them offers
-atomic compare-and-swap operations at all. One - CMUCL - produces relatively fast code,
-but does not support native threads.
+that satisfies all the four requirements. Actually, all the other tested free Lisp compilers
+(ABCL, CCL, CMUCL, ECL) are quite lacking in the second area, and none of them offers
+atomic compare-and-swap or memory barrier operations at all.
+One - CMUCL - produces relatively fast code, but does not support native threads.
 STMX is not tested on any commercial Lisp compiler, so performance on them is simply unknown.
 
 For these reasons, STMX will reach the highest known performance on SBCL by a large

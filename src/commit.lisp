@@ -39,10 +39,30 @@ of TVARs that were read during the transaction."
 
 
 
-(defun valid-and-unlocked? (log)
+(defun valid-and-own-or-unlocked? (log)
   "Return t if LOG is valid and unlocked, i.e. it contains an up-to-date view
 of TVARs that were read during the transaction and none of them is locked
-by other threads."
+by **other** threads."
+  (declare (type tlog log))
+
+  (log.trace "Tlog ~A valid-and-own-or-unlocked?.." (~ log))
+  (do-txhash (var val) (tlog-reads log)
+    (if (tvar-valid-and-own-or-unlocked? var val log)
+
+        (log.trace "Tlog ~A tvar ~A is up-to-date and unlocked" (~ log) (~ var))
+        
+        (progn
+          (log.debug "Tlog ~A tvar ~A conflict or locked: not valid" (~ log) (~ var))
+          (return-from valid-and-own-or-unlocked? nil))))
+
+  (log.trace "Tlog ~A ..is valid and own-or-unlocked" (~ log))
+  t)
+
+
+(defun valid-and-unlocked? (log)
+  "Return t if LOG is valid and unlocked, i.e. it contains an up-to-date view
+of TVARs that were read during the transaction and none of them is locked,
+not even by the current thread."
   (declare (type tlog log))
 
   (log.trace "Tlog ~A valid-and-unlocked?.." (~ log))
@@ -54,6 +74,26 @@ by other threads."
         (progn
           (log.debug "Tlog ~A tvar ~A conflict or locked: not valid" (~ log) (~ var))
           (return-from valid-and-unlocked? nil))))
+
+  (log.trace "Tlog ~A ..is valid and own-or-unlocked" (~ log))
+  t)
+
+#?+hw-transactions
+(defun valid-and-unlocked-hw-assisted? (log)
+  "Return t if LOG is valid and unlocked, i.e. it contains an up-to-date view
+of TVARs that were read during the transaction and none of them is locked,
+not even by the current thread."
+  (declare (type tlog log))
+  (do-txhash (var expected-val) (tlog-reads log)
+    (multiple-value-bind (version val) (%tvar-version-and-value var)
+      (if (and (eq val expected-val)
+               (eql 0 (logand version 1)))
+
+          (log.trace "Tlog ~A tvar ~A is up-to-date and unlocked" (~ log) (~ var))
+        
+          (progn
+            (log.debug "Tlog ~A tvar ~A conflict or locked: not valid" (~ log) (~ var))
+            (return-from valid-and-unlocked-hw-assisted? nil)))))
 
   (log.trace "Tlog ~A ..is valid and unlocked" (~ log))
   t)
@@ -269,6 +309,7 @@ but the TLOG will remain committed."
 
 
 (declaim (inline commit-hw-assisted))
+#?+hw-transactions
 (defun commit-hw-assisted (log changed)
   "Try to perform COMMIT using a hardware memory transaction.
 Return T if successful, NIL if transaction is invalid,
@@ -282,9 +323,15 @@ After successful return, CHANGED contains the list of the TVARs actually written
     (unless (hw-transaction-begin)
       (return-from commit-hw-assisted :fail))
 
-    ;; we can read even locked TVARs: 
-    ;; the hardware transaction guarantees to abort if they change value
-    (unless (valid? log)
+    ;; we could read even locked TVARs: 
+    ;; the hardware transaction guarantees to abort if they change value.
+    ;;
+    ;; but we may read committed values from a newer SW transaction
+    ;; and uncommitted (original) values from an older SW transaction.
+    ;; See the 3rd picture in doc/consistent-reads.md for full explanation
+    ;;
+    ;; so we must check that tlog-reads are unlocked
+    (unless (valid-and-unlocked-hw-assisted? log)
       (hw-transaction-end)
       (return-from commit-hw-assisted nil))
 
@@ -327,7 +374,6 @@ After successful return, CHANGED contains the list of the TVARs actually written
 
 (declaim (inline commit-update-tvars))
 
-#?+hw-transactions
 (defun commit-update-tvars (locked new-version)
   "COMMIT, i.e. actually write new values into TVARs.
 Also unlock all TVARs."
@@ -415,7 +461,7 @@ b) another TLOG is writing the same TVARs being committed
               ;; check for log validity one last time, with locks held.
               ;; Also ensure that TVARs in (tlog-reads log) are not locked
               ;; by other threads. For the reason, see doc/consistent-reads.md
-              (unless (valid-and-unlocked? log)
+              (unless (valid-and-own-or-unlocked? log)
                 (log.debug "Tlog ~A is invalid or reads are locked, not committed" (~ log))
                 (return))
 

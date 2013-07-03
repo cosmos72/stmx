@@ -22,28 +22,20 @@ and it aims at resolving the tension between granularity and concurrency.
 
 ### Latest news, 1st July 2013
 
-STMX now has initial support for hardware transactions using Restricted
+Support for hardware transactions is being added to STMX. It used Restricted
 Memory Transactions (RTM) available on the following Intel x86-64 processors
 released in June 2013:
 * Intel Core i5 4570
 * Intel Core i5 4670
 * Intel Core i7 4770
 
-The current implementation is still quite simple and only accelerates the commit
-phase, not the actual memory reads and writes. Under low to moderate contention,
-it shows a small but measurable performance improvement between 1% and 7%.
-The worst observed case is 0% i.e. same performance, found for few cases
-under high contention.
+The current implementation is still experimental, unoptimized, and disabled by default.
+It can be enabled by uncommenting the relevant flag in `stmx/lang/features-detect.lisp`.
 
-Extending the use of hardware transaction to the actual memory reads and writes
-is expected to give much higher performance improvements (see
-SB-TRANSACTION below), but providing compatibility between hardware
-and software transactions while retaining performance is difficult.
-
-The implementation is based on [SB-TRANSACTION](sb-transaction), a library
-packaged with STMX that provides hardware-only memory transactions on CPUs from
-the list above. SB-TRANSACTION can also be used as a standalone library. In
-such case the performance is **much** higher than STMX and even higher than
+To have a taste of hardware transactions, STMX includes [SB-TRANSACTION](sb-transaction),
+a standalone library that does **not** depend on STMX and provides hardware-only
+memory transactions on CPUs from the list above.
+Its performance is **much** higher than STMX and even higher than
 hand-optimized compare-and-swap fine grained locking code (see benchmark
 results in [doc/benchmark.md](doc/benchmark.md)). The reason is that it avoids
 the overhead and the software compatibility requirements of STMX, providing
@@ -51,6 +43,13 @@ only the raw features - and the limitations - of the underlying CPU.
 At the moment, SB-TRANSACTION only works on SBCL running in native 64-bit mode
 on a CPU with hardware transaction support (see the list above).
 
+The objective is to integrate SB-TRANSACTION with STMX in order
+to take advantage of hardware transactions when available,
+while falling back on software transactions in the following cases:
+- CPU not supporting hardware transactions
+- transactions exceed hardware limits
+- transactions use features not supported by the hardware (ORELSE, RETRY, allocating memory,
+  input/output, system calls...)
 
 General documentation
 ---------------------
@@ -767,7 +766,7 @@ For a less artificial and hopefully more realistic benchmark, the author has por
 [Lee-TM](http://apt.cs.man.ac.uk/projects/TM/LeeBenchmark/),
 a non-trivial benchmark suite for transactional memory developed in 2007
 by the University of Manchester (UK). The result is
-[Lee-STMX](https://github.com/cosmos72/lee-stmx) - as of June 2013, its
+[Lee-STMX](https://github.com/cosmos72/lee-stmx) - as of July 2013, its
 status is BETA.
 
 Contacts, help, discussion
@@ -782,7 +781,7 @@ The author will also try to answer support requests, but gives no guarantees.
 Status
 ------
 
-As of June 2013, STMX is being written by Massimiliano Ghilardi
+As of July 2013, STMX is being written by Massimiliano Ghilardi
 and is considered by the author to be stable.
 
 STMX is a full rewrite of CL-STM, which has been developed by Hoan Ton-That

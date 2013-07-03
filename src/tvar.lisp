@@ -321,38 +321,54 @@ Equivalent to (setf ($ var) value)"
 
 ;;;; ** Locking and unlocking
 
-(declaim (ftype (function (tvar t tlog) boolean) tvar-valid-and-unlocked?)
+(declaim (ftype (function (tvar t tlog) boolean) tvar-valid-and-unlocked?
+                #||#                             tvar-valid-and-own-or-unlocked?)
          (inline
-           tvar-valid-and-unlocked?))
+           tvar-valid-and-unlocked?
+           tvar-valid-and-own-or-unlocked?))
 
 
 (defun tvar-valid-and-unlocked? (var expected-value log)
+  "Return T if VAR is valid, i.e. its value is EQ to EXPECTED-VAL
+and VAR is unlocked.
+Return NIL if VAR has different value, or is locked by some thread (including current thread)."
+  (declare (type tvar var)
+           (type tlog log)
+           (ignore log))
+  
+  (multiple-value-bind (value version fail) (tvar-value-and-version-or-fail var)
+    (declare (ignore version)
+             (type bit fail))
+
+    (and (eq value expected-value)
+         (eql fail 0))))
+
+
+(defun tvar-valid-and-own-or-unlocked? (var expected-value log)
   "Return T if VAR is valid, i.e. its value is EQ to EXPECTED-VAL
 and VAR is locked by current thread or unlocked.
 Return NIL if VAR has different value, or is locked by some other thread."
   (declare (type tvar var)
            (type tlog log)
            (ignorable log))
-  
+    
   (multiple-value-bind (value version fail) (tvar-value-and-version-or-fail var)
     (declare (ignore version)
              (type bit fail))
 
     (unless (eq value expected-value)
-      (return-from tvar-valid-and-unlocked? nil))
+      (return-from tvar-valid-and-own-or-unlocked? nil))
 
     (when (eql fail 0)
-      (return-from tvar-valid-and-unlocked? t))
+      (return-from tvar-valid-and-own-or-unlocked? t))
 
     #?+(and mutex-owner (not fast-lock))
     (mutex-is-own? (the mutex var))
-
+      
     #?-(and mutex-owner (not fast-lock))
     ;; check transaction log to detect if we're the ones that locked VAR
     (let1 present? (nth-value 1 (get-txhash (tlog-writes log) var))
       present?)))
-
-    
 
 
 ;;;; ** Listening and notifying

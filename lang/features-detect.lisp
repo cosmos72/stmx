@@ -89,13 +89,16 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 
 
 
-  (when (feature? 'fast-lock)
+  #+never ;; hardware transactions are still experimental
+  (progn
     ;; do we have the sb-transaction package exposing CPU hardware transactions?
     #?+(symbol sb-transaction transaction-supported-p)
     ;; good, and does the current CPU actually support hardware transactions?
     (when (sb-transaction:transaction-supported-p) 
-      ;; yes.
-      (add-features '(hw-transactions . :sb-transaction))))
+      ;; do we also have memory barriers and atomic compare-and-swap?
+      (when (feature? 'fast-lock)
+        ;; yes.
+        (add-features '(hw-transactions . :sb-transaction)))))
 
 
 

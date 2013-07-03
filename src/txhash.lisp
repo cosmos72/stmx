@@ -28,7 +28,7 @@
 
 (defmacro do-txfifo-entries ((pair) fifo &body body)
   "Execute BODY on each TXPAIR contained in FIFO. Return NIL."
-  (let1 next (gensym "NEXT-")
+  (with-gensym next
     `(loop for ,pair = (txfifo-front ,fifo) then ,next
         while ,pair
         for ,next = (txpair-rest ,pair)
@@ -38,7 +38,7 @@
 
 (defmacro do-txfifo ((key &optional value) fifo &body body)
   "Execute BODY on each KEY/VALUE contained in FIFO. Return NIL."
-  (let ((pair (gensym "PAIR-")))
+  (with-gensym pair
     `(do-txfifo-entries (,pair) ,fifo
        (let ((,key (txpair-key ,pair))
              ,@(when value `((,value (txpair-value ,pair)))))
@@ -47,9 +47,7 @@
 
 (defmacro do-filter-txfifo-entries ((pair) fifo &body body)
   "Execute BODY on each TXPAIR contained in FIFO. Return NIL."
-  (let ((f    (gensym "FIFO-"))
-        (prev (gensym "PREV-"))
-        (next (gensym "NEXT-")))
+  (with-gensyms (f prev next)
     `(let1 ,f ,fifo
        (loop for ,prev = nil then ,pair
           for ,pair = (txfifo-front ,f) then ,next
@@ -67,7 +65,7 @@
 
 (defmacro do-filter-txfifo ((key &optional value) fifo &body body)
   "Execute BODY on each KEY/VALUE contained in FIFO. Return NIL."
-  (let ((pair (gensym "PAIR-")))
+  (with-gensym pair
     `(do-filter-txfifo-entries (,pair) ,fifo
        (let ((,key (txpair-key ,pair))
              ,@(when value `((,value (txpair-value ,pair)))))
@@ -90,13 +88,7 @@
 
 (defmacro do-txhash-entries ((pair) hash &body body)
   "Execute BODY on each TXPAIR pair contained in HASH. Return NIL."
-  (let ((h     (gensym "HASH-"))
-        (vec   (gensym "VEC-"))
-        (i     (gensym "I-"))
-        (n     (gensym "N-"))
-        (left  (gensym "LEFT-"))
-        (next  (gensym "NEXT-"))
-        (loop-name (gensym "LOOP-")))
+  (with-gensyms (h vec i n left next loop-name)
     `(let* ((,h    (the txhash-table ,hash))
             (,vec  (the simple-vector (txhash-table-vec ,h)))
             (,n    (the fixnum (length ,vec)))
@@ -118,7 +110,7 @@
 
 (defmacro do-txhash ((key &optional value) hash &body body)
   "Execute BODY on each KEY/VALUE contained in HASH. Return NIL."
-  (let ((pair (gensym "PAIR-")))
+  (with-gensym pair
     `(do-txhash-entries (,pair) ,hash
        (let ((,key (txpair-key ,pair))
              ,@(when value `((,value (txpair-value ,pair)))))

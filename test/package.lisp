@@ -39,6 +39,7 @@
                 #:retry-error #:retry
                 #:commit
                 #:valid? #:valid-and-unlocked?
+                #:valid-and-own-or-unlocked?
                 #:current-tlog
                 #:with-recording-to-tlog
 

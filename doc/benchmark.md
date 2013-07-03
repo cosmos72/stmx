@@ -65,7 +65,7 @@ Benchmark results
 What follows are some timings obtained on the authors's system, and by no means they
 claim to be exact, absolute or reproducible: your mileage may vary.
 
-Date: 29 June 2013
+Date: 3 July 2013
 
 Hardware: Intel Core-i7 4770 @3.5 GHz (quad-core w/ hyper-threading), 16GB RAM
 
@@ -74,72 +74,73 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
 
 <table>
 
- <tr><th colspan="3">
+ <tr><th colspan="4">
        Single-thread benchmarks, executed one million times
        with <code>(x3 (1m (atomic ...)))</code>
      </th></tr>
 
  <tr><th rowspan="2"><b>name</b>      </th>
      <th rowspan="2"><b>executed code</b></th>
-     <th>software transactions</th>
-     <th>software transactions + hw-assisted commit</th>
-     <th>hardware transactions</th></tr>
+     <th>STMX (sw transactions)</th>
+     <th>STMX EXPERIMENTAL (sw transactions + hw-assisted commit)</th></tr>
 
- <tr><th colspan="3"><b>average time in microseconds</b></th></tr>
+ <tr><th colspan="2"><b>average time in microseconds</b></th></tr>
 
 
  <tr><td>atomic nil       </td><td><code>(atomic nil)</code></td>
-     <td>0.069</td><td>0.069</td><td>0.025</td></tr>
+     <td>0.069</td><td>0.069</td></tr>
 
  <tr><td>atomic read-1    </td><td><code>(atomic ($-tx v))</code></td>
-     <td>0.084</td><td>0.082</td><td>0.026</td></tr>
+     <td>0.084</td><td>0.082</td></tr>
 
  <tr><td>atomic write-1   </td><td><code>(atomic (setf ($-tx v) 1))</code></td>
-     <td>0.108</td><td>0.106</td><td>0.028</td></tr>
+     <td>0.108</td><td>0.105</td></tr>
 
  <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($-tx v)))</code></td>
-     <td>0.135</td><td>0.134</td></tr>
+     <td>0.135</td><td>0.135</td></tr>
 
  <tr><td>atomic read-write-10</td>
      <td><code>(atomic (dotimes (j 10) (incf ($-tx v))))</code></td>
-     <td>0.239</td><td>0.234</td></tr>
+     <td>0.239</td><td>0.235</td></tr>
 
  <tr><td>atomic read-write-100</td>
      <td><code>(atomic (dotimes (j 100) (incf ($-tx v))))</code></td>
-     <td>1.118</td><td>1.113</td></tr>
+     <td>1.118</td><td>1.110</td></tr>
 
  <tr><td>atomic read-write-1000</td>
      <td><code>(atomic (dotimes (j 1000) (incf ($-tx v))))</code></td>
-     <td>9.922</td><td>9.936</td></tr>
+     <td>9.922</td><td>9.868</td></tr>
 
- <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td><td>(0.142+N*0.0098)</td></tr>
+ <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td>
+     <td>(0.142+N*0.0098)</td><td>(0.137+N*0.0097)</td></tr>
 
  <tr><td>orelse empty     </td><td><code>(atomic (orelse))</code></td>
-     <td>0.043</td><td>0.041</td></tr>
+     <td>0.043</td><td>0.042</td></tr>
 
  <tr><td>orelse unary     </td><td><code>(atomic (orelse ($-tx v)))</code></td>
-     <td>0.234</td><td>0.232</td></tr>
+     <td>0.234</td><td>0.230</td></tr>
 
  <tr><td>orelse retry-1   </td><td><code>(atomic (orelse (retry) ($-tx v)))</code></td>
-     <td>0.429</td><td>0.427</td></tr>
+     <td>0.429</td><td>0.424</td></tr>
 
  <tr><td>orelse retry-2   </td><td><code>(atomic (orelse (retry) (retry) ($-tx v)))</code></td>
-     <td>0.601</td><td>0.598</td></tr>
+     <td>0.601</td><td>0.595</td></tr>
 
  <tr><td>orelse retry-4   </td><td><code>(atomic (orelse (retry)<br/>
                                          (retry) (retry) (retry) ($-tx v)))</code></td>
-     <td>0.963</td><td>0.944</td></tr>
+     <td>0.963</td><td>0.947</td></tr>
 
- <tr><td>orelse retry-N   </td><td>best fit of the 3 runs above</td><td>(0.248+N*0.178)</td></tr>
+ <tr><td>orelse retry-N   </td><td>best fit of the 3 runs above</td>
+     <td>(0.248+N*0.178)</td><td>(0.248+N*0.174)</td></tr>
 
  <tr><td>tmap read-write-1</td>
      <td><code>(atomic (incf (get-gmap tm 1)))</code></td>
-     <td>0.531</td><td>0.516</td></tr>
+     <td>0.531</td><td>0.534</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-gmap tm))<br>
                (set-gmap tm i t))</code></td>
-     <td>3.882</td><td>3.849</td></tr>
+     <td>3.882</td><td>3.821</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 100)</td>
      <td><code>(atomic (when (zerop (mod i  100)) (clear-gmap tm))<br>
@@ -190,9 +191,9 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
 
  <tr><th rowspan="2"><b>number of threads</b></th>
      <th rowspan="2"><b>executed code</b></th>
-     <th><b>old STMX (sw transactions)</b></th>
-     <th><b>STMX (sw transactions + hw-assisted commit)</b></th>
-     <th><b>HW-TX (hw transactions)</b></th>
+     <th><b>STMX (sw transactions)</b></th>
+     <th><b>STMX EXPERIMENTAL (sw transactions + hw-assisted commit)</b></th>
+     <th><b>SB-TRANSACTION (hw transactions)</b></th>
      <th><b>LOCK (atomic compare-and-swap)</b></th>
      <th><b>LOCK (bordeaux-threads mutex)</b></th></tr>
 

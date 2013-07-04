@@ -1,5 +1,7 @@
 KNOWN BUGS
 
+none :)
+
 FIXED BUGS:
 
 5) consistent reads were not fully guaranteed. The implementation allowed

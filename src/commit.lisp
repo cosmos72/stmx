@@ -456,7 +456,7 @@ b) another TLOG is writing the same TVARs being committed
             
               (log.trace "Tlog ~A acquired locks..." (~ log))
 
-              (setf new-version (incf-tlog-counter))
+              (setf new-version (global-clock/on-write (tlog-read-version log)))
 
               ;; check for log validity one last time, with locks held.
               ;; Also ensure that TVARs in (tlog-reads log) are not locked

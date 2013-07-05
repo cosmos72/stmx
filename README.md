@@ -726,12 +726,12 @@ by the Lisp compiler being used:
 - it must produce fast, highly optimized code
 - it must expose atomic compare-and-swap operations or, as slower alternative,
   a function to retrieve the thread owning a lock
-- on unordered CPUs (i.e. on most CPUs except x86 and x86-86) it must expose
+- on unordered CPUs (i.e. on most CPUs except x86 and x86-64) it must expose
   memory barrier operations
 
 Among the non-commercial Lisp compilers, SBCL is the only one known to STMX author
 that satisfies all the four requirements. Actually, all the other tested free Lisp compilers
-(ABCL, CCL, CMUCL, ECL) are quite lacking in the second area, and none of them offers
+(ABCL, CCL, CMUCL, ECL) are at least somewhat lacking in the second area, and none of them offers
 atomic compare-and-swap or memory barrier operations at all.
 One - CMUCL - produces relatively fast code, but does not support native threads.
 STMX is not tested on any commercial Lisp compiler, so performance on them is simply unknown.
@@ -761,7 +761,7 @@ and the rate of conflicts and retries.
 ### Note
 These result are **not** absolute performance considerations of the tested Lisp systems.
 They are simply the outcome of running micro-benchmarks of a particular library optimized for SBCL
-(see the atomic compare-and-swap point) on some other Lisp systems.
+(see the atomic compare-and-swap and memory barriers considerations) on some other Lisp systems.
 Do **not** try to construct these results as STMX author's opinions on the mentioned Lisp systems.
 
 ### Lee-STMX

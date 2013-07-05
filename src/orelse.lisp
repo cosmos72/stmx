@@ -160,6 +160,13 @@ Can only be used inside an ATOMIC block."
              log  (new-or-clear-tlog (orelse-tx-log tx) :parent parent-log)
              (orelse-tx-log tx) log)
 
+       (let1 read-version (tlog-read-version log)
+         (if (or (orelse-tx-retry tx) (/= +invalid-version+ read-version))
+             ;; it's a used TLOG which aborted, set read-version on abort
+             (setf (tlog-read-version log) (global-clock/on-abort read-version))
+             ;; it's a new TLOG or one that RETRIED? then set read-version normally
+             (setf (tlog-read-version log) (global-clock/on-read))))
+
        (handler-case
            (return-from run-orelse
              (multiple-value-prog1 (run-once func log)

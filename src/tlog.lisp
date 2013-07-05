@@ -52,7 +52,9 @@ return LOG itself."
 (declaim (inline new-tlog))
 (defun new-tlog ()
   "Get a TLOG from pool or create one, and return it."
-  (the tlog (nth-value 0 (fast-vector-pop-macro *tlog-pool* (make-tlog)))))
+  (let1 log (the tlog (nth-value 0 (fast-vector-pop-macro *tlog-pool* (make-tlog))))
+    (setf (tlog-read-version log) +invalid-version+)
+    log))
 
 
 (declaim (inline free-tlog))

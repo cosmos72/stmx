@@ -19,10 +19,9 @@
 
 ;;;; ** Transactional variables
 
-(declaim (inline tvar))
 (defun tvar (&optional (value +unbound-tvar+))
   (the tvar
-    (make-tvar :value value :id (next-id *tvar-id*))))
+    (make-tvar :value value :id (tvar-id/next))))
 
 (declaim (ftype (function (#-ecl tvar #+ecl t) t) $)
          (ftype (function (t tvar) t) (setf $)))
@@ -63,7 +62,7 @@ This function intentionally ignores transactions and it is only useful
 for debugging purposes. please use (setf ($ var) value) instead."
   (declare (type tvar var))
   (set-tvar-value-and-version var value
-                              (incf-tlog-counter)))
+                              (global-clock/on-write (global-clock/on-read))))
 
   
   
@@ -85,11 +84,13 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
 
   (multiple-value-bind (value version fail) (tvar-value-and-version-or-fail var)
 
-    (declare (type fixnum version)
+    (declare (type atomic-counter-num version)
              (type bit fail))
 
-    (when (or (not (eql 0 fail)) ;; TVAR is locked or could not be read?
-              (> version (tlog-id log))) ;; TVAR changed after this TX started?
+    ;; TVAR is locked or could not be read?
+    (unless (and (eql 0 fail)
+                 ;; TVAR may have changed after this TX started?
+                 (global-clock/valid-read? version (tlog-read-version log)))
       ;; inconsistent data
       (rerun))
 
@@ -129,37 +130,6 @@ Works ONLY inside software memory transactions."
 
 
 
-(declaim (notinline $-hwtx))
-(defun $-hwtx (var)
-    "Get the value from the transactional variable VAR and return it.
-Return +unbound-tvar+ if VAR is not bound to a value.
-Works ONLY inside hardware memory transactions."
-  (declare (type tvar var))
-
-  (multiple-value-bind (value version fail) (tvar-value-and-version-or-fail var)
-    (declare (type fixnum version)
-             (type bit fail))
-
-    (if (and (eql 0 fail) ;; TVAR is unlocked and could not be read?
-             (<= version *hw-tlog-id*)) ;; TVAR unchanged after this TX started?
-        ;; consistent data
-        value
-        ;; inconsistent data
-        (hw-transaction-abort))))
-
-
-(declaim (inline (setf $-hwtx)))
-(defun (setf $-hwtx) (value var)
-  "Store VALUE inside transactional variable VAR and return VALUE.
-Works ONLY inside hardware memory transactions."
-  (declare (type tvar var))
-
-  ;; no need for memory barriers
-  (setf (tvar-version var) *hw-tlog-id*
-        (tvar-value var) value))
-
-
-
 (declaim (inline $-notx))
 (defun $-notx (var)
     "Get the value from the transactional variable VAR and return it.
@@ -180,11 +150,6 @@ Works ONLY outside memory transactions."
 
   (setf (raw-value-of var) value))
 
-
-
-(defmacro use-$-hwtx? ()
-  "Return T if $-hwtx and (setf $-hwtx) should be used, otherwise return NIL."
-  `(hw-transaction-supported-and-running?))
 
 
 (defmacro use-$-tx? ()

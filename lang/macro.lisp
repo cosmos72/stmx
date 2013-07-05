@@ -18,6 +18,14 @@
 
 ;;;; * Miscellaneous macros
 
+(defmacro defconstant-eval-once (name value &optional documentation)
+  "Same as DEFCONSTANT, but evaluate VALUE only once:
+re-executing again the same (DEFCONSTANT-EVAL-ONCE name ...) has no effects."
+  `(defconstant ,name 
+     (if (boundp ',name) ,name #|(symbol-value ',name)|# ,value)
+     ,documentation))
+
+
 (defmacro with-gensym (name &body body)
   `(let ((,name (gensym (symbol-name ',name))))
      ,@body))
@@ -25,6 +33,7 @@
 (defmacro with-gensyms ((&rest names) &body body)
   `(let ,(loop for name in names collect `(,name (gensym (symbol-name ',name))))
      ,@body))
+
 
 
 ;;;; ** A minimal clean-room reimplementation of some macros found in ARNESI
@@ -101,3 +110,5 @@
 (defmacro log.make-logger (&rest args)
   (declare (ignore args))
   nil)
+
+

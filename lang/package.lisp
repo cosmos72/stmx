@@ -21,7 +21,8 @@
   (:use #:cl
         #:bordeaux-threads)
 
-  (:export #:with-gensym  #:with-gensyms
+  (:export #:defconstant-eval-once
+           #:with-gensym  #:with-gensyms
            #:eval-always  #:new     #:let1
            #:when-bind    #:awhen
            #:if-bind      #:aif
@@ -60,8 +61,8 @@
 
            #:atomic-counter-num
            #:atomic-counter #:make-atomic-counter
-           #:get-atomic-counter #:set-atomic-counter
-           #:incf-atomic-counter
+           #:get-atomic-counter #:get-atomic-counter-plus-delta
+           #:set-atomic-counter #:incf-atomic-counter
 
            #:mutex             #:make-mutex
            #:mutex-owner       #:mutex-lock

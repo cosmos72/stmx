@@ -19,23 +19,45 @@
 
 ;;;; ** constants
 
-(defconstant +tlog-counter-delta+ 2
-  "*tlog-counter* is incremented by 2 each time: the lowest bit is used
-as \"locked\" flag in TVARs versioning.")
-
 (declaim (type symbol +unbound-tvar+))
 (defvar +unbound-tvar+ (gensym (symbol-name 'unbound-tvar-)))
 
 (declaim (type fixnum +invalid-version+))
-(defconstant +invalid-version+ (- +tlog-counter-delta+))
+(defconstant +invalid-version+ (- +global-clock-delta+))
 
-(declaim (type cons +versioned-unbound-tvar+))
-(defvar +versioned-unbound-tvar+ (cons +invalid-version+ +unbound-tvar+))
+
+;;;; ** tvar approximate counter (fast but not fully exact in multi-threaded usage)
+
+(eval-always
+  (defstruct approx-counter
+    (value -1 :type fixnum)))
+
+(declaim (type approx-counter +tvar-id+))
+(defconstant-eval-once +tvar-id+ (make-approx-counter))
+
+(declaim (inline get-next-id))
+(defun get-next-id (id)
+  (declare (type fixnum id))
+  (the fixnum
+    #?+fixnum-is-powerof2
+    (logand most-positive-fixnum (1+ id))
+
+    #?-fixnum-is-powerof2
+    (if (= id most-positive-fixnum)
+        0
+        (1+ id))))
+
+(defmacro tvar-id/next ()
+  `(setf (approx-counter-value +tvar-id+) (get-next-id (approx-counter-value +tvar-id+))))
+
+
+
 
 
 ;;;; ** implementation class: TVAR, a versioned "box" containing a value and a lock.
 ;;;; ** Used as base class for TVAR.
 
+(declaim (inline make-tvar))
 
 (defstruct (tvar #?-fast-lock (:include mutex))
   "a transactional variable (tvar) is the smallest unit of transactional memory.
@@ -47,7 +69,7 @@ with a more convenient interface: you can read and write normally the slots
 of a transactional object (with slot-value, accessors ...), and behind
 the scenes the slots will be stored in transactional memory implemented by tvars."
 
-  (version +invalid-version+ :type fixnum)
+  (version +invalid-version+ :type version-type)
   (value   +unbound-tvar+    :type t)
 
   (id +invalid-version+ :type fixnum :read-only t)       ;; tvar-id
@@ -84,7 +106,7 @@ for debugging purposes. please use ($ var) instead."
            %tvar-version-and-value))
 
 (defun %tvar-version-and-value (var)
-  "Internal function used only by TVAR-VALUE-VERSION-AND-LOCK."
+  "Internal function used only by TVAR-VALUE-AND-VERSION-OR-FAIL."
   (declare (type tvar var))
   
   ;; if we have memory barriers, we MUST use them

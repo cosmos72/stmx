@@ -65,7 +65,7 @@
 
 
   #?+(and atomic-ops fixnum-is-large-powerof2)
-  (the fixnum
+  (the counter-num
     (logand most-positive-fixnum
             (+ delta ;; atomic-incf returns the OLD value!
                (logand most-positive-fixnum
@@ -98,10 +98,11 @@
 
 
 (declaim (ftype (function (atomic-counter) counter-num) get-atomic-counter)
+         (ftype (function (atomic-counter positive-fixnum) counter-num) get-atomic-counter-plus-delta)
          (ftype (function (atomic-counter counter-num) counter-num) set-atomic-counter)
 
          #?+(and atomic-ops fixnum-is-large-powerof2)
-         (inline get-atomic-counter set-atomic-counter))
+         (inline get-atomic-counter get-atomic-counter-plus-delta set-atomic-counter))
 
 
 (defun get-atomic-counter (counter)
@@ -109,7 +110,8 @@
   (declare (type atomic-counter counter))
        
   #?+(and atomic-ops fixnum-is-large-powerof2)
-  (let ((counter (mem-read-barrier counter)))
+  (progn
+    (mem-read-barrier)
     (the fixnum
       (logand most-positive-fixnum
               (atomic-counter-version counter))))
@@ -119,6 +121,28 @@
   (the counter-num
     (with-lock ((atomic-counter-lock counter))
       (atomic-counter-version counter))))
+
+
+(defun get-atomic-counter-plus-delta (counter delta)
+  "Return DELTA plus current value of atomic COUNTER."
+  (declare (type atomic-counter counter)
+           (type positive-fixnum delta))
+       
+  #?+fixnum-is-large-powerof2
+  (logand most-positive-fixnum
+          (+ delta
+             (get-atomic-counter counter)))
+
+  #?-fixnum-is-large-powerof2
+  (let ((n (get-atomic-counter counter)))
+    #?+fixnum-is-large
+    (the fixnum
+      (if (> n (the fixnum (- most-positive-fixnum delta)))
+          0
+          (+ delta n)))
+    #?-fixnum-is-large
+    (+ delta n)))
+
 
 
 (defun set-atomic-counter (counter value)

@@ -22,7 +22,7 @@
 (declaim (type symbol +unbound-tvar+))
 (define-global +unbound-tvar+ (gensym (symbol-name 'unbound-tvar-)))
 
-(declaim (type fixnum +invalid-version+))
+(declaim (type version-type +invalid-version+))
 (defconstant +invalid-version+ (- +global-clock-delta+))
 
 
@@ -55,7 +55,7 @@
 
 (declaim (inline make-tvar))
 
-(defstruct (tvar #?-fast-lock (:include mutex))
+(defstruct (tvar #?+(eql tvar-lock :mutex) (:include mutex))
   "a transactional variable (tvar) is the smallest unit of transactional memory.
 it contains a single value that can be read or written during a transaction
 using ($ var) and (setf ($ var) value).
@@ -68,7 +68,7 @@ the scenes the slots will be stored in transactional memory implemented by tvars
   (version +invalid-version+ :type version-type)
   (value   +unbound-tvar+    :type t)
 
-  (id +invalid-version+ :type fixnum :read-only t)       ;; tvar-id
+  (id +invalid-version+ :type fixnum :read-only t)       ;; tvar-id for debugging purposes
 
   (waiting-for nil :type (or null hash-table))           ;; tvar-waiting-for
   (waiting-lock (make-lock "tvar-waiting") :read-only t));; tvar-waiting-lock
@@ -134,7 +134,17 @@ for debugging purposes. please use ($ var) instead."
    - for example because the version changed while reading."
   (declare (type tvar var))
 
-  #?+fast-lock
+  #?+(eql tvar-lock :none)
+  ;; do not use locks at all. this requires hardware transactions.
+  (multiple-value-bind (version0 value) (%tvar-version-and-value var)
+    (let* ((version1 (progn (mem-read-barrier) (tvar-version var)))
+           (fail     (if (= version0 version1) 0 1)))
+      
+      (values value version1 fail)))
+          
+  
+
+  #?+(eql tvar-lock :bit)
   ;; lock is lowest bit of tvar-version. extract and check it.
   ;; we must get version, value and version again EXACTLY in this order.
   ;; see doc/consistent-reads.md for the gory details
@@ -149,7 +159,9 @@ for debugging purposes. please use ($ var) instead."
                                (if (= version0+lock version1+lock) 0 1))))
         (values value version1 fail))))
 
-  #?-fast-lock
+
+
+  #?+(eql tvar-lock :mutex)
   (progn
     #?+(and mutex-owner mem-rw-barriers (not (eql mem-rw-barriers :trivial)))
     ;; this case is tricky. we can get away with unlocked reads
@@ -168,8 +180,8 @@ for debugging purposes. please use ($ var) instead."
 
     #?+(and mutex-owner mem-rw-barriers (eql mem-rw-barriers :trivial))
     ;; trivial memory barriers are even more tricky. we cannot guarantee
-    ;; the order while reading TVAR value and version, so we must read both twice
-    ;; as usual, see doc/consistent-reads.md for the gory details
+    ;; the order while reading TVAR value and version, so we must read both twice,
+    ;; see doc/consistent-reads.md for the gory details
     (multiple-value-bind (version0 value0) (%tvar-version-and-value var)
       (let1 free? (mutex-is-free? (the mutex var))
         (multiple-value-bind (version1 value1) (%tvar-version-and-value var)
@@ -236,7 +248,12 @@ also set it (which may unlock VAR!). Return VALUE."
 
 (defun try-lock-tvar (var)
   "Try to lock VAR. Return T if locked successfully, otherwise return NIL."
-  #?+fast-lock
+  (declare (ignorable var))
+
+  #?+(eql tvar-lock :none)
+  t  
+
+  #?+(eql tvar-lock :bit)
   (let1 version (tvar-version var) 
     (declare (type fixnum version))
     (when (zerop (logand version 1))
@@ -244,17 +261,23 @@ also set it (which may unlock VAR!). Return VALUE."
                                                  version (logior version 1))
         (= version old-version))))
 
-  #?-fast-lock
+  #?+(eql tvar-lock :mutex)
   (try-acquire-mutex (the mutex var)))
   
   
 (defun unlock-tvar (var)
   "Unlock VAR. always return NIL."
-  #?+fast-lock
+  (declare (ignorable var))
+
+  #?+(eql tvar-lock :none)
+  nil
+
+  #?+(eql tvar-lock :bit)
   (let* ((version+lock     (the fixnum (tvar-version var)))
          (version-unlocked (logand version+lock (lognot 1))))
     (mem-write-barrier)
     (setf (tvar-version var) version-unlocked)
     nil)
-  #?-fast-lock
+
+  #?+(eql tvar-lock :mutex)
   (release-mutex (the mutex var)))

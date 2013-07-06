@@ -132,6 +132,29 @@ Works ONLY inside software memory transactions."
 
 
 
+
+(declaim (inline $-hwtx))
+#?+hw-transactions
+(defun $-hwtx (var)
+    "Get the value from the transactional variable VAR and return it.
+Return +unbound-tvar+ if VAR is not bound to a value.
+Works ONLY inside hardware memory transactions."
+  (declare (type tvar var))
+  (tvar-value var))
+
+
+(declaim (inline (setf $-hwtx)))
+#?+hw-transactions
+(defun (setf $-hwtx) (value var &optional (version (hw-tlog-write-version)))
+  "Store VALUE inside transactional variable VAR and return VALUE.
+Works ONLY inside hardware memory transactions."
+  (declare (type tvar var))
+  (setf (tvar-value var) value
+        (tvar-version var) version))
+
+
+
+
 (declaim (inline $-notx))
 (defun $-notx (var)
     "Get the value from the transactional variable VAR and return it.
@@ -319,6 +342,7 @@ Return NIL if VAR has different value, or is locked by some other thread."
            (type tlog log)
            (ignorable log))
     
+
   (multiple-value-bind (value version fail) (tvar-value-and-version-or-fail var)
     (declare (ignore version)
              (type bit fail))
@@ -329,13 +353,20 @@ Return NIL if VAR has different value, or is locked by some other thread."
     (when (eql fail 0)
       (return-from tvar-valid-and-own-or-unlocked? t))
 
-    #?+(and mutex-owner (not fast-lock))
-    (mutex-is-own? (the mutex var))
-      
-    #?-(and mutex-owner (not fast-lock))
-    ;; check transaction log to detect if we're the ones that locked VAR
-    (let1 present? (nth-value 1 (get-txhash (tlog-writes log) var))
-      present?)))
+    #?+(eql tvar-lock :none)
+    t
+
+    #?-(eql tvar-lock :none)
+    (progn
+      #?+(and mutex-owner (eql tvar-lock :mutex))
+      (mutex-is-own? (the mutex var))
+
+      #?-(and mutex-owner (eql tvar-lock :mutex))
+      ;; check transaction log to detect if we're the ones that locked VAR.
+      ;; this may be needed both when TVAR-LOCK feature is :BIT
+      ;; and when it is :MUTEX but we have no MUTEX-OWNER implementation
+      (let1 present? (nth-value 1 (get-txhash (tlog-writes log) var))
+        present?))))
 
 
 ;;;; ** Listening and notifying

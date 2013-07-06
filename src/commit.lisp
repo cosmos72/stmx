@@ -141,6 +141,7 @@ tvar-id and are considered \"larger\". Returns (> (tvar-id var1) (tvar-id var2))
 
 
 
+
 (defun try-lock-tvars (writes locked log)
   "Optionally sort VARS in (tvar> ...) order,
 then non-blocking acquire their locks in such order.
@@ -381,21 +382,21 @@ After successful return, CHANGED contains the list of the TVARs actually written
   (do-filter-txfifo (var val) locked
     (if (eq val (raw-value-of var))
         (progn
-          ;; fast-lock? then we need to manually unlock
-          #?+fast-lock
+          ;; TVAR-LOCK is :BIT? then we need to manually unlock
+          #?+(eql tvar-lock :bit)
           (unlock-tvar var)
           (rem-current-txfifo-entry))
 
         (progn
-          ;; if fast-lock, this also unlocks VAR.
+          ;; if TVAR-LOCK is :BIT?, this also unlocks VAR.
           (set-tvar-value-and-version var val
                                       (global-clock/sw-write write-version))
                    
           (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
                      (~ log) (~ var) current-val val)))
 
-    ;; no fast-lock? then unlock manually in all cases
-    #?-fast-lock
+    ;; TVAR-LOCK is not :BIT? then unlock manually in all cases
+    #?-(eql tvar-lock :bit)
     (unlock-tvar var)))
 
 
@@ -424,7 +425,7 @@ b) another TLOG is writing the same TVARs being committed
          (locked     (the txfifo       (tlog-locked log)))
          (success     nil))
              
-    (declare (type boolean      success))
+    (declare (type boolean success))
 
     (when (zerop (txhash-table-count writes))
       (log.debug "Tlog ~A committed (nothing to write)" (~ log))

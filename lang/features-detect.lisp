@@ -44,9 +44,9 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
  #+sbcl
  (add-features #+compare-and-swap-vops '(atomic-ops . :sbcl)
                #+memory-barrier-vops   '(mem-rw-barriers . :sbcl)
-               ;; usually, bt/lock-owner it not needed on SBCL:
-               ;; the combo atomic-ops + mem-rw-barriers provide fast-lock,
-               ;; which has mutex-owner, a faster replacement for bt/lock-owner
+               ;; usually, bt/lock-owner it not needed on SBCL: the combo
+               ;; ATOMIC-OPS + MEM-RW-BARRIERS provide FAST-MUTEX, which implements
+               ;; its own mutex-owner, without resorting to bt/lock-owner
                '(bt/lock-owner . sb-thread::mutex-owner)
 
                #?+(symbol sb-ext defglobal)
@@ -61,14 +61,6 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 
 
 (eval-always
-
-  ;; use global-clock GV1 by default.
-  ;;
-  ;; Note: the alternative global-clock GV5 reduces performance by ~50%
-  ;; because it causes a lot of (rerun), so it makes sense to use it
-  ;; only together with hardware transactions (GV1 is not suitable for that)
-  (unless (feature? 'global-clock)
-    (add-feature 'global-clock :gv1))
 
   ;; on x86 and x86_64, memory read-after-read and write-after-write barriers
   ;; are NOP (well, technically except for SSE)
@@ -88,31 +80,60 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 
 
   (unless (eql (get-feature 'mem-rw-barriers) :trivial)
-    ;; fast-lock requires atomic compare-and-swap plus real memory barriers.
-    ;; Also, fast-lock provides the preferred implementation of mutex-owner,
+    ;; FAST-MUTEX requires atomic compare-and-swap plus real memory barriers.
+    ;; Also, fast-mutex provides the preferred implementation of mutex-owner,
     ;;   which does not use bt/lock-owner
     (if (all-features? 'atomic-ops 'mem-rw-barriers)
-        (add-features 'fast-lock 'mutex-owner)))
+        (add-features 'fast-mutex '(mutex-owner . :fast-mutex))))
+
 
   ;; if at least fake memory read/write barriers are available, bt/lock-owner
   ;; can be used as concurrency-safe mutex-owner even without atomic-ops
-  (when (all-features? 'mem-rw-barriers 'bt/lock-owner)
-    (add-feature 'mutex-owner))
+  (unless (feature? 'mutex-owner)
+    (when (all-features? 'mem-rw-barriers 'bt/lock-owner)
+      (add-feature 'mutex-owner :bt/lock-owner)))
 
 
 
-  #+never ;; hardware transactions are still experimental
-
-  ;; do we have memory barriers and atomic compare-and-swap?
-  (when (feature? 'fast-lock)
+  ;; hardware transactions are still EXPERIMENTAL.
+  ;;
+  ;; do we have memory barriers, even trivial ones?
+  (when (feature? 'mem-rw-barriers)
     ;; do we also have the sb-transaction package exposing CPU hardware transactions?
     #?+(symbol sb-transaction transaction-supported-p)
     ;; good, and does the current CPU actually support hardware transactions?
     (when (sb-transaction:transaction-supported-p) 
-      ;; yes.
+      ;; yes. start the turbines.
       (add-features '(hw-transactions . :sb-transaction))))
 
 
+  ;; which kind of locking shall we use for TVARs?
+  ;;
+  ;; The preferred choice is hardware transactions, which does not need
+  ;; *any* locking; in such case define the feature TVAR-LOCK to :NONE
+  ;;
+  ;; The second choice is atomic compare-and-swap on a single bit of TVARs version:
+  ;; it requires FAST-MUTEX, i.e. both ATOMIC-OPS and MEM-RW-BARRIERS;
+  ;; in such case define the feature TVAR-LOCK to :BIT
+  ;;
+  ;; The third and least preferred choice is to use mutexes; in such case
+  ;; define the feature TVAR-LOCK to :MUTEX
+  (add-feature 'tvar-lock
+               (cond
+                 ((feature? 'hw-transactions) :none)
+                 ((feature? 'fast-mutex)      :bit)
+                 (t                           :mutex)))
+  
+
+  ;; use global-clock GV1 by default, but switch to GV5 for hardware transactions.
+  ;;
+  ;; Note: using the global-clock GV5 with software transactions
+  ;; reduces performance by ~50% because it causes a lot of (rerun),
+  ;; so it makes sense to use it only together with hardware transactions
+  ;; (GV1 is not suitable for that)
+  (unless (feature? 'global-clock)
+    (add-feature 'global-clock 
+                 (if (feature? 'hw-transactions) :gv5 :gv1)))
 
 
 

@@ -22,10 +22,13 @@
 ;;;; used to ensure transactional read consistency.
 
 
-(defconstant +global-clock-delta+ 2
-  "+global-clock+ is incremented by 2 each time: the lowest bit is reserved
-as \"locked\" flag in TVARs versioning (it is actually used only if
-#?+fast-lock feature is present).")
+(defconstant +global-clock-delta+
+  #?+(eql tvar-lock :bit) 2
+  #?-(eql tvar-lock :bit) 1
+
+  "+global-clock+ is incremented by 1 or by 2 each time: the lowest bit
+will be reserved as \"locked\" flag in TVARs versioning if #?+tvar-lock
+feature is equal to :BIT).")
 
 
 ;;;; ** definitions common to more than one global-clock implementation
@@ -115,10 +118,9 @@ Return WRITE-VERSION."
   write-version)
 
 
-(defmacro gv1/after-abort (read-version)
+(defmacro gv1/after-abort ()
   "This is GV1 implementation of GLOBAL-CLOCK/AFTER-ABORT.
 Return the current +gv1+ value."
-  (declare (ignore read-version))
 
   `(get-atomic-counter +gv1+))
 
@@ -183,10 +185,9 @@ Return WRITE-VERSION."
   write-version)
 
 
-(defmacro gv5/after-abort (read-version)
+(defmacro gv5/after-abort ()
   "This is GV5 implementation of GLOBAL-CLOCK/AFTER-ABORT.
 Increment +gv5+ and return its new value."
-  (declare (ignore read-version))
   `(incf-atomic-counter +gv5+ +global-clock-delta+))
 
 
@@ -254,19 +255,17 @@ during software-based commit phase of transactions."
 current WRITE-VERSION that was assigned by GLOBAL-CLOCK/START-WRITE before
 the transaction started writing to TVARs.
 
-Fhis function must be called for **each** TVAR being written during
+This function must be called for **each** TVAR being written during
 hardware-assisted commit phase of software transactions
 and during pure hardware transactions."
   `(%gv-expand hw-write ,write-version))
 
 
-(defmacro global-clock/after-abort (read-version)
+(defmacro global-clock/after-abort ()
   "Return the value to use as new transaction \"read version\",
-given the current transaction READ-VERSION that was set at transaction start
-either by (GLOBAL-CLOCK/START-READ) or by (GLOBAL-CLOCK/AFTER-ABORT PREVIOUS-READ-VERSION).
 
 This function must be called after a transaction failed/aborted and before rerunning it."
-  `(%gv-expand after-abort ,read-version))
+  `(%gv-expand after-abort))
 
 
 (eval-always
@@ -282,5 +281,3 @@ so they can be tested with #?+ and #?- reader macros."
 
   (global-clock/publish-features))
      
-
-      

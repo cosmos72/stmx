@@ -34,14 +34,14 @@
 
 ;;;; ** nowait mutex
 ;;;;    uses fast atomic ops and read/write memory barriers if available,
-;;;;    otherwise falls back on bordeaux-threads locks
-
+;;;;    otherwise falls back on bordeaux-threads locks.
+;;;;    Tries very hard to also define (mutex-owner) and related functions.
 
 
 (defstruct (mutex (:constructor %make-mutex) (:conc-name))
-  #?+fast-lock
+  #?+fast-mutex
   (mutex-owner nil :type atomic-t)
-  #?-fast-lock
+  #?-fast-mutex
   (mutex-lock (make-lock "MUTEX") :read-only t))
 
 
@@ -66,22 +66,22 @@
   "Try to acquire MUTEX. Return T if successful,
 or NIL if MUTEX was already locked."
   (declare (type mutex mutex))
-  #?+fast-lock
+  #?+fast-mutex
   (mem-write-barrier
     (null
      (atomic-compare-and-swap (mutex-owner mutex) nil *current-thread*)))
-  #?-fast-lock
+  #?-fast-mutex
   (bt:acquire-lock (mutex-lock mutex) nil))
 
 
 (defun release-mutex (mutex)
   "Release MUTEX. Return NIL. Consequences are undefined if MUTEX
 is locked by another thread or is already unlocked."
-  #?+fast-lock
+  #?+fast-mutex
   (progn
     (mem-write-barrier)
     (setf (mutex-owner mutex) nil))
-  #?-fast-lock
+  #?-fast-mutex
   (progn
     (bt:release-lock (mutex-lock mutex))
     nil))
@@ -89,13 +89,13 @@ is locked by another thread or is already unlocked."
    
 
 
-#?-fast-lock #?+mutex-owner
+;; ABCL needs its own magic... special case it
+#?+(and (eql mutex-owner :bt/lock-owner) (not (eql bt/lock-owner :abcl)))
 (eval-always
 
  (declaim (ftype (function (mutex) t) mutex-owner)
           (inline mutex-owner))
 
- #?-(eql bt/lock-owner :abcl) ;; ABCL needs its own magic
  (defun mutex-owner (mutex)
    "Return the thread that locked a mutex, or NIL if mutex is free."
    (declare (type mutex mutex))
@@ -105,7 +105,8 @@ is locked by another thread or is already unlocked."
 
 
 
-#?+(and mutex-owner (not (eql bt/lock-owner :abcl))) ;; ABCL needs its own magic
+;; ABCL needs its own magic... special case it
+#?+(and mutex-owner (not (eql bt/lock-owner :abcl))) 
 (eval-always
 
   (declaim (ftype (function (mutex) boolean) mutex-is-free? mutex-is-own? mutex-is-own-or-free?)
@@ -124,7 +125,7 @@ is currently locked by current thread or some other thread."
   (defun mutex-is-own? (mutex)
     "Return T if MUTEX is locked by current thread."
 
-    (mem-read-barrier)
+    (mem-read-barrier) ;; remember: MUTEX-OWNER depends on MEM-RW-BARRIERS
     (let1 owner (mutex-owner mutex)
       (eq owner *current-thread*)))
 

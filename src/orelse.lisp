@@ -210,7 +210,7 @@ Can only be used inside an ATOMIC block."
          ;; since we are validating parent-log, we should update its read-version
          ;; otherwise the nested transactions (which inherit the parent read-version)
          ;; can enter an infinite retry or rerun loop
-         (setf (tlog-read-version parent-log) (global-clock/after-abort (tlog-read-version parent-log)))
+         (setf (tlog-read-version parent-log) (global-clock/after-abort))
 
          (when (invalid? parent-log)
            (log.debug me "Parent tlog ~A is invalid, re-running it"
@@ -231,7 +231,7 @@ Can only be used inside an ATOMIC block."
        ;; since we are validating parent-log, we should update its read-version
        ;; otherwise the nested transactions (which inherit the parent read-version)
        ;; can enter an infinite retry or rerun loop
-       (setf (tlog-read-version parent-log) (global-clock/after-abort (tlog-read-version parent-log)))
+       (setf (tlog-read-version parent-log) (global-clock/after-abort))
 
        (when (invalid? parent-log)
          (log.debug me "Parent tlog ~A is invalid, re-running it"

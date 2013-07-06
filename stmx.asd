@@ -68,8 +68,9 @@
                              (:file "tlog"           :depends-on ("txhash"))
                              (:file "tvar"           :depends-on ("tlog"))
                              (:file "tclass"         :depends-on ("tvar"))
-                             (:file "commit"         :depends-on ("tlog"))
-                             (:file "atomic"         :depends-on ("tclass" "commit"))
+                             (:file "hw-atomic"      :depends-on ("classes"))
+                             (:file "commit"         :depends-on ("tvar" "hw-atomic"))
+                             (:file "atomic"         :depends-on ("commit"))
                              (:file "orelse"         :depends-on ("atomic")))
                 :depends-on (:lang))
 

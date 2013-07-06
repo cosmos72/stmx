@@ -97,8 +97,8 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 
   ;; hardware transactions are still EXPERIMENTAL.
   ;;
-  ;; do we have memory barriers, even trivial ones?
-  (when (feature? 'mem-rw-barriers)
+  ;; do we have memory barriers (even trivial ones) and mutex-owner?
+  (when (all-features? 'mem-rw-barriers 'mutex-owner)
     ;; do we also have the sb-transaction package exposing CPU hardware transactions?
     #?+(symbol sb-transaction transaction-supported-p)
     ;; good, and does the current CPU actually support hardware transactions?

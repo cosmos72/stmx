@@ -220,9 +220,10 @@ to TLOGs while executing BODY."
 (declaim (type version-type *hw-tlog-write-version*))
 (defvar *hw-tlog-write-version* +invalid-version+)
 
-(defmacro with-hw-tlog (&body body)
-  `(let1 *hw-tlog-write-version* (global-clock/start-write
-                                  (global-clock/start-read))
+(defmacro with-hw-tlog ((hw-tlog-write-version) &body body)
+  `(let* ((,hw-tlog-write-version (global-clock/start-write
+                                   (global-clock/start-read)))
+          (*hw-tlog-write-version* ,hw-tlog-write-version))
      ,@body))
 
 (defmacro hw-tlog-write-version ()

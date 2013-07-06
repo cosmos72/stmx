@@ -164,8 +164,8 @@ transactional memory it read has changed."
    run
    (setf (tlog-read-version log)
          (if aborted
-             (global-clock/on-abort (tlog-read-version log))
-             (global-clock/on-read)))
+             (global-clock/after-abort (tlog-read-version log))
+             (global-clock/start-read)))
 
    (handler-case
        (return

@@ -17,7 +17,8 @@
 
 (enable-#?-syntax)
 
-;;;; ** hardware transactions. need CPU support, see package sb-transaction
+;;;; ** hardware transactions. need CPU support,
+;;;; see package sb-transaction and also stmx/lang/features-detect.lisp
 
 
 #?+(eql hw-transactions :sb-transaction)

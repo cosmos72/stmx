@@ -95,17 +95,17 @@ is locked by another thread or is already unlocked."
  (declaim (ftype (function (mutex) t) mutex-owner)
           (inline mutex-owner))
 
- #?-(eql bt.lock-owner :abcl) ;; ABCL needs its own magic
+ #?-(eql bt/lock-owner :abcl) ;; ABCL needs its own magic
  (defun mutex-owner (mutex)
    "Return the thread that locked a mutex, or NIL if mutex is free."
    (declare (type mutex mutex))
    
-   (#.(stmx.lang::get-feature 'bt.lock-owner) (mutex-lock mutex))))
+   (#.(stmx.lang::get-feature 'bt/lock-owner) (mutex-lock mutex))))
 
 
 
 
-#?+(and mutex-owner (not (eql bt.lock-owner :abcl))) ;; ABCL needs its own magic
+#?+(and mutex-owner (not (eql bt/lock-owner :abcl))) ;; ABCL needs its own magic
 (eval-always
 
   (declaim (ftype (function (mutex) boolean) mutex-is-free? mutex-is-own? mutex-is-own-or-free?)
@@ -142,7 +142,7 @@ Return NIL if MUTEX is currently locked by some other thread."
 
 
 
-#?+(and mutex-owner (eql bt.lock-owner :abcl)) ;; ABCL needs its own magic
+#?+(and mutex-owner (eql bt/lock-owner :abcl)) ;; ABCL needs its own magic
 (eval-always
 
   (defconstant +bt-lock-is-locked+ 

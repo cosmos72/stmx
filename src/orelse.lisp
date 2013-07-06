@@ -15,6 +15,9 @@
 
 (in-package :stmx)
 
+(enable-#?-syntax)
+
+
 ;;;; ** Executing multiple transactions as alternatives
 
 (define-condition orelse-error (control-error)
@@ -48,7 +51,7 @@ Return nil if all tx are valid and want to retry."
            (ignorable me))
 
   (loop for i from 0 to (1- (length txs))
-     for itx    = (aref txs i)
+     for itx    = (svref txs i)
      for iretry = (orelse-tx-retry itx)
      do
        (unless iretry
@@ -66,10 +69,10 @@ Return nil if all tx are valid and want to retry."
   (declare (type simple-vector txs)
            (ignorable me))
 
-  (let1 log (orelse-tx-log (aref txs 0))
+  (let1 log (orelse-tx-log (svref txs 0))
     
     (loop for i from 1 to (1- (length txs))
-       for itx    = (aref txs i)
+       for itx    = (svref txs i)
        for ifunc  = (orelse-tx-func  itx)
        for ilog   = (orelse-tx-log   itx)
        do
@@ -118,6 +121,7 @@ Can only be used inside an ATOMIC block."
 
 
   (let ((parent-log (aif (current-tlog) it (error 'orelse-error)))
+        rerunning
         (index 0)
         tx
         (txs (if funcs
@@ -126,13 +130,15 @@ Can only be used inside an ATOMIC block."
                              :initial-element nil)
                  (return-from run-orelse (values)))))
 
-    (declare (type fixnum index)
+    (declare (type boolean rerunning)
+             (type fixnum index)
              (type simple-vector txs))
 
     (labels ((ensure-tx ()
-               (unless (setf tx (aref txs index))
+               (unless (setf tx (svref txs index))
                  (setf tx (make-orelse-tx :func (pop funcs)))
-                 (setf (aref txs index) tx))
+                 (setf (svref txs index) tx))
+               (setf rerunning nil)
                tx)
              
              (set-index (idx)
@@ -160,18 +166,9 @@ Can only be used inside an ATOMIC block."
              log  (new-or-clear-tlog (orelse-tx-log tx) :parent parent-log)
              (orelse-tx-log tx) log)
 
-       #-always
        ;; in a nested transaction we must use the same read-version as the parent
        ;; because we inherit its tlog-reads and tlog-writes...
        (setf (tlog-read-version log) (tlog-read-version parent-log))
-
-       #+never
-       (let1 read-version (tlog-read-version log)
-         (if (or (orelse-tx-retry tx) (/= +invalid-version+ read-version))
-             ;; it's a used TLOG which aborted, set read-version on abort
-             (setf (tlog-read-version log) (global-clock/on-abort read-version))
-             ;; it's a new TLOG or one that RETRIED? then set read-version normally
-             (setf (tlog-read-version log) (global-clock/on-read))))
 
        (handler-case
            (return-from run-orelse
@@ -189,12 +186,42 @@ Can only be used inside an ATOMIC block."
            (go run-next))
 
          (rerun-error ()
-           (log.debug me "Tlog ~A {~A} wants to re-run, trying next one"
-                      (~ log) (~ func))
            (wants-to-rerun)
+
+           #?+global-clock/spurious-failures-in-single-thread
+           (if rerunning
+               (log.debug me "Tlog ~A {~A} wants to re-run, trying next one"
+                          (~ log) (~ func))
+               (progn
+                 (log.debug me "Tlog ~A {~A} wants to re-run, trying it again before moving to next one"
+                            (~ log) (~ func))
+                 (go wants-to-rerun-maybe-spurious-failure)))
+
            (go run-next)))
 
 
+
+
+       #?+global-clock/spurious-failures-in-single-thread
+       wants-to-rerun-maybe-spurious-failure
+
+       #?+global-clock/spurious-failures-in-single-thread
+       (progn
+         ;; since we are validating parent-log, we should update its read-version
+         ;; otherwise the nested transactions (which inherit the parent read-version)
+         ;; can enter an infinite retry or rerun loop
+         (setf (tlog-read-version parent-log) (global-clock/after-abort (tlog-read-version parent-log)))
+
+         (when (invalid? parent-log)
+           (log.debug me "Parent tlog ~A is invalid, re-running it"
+                      (~ parent-log))
+           (rerun))
+
+         ;; rerun TX a second time before giving up
+         (setf rerunning t)
+         (go run-tx))
+
+         
 
        run-next
        (when (< (incf index) (length txs))
@@ -204,7 +231,7 @@ Can only be used inside an ATOMIC block."
        ;; since we are validating parent-log, we should update its read-version
        ;; otherwise the nested transactions (which inherit the parent read-version)
        ;; can enter an infinite retry or rerun loop
-       (setf (tlog-read-version parent-log) (global-clock/on-abort (tlog-read-version parent-log)))
+       (setf (tlog-read-version parent-log) (global-clock/after-abort (tlog-read-version parent-log)))
 
        (when (invalid? parent-log)
          (log.debug me "Parent tlog ~A is invalid, re-running it"
@@ -213,7 +240,7 @@ Can only be used inside an ATOMIC block."
 
        (let1 idx (find-first-rerun-tx txs me)
          (when idx
-           ;; (aref txs idx) wants to rerun, so rerun it
+           ;; (svref txs idx) wants to rerun, so rerun it
            (maybe-yield-before-rerun)
            (set-index idx)
            (go run-tx)))
@@ -236,7 +263,7 @@ Can only be used inside an ATOMIC block."
        ;; since we are validating parent-log, we should update its read-version
        ;; otherwise the nested transactions (which inherit the parent read-version)
        ;; can enter an infinite retry or rerun loop
-       (setf (tlog-read-version parent-log) (global-clock/on-read))
+       (setf (tlog-read-version parent-log) (global-clock/start-read))
 
        (when (invalid? parent-log)
          (log.debug me "Parent tlog ~A is invalid, re-running it"
@@ -251,6 +278,11 @@ Can only be used inside an ATOMIC block."
 (defmacro orelse (&body body)
   "Execute each form in BODY from left to right in separate, nested transactions
 until one succeeds (i.e. commits) or signals an error.
+
+If a form calls (RETRY) or has a temporary failure \(temporary failures as
+for example conflicts are normally invisible because (ATOMIC ...) re-executes
+them automatically) advance to the next form and run it instead of retrying
+the current one.
 
 Returns the value of the transaction that succeeded,
 or signals the error raised by the transaction that failed.

@@ -59,10 +59,12 @@
 (defun (setf raw-value-of) (value var)
   "Set the VALUE of VAR. Return VALUE.
 This function intentionally ignores transactions and it is only useful
-for debugging purposes. please use (setf ($ var) value) instead."
+for debugging purposes. Use (setf ($ var) value) instead."
   (declare (type tvar var))
   (set-tvar-value-and-version var value
-                              (global-clock/on-write (global-clock/on-read))))
+                              (global-clock/sw-write
+                               (global-clock/start-write
+                                (global-clock/start-read)))))
 
   
   

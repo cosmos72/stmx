@@ -33,16 +33,16 @@ as \"locked\" flag in TVARs versioning (it is actually used only if
 (deftype global-clock-incrementable/version-type () 'atomic-counter-num)
 
 (declaim (type atomic-counter +global-clock-incrementable+))
-(defconstant-eval-once +global-clock-incrementable+ (make-atomic-counter))
+(define-constant-eval-once +global-clock-incrementable+ (make-atomic-counter))
 
 (eval-always
   (let1 stmx-package (find-package 'stmx)
-    (defun %gvx-expand0-f (gvx name)
-      (declare (type symbol gvx name))
+    (defun %gvx-expand0-f (prefix suffix)
+      (declare (type symbol prefix suffix))
       (intern (concatenate 'string
-                           (symbol-name gvx)
+                           (symbol-name prefix)
                            "/"
-                           (symbol-name name))
+                           (symbol-name suffix))
               stmx-package)))
 
   (defun %gv-expand0-f (name)
@@ -64,26 +64,6 @@ as \"locked\" flag in TVARs versioning (it is actually used only if
 
 
 
-(defmacro declaim-global-clock-functions (gvx)
-  (let ((version-type (%gvx-expand0-f gvx 'version-type))
-        (on-read      (%gvx-expand0-f gvx 'on-read))
-        (valid-read?  (%gvx-expand0-f gvx 'valid-read?))
-        (on-write     (%gvx-expand0-f gvx 'on-write))
-        (on-abort     (%gvx-expand0-f gvx 'on-abort)))
-        
-    `(declaim
-      (ftype (function () ,version-type) ,on-read)
-
-      (ftype (function (,version-type ,version-type) boolean) ,valid-read?)
-         
-      (ftype (function (,version-type) ,version-type) ,on-write ,on-abort)
-
-      (inline ,on-read ,valid-read? ,on-write ,on-abort))))
-
-
-
-
-
 
 
 
@@ -93,10 +73,18 @@ as \"locked\" flag in TVARs versioning (it is actually used only if
 
 (define-symbol-macro +gv1+   +global-clock-incrementable+)
 
-;;(declaim-global-clock-functions gv1)
 
-(defmacro gv1/on-read ()
-  "This is GV1 implementation of GLOBAL-CLOCK/ON-READ.
+(defmacro gv1/features ()
+  "This is GV1 implementation of GLOBAL-CLOCK/FEATURES.
+
+Return nil, i.e. not '(:suitable-for-hw-transactions) because
+\(GV1/START-WRITE ...) increments the global clock, which causes conflicts
+and aborts when multiple hardware transactions are running simultaneously."
+  'nil)
+
+
+(defmacro gv1/start-read ()
+  "This is GV1 implementation of GLOBAL-CLOCK/START-READ.
 Return the current +gv1+ value."
   `(get-atomic-counter +gv1+))
 
@@ -107,20 +95,33 @@ Return (<= tvar-version read-version)"
   `(<= (the gv1/version-type ,tvar-version) (the gv1/version-type ,read-version)))
 
 
-(defmacro gv1/on-write (read-version)
-  "This is GV1 implementation of GLOBAL-CLOCK/ON-WRITE.
+(defmacro gv1/start-write (read-version)
+  "This is GV1 implementation of GLOBAL-CLOCK/START-WRITE.
 Atomically increment +gv1+ and return its new value."
   (declare (ignore read-version))
 
   `(incf-atomic-counter +gv1+ +global-clock-delta+))
 
 
-(defmacro gv1/on-abort (read-version)
-  "This is GV1 implementation of GLOBAL-CLOCK/ON-ABORT.
+(defmacro gv1/sw-write (write-version)
+  "This is GV1 implementation of GLOBAL-CLOCK/SW-WRITE.
+Return WRITE-VERSION."
+  write-version)
+
+
+(defmacro gv1/hw-write (write-version)
+  "This is GV1 implementation of GLOBAL-CLOCK/HW-WRITE.
+Return WRITE-VERSION."
+  write-version)
+
+
+(defmacro gv1/after-abort (read-version)
+  "This is GV1 implementation of GLOBAL-CLOCK/AFTER-ABORT.
 Return the current +gv1+ value."
   (declare (ignore read-version))
 
   `(get-atomic-counter +gv1+))
+
 
 
 
@@ -135,10 +136,21 @@ Return the current +gv1+ value."
 
 (define-symbol-macro +gv5+   +global-clock-incrementable+)
 
-;;(declaim-global-clock-functions gv5)
 
-(defmacro gv5/on-read ()
-  "This is GV5 implementation of GLOBAL-CLOCK/ON-READ.
+(defmacro gv5/features ()
+  "This is GV5 implementation of GLOBAL-CLOCK/FEATURES.
+
+Return '(:SUITABLE-FOR-HW-TRANSACTIONS :SPURIOUS-FAILURES-IN-SINGLE-THREAD)
+because the global clock is incremented only by GV5/AFTER-ABORT, which avoids
+incrementing it in GV5/START-WRITE (it would cause hardware transactions
+to conflict with each other and abort) but also causes a 50% abort rate (!) even
+in a single, isolated thread reading and writing its own transactional memory."
+
+ ''(:suitable-for-hw-transactions :spurious-failures-in-single-thread))
+
+
+(defmacro gv5/start-read ()
+  "This is GV5 implementation of GLOBAL-CLOCK/START-READ.
 Return the current +gv5+ value."
   `(get-atomic-counter +gv5+))
 
@@ -149,18 +161,32 @@ Return (<= tvar-version read-version)"
   `(<= (the gv5/version-type ,tvar-version) (the gv5/version-type ,read-version)))
 
 
-(defmacro gv5/on-write (read-version)
-  "This is GV5 implementation of GLOBAL-CLOCK/ON-WRITE?
+(defmacro gv5/start-write (read-version)
+  "This is GV5 implementation of GLOBAL-CLOCK/START-WRITE.
 Return (1+ +gv5+) without incrementing it."
   (declare (ignore read-version))
 
   `(get-atomic-counter-plus-delta +gv5+ +global-clock-delta+))
 
-(defmacro gv5/on-abort (read-version)
-  "This is GV5 implementation of GLOBAL-CLOCK/ON-ABORT?
-Return the current +gv5+ value."
-  (declare (ignore read-version))
 
+(defmacro gv5/sw-write (write-version)
+  "This is GV5 implementation of GLOBAL-CLOCK/SW-WRITE.
+Return (1+ +gv5+) without incrementing it."
+  (declare (ignore write-version))
+
+  `(get-atomic-counter-plus-delta +gv5+ +global-clock-delta+))
+
+
+(defmacro gv5/hw-write (write-version)
+  "This is GV5 implementation of GLOBAL-CLOCK/HW-WRITE.
+Return WRITE-VERSION."
+  write-version)
+
+
+(defmacro gv5/after-abort (read-version)
+  "This is GV5 implementation of GLOBAL-CLOCK/AFTER-ABORT.
+Increment +gv5+ and return its new value."
+  (declare (ignore read-version))
   `(incf-atomic-counter +gv5+ +global-clock-delta+))
 
 
@@ -175,15 +201,22 @@ Return the current +gv5+ value."
 (deftype global-clock/version-type () (%gv-expand0-f 'version-type))
 (deftype              version-type () (%gv-expand0-f 'version-type))
 
-;; (declaim-global-clock-functions global-clock)
 
-(defmacro global-clock/on-read ()
+(defmacro global-clock/features ()
+  "Return the features of the GLOBAL-CLOCK algorithm, i.e. a list
+containing zero or more of :SUITABLE-FOR-HW-TRANSACTIONS and
+:SPURIOUS-FAILURES-IN-SINGLE-THREAD. The list of possible features
+will be expanded as more GLOBAL-CLOCK algorithms are implemented."
+  `(%gv-expand features))
+
+
+(defmacro global-clock/start-read ()
   "Return the value to use as transaction \"read version\".
 
 This function must be invoked once upon starting a transaction for the first time.
 In case the transaction just aborted and is being re-executed, invoke instead
-\(GLOBAL-CLOCK/ON-ABORT PREVIOUS-READ-VERSION)."
-  `(%gv-expand on-read))
+\(GLOBAL-CLOCK/AFTER-ABORT PREVIOUS-READ-VERSION)."
+  `(%gv-expand start-read))
 
 
 (defmacro global-clock/valid-read? (tvar-version read-version)
@@ -196,20 +229,58 @@ During hardware transactions, this function is not used."
   `(%gv-expand valid-read? ,tvar-version ,read-version))
 
 
-(defmacro global-clock/on-write (read-version)
+(defmacro global-clock/start-write (read-version)
   "Return the value to use as transaction \"write version\", given the transaction
 current READ-VERSION that was assigned at transaction start.
 
 During software-base commits, this function must be called once before
 the first TVAR write; while during hardware-based commits and transactions
 it must be called once before writing the first TVAR."
-  `(%gv-expand on-write read-version))
+  `(%gv-expand start-write ,read-version))
 
 
-(defmacro global-clock/on-abort (read-version)
+(defmacro global-clock/sw-write (write-version)
+  "Return the value to use as TVAR \"write version\", given the transaction
+current WRITE-VERSION that was assigned by GLOBAL-CLOCK/START-WRITE before
+the transaction started writing to TVARs.
+
+Fhis function must be called for **each** TVAR being written
+during software-based commit phase of transactions."
+  `(%gv-expand sw-write ,write-version))
+
+
+(defmacro global-clock/hw-write (write-version)
+  "Return the value to use as TVAR \"write version\", given the transaction
+current WRITE-VERSION that was assigned by GLOBAL-CLOCK/START-WRITE before
+the transaction started writing to TVARs.
+
+Fhis function must be called for **each** TVAR being written during
+hardware-assisted commit phase of software transactions
+and during pure hardware transactions."
+  `(%gv-expand hw-write ,write-version))
+
+
+(defmacro global-clock/after-abort (read-version)
   "Return the value to use as new transaction \"read version\",
 given the current transaction READ-VERSION that was set at transaction start
-either by (GLOBAL-CLOCK/ON-READ) or by (GLOBAL-CLOCK/ON-ABORT PREVIOUS-READ-VERSION).
+either by (GLOBAL-CLOCK/START-READ) or by (GLOBAL-CLOCK/AFTER-ABORT PREVIOUS-READ-VERSION).
 
-This function must be called before rerunning a transaction that failed/aborted."
-  `(%gv-expand on-abort read-version))
+This function must be called after a transaction failed/aborted and before rerunning it."
+  `(%gv-expand after-abort ,read-version))
+
+
+(eval-always
+  (defun global-clock/publish-features ()
+    "Publish (GLOBAL-CLOCK/FEATURES) to stmx.lang::*feature-list*
+so they can be tested with #?+ and #?- reader macros."
+    (loop for pair in (global-clock/features) do
+         (let* ((feature (if (consp pair) (first pair) pair))
+                (value   (if (consp pair) (rest  pair) t))
+                (gv-feature (%gvx-expand0-f 'global-clock feature)))
+
+           (stmx.lang::add-feature gv-feature value))))
+
+  (global-clock/publish-features))
+     
+
+      

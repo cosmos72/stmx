@@ -18,9 +18,9 @@
 
 ;;;; * Miscellaneous macros
 
-(defmacro defconstant-eval-once (name value &optional (doc nil docp))
+(defmacro define-constant-eval-once (name value &optional (doc nil docp))
   "Same as DEFCONSTANT, but evaluate VALUE only once:
-re-executing again the same (DEFCONSTANT-EVAL-ONCE name ...) has no effects."
+re-executing again the same (DEFINE-CONSTANT-EVAL-ONCE name ...) has no effects."
   `(defconstant ,name 
      (if (boundp ',name) (symbol-value ',name) ,value)
      ,@(when docp `(,doc))))

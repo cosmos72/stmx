@@ -33,6 +33,7 @@
  (defun take2 (c)
    (nonblocking (take c))))
 
+;; try-take is already a transaction, wrapping it again is redundant
 (transaction
  (defun take3 (c)
    (try-take c)))
@@ -47,6 +48,7 @@
  (defun put2 (c val)
    (nonblocking (put c val))))
 
+;; try-put is already a transaction, wrapping it again is redundant
 (transaction
  (defun put3 (c val)
    (try-put c val)))
@@ -56,26 +58,29 @@
        (loop for takef in (list #'take1 #'take2 #'take3) do
             (loop for putf in (list #'put1 #'put2 #'put3)
                for unique = (gensym) do
+                 (locally
 
-                 (multiple-value-bind (took? value) (funcall takef place)
-                   (are-true (not took?)
-                             (null value)
-                             (empty? place)))
+                     (declare (type function takef putf))
+                   
+                   (multiple-value-bind (took? value) (funcall takef place)
+                     (are-true (not took?)
+                               (null value)
+                               (empty? place)))
 
-                 (multiple-value-bind (put? value) (funcall putf place unique)
-                   (are-true put?
-                             (eq value unique)
-                             (full? place)))
+                   (multiple-value-bind (put? value) (funcall putf place unique)
+                     (are-true put?
+                               (eq value unique)
+                               (full? place)))
 
-                 (multiple-value-bind (put? value) (funcall putf place unique)
-                   (are-true (not put?)
-                             (null value)
-                             (full? place)))
+                   (multiple-value-bind (put? value) (funcall putf place unique)
+                     (are-true (not put?)
+                               (null value)
+                               (full? place)))
 
-                 (multiple-value-bind (took? value) (funcall takef place)
-                   (are-true took?
-                             (eq value unique)
-                             (empty? place)))))))
+                   (multiple-value-bind (took? value) (funcall takef place)
+                     (are-true took?
+                               (eq value unique)
+                               (empty? place))))))))
       
 (test orelse
   (orelse-test))

@@ -30,27 +30,27 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
  (add-features 'disable-optimize-slot-access)
 
  #+abcl
- (add-features '(bt.lock-owner . :abcl))
+ (add-features '(bt/lock-owner . :abcl))
 
  #+ecl
- (add-features '(bt.lock-owner . mp::lock-owner))
+ (add-features '(bt/lock-owner . mp::lock-owner))
 
  #+cmucl
- (add-features '(bt.lock-owner . mp::lock-process))
+ (add-features '(bt/lock-owner . mp::lock-process))
 
  #+ccl
- (add-features '(bt.lock-owner . ccl::%%lock-owner))
+ (add-features '(bt/lock-owner . ccl::%%lock-owner))
 
  #+sbcl
  (add-features #+compare-and-swap-vops '(atomic-ops . :sbcl)
                #+memory-barrier-vops   '(mem-rw-barriers . :sbcl)
-               ;; usually, bt.lock-owner it not needed on SBCL:
+               ;; usually, bt/lock-owner it not needed on SBCL:
                ;; the combo atomic-ops + mem-rw-barriers provide fast-lock,
-               ;; which has mutex-owner, a faster replacement for bt.lock-owner
-               '(bt.lock-owner . sb-thread::mutex-owner)
+               ;; which has mutex-owner, a faster replacement for bt/lock-owner
+               '(bt/lock-owner . sb-thread::mutex-owner)
 
                #?+(symbol sb-ext defglobal)
-               '(defglobal . sb-ext:defglobal)))
+               '(define-global . sb-ext:defglobal)))
 
 
 
@@ -63,7 +63,10 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 (eval-always
 
   ;; use global-clock GV1 by default.
-  ;; Note: the alternative global-clock GV5 is UNTESTED!
+  ;;
+  ;; Note: the alternative global-clock GV5 reduces performance by ~50%
+  ;; because it causes a lot of (rerun), so it makes sense to use it
+  ;; only together with hardware transactions (GV1 is not suitable for that)
   (unless (feature? 'global-clock)
     (add-feature 'global-clock :gv1))
 
@@ -74,7 +77,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
   ;; so there is no way to stop the compiler from reordering assembler instructions.
   ;;
   ;; Luckily, the compiler cannot reorder memory-accessing assembler instructions
-  ;; with function calls, which is the only guarantee we need to use bt.lock-owner
+  ;; with function calls, which is the only guarantee we need to use bt/lock-owner
   ;; as long as we keep TVAR value and version in a CONS.
   ;;
   ;; note that in this case the memory barrier functions/macros do NOT
@@ -87,13 +90,13 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
   (unless (eql (get-feature 'mem-rw-barriers) :trivial)
     ;; fast-lock requires atomic compare-and-swap plus real memory barriers.
     ;; Also, fast-lock provides the preferred implementation of mutex-owner,
-    ;;   which does not use bt.lock-owner
+    ;;   which does not use bt/lock-owner
     (if (all-features? 'atomic-ops 'mem-rw-barriers)
         (add-features 'fast-lock 'mutex-owner)))
 
-  ;; if at least fake memory read/write barriers are available, bt.lock-owner
+  ;; if at least fake memory read/write barriers are available, bt/lock-owner
   ;; can be used as concurrency-safe mutex-owner even without atomic-ops
-  (when (all-features? 'mem-rw-barriers 'bt.lock-owner)
+  (when (all-features? 'mem-rw-barriers 'bt/lock-owner)
     (add-feature 'mutex-owner))
 
 
@@ -129,12 +132,12 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 
 
 
-  (defmacro defglobal (name value &optional (doc nil docp))
-    "Define NAME as a global variable, declaring that it will have
-the same value in all threads, i.e. it will not be special nor dynamically bound.
+  (defmacro define-global (name value &optional (doc nil docp))
+    "Define NAME as a global variable, declaring that it will have the same value
+in all threads, i.e. it will not be special nor dynamically bound.
 
-This is implemented either with a compiler-specific macro (for example SB-EXT:DEFGLOBAL
-on SBCL), or as DEFVAR if no better implementation is available."
+This is implemented either with a compiler-specific macro (for example
+SB-EXT:DEFGLOBAL on SBCL), or as DEFVAR if no better implementation is available."
     
-    (let1 defglobal-impl (get-feature 'defglobal 'defvar)
-      `(,defglobal-impl ,name ,value ,@(when docp `(,doc))))))
+    (let1 define-global-impl (get-feature 'define-global 'defvar)
+      `(,define-global-impl ,name ,value ,@(when docp `(,doc))))))

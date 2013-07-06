@@ -20,7 +20,7 @@
 ;;;; ** constants
 
 (declaim (type symbol +unbound-tvar+))
-(defglobal +unbound-tvar+ (gensym (symbol-name 'unbound-tvar-)))
+(define-global +unbound-tvar+ (gensym (symbol-name 'unbound-tvar-)))
 
 (declaim (type fixnum +invalid-version+))
 (defconstant +invalid-version+ (- +global-clock-delta+))
@@ -29,7 +29,7 @@
 ;;;; ** tvar approximate counter (fast but not fully exact in multi-threaded usage)
 
 (declaim (type fixnum +tvar-id+))
-(defglobal +tvar-id+ -1)
+(define-global +tvar-id+ -1)
 
 (declaim (inline get-next-id))
 (defun get-next-id (id)

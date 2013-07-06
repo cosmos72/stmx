@@ -71,21 +71,6 @@ bad style; I prefer to be notified early if I try to do something plainly wrong.
   (zerop (gmap-count m)))
 
 
-(defgeneric get-gmap (m key &optional default)
-  (:documentation "Find KEY in binary tree M and return its value and T as multiple values.
-If M does not contain KEY, return (values DEFAULT NIL)."))
-
-
-(defgeneric set-gmap (m key value)
-  (:documentation "Add KEY to binary tree M if not present, and associate KEY to VALUE in M.
-Return VALUE."))
-
-(declaim (inline (setf get-gmap)))
-(defun (setf get-gmap) (value m key)
-  "Add KEY to binary tree M if not present, and associate VALUE to KEY in M.
-Return VALUE."
-  (declare (type gmap m))
-  (set-gmap m key value))
 
 
 (defgeneric rem-gmap (m key)
@@ -285,18 +270,19 @@ return := if KEY1 and KEY2 compare as equal."
 
 
 
-(defmethod get-gmap ((m gmap) key &optional default)
+(defun get-gmap (m key &optional default)
   "Find KEY in binary tree M and return its value and T as multiple values.
 If M does not contain KEY, return (values DEFAULT NIL)."
-   (let ((node (_ m root))
-         (pred (_ m pred)))
-     (loop while node 
-          for xkey = (_ node key) do
-          (case (gmap-compare-keys pred key xkey)
-            (:< (setf node (_ node left)))
-            (:> (setf node (_ node right)))
-            (t (return-from get-gmap (values (_ node value) t)))))
-     (values default nil)))
+  (declare (type gmap m))
+  (let ((node (_ m root))
+        (pred (_ m pred)))
+    (loop while node 
+       for xkey = (_ node key) do
+         (case (gmap-compare-keys pred key xkey)
+           (:< (setf node (_ node left)))
+           (:> (setf node (_ node right)))
+           (t (return-from get-gmap (values (_ node value) t)))))
+    (values default nil)))
 
 
 
@@ -320,9 +306,10 @@ as multiple values"
              (the (or null comp-keyword) comp))))
      
 
-(defmethod set-gmap ((m gmap) key value)
+(defun set-gmap (m key value)
   "Add KEY to binary tree M if not present, and associate KEY to VALUE in M.
 Return VALUE."
+  (declare (type gmap m))
   (multiple-value-bind (stack comp) (find-key-and-stack m key)
     (let1 node (first stack)
        
@@ -344,6 +331,15 @@ Return VALUE."
       
     (free-list^ stack)
     value))
+
+
+
+(declaim (inline (setf get-gmap)))
+(defun (setf get-gmap) (value m key)
+  "Add KEY to binary tree M if not present, and associate VALUE to KEY in M.
+Return VALUE."
+  (declare (type gmap m))
+  (set-gmap m key value))
 
 
 

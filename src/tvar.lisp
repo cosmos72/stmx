@@ -158,9 +158,8 @@ returned by (HW-TLOG-WRITE-VERSION) - it is a per-transaction constant.
 Its purpose is to speed up this function, by removing the two nanoseconds
 required to retrieve such value from thread-local storage."
   (declare (type tvar var))
-  (setf (tvar-value var) value
-        (tvar-version var) version))
-
+  (setf (tvar-version var) version
+        (tvar-value var) value))
 
 
 

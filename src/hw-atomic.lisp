@@ -57,7 +57,8 @@ If the transaction aborts for any reason, execute FALLBACK."
              (hw-transaction-abort))
 
            (multiple-value-prog1
-               ,body
+               (block hw-atomic
+                 ,body)
              (hw-transaction-end)))
 
          (progn

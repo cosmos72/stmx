@@ -1,5 +1,7 @@
 TO DO:
 
+15) rewrite GMAP methods as functions
+
 14) implement pools of RBNODE and TNODE - check if benchmarks improve or not
 
 8) optimize ORELSE. The current implementation is quite naive,

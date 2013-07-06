@@ -119,6 +119,13 @@ Can only be used inside an ATOMIC block."
   ;;       2.2 otherwise, if parent-tx is invalid, tell it to re-execute with (rerun)
   ;;       2.3 otherwise, run tx[0] (set i=0 and jump to a).
 
+  
+  ;; ORELSE does not support hardware transactions!
+  (when (hw-transaction-supported-and-running?)
+    (if funcs
+        (hw-transaction-abort)
+        (return-from run-orelse (values))))
+
 
   (let ((parent-log (aif (current-tlog) it (error 'orelse-error)))
         rerunning

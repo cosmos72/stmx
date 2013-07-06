@@ -726,7 +726,7 @@ by the Lisp compiler being used:
 - it must produce fast, highly optimized code
 - it must expose atomic compare-and-swap operations or, as slower alternative,
   a function to retrieve the thread owning a lock
-- on unordered CPUs (i.e. on most CPUs except x86 and x86-86) it must expose
+- on unordered CPUs (i.e. on most CPUs except x86 and x86-64) it must expose
   memory barrier operations
 
 Among the non-commercial Lisp compilers, SBCL is the only one known to STMX author

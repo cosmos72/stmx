@@ -47,7 +47,10 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
                ;; usually, bt.lock-owner it not needed on SBCL:
                ;; the combo atomic-ops + mem-rw-barriers provide fast-lock,
                ;; which has mutex-owner, a faster replacement for bt.lock-owner
-               '(bt.lock-owner . sb-thread::mutex-owner)))
+               '(bt.lock-owner . sb-thread::mutex-owner)
+
+               #?+(symbol sb-ext defglobal)
+               '(defglobal . sb-ext:defglobal)))
 
 
 
@@ -58,6 +61,12 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 
 
 (eval-always
+
+  ;; use global-clock GV1 by default.
+  ;; Note: the alternative global-clock GV5 is UNTESTED!
+  (unless (feature? 'global-clock)
+    (add-feature 'global-clock :gv1))
+
   ;; on x86 and x86_64, memory read-after-read and write-after-write barriers
   ;; are NOP (well, technically except for SSE)
   ;;
@@ -90,15 +99,15 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 
 
   #+never ;; hardware transactions are still experimental
-  (progn
-    ;; do we have the sb-transaction package exposing CPU hardware transactions?
+
+  ;; do we have memory barriers and atomic compare-and-swap?
+  (when (feature? 'fast-lock)
+    ;; do we also have the sb-transaction package exposing CPU hardware transactions?
     #?+(symbol sb-transaction transaction-supported-p)
     ;; good, and does the current CPU actually support hardware transactions?
     (when (sb-transaction:transaction-supported-p) 
-      ;; do we also have memory barriers and atomic compare-and-swap?
-      (when (feature? 'fast-lock)
-        ;; yes.
-        (add-features '(hw-transactions . :sb-transaction)))))
+      ;; yes.
+      (add-features '(hw-transactions . :sb-transaction))))
 
 
 
@@ -116,4 +125,16 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 
   ;; both the above two features
   (when (all-features? 'fixnum-is-large 'fixnum-is-powerof2)
-    (add-feature 'fixnum-is-large-powerof2)))
+    (add-feature 'fixnum-is-large-powerof2))
+
+
+
+  (defmacro defglobal (name value &optional (doc nil docp))
+    "Define NAME as a global variable, declaring that it will have
+the same value in all threads, i.e. it will not be special nor dynamically bound.
+
+This is implemented either with a compiler-specific macro (for example SB-EXT:DEFGLOBAL
+on SBCL), or as DEFVAR if no better implementation is available."
+    
+    (let1 defglobal-impl (get-feature 'defglobal 'defvar)
+      `(,defglobal-impl ,name ,value ,@(when docp `(,doc))))))

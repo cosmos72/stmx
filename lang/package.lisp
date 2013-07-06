@@ -21,7 +21,8 @@
   (:use #:cl
         #:bordeaux-threads)
 
-  (:export #:defconstant-eval-once
+  (:export #:defglobal    #:defconstant-eval-once
+
            #:with-gensym  #:with-gensyms
            #:eval-always  #:new     #:let1
            #:when-bind    #:awhen

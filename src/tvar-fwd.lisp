@@ -20,7 +20,7 @@
 ;;;; ** constants
 
 (declaim (type symbol +unbound-tvar+))
-(defvar +unbound-tvar+ (gensym (symbol-name 'unbound-tvar-)))
+(defglobal +unbound-tvar+ (gensym (symbol-name 'unbound-tvar-)))
 
 (declaim (type fixnum +invalid-version+))
 (defconstant +invalid-version+ (- +global-clock-delta+))
@@ -28,12 +28,8 @@
 
 ;;;; ** tvar approximate counter (fast but not fully exact in multi-threaded usage)
 
-(eval-always
-  (defstruct approx-counter
-    (value -1 :type fixnum)))
-
-(declaim (type approx-counter +tvar-id+))
-(defconstant-eval-once +tvar-id+ (make-approx-counter))
+(declaim (type fixnum +tvar-id+))
+(defglobal +tvar-id+ -1)
 
 (declaim (inline get-next-id))
 (defun get-next-id (id)
@@ -48,7 +44,7 @@
         (1+ id))))
 
 (defmacro tvar-id/next ()
-  `(setf (approx-counter-value +tvar-id+) (get-next-id (approx-counter-value +tvar-id+))))
+  `(setf +tvar-id+ (get-next-id +tvar-id+)))
 
 
 

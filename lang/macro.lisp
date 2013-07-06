@@ -18,12 +18,12 @@
 
 ;;;; * Miscellaneous macros
 
-(defmacro defconstant-eval-once (name value &optional documentation)
+(defmacro defconstant-eval-once (name value &optional (doc nil docp))
   "Same as DEFCONSTANT, but evaluate VALUE only once:
 re-executing again the same (DEFCONSTANT-EVAL-ONCE name ...) has no effects."
   `(defconstant ,name 
-     (if (boundp ',name) ,name #|(symbol-value ',name)|# ,value)
-     ,documentation))
+     (if (boundp ',name) (symbol-value ',name) ,value)
+     ,@(when docp `(,doc))))
 
 
 (defmacro with-gensym (name &body body)

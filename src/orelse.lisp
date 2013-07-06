@@ -161,14 +161,9 @@ Can only be used inside an ATOMIC block."
              (orelse-tx-log tx) log)
 
        #-always
-       ;; why do we need to read again the global clock?
-       ;; 
-       ;; a naive argument would tell that in a nested transaction
-       ;; we must use the same read-version as the parent
+       ;; in a nested transaction we must use the same read-version as the parent
        ;; because we inherit its tlog-reads and tlog-writes...
-       ;;
-       ;; but doing so causes test failures (deeper analysis needed)
-       (setf (tlog-read-version log) (global-clock/on-read))
+       (setf (tlog-read-version log) (tlog-read-version parent-log))
 
        #+never
        (let1 read-version (tlog-read-version log)
@@ -177,8 +172,6 @@ Can only be used inside an ATOMIC block."
              (setf (tlog-read-version log) (global-clock/on-abort read-version))
              ;; it's a new TLOG or one that RETRIED? then set read-version normally
              (setf (tlog-read-version log) (global-clock/on-read))))
-       
-       
 
        (handler-case
            (return-from run-orelse
@@ -208,6 +201,11 @@ Can only be used inside an ATOMIC block."
          (ensure-tx)
          (go run-tx))
 
+       ;; since we are validating parent-log, we should update its read-version
+       ;; otherwise the nested transactions (which inherit the parent read-version)
+       ;; can enter an infinite retry or rerun loop
+       (setf (tlog-read-version parent-log) (global-clock/on-abort (tlog-read-version parent-log)))
+
        (when (invalid? parent-log)
          (log.debug me "Parent tlog ~A is invalid, re-running it"
                     (~ parent-log))
@@ -235,6 +233,11 @@ Can only be used inside an ATOMIC block."
        (log.debug me "ORELSE will sleep, then re-run")
        (wait-tlog log)
        
+       ;; since we are validating parent-log, we should update its read-version
+       ;; otherwise the nested transactions (which inherit the parent read-version)
+       ;; can enter an infinite retry or rerun loop
+       (setf (tlog-read-version parent-log) (global-clock/on-read))
+
        (when (invalid? parent-log)
          (log.debug me "Parent tlog ~A is invalid, re-running it"
                     (~ parent-log))

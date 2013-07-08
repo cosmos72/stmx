@@ -1,4 +1,9 @@
-TO DO:
+========== TO DO ==========
+
+17) implement adaptive global clock
+
+16) automatically expand $ to either $-tx or $-hwtx, and similarly expand
+    user-defined functions
 
 15) rewrite GMAP methods as functions
 
@@ -7,7 +12,7 @@ TO DO:
 8) optimize ORELSE. The current implementation is quite naive,
    it makes a full copy of the current transaction's read and write sets.
 
-DONE:
+========== DONE ==========
 
 13) optimize THASH-TABLE. The old implementation was very slow,
     before committing it made a full copy of the original hash table.

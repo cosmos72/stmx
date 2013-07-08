@@ -134,16 +134,6 @@ for debugging purposes. please use ($ var) instead."
    - for example because the version changed while reading."
   (declare (type tvar var))
 
-  #?+(eql tvar-lock :none)
-  ;; do not use locks at all. this requires hardware transactions.
-  (multiple-value-bind (version0 value) (%tvar-version-and-value var)
-    (let* ((version1 (progn (mem-read-barrier) (tvar-version var)))
-           (fail     (if (= version0 version1) 0 1)))
-      
-      (values value version1 fail)))
-          
-  
-
   #?+(eql tvar-lock :bit)
   ;; lock is lowest bit of tvar-version. extract and check it.
   ;; we must get version, value and version again EXACTLY in this order.
@@ -158,7 +148,6 @@ for debugging purposes. please use ($ var) instead."
              (fail     (logior lock1
                                (if (= version0+lock version1+lock) 0 1))))
         (values value version1 fail))))
-
 
 
   #?+(eql tvar-lock :mutex)
@@ -250,15 +239,13 @@ also set it (which may unlock VAR!). Return VALUE."
   "Try to lock VAR. Return T if locked successfully, otherwise return NIL."
   (declare (ignorable var))
 
-  #?+(eql tvar-lock :none)
-  t  
-
   #?+(eql tvar-lock :bit)
-  (let1 version (tvar-version var) 
+  (let1 version (progn (mem-read-barrier) (the version-type (tvar-version var)))
     (declare (type fixnum version))
     (when (zerop (logand version 1))
-      (let1 old-version (atomic-compare-and-swap (tvar-version var)
-                                                 version (logior version 1))
+      (let* ((new-version (the version-type (logior version 1)))
+             (old-version (atomic-compare-and-swap (tvar-version var)
+                                                   version new-version)))
         (= version old-version))))
 
   #?+(eql tvar-lock :mutex)
@@ -269,12 +256,8 @@ also set it (which may unlock VAR!). Return VALUE."
   "Unlock VAR. always return NIL."
   (declare (ignorable var))
 
-  #?+(eql tvar-lock :none)
-  nil
-
   #?+(eql tvar-lock :bit)
-  (let* ((version+lock     (the fixnum (tvar-version var)))
-         (version-unlocked (logand version+lock (lognot 1))))
+  (let1 version-unlocked (logand (the version-type (tvar-version var)) (lognot 1))
     (mem-write-barrier)
     (setf (tvar-version var) version-unlocked)
     nil)

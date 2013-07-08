@@ -367,10 +367,6 @@ Return NIL if VAR has different value, or is locked by some other thread."
     (when (eql fail 0)
       (return-from tvar-valid-and-own-or-unlocked? t))
 
-    #?+(eql tvar-lock :none)
-    t
-
-    #?-(eql tvar-lock :none)
     (progn
       #?+(and mutex-owner (eql tvar-lock :mutex))
       (mutex-is-own? (the mutex var))
@@ -378,7 +374,7 @@ Return NIL if VAR has different value, or is locked by some other thread."
       #?-(and mutex-owner (eql tvar-lock :mutex))
       ;; check transaction log to detect if we're the ones that locked VAR.
       ;; this may be needed both when TVAR-LOCK feature is :BIT
-      ;; and when it is :MUTEX but we have no MUTEX-OWNER implementation
+      ;; and when TVAR-LOCK is :MUTEX but we have no MUTEX-OWNER implementation
       (let1 present? (nth-value 1 (get-txhash (tlog-writes log) var))
         present?))))
 

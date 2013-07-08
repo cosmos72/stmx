@@ -22,21 +22,23 @@
 ;;;; used to ensure transactional read consistency.
 
 
-(defconstant +global-clock-delta+
-  #?+(eql tvar-lock :bit) 2
-  #?-(eql tvar-lock :bit) 1
-
-  "+global-clock+ is incremented by 1 or by 2 each time: the lowest bit
-will be reserved as \"locked\" flag in TVARs versioning if #?+tvar-lock
-feature is equal to :BIT).")
+(defconstant +global-clock-delta+ 2
+  "+global-clock+ is incremented by 2 each time: the lowest bit
+is reserved as \"locked\" flag in TVARs versioning - used if TVAR-LOCK
+feature is equal to :BIT.")
 
 
 ;;;; ** definitions common to more than one global-clock implementation
 
 (deftype global-clock-incrementable/version-type () 'atomic-counter-num)
 
+(eval-always
+  (defstruct (global-clock-incrementable (:include atomic-counter))
+    (sw-commits 0 :type atomic-counter-slot-type)))
+
+           
 (declaim (type atomic-counter +global-clock-incrementable+))
-(define-constant-eval-once +global-clock-incrementable+ (make-atomic-counter))
+(define-constant-eval-once +global-clock-incrementable+ (make-global-clock-incrementable))
 
 (eval-always
   (let1 stmx-package (find-package 'stmx)
@@ -125,6 +127,21 @@ Return the current +gv1+ value."
   `(get-atomic-counter +gv1+))
 
 
+(defmacro gv1/get-sw-commits ()
+  "This is GV5 implementation of GLOBAL-CLOCK/GET-SW-COMMITS.
+It always returns zero."
+  `0)
+
+(defmacro gv1/incf-sw-commits ()
+  "This is GV5 implementation of GLOBAL-CLOCK/INCF-SW-COMMITS.
+It does nothing and returns zero."
+  `0)
+
+(defmacro gv1/decf-sw-commits ()
+  "This is GV5 implementation of GLOBAL-CLOCK/DECF-SW-COMMITS.
+It does nothing and returns zero."
+  `0)
+
 
 
 
@@ -191,6 +208,28 @@ Increment +gv5+ and return its new value."
   `(incf-atomic-counter +gv5+ +global-clock-delta+))
 
 
+(defmacro gv5/get-sw-commits ()
+  "This is GV5 implementation of GLOBAL-CLOCK/GET-SW-COMMITS.
+Return the number of software-only transaction commits currently running."
+  `(get-atomic-place (global-clock-incrementable-sw-commits +gv5+)))
+
+
+(defmacro gv5/incf-sw-commits ()
+  "This is GV5 implementation of GLOBAL-CLOCK/INCF-SW-COMMITS.
+Increment by one the slot SW-COMMITS of +gv5+ and return its new value."
+  `(incf-atomic-place (global-clock-incrementable-sw-commits +gv5+)
+                      1
+                      #?+atomic-counter-mutex :place-mutex
+                      #?+atomic-counter-mutex (atomic-counter-mutex +gv5+)))
+
+
+(defmacro gv5/decf-sw-commits ()
+  "This is GV5 implementation of GLOBAL-CLOCK/DECF-SW-COMMITS.
+Decrement by one the slot SW-COMMITS of +gv5+ and return its new value."
+  `(incf-atomic-place (global-clock-incrementable-sw-commits +gv5+)
+                      -1
+                      #?+atomic-counter-mutex :place-mutex
+                      #?+atomic-counter-mutex (atomic-counter-mutex +gv5+)))
 
 
 
@@ -266,6 +305,38 @@ and during pure hardware transactions."
 
 This function must be called after a transaction failed/aborted and before rerunning it."
   `(%gv-expand after-abort))
+
+
+(defmacro global-clock/get-sw-commits ()
+  "Return the number of software-only transaction commits currently running.
+
+This function must be called at the beginning of each hardware transaction
+in order to detect if a software-only transaction is started during
+the hardware transaction, since their current implementations are incompatible."
+  `(%gv-expand get-sw-commits))
+
+
+(defmacro global-clock/incf-sw-commits ()
+  "Increment by one the number of software-only transaction commits currently running.
+
+This function must be called at the beginning of each software-only transaction commit
+in order to abort any running hardware transaction, since their current implementations
+are mutually incompatible."
+  `(%gv-expand incf-sw-commits))
+
+
+(defmacro global-clock/decf-sw-commits ()
+  "Decrement by one the number of software-only transaction commits currently running.
+
+This function must be called at the end of each software-only transaction commit
+\(both if the commits succeeds and if it fails) in order to allow again hardware
+transactions, since their current implementations are mutually incompatible."
+  `(%gv-expand decf-sw-commits))
+
+
+
+
+
 
 
 (eval-always

@@ -50,20 +50,28 @@
            #:hw-transaction-running?
            #:hw-transaction-abort
            #:hw-transaction-end
+           #:hw-transaction-rerun-may-succeed?
+           ;; returned by (hw-transaction-begin) if successful
+           #:+hw-transaction-started+
            ;; cached result of (hw-transaction-supported?)
            #:+hw-transaction-supported+
            ;; equivalent to (and +hw-transaction-supported+ (hw-transaction-running?))
            #:hw-transaction-supported-and-running?
 
            ;; atomic operations
-           #:atomic-num #:atomic-incf #:atomic-decf
+           #:atomic-num
+           #:atomic-incf #:atomic-decf
            #:atomic-compare-and-swap  #:atomic-pop
            #:mem-read-barrier #:mem-write-barrier
 
-           #:atomic-counter-num
+           #:atomic-counter-slot-type #:atomic-counter-num
            #:atomic-counter #:make-atomic-counter
-           #:get-atomic-counter #:get-atomic-counter-plus-delta
-           #:set-atomic-counter #:incf-atomic-counter
+
+           #:incf-atomic-counter #:incf-atomic-place
+           #:set-atomic-counter  #:set-atomic-place
+           #:get-atomic-counter  #:get-atomic-place
+           #:get-atomic-counter-plus-delta #:get-atomic-place-plus-delta
+           
 
            #:mutex             #:make-mutex
            #:mutex-owner       #:mutex-lock

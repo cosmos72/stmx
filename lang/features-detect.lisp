@@ -107,35 +107,6 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
       (add-features '(hw-transactions . :sb-transaction))))
 
 
-  ;; which kind of locking shall we use for TVARs?
-  ;;
-  ;; The preferred choice is hardware transactions, which does not need
-  ;; *any* locking; in such case define the feature TVAR-LOCK to :NONE
-  ;;
-  ;; The second choice is atomic compare-and-swap on a single bit of TVARs version:
-  ;; it requires FAST-MUTEX, i.e. both ATOMIC-OPS and MEM-RW-BARRIERS;
-  ;; in such case define the feature TVAR-LOCK to :BIT
-  ;;
-  ;; The third and least preferred choice is to use mutexes; in such case
-  ;; define the feature TVAR-LOCK to :MUTEX
-  (add-feature 'tvar-lock
-               (cond
-                 ((feature? 'hw-transactions) :none)
-                 ((feature? 'fast-mutex)      :bit)
-                 (t                           :mutex)))
-  
-
-  ;; use global-clock GV1 by default, but switch to GV5 for hardware transactions.
-  ;;
-  ;; Note: using the global-clock GV5 with software transactions
-  ;; reduces performance by ~50% because it causes a lot of (rerun),
-  ;; so it makes sense to use it only together with hardware transactions
-  ;; (GV1 is not suitable for that)
-  (unless (feature? 'global-clock)
-    (add-feature 'global-clock 
-                 (if (feature? 'hw-transactions) :gv5 :gv1)))
-
-
 
 
   ;; (1+ most-positive-fixnum) is a power of two?
@@ -150,6 +121,34 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
   ;; both the above two features
   (when (all-features? 'fixnum-is-large 'fixnum-is-powerof2)
     (add-feature 'fixnum-is-large-powerof2))
+
+
+
+
+  ;; which kind of locking shall we use for TVARs?
+  ;;
+  ;; The preferred choice is a single lock bit embedded in TVARs version.
+  ;; It requires FAST-MUTEX (i.e. both ATOMIC-OPS and MEM-RW-BARRIERS)
+  ;; and FIXNUM-IS-POWEROF2. In such case define the feature TVAR-LOCK to :BIT
+  ;;
+  ;; The second and much slower choice is to use mutexes; in such case
+  ;; define the feature TVAR-LOCK to :MUTEX
+  (if (all-features? 'fast-mutex 'fixnum-is-powerof2)
+      (add-feature 'tvar-lock :bit)
+      (add-feature 'tvar-lock :mutex))
+  
+
+  ;; use global-clock GV1 by default, but switch to GV5 for hardware transactions.
+  ;;
+  ;; Note: using the global-clock GV5 with software transactions
+  ;; reduces performance by ~50% because it causes a lot of (rerun),
+  ;; so it makes sense to use it only together with hardware transactions
+  ;; (GV1 is not suitable for that)
+  (add-feature 'global-clock 
+               (if (feature? 'hw-transactions) :gv5 :gv1))
+
+
+
 
 
 

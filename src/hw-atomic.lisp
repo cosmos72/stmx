@@ -17,56 +17,54 @@
 
 (enable-#?-syntax)
 
-;;;; ** global lock to prevent hardware transactions from running.
-;;;;    used by software transactions when hw-assisted commit fails.
-
-(declaim (type mutex +hw-transaction-stop-the-world+))
-(define-constant-eval-once +hw-transaction-stop-the-world+ (make-mutex))
-
-(defmacro try-acquire-hw-transaction-stop-the-world ()
-  "Try to acquire the mutex +HW-TRANSACTION-STOP-THE-WORLD+.
-Return T if successful, NIL if failed."
-  `(try-acquire-mutex +hw-transaction-stop-the-world+))
-
-
-(defmacro release-hw-transaction-stop-the-world ()
-  "Release the mutex +HW-TRANSACTION-STOP-THE-WORLD+."
-  `(release-mutex +hw-transaction-stop-the-world+))
-
-
-(defmacro hw-transaction-stop-the-world-is-free? ()
-  "Return T if the mutex +HW-TRANSACTION-STOP-THE-WORLD+ is free."
-  `(mutex-is-free? +hw-transaction-stop-the-world+))
-
-
-
 
 ;;;; ** Running hardware transactions
 
+(defconstant +hw-atomic-max-attempts+ 3)
 
-
-(defmacro %hw-atomic (helper-$-hwtx body fallback)
+(defmacro %hw-atomic ((&optional tvar-write-version err)
+                      body fallback)
   "Run BODY in a hardware memory transaction.
 If the transaction aborts for any reason, execute FALLBACK."
-  
-  `(with-hw-tlog (,helper-$-hwtx)
-     (if (hw-transaction-begin)
 
-         (progn
-           (unless (hw-transaction-stop-the-world-is-free?)
-             (hw-transaction-abort))
+  (let ((tvar-write-version (or tvar-write-version (gensym (symbol-name 'tvar-write-version))))
+        (err (or err (gensym (symbol-name 'err)))))
+    (with-gensyms (attempts-left tx-begin)
+      `(prog ((,err 0)
+              (,attempts-left +hw-atomic-max-attempts+)
+              (*hw-tlog-write-version* 0)) ;; thread-local global variable
 
-           (multiple-value-prog1
-               (block hw-atomic
-                 ,body)
-             (hw-transaction-end)))
+          (declare (type (integer 0 #.+hw-atomic-max-attempts+) ,attempts-left))
 
-         (progn
-           (global-clock/after-abort)
-           ,fallback))))
+          ,tx-begin
+          (setf ,err (hw-transaction-begin))
+          (when (= ,err +hw-transaction-started+)
+            (let ((,tvar-write-version
+                   (setf *hw-tlog-write-version*
+                         (global-clock/start-write (global-clock/start-read)))))
+              (declare (ignorable ,tvar-write-version))
+
+              ;; hardware transactions are currently incompatible
+              ;; with software-only transaction commits :-(
+              (unless (zerop (global-clock/get-sw-commits))
+                (hw-transaction-abort))
+
+              (return ;; returns from (prog ...)
+                (multiple-value-prog1
+                    (block nil
+                      ,body)
+                  (hw-transaction-end)))))
+
+          (unless (zerop (decf ,attempts-left))
+            (when (hw-transaction-rerun-may-succeed? ,err)
+              (go ,tx-begin)))
+
+          (return ;; returns from (prog ...)
+            (block nil
+              ,fallback))))))
 
 
-(defmacro hw-atomic ((&optional (helper-$-hwtx (gensym)))
+(defmacro hw-atomic ((&optional tvar-write-version err)
                      &optional (body nil body?) (fallback body))
 
   "Run BODY in a hardware memory transaction. All changes to transactional memory
@@ -78,5 +76,7 @@ threads.
 
 If hardware memory transaction aborts for any reason, execute FALLBACK."
   (if body?
-      `(%hw-atomic ,helper-$-hwtx ,body ,fallback)
+      `(%hw-atomic (,tvar-write-version ,err) ,body ,fallback)
       `(values)))
+
+

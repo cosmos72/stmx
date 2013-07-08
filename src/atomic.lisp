@@ -109,9 +109,10 @@ For pre-defined transactional classes, see the package STMX.UTIL"
 
 (defmacro fast-atomic (&rest body)
   (if body
-      `(if (transaction?)
-           (locally ,@body)
-           (%run-atomic (lambda () ,@body)))
+      (let1 form `(locally ,@body)
+        `(if (transaction?)
+             (block nil ,form)
+             (hw-atomic () ,form (atomic ,form))))
       `(values)))
 
        

@@ -165,8 +165,8 @@ transactional memory it read has changed."
    run
    (setf (tlog-read-version log)
          (if aborted
-             (global-clock/after-abort)
-             (global-clock/start-read)))
+             (global-clock/sw/after-abort)
+             (global-clock/sw/start-read)))
 
    (handler-case
        (return
@@ -179,7 +179,9 @@ transactional memory it read has changed."
                ;; all done, prepare to return.
                ;; we are not returning TLOGs to the pool in case tx signaled an error,
                ;; but that's not a problem since the TLOG pool is just a speed optimization
-               (free-tlog log)
+               (progn
+                 (global-clock/stat-committed)
+                 (free-tlog log))
 
                (progn
                  (log.debug "Tlog ~A {~A} could not commit, re-running it" (~ log) (~ tx))
@@ -196,6 +198,7 @@ transactional memory it read has changed."
 
    rerun
    (log.debug "Tlog ~A {~A} will re-run" (~ log) (~ tx))
+   (global-clock/stat-aborted)
    (maybe-yield-before-rerun)
    (setf aborted t)
    ;; fallthrough

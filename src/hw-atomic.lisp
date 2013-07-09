@@ -29,19 +29,22 @@ If the transaction aborts for any reason, execute FALLBACK."
 
   (let ((tvar-write-version (or tvar-write-version (gensym (symbol-name 'tvar-write-version))))
         (err (or err (gensym (symbol-name 'err)))))
-    (with-gensyms (attempts-left tx-begin)
+    (with-gensyms (attempts-left tx-begin tx-fallback)
       `(prog ((,err 0)
               (,attempts-left +hw-atomic-max-attempts+)
               (*hw-tlog-write-version* 0)) ;; thread-local global variable
 
           (declare (type (integer 0 #.+hw-atomic-max-attempts+) ,attempts-left))
 
+          (unless (zerop (global-clock/get-sw-commits))
+            (go ,tx-fallback))
+
           ,tx-begin
           (setf ,err (hw-transaction-begin))
           (when (= ,err +hw-transaction-started+)
             (let ((,tvar-write-version
                    (setf *hw-tlog-write-version*
-                         (global-clock/start-write (global-clock/start-read)))))
+                         (global-clock/hw/start-write (global-clock/hw/start-read)))))
               (declare (ignorable ,tvar-write-version))
 
               ;; hardware transactions are currently incompatible
@@ -53,12 +56,16 @@ If the transaction aborts for any reason, execute FALLBACK."
                 (multiple-value-prog1
                     (block nil
                       ,body)
-                  (hw-transaction-end)))))
+                  (hw-transaction-end)
+                  (global-clock/stat-committed)))))
 
           (unless (zerop (decf ,attempts-left))
             (when (hw-transaction-rerun-may-succeed? ,err)
               (go ,tx-begin)))
 
+          (global-clock/stat-aborted)
+
+          ,tx-fallback
           (return ;; returns from (prog ...)
             (block nil
               ,fallback))))))

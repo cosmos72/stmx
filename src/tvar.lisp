@@ -62,9 +62,9 @@ This function intentionally ignores transactions and it is only useful
 for debugging purposes. Use (setf ($ var) value) instead."
   (declare (type tvar var))
   (set-tvar-value-and-version var value
-                              (global-clock/sw-write
-                               (global-clock/start-write
-                                (global-clock/start-read)))))
+                              (global-clock/sw/write
+                               (global-clock/sw/start-write
+                                (global-clock/sw/start-read)))))
 
   
   

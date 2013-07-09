@@ -360,7 +360,7 @@ After successful return, CHANGED contains the list of the TVARs actually written
   (declare (type txfifo locked))
 
   (let1 write-version (the version-type
-                        (global-clock/start-write (tlog-read-version log)))
+                        (global-clock/sw/start-write (tlog-read-version log)))
 
     (do-filter-txfifo (var val) locked
       (if (eq val (raw-value-of var))
@@ -373,7 +373,7 @@ After successful return, CHANGED contains the list of the TVARs actually written
           (progn
             ;; if TVAR-LOCK is :BIT?, this also unlocks VAR.
             (set-tvar-value-and-version var val
-                                        (global-clock/sw-write write-version))
+                                        (global-clock/sw/write write-version))
                    
             (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
                        (~ log) (~ var) current-val val)))

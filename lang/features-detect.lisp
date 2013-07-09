@@ -113,8 +113,8 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
   (when (zerop (logand most-positive-fixnum (1+ most-positive-fixnum)))
     (add-feature 'fixnum-is-powerof2))
 
-  ;; fixnum is large enough to count 10 million transactions
-  ;; per second for at least 100 years?
+  ;; fixnum is large enough to count 50 million transactions
+  ;; per second for at least 20 years?
   (when (>= most-positive-fixnum #x7fffffffffffff)
     (add-feature 'fixnum-is-large))
 

@@ -153,9 +153,11 @@ Can only be used inside an ATOMIC block."
                (ensure-tx))
 
              (wants-to-retry ()
+               (global-clock/stat-aborted)
                (setf (orelse-tx-retry tx) t))
 
              (wants-to-rerun ()
+               (global-clock/stat-committed)
                (setf (orelse-tx-retry tx) nil)))
            
 
@@ -181,6 +183,7 @@ Can only be used inside an ATOMIC block."
            (return-from run-orelse
              (multiple-value-prog1 (run-once func log)
 
+               (global-clock/stat-committed)
                (commit-nested log)
                (log.debug me "Tlog ~A {~A} committed to parent tlog ~A"
                           (~ log) (~ func) (~ parent-log))
@@ -217,7 +220,7 @@ Can only be used inside an ATOMIC block."
          ;; since we are validating parent-log, we should update its read-version
          ;; otherwise the nested transactions (which inherit the parent read-version)
          ;; can enter an infinite retry or rerun loop
-         (setf (tlog-read-version parent-log) (global-clock/after-abort))
+         (setf (tlog-read-version parent-log) (global-clock/sw/after-abort))
 
          (when (invalid? parent-log)
            (log.debug me "Parent tlog ~A is invalid, re-running it"
@@ -238,7 +241,7 @@ Can only be used inside an ATOMIC block."
        ;; since we are validating parent-log, we should update its read-version
        ;; otherwise the nested transactions (which inherit the parent read-version)
        ;; can enter an infinite retry or rerun loop
-       (setf (tlog-read-version parent-log) (global-clock/after-abort))
+       (setf (tlog-read-version parent-log) (global-clock/sw/after-abort))
 
        (when (invalid? parent-log)
          (log.debug me "Parent tlog ~A is invalid, re-running it"
@@ -270,7 +273,7 @@ Can only be used inside an ATOMIC block."
        ;; since we are validating parent-log, we should update its read-version
        ;; otherwise the nested transactions (which inherit the parent read-version)
        ;; can enter an infinite retry or rerun loop
-       (setf (tlog-read-version parent-log) (global-clock/start-read))
+       (setf (tlog-read-version parent-log) (global-clock/sw/start-read))
 
        (when (invalid? parent-log)
          (log.debug me "Parent tlog ~A is invalid, re-running it"

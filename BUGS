@@ -1,6 +1,6 @@
 KNOWN BUGS
 
-none :)
+6) with HW-TRANSACTIONS enabled, test suite hangs!
 
 FIXED BUGS:
 

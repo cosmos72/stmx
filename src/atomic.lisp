@@ -103,16 +103,16 @@ For advanced features inside transactions, see RETRY, ORELSE, NONBLOCKING,
 For pre-defined transactional classes, see the package STMX.UTIL"
 
   (if body
-      `(run-atomic (lambda () ,@body))
+      `(run-atomic (lambda () (block nil (locally ,@body))))
       `(values)))
 
 
 (defmacro fast-atomic (&rest body)
   (if body
-      (let1 form `(locally ,@body)
+      (let1 form `(block nil (locally ,@body))
         `(if (transaction?)
-             (block nil ,form)
-             (hw-atomic () ,form (atomic ,form))))
+             ,form
+             (%run-atomic (lambda () ,@body))))
       `(values)))
 
        

@@ -1,9 +1,20 @@
 ========== TO DO ==========
 
+18) remember that HW transactions **cannot** be started from inside a SW transaction...
+    disaster would follow, as HW transactions do not check TVARs values stored in the TLOG
+    and when committing they write directly into TVARs globaly-visible value
+
 17) implement adaptive global clock
 
 16) automatically expand $ to either $-tx or $-hwtx, and similarly expand
     user-defined functions
+
+16) implement with-lock-elision using hw-only transactions. It must abort if a SW
+    transaction is running, and it must check for a running HW transaction to make it nestable:
+    (with-lock-elision (lock1)
+      (with-lock-elision (lock2)
+      ...))
+    Implement it for both Bordeaux-threads locks and CAS fast mutexes (if available)
 
 15) rewrite GMAP methods as functions
 

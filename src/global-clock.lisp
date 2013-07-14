@@ -35,7 +35,7 @@ feature is equal to :BIT.")
 (eval-always
   (defstruct (global-clock-gv156 (:include atomic-counter))
     (sw-commits 0 :type atomic-counter-slot-type)
-    (commit-percentage 0 :type (integer -100 100))))
+    (success-stat 0 :type (integer -100 100))))
 
            
 (declaim (type atomic-counter +global-clock-gv156+))

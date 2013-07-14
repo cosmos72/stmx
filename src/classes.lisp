@@ -156,8 +156,8 @@ while it is normally disabled in these cases:
 (declaim (inline transaction?))
 (defun transaction? ()
   "Return true if inside a software or hardware transaction."
-  (or *record-to-tlogs*
-      (hw-transaction-supported-and-running?)))
+  (or (hw-transaction-supported-and-running?)
+      *record-to-tlogs*))
 
 
 
@@ -210,11 +210,6 @@ to TLOGs while executing BODY."
        ,@body)))
 
 
-(eval-when (:load-toplevel :execute)
-  (save-thread-initial-bindings *tlog* *record-to-tlogs* *hide-tvars*))
-
-
-
 ;;;; ** Current hardware transaction log
 
 (declaim (type version-type *hw-tlog-write-version*))
@@ -223,6 +218,11 @@ to TLOGs while executing BODY."
 (defmacro hw-tlog-write-version ()
   "Return the WRITE-VERSION for the current hardware transaction"
   '*hw-tlog-write-version*)
+
+
+
+(eval-when (:load-toplevel :execute)
+  (save-thread-initial-bindings *tlog* *record-to-tlogs* *hide-tvars* *hw-tlog-write-version*))
 
 
 

@@ -97,7 +97,7 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
      <td>0.108</td><td>0.019</td></tr>
 
  <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($-tx v)))</code></td>
-     <td>0.135</td><td>0.019</td></tr>
+     <td>0.135</td><td>0.025</td></tr>
 
  <tr><td>atomic read-write-10</td>
      <td><code>(atomic (dotimes (j 10) (incf ($-tx v))))</code></td>

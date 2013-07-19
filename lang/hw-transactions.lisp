@@ -33,7 +33,7 @@ otherwise return NIL."
     `(sb-transaction:transaction-supported-p))
 
   (defmacro hw-transaction-begin ()
-    "Start a hardware memory transaction. Return +transaction-started+
+    "Start a hardware memory transaction. Return +hw-transaction-started+
 if transaction runs successfully, otherwise return abort reason."
     `(sb-transaction:transaction-begin))
 
@@ -73,7 +73,7 @@ Return NIL if re-running the same transaction has no possibility to succeed."
 
   ;; stub implementation if no compiler support
 
-  (defconstant +hw-transaction-started+ 0)
+  (defconstant +hw-transaction-started+ 3)
 
   (defmacro hw-transaction-supported? ()
     "Return T if the CPU supports hardware memory transactions,
@@ -82,9 +82,9 @@ otherwise return NIL."
     `nil)
 
   (defmacro hw-transaction-begin ()
-    "Start a hardware memory transaction. Return +transaction-started+
+    "Start a hardware memory transaction. Return +hw-transaction-started+
 if transaction started successfully, otherwise return abort reason."
-    `-1)
+    `0)
 
   (defmacro hw-transaction-running? ()
     "Return T if a hardware memory transaction is in progress."
@@ -107,6 +107,7 @@ at (hw-transaction-begin) by returning abort reason."
 return T if re-running the same transaction has a possibility to succeed,
 i.e. if the abort reason was temporary (as for example a conflict with another thread).
 Return NIL if re-running the same transaction has no possibility to succeed."
+    (declare (ignore err-code))
     `nil)
 
 

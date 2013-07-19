@@ -70,7 +70,8 @@
                              (:file "tclass"         :depends-on ("tvar"))
                              (:file "hw-atomic"      :depends-on ("classes"))
                              (:file "commit"         :depends-on ("tvar" "hw-atomic"))
-                             (:file "atomic"         :depends-on ("commit"))
+                             (:file "sw-atomic"      :depends-on ("commit"))
+                             (:file "atomic"         :depends-on ("hw-atomic" "sw-atomic"))
                              (:file "orelse"         :depends-on ("atomic")))
                 :depends-on (:lang))
 

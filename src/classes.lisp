@@ -228,6 +228,11 @@ to TLOGs while executing BODY."
 
 ;;;; ** Retrying
 
+(defmacro maybe-yield-before-rerun ()
+  #+never nil
+  #-always (thread-yield))
+
+
 (define-condition stmx.control-error (control-error)
   ()
   (:documentation "Parent class of all STMX errors"))

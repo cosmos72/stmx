@@ -65,7 +65,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
   ;; on x86 and x86_64, memory read-after-read and write-after-write barriers
   ;; are NOP (well, technically except for SSE)
   ;;
-  ;; Unluckily, if the underlying Lisp does know about them,
+  ;; Unluckily, if the underlying Lisp does not know about them,
   ;; so there is no way to stop the compiler from reordering assembler instructions.
   ;;
   ;; Luckily, the compiler cannot reorder memory-accessing assembler instructions

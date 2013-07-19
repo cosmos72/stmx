@@ -57,9 +57,7 @@ If it has no chances to succeed, execute BODY in a software memory transaction."
 
                  (return ;; returns from (prog ...)
                    (multiple-value-prog1
-                       (block nil
-			 (locally
-			     ,body))
+		       ,body
                      (hw-transaction-end)
                      (global-clock/stat-committed)))))
 
@@ -70,9 +68,7 @@ If it has no chances to succeed, execute BODY in a software memory transaction."
 
              ,tx-fallback
              (return ;; returns from (prog ...)
-               (block nil
-		 (locally
-		     ,fallback)))))))))
+	       ,fallback)))))))
 
 
 (defmacro hw-atomic2 ((&optional tvar-write-version err)
@@ -89,21 +85,6 @@ If it fails for some other reason, execute FALLBACK."
   (if body?
       `(%hw-atomic2 (,tvar-write-version ,err)
                    ,body ,fallback)
-      `(values)))
-
-
-(defmacro hw-atomic (&optional (body nil body?))
-  "Run BODY in a hardware memory transaction. All changes to transactional memory
-will be visible to other threads only after BODY returns normally (commits).
-If BODY signals an error, its effects on transactional memory are rolled back
-and the error is propagated normally.
-Also, no work-in-progress transactional memory will ever be visible to other
-threads.
-
-If hardware memory transaction aborts for a conflict, rerun it.
-If it fails for some other reason, execute BODY in a software memory transaction."
-  (if body?
-      `(%hw-atomic2 () ,body (atomic ,body))
       `(values)))
 
 

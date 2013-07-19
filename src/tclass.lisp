@@ -294,6 +294,22 @@ and alter its :type to also accept TVARs"
 
 
 
+(defmacro transactional ((defclass class-name direct-superclasses direct-slots &rest class-options))
+  "Define CLASS-NAME as a new transactional class.
+Use this macro to wrap a normal DEFCLASS as follows:
+\(TRANSACTIONAL (DEFCLASS class-name (superclasses) (slots) [options]))
+
+The effect is the same as DEFCLASS, plus:
+- by default, slots are transactional memory (implemented by TVARs)
+- it inherits also from TRANSACTIONAL-OBJECT
+- the metaclass is TRANSACTIONAL-CLASS"
+  `(,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
+     ,(adjust-transactional-slots-definitions direct-slots class-name direct-superclasses)
+     ,@class-options
+     #?+disable-optimize-slot-access (:optimize-slot-access nil)
+     (:metaclass transactional-class)))
+
+
 
 ;;;; ** Signalling unbound slots
 

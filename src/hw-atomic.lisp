@@ -22,42 +22,43 @@
 
 ;;(defconstant +hw-atomic-max-attempts+ 3)
 
-(defmacro %hw-atomic2 ((&optional tvar-write-version err) body fallback)
+(defmacro %hw-atomic2 ((&optional tvar-write-version &key err (test-for-running-tx? t))
+                       body fallback)
   "Run BODY in a hardware memory transaction.
 If the transaction aborts, retry it as long as it has chances to succeed.
 If it has no chances to succeed, execute BODY in a software memory transaction."
 
   (let ((tvar-write-version (or tvar-write-version (gensym (symbol-name 'tvar-write-version))))
         (err (or err (gensym (symbol-name 'err)))))
+    
     (with-gensyms (tx-begin tx-fallback)
       `(cond
-         ;; already in a hardware or software transaction? then just run body
-         ((transaction?) ,body)
+         ,@(if test-for-running-tx? `(((transaction?) ,body)) `())
          (t
           (prog ((,err 0)
                  ;; create a a thread-local binding for *hw-tlog-write-version*
                  (*hw-tlog-write-version* 0))
-
-             (unless (zerop (global-clock/get-sw-commits))
+             
+             (unless (zerop (global-clock/get-nohw-counter))
                (go ,tx-fallback))
-
+             
              ,tx-begin
              (setf ,err (hw-transaction-begin))
              (when (= ,err +hw-transaction-started+)
                ;; hardware transactions are currently incompatible
                ;; with software-only transaction commits :-(
-               (unless (zerop (global-clock/get-sw-commits))
+               (unless (zerop (global-clock/get-nohw-counter))
                  (hw-transaction-abort))
 
                (let ((,tvar-write-version
                       (setf *hw-tlog-write-version*
                             (global-clock/hw/start-write (global-clock/hw/start-read)))))
                  (declare (ignorable ,tvar-write-version))
-
+                  
 
                  (return ;; returns from (prog ...)
                    (multiple-value-prog1
-		       ,body
+                       ,body
                      (hw-transaction-end)
                      (global-clock/stat-committed)))))
 
@@ -65,13 +66,13 @@ If it has no chances to succeed, execute BODY in a software memory transaction."
                (go ,tx-begin))
 
              (global-clock/stat-aborted)
-
+             
              ,tx-fallback
              (return ;; returns from (prog ...)
-	       ,fallback)))))))
+               ,fallback)))))))
 
 
-(defmacro hw-atomic2 ((&optional tvar-write-version err)
+(defmacro hw-atomic2 ((&optional tvar-write-version &key err (test-for-running-tx? t))
                      &optional (body nil body?) fallback)
   "Run BODY in a hardware memory transaction. All changes to transactional memory
 will be visible to other threads only after BODY returns normally (commits).
@@ -83,7 +84,7 @@ threads.
 If hardware memory transaction aborts for a conflict, rerun it.
 If it fails for some other reason, execute FALLBACK."
   (if body?
-      `(%hw-atomic2 (,tvar-write-version ,err)
+      `(%hw-atomic2 (,tvar-write-version :err ,err :test-for-running-tx? ,test-for-running-tx?)
                    ,body ,fallback)
       `(values)))
 

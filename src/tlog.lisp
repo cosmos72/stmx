@@ -15,6 +15,8 @@
 
 (in-package :stmx)
 
+(enable-#?-syntax)
+
 ;;;; * Transaction logs
 
 ;;;; ** thread-local TLOGs pool
@@ -161,13 +163,30 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
 
   (declare (type tlog log))
   (let ((lock (tlog-lock log))
-        (prevent-sleep nil))
+        (prevent-sleep nil)
+        #?+hw-transactions
+        (nohw-counter-increased nil))
 
     (log.debug "Tlog ~A sleeping now" (~ log))
 
-    (with-lock (lock)
-      (unless (setf prevent-sleep (tlog-prevent-sleep log))
-        (condition-wait (tlog-semaphore log) lock)))
+
+    (unwind-protect
+         (progn
+           (bt:acquire-lock lock)
+
+           #?+hw-transactions
+           (progn
+             (global-clock/incf-nohw-counter)
+             (setf nohw-counter-increased t))
+
+           (unless (setf prevent-sleep (tlog-prevent-sleep log))
+             (condition-wait (tlog-semaphore log) lock)))
+
+      #?+hw-transactions
+      (when nohw-counter-increased
+        (global-clock/decf-nohw-counter))
+      
+      (bt:release-lock lock))
 
     (when (log.debug)
       (if prevent-sleep

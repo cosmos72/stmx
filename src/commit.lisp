@@ -317,9 +317,9 @@ After successful return, CHANGED contains the list of the TVARs actually written
            (type txfifo changed))
 
   (the (member t nil :fail)
-    (hw-atomic (write-version)
-    
-      (progn
+    (hw-atomic2 (write-version :test-for-running-tx? nil)
+
+      (block nil
         ;; hardware transaction. if you need to jump out of it
         ;; use (return ...), or it will abort and roll back!
         (unless (valid-hw-assisted? log)
@@ -427,7 +427,7 @@ b) another TLOG is writing the same TVARs being committed
        ;; fall back on SW commit
        (unwind-protect
             (progn
-              #?+hw-transactions (global-clock/incf-sw-commits)
+              #?+hw-transactions (global-clock/incf-nohw-counter)
 
               ;; we must lock TVARs that will been written: expensive
               ;; but needed to ensure concurrent commits do not conflict.
@@ -459,7 +459,7 @@ b) another TLOG is writing the same TVARs being committed
 
          ;; cleanup
 
-         #?+hw-transactions (global-clock/decf-sw-commits)
+         #?+hw-transactions (global-clock/decf-nohw-counter)
          
          (unless success
            (unlock-tvars locked)

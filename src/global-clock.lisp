@@ -34,7 +34,7 @@ feature is equal to :BIT.")
 
 (eval-always
   (defstruct (global-clock-gv156 (:include atomic-counter))
-    (sw-commits 0 :type atomic-counter-slot-type)
+    (nohw-counter 0 :type atomic-counter-slot-type)
     (success-stat 0 :type (integer -100 100))))
 
            
@@ -70,7 +70,7 @@ feature is equal to :BIT.")
 (defmacro gvx-add-missing (gvx)
   (let1 newline (make-string 1 :initial-element (code-char 10))
     `(progn
-       ,@(loop for suffix in '(get-sw-commits incf-sw-commits decf-sw-commits
+       ,@(loop for suffix in '(get-nohw-counter incf-nohw-counter decf-nohw-counter
                                stat-committed stat-aborted)
             for name = (%gvx-expand0-f gvx suffix)
             unless (fboundp name)
@@ -156,7 +156,7 @@ Return the current +gv1+ value."
 
 
 ;; define stub macros (GV5/STAT-COMMITTED) (GV5/STAT-ABORTED)
-;; (GV1/GET-SW-COMMITS) (GV1/INCF-SW-COMMITS) and (GV1/DECF-SW-COMMITS) 
+;; (GV1/GET-NOHW-COUNTER) (GV1/INCF-NOHW-COUNTER) and (GV1/DECF-NOHW-COUNTER) 
 (gvx-add-missing gv1)
 
 
@@ -223,25 +223,25 @@ Increment +gv5+ and return its new value."
   `(incf-atomic-counter +gv5+ +global-clock-delta+))
 
 
-(defmacro gv5/get-sw-commits ()
-  "This is GV5 implementation of GLOBAL-CLOCK/GET-SW-COMMITS.
+(defmacro gv5/get-nohw-counter ()
+  "This is GV5 implementation of GLOBAL-CLOCK/GET-NOHW-COUNTER.
 Return the number of software-only transaction commits currently running."
-  `(get-atomic-place (global-clock-gv156-sw-commits +gv5+)))
+  `(get-atomic-place (global-clock-gv156-nohw-counter +gv5+)))
 
 
-(defmacro gv5/incf-sw-commits ()
-  "This is GV5 implementation of GLOBAL-CLOCK/INCF-SW-COMMITS.
-Increment by two the slot SW-COMMITS of +gv5+ and return its new value."
-  `(incf-atomic-place (global-clock-gv156-sw-commits +gv5+)
+(defmacro gv5/incf-nohw-counter ()
+  "This is GV5 implementation of GLOBAL-CLOCK/INCF-NOHW-COUNTER.
+Increment by two the slot NOHW-COUNTER of +gv5+ and return its new value."
+  `(incf-atomic-place (global-clock-gv156-nohw-counter +gv5+)
                       2
                       #?+atomic-counter-mutex :place-mutex
                       #?+atomic-counter-mutex (atomic-counter-mutex +gv5+)))
 
 
-(defmacro gv5/decf-sw-commits ()
-  "This is GV5 implementation of GLOBAL-CLOCK/DECF-SW-COMMITS.
-Decrement by two the slot SW-COMMITS of +gv5+ and return its new value."
-  `(incf-atomic-place (global-clock-gv156-sw-commits +gv5+)
+(defmacro gv5/decf-nohw-counter ()
+  "This is GV5 implementation of GLOBAL-CLOCK/DECF-NOHW-COUNTER.
+Decrement by two the slot NOHW-COUNTER of +gv5+ and return its new value."
+  `(incf-atomic-place (global-clock-gv156-nohw-counter +gv5+)
                       -2
                       #?+atomic-counter-mutex :place-mutex
                       #?+atomic-counter-mutex (atomic-counter-mutex +gv5+)))
@@ -282,7 +282,7 @@ in order to try to reduce the abort rates."
 (defmacro gv6/is-gv5-mode? ()
   "Return T if GV6 is currently in GV5 mode.
 Return NIL if GV6 is currently in GV1 mode."
-  `(zerop (gv5/get-sw-commits)))
+  `(zerop (gv5/get-nohw-counter)))
 
 
 (defmacro gv6/hw/start-read ()
@@ -348,22 +348,22 @@ Calls either (GV5/AFTER-ABORT) or (GV1/AFTER-ABORT), depending on the current mo
        (gv1/sw/after-abort)))
 
 
-(defmacro gv6/get-sw-commits ()
-  "This is GV6 implementation of GLOBAL-CLOCK/GET-SW-COMMITS.
-Calls (GV5/GET-SW-COMMITS)."
-  `(gv5/get-sw-commits))
+(defmacro gv6/get-nohw-counter ()
+  "This is GV6 implementation of GLOBAL-CLOCK/GET-NOHW-COUNTER.
+Calls (GV5/GET-NOHW-COUNTER)."
+  `(gv5/get-nohw-counter))
 
 
-(defmacro gv6/incf-sw-commits ()
-  "This is GV6 implementation of GLOBAL-CLOCK/INCF-SW-COMMITS.
-Calls (GV5/INCF-SW-COMMITS)."
-  `(gv5/incf-sw-commits))
+(defmacro gv6/incf-nohw-counter ()
+  "This is GV6 implementation of GLOBAL-CLOCK/INCF-NOHW-COUNTER.
+Calls (GV5/INCF-NOHW-COUNTER)."
+  `(gv5/incf-nohw-counter))
 
 
-(defmacro gv6/decf-sw-commits ()
-  "This is GV6 implementation of GLOBAL-CLOCK/DECF-SW-COMMITS.
-Calls (GV5/DECF-SW-COMMITS)."
-  `(gv5/decf-sw-commits))
+(defmacro gv6/decf-nohw-counter ()
+  "This is GV6 implementation of GLOBAL-CLOCK/DECF-NOHW-COUNTER.
+Calls (GV5/DECF-NOHW-COUNTER)."
+  `(gv5/decf-nohw-counter))
 
 
 (defmacro gv6/stat-committed ()
@@ -489,31 +489,36 @@ and before rerunning it."
   `(%gv-expand sw/after-abort))
 
 
-(defmacro global-clock/get-sw-commits ()
-  "Return the number of software-only transaction commits currently running.
+(defmacro global-clock/get-nohw-counter ()
+  "Return the number of operations currently running that are incompatible with
+hardware transactions. Example of operations that AT THE MOMENT are incompatible with
+hardware transactions include:
+1) software-only transaction commits
+2) (retry)
 
 This function must be called at the beginning of each hardware transaction
-in order to detect if a software-only transaction is started during
-the hardware transaction, since their current implementations are incompatible."
-  `(%gv-expand get-sw-commits))
+in order to detect if an incompatible operation is started during the hardware
+transaction, and abort the transaction in such case."
+  `(%gv-expand get-nohw-counter))
 
 
-(defmacro global-clock/incf-sw-commits ()
-  "Increment by one the number of software-only transaction commits currently running.
+(defmacro global-clock/incf-nohw-counter ()
+  "Increment by one the number of operations currently running that are incompatible with
+hardware transactions.
 
-This function must be called at the beginning of each software-only transaction commit
-in order to abort any running hardware transaction, since their current implementations
-are mutually incompatible."
-  `(%gv-expand incf-sw-commits))
+This function must be called at the beginning of each software-only transaction commit,
+\(retry), or any other operation incompatible with hardware transactions, in order
+to abort the latter, since their current implementations are mutually incompatible."
+  `(%gv-expand incf-nohw-counter))
 
 
-(defmacro global-clock/decf-sw-commits ()
+(defmacro global-clock/decf-nohw-counter ()
   "Decrement by one the number of software-only transaction commits currently running.
 
-This function must be called at the end of each software-only transaction commit
-\(both if the commits succeeds and if it fails) in order to allow again hardware
-transactions, since their current implementations are mutually incompatible."
-  `(%gv-expand decf-sw-commits))
+This function must be called at the end of each software-only transaction commit,
+\(retry), or any other operation incompatible with hardware transactions, in order
+to let the latter run, since their current implementations are mutually incompatible."
+  `(%gv-expand decf-nohw-counter))
 
 
 (defmacro global-clock/stat-committed ()

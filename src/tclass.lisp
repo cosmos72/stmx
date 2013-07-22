@@ -15,6 +15,8 @@
 
 (in-package :stmx)
 
+(enable-#?-syntax)
+
 ;;;; * Transactional classes
 
 ;;;; ** Metaclasses

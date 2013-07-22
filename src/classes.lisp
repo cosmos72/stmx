@@ -270,13 +270,16 @@ to application code only in case of bugs"))
 
 Before re-executing, the transaction will wait on all variables that it read
 until at least one of them changes."
+    #?+hw-transactions
+    (when (hw-transaction-supported-and-running?) (hw-transaction-abort))
     (error retry-error-obj)))
 
 
 (let1 rerun-error-obj (make-condition 'rerun-error)
   (defun rerun ()
     "Abort the current transaction and immediately re-run it from the
-beginning without waiting. Used by ORELSE."
+beginning without waiting. Automatically invoked when a SW transaction detects
+a possibly inconsistent read."
     (error rerun-error-obj)))
 
   

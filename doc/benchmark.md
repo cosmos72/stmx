@@ -74,48 +74,49 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
 
 <table>
 
- <tr><th colspan="4">
+ <tr><th colspan="5">
        Single-thread benchmarks, executed one million times
        with <code>(x3 (1m (atomic ...)))</code>
      </th></tr>
 
  <tr><th rowspan="2"><b>name</b>      </th>
      <th rowspan="2"><b>executed code</b></th>
-     <th>STMX (sw transactions)</th>
-     <th>STMX EXPERIMENTAL (hw transactions + sw fallback)</th></tr>
+     <th>STMX STABLE (sw-only transactions)</th>
+     <th>STMX EXPERIMENTAL (hybrid hw+sw transactions)</th>
+     <th>HAND-OPTIMIZED hw transactions</th></tr>
 
  <tr><th colspan="2"><b>average time in microseconds</b></th></tr>
 
 
  <tr><td>atomic nil       </td><td><code>(atomic nil)</code></td>
-     <td>0.069</td><td>0.013</td></tr>
+     <td>0.069</td><td>0.021</td><td>0.012</td></tr>
 
- <tr><td>atomic read-1    </td><td><code>(atomic ($-tx v))</code></td>
-     <td>0.084</td><td>0.014</td></tr>
+ <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code></td>
+     <td>0.082</td><td>0.023</td>0.021<td></td></tr>
 
- <tr><td>atomic write-1   </td><td><code>(atomic (setf ($-tx v) 1))</code></td>
-     <td>0.108</td><td>0.019</td></tr>
+ <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) 1))</code></td>
+     <td>0.108</td><td>0.026</td><td>0.022</td></tr>
 
- <tr><td>atomic read-write-1</td><td><code>(atomic (incf ($-tx v)))</code></td>
-     <td>0.135</td><td>0.025</td></tr>
+ <tr><td>atomic read-write-1</td><td><code>(atomic (incf (the fixnum ($ v))))</code></td>
+     <td>0.135</td><td>0.027</td><td>0.022</td></tr>
 
  <tr><td>atomic read-write-10</td>
-     <td><code>(atomic (dotimes (j 10) (incf ($-tx v))))</code></td>
-     <td>0.239</td><td>0.030</td></tr>
+     <td><code>(atomic (dotimes (j 10) (incf (the fixnum ($ v)))))</code></td>
+     <td>0.239</td><td>0.153</td><td>0.034</td></tr>
 
  <tr><td>atomic read-write-100</td>
-     <td><code>(atomic (dotimes (j 100) (incf ($-tx v))))</code></td>
-     <td>1.118</td><td>0.181</td></tr>
+     <td><code>(atomic (dotimes (j 100) (incf (the fixnum ($ v)))))</code></td>
+     <td>1.118</td><td>1.320</td><td>0.185</td></tr>
 
  <tr><td>atomic read-write-1000</td>
-     <td><code>(atomic (dotimes (j 1000) (incf ($-tx v))))</code></td>
-     <td>9.922</td><td>1.654</td></tr>
+     <td><code>(atomic (dotimes (j 1000) (incf (the fixnum ($ v)))))</code></td>
+     <td>9.922</td><td>13.062</td><td>1.686</td></tr>
 
  <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td>
-     <td>(0.142+N*0.0098)</td><td></td></tr>
+     <td>(0.142+N*0.0098)</td><td>(0.0193+N*0.0130)</td><td>(0.0177+N*0.00167)</td></tr>
 
  <tr><td>orelse empty     </td><td><code>(atomic (orelse))</code></td>
-     <td>0.043</td><td>0.024</td></tr>
+     <td>0.043</td><td>0.024</td><td>0.021</td></tr>
 
  <tr><td>orelse unary     </td><td><code>(atomic (orelse ($-tx v)))</code></td>
      <td>0.234</td><td></td></tr>
@@ -135,11 +136,11 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
 
  <tr><td>tmap read-1</td>
      <td><code>(atomic (get-gmap tm 1))</code></td>
-     <td></td><td>0.180</td></tr>
+     <td></td><td>0.172</td></tr>
 
  <tr><td>tmap read-write-1</td>
      <td><code>(atomic (incf (get-gmap tm 1)))</code></td>
-     <td>0.531</td><td>0.454</td></tr>
+     <td>0.531</td><td>0.364</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
      <td><code>(atomic (when (zerop (mod i   10)) (clear-gmap tm))<br>

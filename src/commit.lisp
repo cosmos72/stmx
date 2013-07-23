@@ -425,10 +425,10 @@ b) another TLOG is writing the same TVARs being committed
 
        ;; HW-assisted commit failed, but transaction may still be valid.
        ;; fall back on SW commit
+       #?+hw-transactions (global-clock/incf-nohw-counter)
+
        (unwind-protect
             (progn
-              #?+hw-transactions (global-clock/incf-nohw-counter)
-
               ;; we must lock TVARs that will been written: expensive
               ;; but needed to ensure concurrent commits do not conflict.
               (log.trace "before (try-lock-tvars)")
@@ -456,9 +456,7 @@ b) another TLOG is writing the same TVARs being committed
               (commit-sw-update-tvars locked)
               (setf success t))
 
-
          ;; cleanup
-
          #?+hw-transactions (global-clock/decf-nohw-counter)
          
          (unless success

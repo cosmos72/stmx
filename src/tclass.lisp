@@ -351,10 +351,10 @@ The effect is the same as DEFCLASS, plus:
 
         ;; It is a TVAR, return its value.
         ;; During transactions, reading from tvars is recorded to the current tlog.
-        (multiple-value-bind (value bound?) (peek-$ (the tvar obj))
-          (if bound?
-              value
-              (unbound-slot-error class instance slot)))
+        (let1 value ($ (the tvar obj))
+          (if (eq value +unbound-tvar+)
+              (unbound-slot-error class instance slot)
+              value))
     
         ;; Return the plain slot-value.
         obj)))
@@ -375,7 +375,7 @@ The effect is the same as DEFCLASS, plus:
       ;; Get the tvar from the slot and write inside it.
       ;; During transactions, writing tvars is recorded into the current tlog.
       (let1 var (slot-raw-tvar class instance slot)
-        (setf ($-slot var) value))
+        (setf ($ var) value))
       
       ;; Write in the slot
       (call-next-method)))

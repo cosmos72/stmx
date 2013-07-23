@@ -112,11 +112,6 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
 
   (declare (type tlog log))
 
-  ;; TVAR change notifications are not supported by HW transactions,
-  ;; so we must disable them
-  #?+hw-transactions
-  (global-clock/incf-nohw-counter)
-
   (let1 reads (tlog-reads log)
 
     (when (zerop (txhash-table-count reads))
@@ -156,10 +151,6 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   "Un-listen on tvars, i.e. deregister not to get notifications if they change."
 
   (declare (type tlog log))
-
-  ;; re-enable HW transactions previously disabled by LISTEN-TVARS-OF
-  #?+hw-transactions
-  (global-clock/decf-nohw-counter)
 
   (do-txhash (var) (tlog-reads log)
     (unlisten-tvar var log))
@@ -203,10 +194,18 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
   (with-lock ((tlog-lock log))
     (setf (tlog-prevent-sleep log) nil))
 
+  ;; TVAR change notifications are not supported by HW transactions,
+  ;; so we must disable them
+  #?+hw-transactions (global-clock/incf-nohw-counter)
+
   (unwind-protect
        (when (listen-tvars-of log)
          (loop while (and (wait-once log) (valid? log))))
-    ;; call UNLISTEN-TVARS-OF also if an error is signaled!
+
+    ;; re-enable HW transactions
+    #?+hw-transactions (global-clock/decf-nohw-counter)
+
+    ;; call UNLISTEN-TVARS-OF also if an error is signaled
     (unlisten-tvars-of log))
   t)
       

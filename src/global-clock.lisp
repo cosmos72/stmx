@@ -47,8 +47,6 @@ is reserved as \"prevent HW transactions\"")
 (define-constant-eval-once +global-clock-gv156+ (make-global-clock-gv156))
 
 (eval-always
-  ;;(setf (global-clock-gv156-nohw-counter +global-clock-gv156+) 1000000000)
-
   (let1 stmx-package (find-package 'stmx)
     (defun %gvx-expand0-f (prefix suffix)
       (declare (type symbol prefix suffix))
@@ -364,15 +362,29 @@ Calls (GV5/GET-NOHW-COUNTER)."
 (defmacro gv6/incf-nohw-counter (&optional (delta +global-clock-nohw-delta+))
   "This is GV6 implementation of GLOBAL-CLOCK/INCF-NOHW-COUNTER.
 Calls (GV5/INCF-NOHW-COUNTER)."
-  `(gv5/incf-nohw-counter ,delta))
+  (with-gensym counter
+    `(progn
+       ;; FIXME: do we need to preemptively increment global-clock version?
+       ;; we may be switching from GV5 to GV1...
+       (gv5/hw/after-abort)
+       (let1 ,counter (gv5/incf-nohw-counter ,delta)
+         (when (zerop counter)
+           (break (format nil "gv6/incf-nohw-counter returned zero")))))))
 
 
 (defmacro gv6/decf-nohw-counter (&optional (delta +global-clock-nohw-delta+))
   "This is GV6 implementation of GLOBAL-CLOCK/DECF-NOHW-COUNTER.
 Calls (GV5/DECF-NOHW-COUNTER)."
-  `(gv5/decf-nohw-counter ,delta))
+  (with-gensym counter
+    `(let1 ,counter (gv5/decf-nohw-counter ,delta)
+       (when (> ,counter (- most-positive-fixnum 1000))
+         (break (format nil "gv6/decf-nohw-counter returned ~A" ,counter))))))
 
 
+(defun gv6/%update-stat (delta)
+  delta)
+
+#+never
 (defun gv6/%update-stat (delta)
   (declare (type (member -2 2) delta))
   (macrolet ((fixnum+ (a b) `(the fixnum (+ (the fixnum ,a) (the fixnum ,b))))
@@ -385,7 +397,7 @@ Calls (GV5/DECF-NOHW-COUNTER)."
           ;; GV6 is currently allowing HW transactions.
           ;; disable them if abort rates are high
           (when (<= new-stat -33)
-            (gv6/incf-nohw-counter 1)
+            ;;(gv6/incf-nohw-counter 1)
             (setf new-stat 0))
 
           ;; GV6 is currently forbidding HW transactions due to high abort.
@@ -393,7 +405,7 @@ Calls (GV5/DECF-NOHW-COUNTER)."
           ;; 1. success rate becomes very high
           ;; 2. abort rates remain high
           (unless (< -33 new-stat 67)
-            (gv6/decf-nohw-counter 1)
+            ;;(gv6/decf-nohw-counter 1)
             (setf new-stat 0)))
 
       (setf (global-clock-gv156-success-stat +gv6+) new-stat))))

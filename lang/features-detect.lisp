@@ -145,7 +145,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
   ;; so it makes sense to use it only together with hardware transactions
   ;; (GV1 is not suitable for that)
   (add-feature 'global-clock 
-               (if (feature? 'hw-transactions) :gv6 :gv1))
+               (if (feature? 'hw-transactions) :gv5 :gv1))
 
 
 

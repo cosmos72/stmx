@@ -1,7 +1,5 @@
 ========== TO DO ==========
 
-18) implement adaptive global clock
-
 17) automatically expand $ to $-tx, $-hwtx or $-notx, and similarly expand
     (setf $...) and user-defined functions
 
@@ -29,6 +27,8 @@
     HW transactions **cannot** be started from inside another transaction...
     disaster would follow, as HW transactions do not check TVARs values stored
     in the TLOG and when committing they write directly into TVARs globaly-visible value.
+
+18) implemented adaptive global clock GV6
 
 13) completely rewritten THASH-TABLE from scratch. The old implementation was very slow,
     before committing it made a full copy of the original hash table then applied

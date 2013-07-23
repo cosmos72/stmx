@@ -138,14 +138,14 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
       (add-feature 'tvar-lock :mutex))
   
 
-  ;; use global-clock GV1 by default, but switch to GV5 for hardware transactions.
+  ;; use global-clock GV1 by default, but switch to GV6 for hardware transactions.
   ;;
-  ;; Note: using the global-clock GV5 with software transactions
+  ;; Note: using the global-clock GV6 with software transactions
   ;; reduces performance by ~50% because it causes a lot of (rerun),
   ;; so it makes sense to use it only together with hardware transactions
   ;; (GV1 is not suitable for that)
   (add-feature 'global-clock 
-               (if (feature? 'hw-transactions) :gv5 :gv1))
+               (if (feature? 'hw-transactions) :gv6 :gv1))
 
 
 

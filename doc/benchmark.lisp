@@ -63,28 +63,28 @@
 
 
 (run10m (sw-atomic  ($-tx v)))
-(run10m (atomic     ($-noerror v)))
+(run10m (atomic     ($ v)))
 (run10m (hw-atomic2 ()
                     ($-hwtx v) ;; hw transaction
                     ($-tx v))) ;; sw transaction
 
 
 (run10m (sw-atomic  (setf ($-tx v) 1)))
-(run10m (atomic     (setf ($-noerror v) 1)))
+(run10m (atomic     (setf ($ v) 1)))
 (run10m (hw-atomic2 (wv)
                     (setf ($-hwtx v wv) 1)
                     (setf ($-tx v) 1)))
 
 
 (run10m (sw-atomic  (incf (the fixnum ($-tx v)))))
-(run10m (atomic     (incf (the fixnum ($-noerror v)))))
+(run10m (atomic     (incf (the fixnum ($ v)))))
 (run10m (hw-atomic2 (wv)
                     (incf (the fixnum ($-hwtx v wv)))
                     (incf (the fixnum ($-tx v)))))
 
 
 (run10m (sw-atomic  (dotimes (j 10) (incf (the fixnum ($-tx v))))))
-(run10m (atomic     (dotimes (j 10) (incf (the fixnum ($-noerror v))))))
+(run10m (atomic     (dotimes (j 10) (incf (the fixnum ($ v))))))
 (run10m (hw-atomic2 (wv)
                     (dotimes (j 10) (incf (the fixnum ($-hwtx v wv))))
                     (dotimes (j 10) (incf (the fixnum ($-tx v))))))
@@ -94,14 +94,14 @@
 
 
 (run10m (sw-atomic  (dotimes (j 100) (incf (the fixnum ($-tx v))))))
-(run10m (atomic     (dotimes (j 100) (incf (the fixnum ($-noerror v))))))
+(run10m (atomic     (dotimes (j 100) (incf (the fixnum ($ v))))))
 (run10m (hw-atomic2 (wv)
                     (dotimes (j 100) (incf (the fixnum ($-hwtx v wv))))
                     (dotimes (j 100) (incf (the fixnum ($-tx v))))))
 
 
 (run1m (sw-atomic  (dotimes (j 1000) (incf (the fixnum ($-tx v))))))
-(run1m (atomic     (dotimes (j 1000) (incf (the fixnum ($-noerror v))))))
+(run1m (atomic     (dotimes (j 1000) (incf (the fixnum ($ v))))))
 (run1m (hw-atomic2 (wv)
                    (dotimes (j 1000) (incf (the fixnum ($-hwtx v wv))))
                    (dotimes (j 1000) (incf (the fixnum ($-tx v))))))

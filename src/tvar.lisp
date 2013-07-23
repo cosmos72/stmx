@@ -59,7 +59,7 @@
 (defun (setf raw-value-of) (value var)
   "Set the VALUE of VAR. Return VALUE.
 This function intentionally ignores transactions and it is only useful
-for debugging purposes. Use (setf ($ var) value) instead."
+for debugging purposes. Use (SETF ($-SLOT VAR) VALUE) or (SETF ($ VAR) VALUE) instead."
   (declare (type tvar var))
   (set-tvar-value-and-version var value
                               (global-clock/sw/write
@@ -103,7 +103,7 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
 (defun tx-write-of (var value &optional (log (current-tlog)))
   "Store in transaction LOG the writing of VALUE into VAR; return VALUE.
 
-TX-WRITE-OF is an internal function called by (setf ($ VAR) VALUE)
+TX-WRITE-OF is an internal function called by (SETF ($ VAR) VALUE)
 and by writing TOBJs slots."
   (declare (type tvar var)
            (type tlog log))
@@ -198,8 +198,8 @@ Works ONLY outside memory transactions."
   `(recording?))
 
 
-(declaim (inline $-noerror))
-(defun $-noerror (var)
+(declaim (inline $))
+(defun $ (var)
   "Get the value from the transactional variable VAR and return it.
 Return +unbound-tvar+ if VAR is not bound to a value.
 
@@ -213,7 +213,7 @@ and to check for any value stored in the log."
           ($-notx var))))
 
                
-(defun $ (var)
+(defun $-slot (var)
   "Get the value from the transactional variable VAR and return it.
 Signal an error if VAR is not bound to a value.
 
@@ -222,9 +222,9 @@ During transactions, it uses transaction log to record the read
 and to check for any value stored in the log."
   (declare (type tvar var))
 
-  (let1 value ($-noerror var)
+  (let1 value ($ var)
     (unless (eq value +unbound-tvar+)
-      (return-from $ value))
+      (return-from $-slot value))
     (unbound-tvar-error var)))
 
 
@@ -246,8 +246,9 @@ During transactions, it uses transaction log to record the value."
       (if (use-$-tx?) (setf ($-tx var) value)
           (setf ($-notx var) value))))
 
-(declaim (inline (setf $-noerror)))
-(defun (setf $-noerror) (value var)
+(declaim (inline (setf $-slot)))
+(defun (setf $-slot) (value var)
+  (declare (type tvar var))
   (setf ($ var) value))
 
   
@@ -259,7 +260,7 @@ During transactions, it uses transaction log to record the read
 and to check for any value stored in the log."
   (declare (type tvar var))
 
-  (not (eq +unbound-tvar+ ($-noerror var))))
+  (not (eq +unbound-tvar+ ($ var))))
 
 
 (defun unbind-$ (var)
@@ -283,7 +284,7 @@ If VAR is not bound to a value, return (values DEFAULT nil).
 Works both inside and outside transactions."
   (declare (type tvar var))
 
-  (let1 value ($-noerror var)
+  (let1 value ($ var)
     (if (eq value +unbound-tvar+)
       (values default nil)
       (values value   t))))
@@ -297,7 +298,7 @@ If VAR is not bound to a value, return (values nil DEFAULT).
 Works both inside and outside transactions."
   (declare (type tvar var))
 
-  (let1 value ($-noerror var)
+  (let1 value ($ var)
     (if (eq value +unbound-tvar+)
         (values nil default)
         (progn
@@ -312,7 +313,7 @@ If VAR is already bound to a value, return (values DEFAULT nil).
 Works only inside software transactions."
   (declare (type tvar var))
 
-  (let1 old-value ($-noerror var)
+  (let1 old-value ($ var)
     (if (eq old-value +unbound-tvar+)
         (values t (setf ($ var) value))
         (values nil default))))
@@ -324,13 +325,13 @@ Works only inside software transactions."
 
 (defmethod value-of ((var tvar))
   "Return the value inside a TVAR. Works both outside and inside transactions.
-Equivalent to ($ var)"
-  ($ var))
+Equivalent to ($-slot var)"
+  ($-slot var))
 
 (defmethod (setf value-of) (value (var tvar))
   "Set the value inside a TVAR. Works both outside and inside transactions.
-Equivalent to (setf ($ var) value)"
-  (setf ($ var) value))
+Equivalent to (setf ($-slot var) value)"
+  (setf ($-slot var) value))
 
 
 

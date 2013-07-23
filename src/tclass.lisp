@@ -375,7 +375,7 @@ The effect is the same as DEFCLASS, plus:
       ;; Get the tvar from the slot and write inside it.
       ;; During transactions, writing tvars is recorded into the current tlog.
       (let1 var (slot-raw-tvar class instance slot)
-        (setf ($ var) value))
+        (setf ($-slot var) value))
       
       ;; Write in the slot
       (call-next-method)))

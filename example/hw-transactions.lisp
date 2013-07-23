@@ -76,7 +76,7 @@
 (defun example-hw-atomic-nil ()
   (x3
    (1m
-    (hw-atomic (helper)
+    (hw-atomic2 (helper)
       t
       nil))))
 
@@ -98,7 +98,7 @@
   (declare (type tvar v))
   (x3
    (1m
-    (hw-atomic (helper)
+    (hw-atomic2 (helper)
       ($-hwtx v)
       nil))))
 
@@ -106,7 +106,7 @@
   (declare (type tvar v))
   (x3
    (1m
-    (hw-atomic (helper)
+    (hw-atomic2 (helper)
       (setf ($-hwtx v helper) 1)
       nil))))
 
@@ -115,7 +115,7 @@
   (declare (type tvar v))
   (x3
    (1m
-    (hw-atomic (helper)
+    (hw-atomic2 (helper)
       (incf (the fixnum ($-hwtx v helper)))
       nil))))
 
@@ -125,7 +125,7 @@
            (type tvar v))
   (x3
    (1m
-    (hw-atomic (helper)
+    (hw-atomic2 (helper)
       ;; remember to return non-NIL, indicating success
       (loop repeat n do
            (incf (the fixnum ($-hwtx v helper)))
@@ -136,7 +136,7 @@
 (defun example-hw-atomic-orelse ()
   (x3
    (1m
-    (hw-atomic (helper)
+    (hw-atomic2 (helper)
       ;; remember to return non-NIL, indicating success
       (progn
         (orelse)
@@ -147,22 +147,22 @@
   (declare (type tmap tm))
   (x3
    (1m
-    (hw-atomic (helper)
+    (hw-atomic2 (helper)
       (get-gmap tm 1)
 
       ;; fallback
-      (atomic (get-gmap tm 1)
+      (sw-atomic (get-gmap tm 1)
               nil)))))
 
 (defun example-hw-atomic-incf-gmap (&optional (tm *tm*))
   (declare (type tmap tm))
   (x3
    (1m
-    (hw-atomic (helper)
+    (hw-atomic2 (helper)
       (incf (the fixnum (get-gmap tm 1)))
 
       ;; fallback
-      (atomic (incf (the fixnum (get-gmap tm 1)))
+      (sw-atomic (incf (the fixnum (get-gmap tm 1)))
               nil)))))
 
 
@@ -171,13 +171,13 @@
            (type tmap tm))
   (x3
    (1m
-    (hw-atomic (helper)
+    (hw-atomic2 (helper)
       (progn
         (when (zerop (mod i n)) (clear-gmap tm))
         (set-gmap tm i t))
 
       ;; fallback
-      (atomic
+      (sw-atomic
        (when (zerop (mod i n)) (clear-gmap tm))
        (set-gmap tm i t)
        nil)))))

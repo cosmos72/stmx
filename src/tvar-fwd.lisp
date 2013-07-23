@@ -58,7 +58,7 @@
 (defstruct (tvar #?+(eql tvar-lock :mutex) (:include mutex))
   "a transactional variable (tvar) is the smallest unit of transactional memory.
 it contains a single value that can be read or written during a transaction
-using ($ var) and (setf ($ var) value).
+using ($-slot var) and (setf ($-slot var) value).
 
 tvars are seldom used directly, since transactional objects (tobjs) wrap them
 with a more convenient interface: you can read and write normally the slots
@@ -88,7 +88,7 @@ the scenes the slots will be stored in transactional memory implemented by tvars
 (defun raw-value-of (var)
   "return the current value of VAR, or +unbound-tvar+ if VAR is not bound to a value.
 This finction intentionally ignores transactions and it is only useful
-for debugging purposes. please use ($ var) instead."
+for debugging purposes. please use ($-slot var) instead."
   (declare (type tvar var))
   (tvar-value var))
 

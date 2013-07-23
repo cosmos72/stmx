@@ -68,7 +68,7 @@ Supported systems
 -----------------
 STMX is currently tested on the following Common Lisp implementations:
 
-* SBCL  version 1.1.8        (x86_64) on Debian GNU/Linux 7.0  (x86_64)
+* SBCL  version 1.1.9        (x86_64) on Debian GNU/Linux 7.0  (x86_64)
 * SBCL  version 1.0.55.0     (x86)    on Ubuntu Linux 12.04LTS (x86)
 * ABCL  version 1.1.1 with OpenJDK 6b27-1.12.5-2 (x86_64) on Debian GNU/Linux 7.0 (x86_64)
 * CCL   version 1.9-r15769   (x86_64) on Debian GNU/Linux 7.0  (x86_64)
@@ -555,29 +555,22 @@ features are available:
    transactions is only intended for **debugging** purposes). Functions and
    methods:
    - `(tvar [initial-value])` Create a new TVAR, optionally bound to a value.
-   - `($ var)` Get the value of VAR. Signals an error if VAR is not bound to any
-      value.
-   - `(setf ($ var) value)` Store VALUE into VAR.
+   - `($-slot var)` Get the value of VAR. Signals an error if VAR is not bound
+      to any value. Note: before STMX 2.0.0, this function was named `($ var)`.
+   - `(setf ($-slot var) value)` Store VALUE into VAR.
+      Note: before STMX 2.0.0, this function was named `(setf ($ var) value)`.
    - `(bound-$? var)` Return true if VAR is bound to some value.
    - `(unbind-$ var)` Unbind VAR from its value.
-   - `(value-of var)` getter method, equivalent to `($ var)`
+   - `(value-of var)` getter method, equivalent to `($-slot var)`
    - `(setf (value-of var) value)` setter method, equivalent to
-      `(setf ($ var) value)`
+      `(setf ($-slot var) value)`
 
    For programmers that want to squeeze the last CPU cycle out of STMX, there
-   are two more functions that work **only inside** transactions:
-   - `($-tx var)` Get the value of VAR. Return `+unbound-tvar+` if VAR is not
+   are also some more specialized functions:
+   - `($ var)` Get the value of VAR. Return `+unbound-tvar+` if VAR is not
      bound to any value.
-     Quite obviously, explicitly checking the value returned by `$-tx` against
-     `+unbound-tvar+` would negate the speed advantage: `$-tx` is intended
-     for those cases where the TVAR is known to be bound to a value.
-   - `(setf ($-tx var) value)` Store VALUE into VAR.
-   
-   And two that work **only outside** transactions:
-   - `($-notx var)` Analogous to `$-tx`: get the value of VAR, return
-     `+unbound-tvar+` if VAR is not bound to any value.
-   - `(setf ($-notx var) value)` Analogous to `(setf $-tx)`: store VALUE into
-      VAR.
+   - `(setf ($ var) value)` Set the value of VAR. Identical to `(setf ($-slot var) value)`
+     and provided for simmetry with `($ var)`.
 
 Utilities and examples
 ---------------------

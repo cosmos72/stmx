@@ -61,9 +61,9 @@
 
            ;; low-level API to use TVARs directly
            #:tvar #:+unbound-tvar+
-           #:$ #:$-tx #:$-hwtx #:$-notx ;; also (setf $) (setf $-tx) (setf $-hwtx) and (setf $-notx)
+           #:$-slot #:$-tx #:$-hwtx #:$-notx ;; also (setf $-slot) (setf $-tx) (setf $-hwtx) and (setf $-notx)
 
-           #:$-noerror ;; same as ($ VAR) but returns +unbound-tvar+ if VAR is unbound
+           #:$ ;; same as ($-slot VAR) but returns +unbound-tvar+ if VAR is unbound
            #:bound-$? #:unbind-$
 
            #:fast-atomic))

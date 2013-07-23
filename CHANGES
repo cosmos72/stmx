@@ -1,0 +1,6 @@
+Changes in STMX 2.0.0:
+* Small API change: renamed $ and (SETF $) to $-SLOT and (SETF $-SLOT) respectively.
+  They behaves as before the rename: ($-SLOT VAR) signals an error if VAR is unbound.
+
+  The functions $ and (SETF $) still exist but now have slightly different - and faster -
+  behaviour: if VAR is unbound, ($ VAR) returns +UNBOUND-TVAR+ instead of signaling an error.

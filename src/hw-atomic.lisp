@@ -37,7 +37,7 @@ If it has no chances to succeed, execute BODY in a software memory transaction."
          (t
           (prog ((,err 0)
                  ;; create a a thread-local binding for *hw-tlog-write-version*
-                 (*hw-tlog-write-version* 0))
+                 (*hw-tlog-write-version* +invalid-version+))
              
              (unless (zerop (global-clock/get-nohw-counter))
                (go ,tx-fallback))

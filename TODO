@@ -1,5 +1,7 @@
 ========== TO DO ==========
 
+19) change $ _not_ to raise unbound-slot-error. Write a new function $... for that.
+
 18) remember that HW transactions **cannot** be started from inside a SW transaction...
     disaster would follow, as HW transactions do not check TVARs values stored in the TLOG
     and when committing they write directly into TVARs globaly-visible value

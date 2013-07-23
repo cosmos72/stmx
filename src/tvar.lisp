@@ -184,10 +184,13 @@ Works ONLY outside memory transactions."
   (setf (raw-value-of var) value))
 
 
-
 (defmacro use-$-hwtx? ()
   "Return T if $-hwtx and (setf $-hwtx) should be used, otherwise return NIL."
+  #-always
+  `(/= +invalid-version+ *hw-tlog-write-version*)
+  #+never
   `(hw-transaction-supported-and-running?))
+  
 
 
 (defmacro use-$-tx? ()
@@ -233,11 +236,19 @@ Works both outside and inside transactions.
 During transactions, it uses transaction log to record the value."
   (declare (type tvar var))
 
+  #-always
+  (let ((hw-write-version *hw-tlog-write-version*))
+    (if (/= +invalid-version+ hw-write-version) (setf ($-hwtx var hw-write-version) value)
+        (if (use-$-tx?) (setf ($-tx var) value)
+            (setf ($-notx var) value))))
+  #+never
   (if (use-$-hwtx?) (setf ($-hwtx var) value)
       (if (use-$-tx?) (setf ($-tx var) value)
           (setf ($-notx var) value))))
 
-
+(declaim (inline (setf $-noerror)))
+(defun (setf $-noerror) (value var)
+  (setf ($ var) value))
 
   
 (defun bound-$? (var)

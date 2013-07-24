@@ -90,27 +90,34 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.8 (x86_64), STMX 1.3.3
 
  <tr><td>atomic nil       </td><td><code>(atomic nil)</code></td>
      <td>0.069</td><td>0.021</td><td>0.012</td></tr>
+     <!-- laptop 0.153; gv6 0.159 -->
 
- <tr><td>atomic read-1    </td><td><code>(atomic ($-noerror v))</code></td>
+ <tr><td>atomic read-1    </td><td><code>(atomic ($ v))</code></td>
      <td>0.082</td><td>0.021</td>0.021<td></td></tr>
+     <!-- laptop 0.187; gv6 0.195 -->
 
- <tr><td>atomic write-1   </td><td><code>(atomic (setf ($-noerror v) 1))</code></td>
+ <tr><td>atomic write-1   </td><td><code>(atomic (setf ($ v) 1))</code></td>
      <td>0.108</td><td>0.025</td><td>0.022</td></tr>
+     <!-- laptop 0.277; gv6 0.257 -->
 
- <tr><td>atomic read-write-1</td><td><code>(atomic (incf (the fixnum ($-noerror v))))</code></td>
+ <tr><td>atomic read-write-1</td><td><code>(atomic (incf (the fixnum ($ v))))</code></td>
      <td>0.135</td><td>0.026</td><td>0.022</td></tr>
+     <!-- laptop 0.339; gv6 0.596 -->
 
  <tr><td>atomic read-write-10</td>
-     <td><code>(atomic (dotimes (j 10) (incf (the fixnum ($-noerror v)))))</code></td>
+     <td><code>(atomic (dotimes (j 10) (incf (the fixnum ($ v)))))</code></td>
      <td>0.239</td><td>0.054</td><td>0.034</td></tr>
+     <!-- laptop 0.686; gv6 0.971 -->
 
  <tr><td>atomic read-write-100</td>
-     <td><code>(atomic (dotimes (j 100) (incf (the fixnum ($-noerror v)))))</code></td>
+     <td><code>(atomic (dotimes (j 100) (incf (the fixnum ($ v)))))</code></td>
      <td>1.118</td><td>0.382</td><td>0.185</td></tr>
+     <!-- laptop 3.703; gv6 4.160 -->
 
  <tr><td>atomic read-write-1000</td>
-     <td><code>(atomic (dotimes (j 1000) (incf (the fixnum ($-noerror v)))))</code></td>
+     <td><code>(atomic (dotimes (j 1000) (incf (the fixnum ($ v)))))</code></td>
      <td>9.922</td><td>3.617</td><td>1.686</td></tr>
+     <!-- laptop 33.070; gv6 34.607 -->
 
  <tr><td>atomic read-write-N</td><td>best fit of the 3 runs above</td>
      <td>(0.142+N*0.0098)</td><td>(0.0201+N*0.0036)</td><td>(0.0177+N*0.00167)</td></tr>

@@ -60,12 +60,12 @@ If it has no chances to succeed, execute BODY in a software memory transaction."
                    (multiple-value-prog1
                        ,body
                      (hw-transaction-end)
-                     (global-clock/stat-committed)))))
+                     (global-clock/hw/stat-committed)))))
 
              (when (hw-transaction-rerun-may-succeed? ,err)
                (go ,tx-begin))
 
-             (global-clock/stat-aborted)
+             (global-clock/hw/stat-aborted)
              
              ,tx-fallback
              (return ;; returns from (prog ...)

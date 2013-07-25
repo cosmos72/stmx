@@ -30,9 +30,9 @@ threads.
 If hardware memory transaction aborts for a conflict, rerun it.
 If it fails for some other reason, execute BODY in a software memory transaction."
   (if body
-      #?+hw-transactions
+      #+never ;;#?+hw-transactions
       `(%hw-atomic2 () (block nil (locally ,@body)) (sw-atomic ,@body))
-      #?-hw-transactions
+      #-always ;; #?-hw-transactions
       `(sw-atomic ,@body)
 
       `(values)))

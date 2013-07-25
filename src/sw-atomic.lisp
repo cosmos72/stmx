@@ -160,16 +160,14 @@ transactional memory it read has changed."
                ;; all done, prepare to return.
                ;; we are not returning TLOGs to the pool in case tx signaled an error,
                ;; but that's not a problem since the TLOG pool is just a speed optimization
-               (progn
-                 (global-clock/stat-committed)
-                 (free-tlog log))
+               (free-tlog log)
 
                (progn
                  (log.debug "Tlog ~A {~A} could not commit, re-running it" (~ log) (~ tx))
                  (go rerun)))))
 
-     (retry-error () (go retry))
-     (rerun-error () (go rerun)))
+     (retry-error () (global-clock/sw/stat-committed) (go retry))
+     (rerun-error () (global-clock/sw/stat-aborted)   (go rerun)))
 
    retry
    (log.debug "Tlog ~A {~A} will sleep, then retry" (~ log) (~ tx))
@@ -179,7 +177,6 @@ transactional memory it read has changed."
 
    rerun
    (log.debug "Tlog ~A {~A} will re-run" (~ log) (~ tx))
-   (global-clock/stat-aborted)
    (maybe-yield-before-rerun)
    (setf aborted t)
    ;; fallthrough

@@ -312,7 +312,9 @@ but the TLOG will remain committed."
   "Try to perform COMMIT using a hardware memory transaction.
 Return T if successful, NIL if transaction is invalid,
 or :fail if hardware memory transaction does not complete.
-After successful return, CHANGED contains the list of the TVARs actually written."
+After successful return, CHANGED contains the list of the TVARs actually written.
+
+Note: invokes HW-ATOMIC2, which in turn invokes GLOBAL-CLOCK/HW/STAT-{COMMITTED,ABORTED}"
   (declare (type tlog log)
            (type txfifo changed))
 
@@ -393,7 +395,9 @@ a) the TLOG is invalid - then the whole transaction must be re-executed
 b) another TLOG is writing the same TVARs being committed
    so that TVARs locks could not be aquired - also in this case
    the whole transaction will be re-executed, as there is little hope
-   that the TLOG will still be valid."
+   that the TLOG will still be valid.
+
+Note: internally invokes GLOBAL-CLOCK/{HW,SW}/STAT-{COMMITTED,ABORTED}"
    
   (declare (type tlog log))
 
@@ -454,6 +458,7 @@ b) another TLOG is writing the same TVARs being committed
               ;; Also unlock all TVARs.
 
               (commit-sw-update-tvars locked)
+              (global-clock/sw/stat-committed)
               (setf success t))
 
          ;; cleanup
@@ -462,6 +467,7 @@ b) another TLOG is writing the same TVARs being committed
          (unless success
            (unlock-tvars locked)
            (log.trace "Tlog ~A ...released locks" (~ log))
+           (global-clock/sw/stat-aborted)
            (return-from commit success)))
 
        

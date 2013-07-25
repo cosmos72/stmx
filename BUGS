@@ -1,5 +1,7 @@
 KNOWN BUGS
 
+7) GV6/%UPDATE-STAT contains a race condition (probable cause of bug 6)
+
 6) with HW-TRANSACTIONS enabled, test suite hangs!
 
 FIXED BUGS:

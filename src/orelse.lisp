@@ -153,11 +153,11 @@ Can only be used inside an ATOMIC block."
                (ensure-tx))
 
              (wants-to-retry ()
-               (global-clock/stat-aborted)
+               (global-clock/sw/stat-committed)
                (setf (orelse-tx-retry tx) t))
 
              (wants-to-rerun ()
-               (global-clock/stat-committed)
+               (global-clock/sw/stat-aborted)
                (setf (orelse-tx-retry tx) nil)))
            
 
@@ -183,7 +183,7 @@ Can only be used inside an ATOMIC block."
            (return-from run-orelse
              (multiple-value-prog1 (run-once func log)
 
-               (global-clock/stat-committed)
+               (global-clock/sw/stat-committed)
                (commit-nested log)
                (log.debug me "Tlog ~A {~A} committed to parent tlog ~A"
                           (~ log) (~ func) (~ parent-log))

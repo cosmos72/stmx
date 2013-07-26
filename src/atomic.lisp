@@ -30,9 +30,10 @@ threads.
 If hardware memory transaction aborts for a conflict, rerun it.
 If it fails for some other reason, execute BODY in a software memory transaction."
   (if body
-      #+never ;;#?+hw-transactions
-      `(%hw-atomic2 () (block nil (locally ,@body)) (sw-atomic ,@body))
-      #-always ;; #?-hw-transactions
+      #?+hw-transactions
+      (let ((form `(block nil (locally ,@body))))
+        `(%hw-atomic2 () ,form (%run-atomic (lambda () ,form))))
+      #?-hw-transactions
       `(sw-atomic ,@body)
 
       `(values)))
@@ -41,8 +42,10 @@ If it fails for some other reason, execute BODY in a software memory transaction
 (defmacro fast-atomic (&rest body)
   "Possibly slightly faster variant of ATOMIC.
 
-On systems with support for hardware transactions (as of July 2013, very few systems support them), FAST-ATOMIC and ATOMIC are identical.
-On other systems, multiple nested FAST-ATOMIC blocks may be slightly faster than multiple nested ATOMIC blocks, at the price of compiling BODY more than once."
+On systems supporting hardware transactions (as of July 2013, very few systems
+support them), FAST-ATOMIC and ATOMIC are identical.
+On other systems, multiple nested FAST-ATOMIC forms may be slightly faster than
+multiple nested ATOMIC blocks, at the price of compiling BODY more than once."
   #?+hw-transactions
   `(atomic ,@body)
 

@@ -228,4 +228,4 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
 ;;;; ** Printing
 
 (defprint-object (obj tlog)
-  (format t "~A" (~ obj)))
+  (format t "v~A" (~ obj)))

@@ -40,6 +40,7 @@ is reserved as \"prevent HW transactions\"")
 (eval-always
   (defstruct (global-clock-gv156 (:include atomic-counter))
     (nohw-counter 0 :type atomic-counter-slot-type)
+    (nohw-flag    0 :type bit)
     ;; padding to put success-stat in a different cache line
     ;; (assumes cache line size = 8 words: 64 bytes on 64-bit archs)
     (pad1 0) (pad2 0) (pad3 0)
@@ -50,6 +51,13 @@ is reserved as \"prevent HW transactions\"")
            
 (declaim (type atomic-counter +global-clock-gv156+))
 (define-constant-eval-once +global-clock-gv156+ (make-global-clock-gv156))
+
+(defmacro %global-clock-nohw-flag ()
+  `(global-clock-gv156-nohw-flag +global-clock-gv156+))
+
+(defmacro %global-clock-success-stat ()
+  `(global-clock-gv156-success-stat +global-clock-gv156+))
+
 
 (eval-always
   (let1 stmx-package (find-package 'stmx)
@@ -234,7 +242,7 @@ Return the number of software-only transaction commits currently running."
 
 (defmacro gv5/incf-nohw-counter (&optional (delta +global-clock-nohw-delta+))
   "This is GV5 implementation of GLOBAL-CLOCK/INCF-NOHW-COUNTER.
-Increment by two the slot NOHW-COUNTER of +gv5+ and return its new value."
+Increment by DELTA the slot NOHW-COUNTER of +gv5+ and return its new value."
   `(incf-atomic-place (global-clock-gv156-nohw-counter +gv5+)
                       ,delta
                       #?+atomic-counter-mutex :place-mutex
@@ -243,7 +251,7 @@ Increment by two the slot NOHW-COUNTER of +gv5+ and return its new value."
 
 (defmacro gv5/decf-nohw-counter (&optional (delta +global-clock-nohw-delta+))
   "This is GV5 implementation of GLOBAL-CLOCK/DECF-NOHW-COUNTER.
-Decrement by two the slot NOHW-COUNTER of +gv5+ and return its new value."
+Decrement by DELTA the slot NOHW-COUNTER of +gv5+ and return its new value."
   `(incf-atomic-place (global-clock-gv156-nohw-counter +gv5+)
                       (- ,delta)
                       #?+atomic-counter-mutex :place-mutex
@@ -285,7 +293,7 @@ in order to try to reduce the abort rates."
 (defmacro gv6/%is-gv5-mode? ()
   "Return T if GV6 is currently in GV5 mode, i.e. it allows HW transactions.
 Return NIL if GV6 is currently in GV1 mode, i.e. it forbids HW transactions."
-  `(zerop (gv5/get-nohw-counter)))
+  `(zerop (gv6/get-nohw-counter)))
 
 
 (defmacro gv6/hw/start-read ()
@@ -353,8 +361,12 @@ Calls either (GV5/AFTER-ABORT) or (GV1/AFTER-ABORT), depending on the current mo
 
 (defmacro gv6/get-nohw-counter ()
   "This is GV6 implementation of GLOBAL-CLOCK/GET-NOHW-COUNTER.
-Calls (GV5/GET-NOHW-COUNTER)."
-  `(gv5/get-nohw-counter))
+Return LOGIOR of two quantities:
+1. (GV5/GET-NOHW-COUNTER)
+2. the global-clock slot NOHW-FLAG"
+  `(logior
+    (gv5/get-nohw-counter)
+    (%global-clock-nohw-flag)))
 
 
 (defmacro gv6/incf-nohw-counter (&optional (delta +global-clock-nohw-delta+))
@@ -382,32 +394,33 @@ Calls (GV5/DECF-NOHW-COUNTER)."
   (macrolet ((fixnum+ (a b) `(the fixnum (+ (the fixnum ,a) (the fixnum ,b))))
              (fixnum* (a b) `(the fixnum (* (the fixnum ,a) (the fixnum ,b)))))
 
-    (let* ((old-stat (global-clock-gv156-success-stat +gv6+))
+    (let* ((old-stat (%global-clock-success-stat))
            (new-stat (fixnum+ delta (ash (fixnum+ 16 (fixnum* 31 old-stat)) -5))))
 
-      (if (zerop (logand 1 (gv6/get-nohw-counter)))
+      (if (zerop (%global-clock-nohw-flag))
           ;; GV6 is currently allowing HW transactions (GV5 mode).
           ;; if abort rates are high, disable them by switching to GV1 mode.
           (when (< new-stat 0) ;; min with -20 is -625
 	    (log.debug "stat is ~S, switching to GV1 - forbid HW TXs" new-stat)
-
-            ;; BUG! FIXME! another thread may have already executed next call!
-            (gv6/incf-nohw-counter 1)
+            (setf (%global-clock-nohw-flag) 1)
+            ;; we just switched to GV1 mode, where aborts no longer increase
+            ;; GLOBAL-CLOCK version.
+            ;; Manually increase GLOBAL-CLOCK version, otherwise transactions
+            ;; may livelock due to some TVAR version > GLOBAL-CLOCK version
+            (gv5/sw/after-abort)
             (setf new-stat 200))
-
+          
           ;; GV6 is currently forbidding HW transactions due to high abort (GV1 mode)
           ;; re-enable HW transactions by switching to GV5 mode in two cases:
           ;; 1. success rate becomes very high
           ;; 2. abort rates remain high
           (unless (< 0 new-stat 600) ;; max with +20 is 625
 	    (log.debug "stat is ~S, switching to GV5 - allow HW TXs" new-stat)
-
-            ;; BUG! FIXME! another thread may have already executed next call!
-            (gv6/decf-nohw-counter 1)
+            (setf (%global-clock-nohw-flag) 0)
             (setf new-stat 100)))
 
       ;;(break)
-      (setf (global-clock-gv156-success-stat +gv6+) new-stat))))
+      (setf (%global-clock-success-stat) new-stat))))
 
 
 (defmacro gv6/hw/stat-committed ()

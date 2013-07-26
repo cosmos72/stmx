@@ -270,9 +270,13 @@ to application code only in case of bugs"))
 
 Before re-executing, the transaction will wait on all variables that it read
 until at least one of them changes."
+    
     #?+hw-transactions
-    (when (hw-transaction-supported-and-running?) (hw-transaction-abort))
+    (when (hw-transaction-supported-and-running?)
+      (hw-transaction-abort))
+
     (error retry-error-obj)))
+
 
 
 (let1 rerun-error-obj (make-condition 'rerun-error)

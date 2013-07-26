@@ -29,17 +29,28 @@
 (in-package :stmx.example1)
   
 
-(declaim (ftype (function (cons) fixnum) eat-from-plate)
-         (inline eat-from-plate))
+(declaim (ftype (function (cons) fixnum) eat-from-plate eat-from-plate/swtx)
+         (inline
+           eat-from-plate
+           eat-from-plate/swtx))
+
 (defun eat-from-plate (plate)
+  "Decrease by one TVAR in plate."
+  (declare (type cons plate))
+  (decf (the fixnum ($ (car plate)))))
+
+(defun eat-from-plate/swtx (plate)
   "Decrease by one TVAR in plate."
   (declare (type cons plate))
   (decf (the fixnum ($-tx (car plate)))))
 
 
-(declaim (ftype (function (tvar tvar cons) fixnum) philosopher-eats fast-philosopher-eats)
+(declaim (ftype (function (tvar tvar cons) fixnum) philosopher-eats
+                                                   fast-philosopher-eats
+                                                   fast-philosopher-eats/swtx)
          (inline philosopher-eats
-                 fast-philosopher-eats))
+                 fast-philosopher-eats
+                 fast-philosopher-eats/swtx))
 
 (defun philosopher-eats (fork1 fork2 plate)
   "Eat once. return remaining hunger"
@@ -68,11 +79,33 @@
         (free t)
         (busy +unbound-tvar+))
 
+    (when (eq free ($ fork1))
+      (setf ($ fork1) busy)
+      (when (eq free ($-tx fork2))
+        (setf ($ fork2) busy
+              hunger (eat-from-plate plate)
+              ($ fork2) free))
+      (setf ($ fork1) free))
+
+    hunger))
+
+(defun fast-philosopher-eats/swtx (fork1 fork2 plate)
+  "Eat once. return remaining hunger"
+  (declare (type tvar fork1 fork2)
+           (type cons plate))
+  ;; use a normal (non-transactional) counter to keep track
+  ;; of retried transactions for demonstration purposes.
+  (decf (the fixnum (cdr plate)))
+   
+  (let ((hunger -1) ;; unknown
+        (free t)
+        (busy +unbound-tvar+))
+
     (when (eq free ($-tx fork1))
       (setf ($-tx fork1) busy)
       (when (eq free ($-tx fork2))
         (setf ($-tx fork2) busy
-              hunger (eat-from-plate plate)
+              hunger (eat-from-plate/swtx plate)
               ($-tx fork2) free))
       (setf ($-tx fork1) free))
 
@@ -95,9 +128,11 @@
 
 
   ;; NOTE: this simpler version works too, but allocates a closure at each iteration:
-  ;; (loop until (zerop (the fixnum (atomic (philosopher-eats fork1 fork2 plate)))))
+  #-always
+  (loop until (zerop (the fixnum (atomic (philosopher-eats fork1 fork2 plate)))))
 
-  (let1 lambda-philosopher-eats (lambda () (fast-philosopher-eats fork1 fork2 plate)) 
+  #+never
+  (let1 lambda-philosopher-eats (lambda () (fast-philosopher-eats/swtx fork1 fork2 plate)) 
     (loop until (zerop (the fixnum (run-atomic lambda-philosopher-eats))))))
 
 

@@ -20,7 +20,7 @@
 
 ;;;; ** Running hardware transactions
 
-;;(defconstant +hw-atomic-max-attempts+ 3)
+(defconstant +hw-atomic-max-attempts+ 5)
 
 (defmacro %hw-atomic2 ((&optional tvar-write-version &key err (test-for-running-tx? t))
                        body fallback)
@@ -31,11 +31,12 @@ If it has no chances to succeed, execute BODY in a software memory transaction."
   (let ((tvar-write-version (or tvar-write-version (gensym (symbol-name 'tvar-write-version))))
         (err (or err (gensym (symbol-name 'err)))))
     
-    (with-gensyms (tx-begin tx-fallback)
+    (with-gensyms (tx-begin tx-fallback attempts)
       `(cond
          ,@(if test-for-running-tx? `(((transaction?) ,body)) `())
          (t
           (prog ((,err 0)
+                 (,attempts +hw-atomic-max-attempts+)
                  ;; create a a thread-local binding for *hw-tlog-write-version*
                  (*hw-tlog-write-version* +invalid-version+))
              
@@ -62,8 +63,10 @@ If it has no chances to succeed, execute BODY in a software memory transaction."
                      (hw-transaction-end)
                      (global-clock/hw/stat-committed)))))
 
-             (when (hw-transaction-rerun-may-succeed? ,err)
-               (go ,tx-begin))
+             (unless (zerop (decf ,attempts))
+               (when (hw-transaction-rerun-may-succeed? ,err)
+                 ;;(maybe-yield-before-rerun)
+                 (go ,tx-begin)))
 
              (global-clock/hw/stat-aborted)
              

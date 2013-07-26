@@ -447,22 +447,20 @@ if VAR changes."
 
 (defprint-object (var tvar :identity nil)
 
-  (let ((value +unbound-tvar+)
-        (present? nil)
-        (id (~ var)))
+  (let ((value (tvar-value var))
+        (version (tvar-version var))
+        (id (~ var))
+        (log (current-tlog)))
 
-    (when (recording?)
+    (when log
       ;; extract transactional value without triggering a (rerun):
       ;; printing TVARs is _only_ for debugging purposes
       (multiple-value-bind (tx-value tx-present?)
-          (get-txhash (tlog-writes (current-tlog)) var)
+          (get-txhash (tlog-writes log) var)
         (when tx-present?
           (setf value    tx-value
-                present? tx-present?))))
-
-    (unless present?
-      (setf value (tvar-value var)))
+                version (tlog-read-version log)))))
 
     (if (eq value +unbound-tvar+)
-        (format t "~A unbound" id)
-        (format t "~A [~A]" id value))))
+        (format t "~A v~A unbound" id version)
+        (format t "~A v~A [~A]" id version value))))

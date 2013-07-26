@@ -20,7 +20,7 @@
 
 ;;;; ** Running hardware transactions
 
-(defconstant +hw-atomic-max-attempts+ 5)
+(defconstant +hw-atomic-max-attempts+ 10)
 
 (defmacro %hw-atomic2 ((&optional tvar-write-version &key err (test-for-running-tx? t))
                        body fallback)
@@ -63,7 +63,7 @@ If it has no chances to succeed, execute BODY in a software memory transaction."
                      (hw-transaction-end)
                      (global-clock/hw/stat-committed)))))
 
-             (unless (zerop (decf ,attempts))
+             (unless (zerop (decf (the fixnum ,attempts)))
                (when (hw-transaction-rerun-may-succeed? ,err)
                  ;;(maybe-yield-before-rerun)
                  (go ,tx-begin)))

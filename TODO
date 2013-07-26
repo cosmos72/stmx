@@ -1,5 +1,8 @@
 ========== TO DO ==========
 
+18bis) optimize adaptive global clock GV6 - currently it is horribly slow,
+    writes to global memory after each commit and rollback
+
 17) automatically expand $ to $-tx, $-hwtx or $-notx, and similarly expand
     (setf $...) and user-defined functions
 

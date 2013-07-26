@@ -27,17 +27,25 @@
 
 
 (in-package :stmx.example1)
-  
+
+(enable-#?-syntax)  
 
 (declaim (ftype (function (cons) fixnum) eat-from-plate eat-from-plate/swtx)
+         (ftype (function (fixnum cons) fixnum)         eat-from-plate/hwtx)
          (inline
            eat-from-plate
+           eat-from-plate/hwtx
            eat-from-plate/swtx))
 
 (defun eat-from-plate (plate)
   "Decrease by one TVAR in plate."
   (declare (type cons plate))
   (decf (the fixnum ($ (car plate)))))
+
+(defun eat-from-plate/hwtx (helper plate)
+  "Decrease by one TVAR in plate."
+  (declare (type cons plate))
+  (decf (the fixnum ($-hwtx (car plate) helper))))
 
 (defun eat-from-plate/swtx (plate)
   "Decrease by one TVAR in plate."
@@ -48,8 +56,11 @@
 (declaim (ftype (function (tvar tvar cons) fixnum) philosopher-eats
                                                    fast-philosopher-eats
                                                    fast-philosopher-eats/swtx)
+
+         (ftype (function (fixnum tvar tvar cons) fixnum) fast-philosopher-eats/hwtx)
          (inline philosopher-eats
                  fast-philosopher-eats
+                 fast-philosopher-eats/hwtx
                  fast-philosopher-eats/swtx))
 
 (defun philosopher-eats (fork1 fork2 plate)
@@ -81,13 +92,43 @@
 
     (when (eq free ($ fork1))
       (setf ($ fork1) busy)
-      (when (eq free ($-tx fork2))
+      (when (eq free ($ fork2))
         (setf ($ fork2) busy
               hunger (eat-from-plate plate)
               ($ fork2) free))
       (setf ($ fork1) free))
 
     hunger))
+
+
+(defun fast-philosopher-eats/hwtx (helper fork1 fork2 plate)
+  "Eat once. return remaining hunger"
+  (declare (type tvar fork1 fork2)
+           (type cons plate))
+  ;; we cannot use a normal (non-transactional) counter to keep track
+  ;; of retried transactions for demonstration purposes:
+  ;; inside a HW transaction, ALL memory is transactional.
+  ;; so move this counter outside the HW TX.
+  #+never (decf (the fixnum (cdr plate)))
+   
+  (let ((hunger -1) ;; unknown
+        (free t)
+        (busy +unbound-tvar+))
+
+    (when (eq free ($-hwtx fork1))
+      (setf ($-hwtx fork1 helper) busy)
+      (when (eq free ($-hwtx fork2))
+        (setf ($-hwtx fork2 helper) busy
+              hunger (eat-from-plate/hwtx helper plate)
+              ($-hwtx fork2 helper) free))
+      (setf ($-hwtx fork1 helper) free))
+
+    #+never
+    (when (= -1 hunger)
+      (hw-transaction-abort))
+    
+    hunger))
+
 
 (defun fast-philosopher-eats/swtx (fork1 fork2 plate)
   "Eat once. return remaining hunger"
@@ -128,12 +169,32 @@
 
 
   ;; NOTE: this simpler version works too, but allocates a closure at each iteration:
-  #-always
+  #+never
   (loop until (zerop (the fixnum (atomic (philosopher-eats fork1 fork2 plate)))))
 
-  #+never
-  (let1 lambda-philosopher-eats (lambda () (fast-philosopher-eats/swtx fork1 fork2 plate)) 
-    (loop until (zerop (the fixnum (run-atomic lambda-philosopher-eats))))))
+  #?-hw-transactions
+  (let1 lambda-philosopher-eats (lambda () (fast-philosopher-eats/swtx fork1 fork2 plate))
+    (loop until (zerop (the fixnum (run-atomic lambda-philosopher-eats)))))
+
+
+  #?+hw-transactions
+  (let1 lambda-philosopher-eats/swtx
+      (lambda () (fast-philosopher-eats/swtx fork1 fork2 plate))
+
+    (loop
+       do (decf (the fixnum (cdr plate)))
+       until
+         (zerop
+          (the fixnum
+            
+            (stmx::hw-atomic2 (helper :test-for-running-tx? nil)
+
+             (fast-philosopher-eats/hwtx helper fork1 fork2 plate)
+
+             (run-atomic lambda-philosopher-eats/swtx)))))))
+
+
+
 
 
 (defun dining-philosophers (philosophers-count &optional (philosophers-initial-hunger 10000000))

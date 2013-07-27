@@ -206,6 +206,12 @@ After return, LOCKED will contain all TXPAIR entries of locked VARS."
 IMPORTANT: See BEFORE-COMMIT for what FUNC must not do."
   (declare (type function func)
            (type tlog log))
+
+  #?+hw-transactions
+  (when (hw-transaction-supported-and-running?)
+    ;; hw transactions do not support before-commit
+    (hw-transaction-abort))
+
   (vector-push-extend func (ensure-tlog-before-commit log))
   func)
 
@@ -215,6 +221,12 @@ IMPORTANT: See BEFORE-COMMIT for what FUNC must not do."
 IMPORTANT: See AFTER-COMMIT for what FUNC must not do."
   (declare (type function func)
            (type tlog log))
+
+  #?+hw-transactions
+  (when (hw-transaction-supported-and-running?)
+    ;; hw transactions do not support after-commit
+    (hw-transaction-abort))
+
   (vector-push-extend func (ensure-tlog-after-commit log))
   func)
 
@@ -332,7 +344,7 @@ Note: invokes HW-ATOMIC2, which in turn invokes GLOBAL-CLOCK/HW/STAT-{COMMITTED,
                 (val           (txpair-value entry)))
 
             ;; degrade "write the same value already present" to "read"
-            ;; the hardware transaction guarantees to abort if the var changes value
+            ;; the hardware transaction guarantees to abort if the tvar changes value
             (unless (eq val (raw-value-of var))
               (put-txfifo changed entry)
               (setf ($-hwtx var write-version) val))))
@@ -355,7 +367,7 @@ Note: invokes HW-ATOMIC2, which in turn invokes GLOBAL-CLOCK/HW/STAT-{COMMITTED,
   
 
 
-(declaim (inline sw-commit-update-tvars))
+(declaim (inline commit-sw-update-tvars))
 
 (defun commit-sw-update-tvars (locked)
   "Actually COMMIT, i.e. write new values into TVARs. Also unlock all TVARs."

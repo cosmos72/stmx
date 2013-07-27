@@ -54,42 +54,14 @@ The effect is the same as DEFUN - or DEFMETHOD - plus:
 
 
 (defmacro sw-atomic (&rest body)
-  "Main entry point for STMX.
-
-Run BODY in a memory transaction. All changes to transactional memory
+  "Run BODY in a software memory transaction. All changes to transactional memory
 will be visible to other threads only after BODY returns normally (commits).
 If BODY signals an error, its effects on transactional memory are rolled back
 and the error is propagated normally.
 Also, no work-in-progress transactional memory will ever be visible to other
-threads.
-
-A memory transaction can also retry: in such case ATOMIC will abort it,
-wait until some of the value read by the transaction have changed,
-then re-run the transaction from the beginning.
-
-Since STMX transactions do not lock memory, it is possible for different
-transactions to try to update the same memory (almost) simultaneously.
-In such case, the conflict is detected when they try to commit or rollback,
-and only one conflicting transaction is allowed to commit:
-all others are immediately re-run again from the beginning,
-also ignoring any error they may have signalled.
-
-For this reason, a transaction ABSOLUTELY MUST NOT perform any irreversible
-operation such as INPUT/OUTPUT: the result would be that I/O is executed
-multiple times, or executed even when it should not!
-Irreversible operations MUST be performed OUTSIDE transactions,
-for example by queueing them into transactional memory that another thread
-will consume and then, OUTSIDE transactions, actually perform them.
-
-For how to create transactional memory, see TRANSACTIONAL or TVAR.
-For another way to run transactions, see also TRANSACTION.
-For advanced features inside transactions, see RETRY, ORELSE, NONBLOCKING,
-    BEFORE-COMMIT and AFTER-COMMIT.
-
-For pre-defined transactional classes, see the package STMX.UTIL"
-
+threads."
   (if body
-      `(run-atomic (lambda () (block nil (locally ,@body))))
+      `(run-sw-atomic (lambda () (block nil (locally ,@body))))
       `(values)))
 
 
@@ -98,7 +70,7 @@ For pre-defined transactional classes, see the package STMX.UTIL"
       (let1 form `(block nil (locally ,@body))
         `(if (transaction?)
              ,form
-             (%run-atomic (lambda () ,form))))
+             (%run-sw-atomic (lambda () ,form))))
       `(values)))
 
        
@@ -106,7 +78,7 @@ For pre-defined transactional classes, see the package STMX.UTIL"
 (declaim (inline run-once))
 
 (defun run-once (tx log)
-  "Internal function invoked by RUN-ATOMIC and RUN-ORELSE2.
+  "Internal function invoked by RUN-SW-ATOMIC and RUN-ORELSE.
 
 Run once the function TX inside a transaction,
 using LOG as its transaction log."
@@ -124,7 +96,7 @@ using LOG as its transaction log."
 
 
 
-(defun %run-atomic (tx)
+(defun %run-sw-atomic (tx)
   "Function equivalent of the SW-ATOMIC macro.
 
 Run the function TX inside a transaction.
@@ -188,9 +160,9 @@ transactional memory it read has changed."
    (go run)))
 
 
-(declaim (inline run-atomic))
+(declaim (inline run-sw-atomic))
 
-(defun run-atomic (tx)
+(defun run-sw-atomic (tx)
   "Function equivalent of the SW-ATOMIC macro.
 
 Run the function TX inside a transaction.
@@ -206,5 +178,5 @@ transactional memory it read has changed."
 
   (if (transaction?)
       (funcall tx)
-      (%run-atomic tx)))
+      (%run-sw-atomic tx)))
 

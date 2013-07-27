@@ -20,36 +20,43 @@ threads until it commits.
 Transactional memory gives freedom from deadlocks, automatic roll-back on failure,
 and it aims at resolving the tension between granularity and concurrency.
 
-### Latest news, 1st July 2013
+### Latest news, 27th July 2013
 
-Support for hardware transactions is being added to STMX. It used Restricted
-Memory Transactions (RTM) available on the following Intel x86-64 processors
-released in June 2013:
+STMX now supports hardware transactions. It uses Transactional Synchronization
+Extensions (TSX) available on the following Intel x86-64 processors released
+in June 2013:
 * Intel Core i5 4570
 * Intel Core i5 4670
 * Intel Core i7 4770
 
-The current implementation is still experimental, unoptimized, and disabled by default.
-It can be enabled by uncommenting the relevant flag in `stmx/lang/features-detect.lisp`.
+To actually use hardware transactions with STMX, you will need:
+* one of the above CPUs
+* a 64-bit unix-like OS (currently tested on Debian GNU/Linux x86_64)
+* a 64-bit installation of Steel Back Common Lisp (SBCL) version 1.0.55 or later
+  (currently tested on SBCL for x86-64, version 1.1.9)
+  Note: x86-64 is often named AMD64 - they are the same thing
+* the latest STMX version - download it from [GitHub](https://github.com/cosmos72/stmx)
+  as described in **Installation and loading** below
 
-To have a taste of hardware transactions, STMX includes [SB-TRANSACTION](sb-transaction),
-a standalone library that does **not** depend on STMX and provides hardware-only
-memory transactions on CPUs from the list above.
-Its performance is **much** higher than STMX and even higher than
+The current hardware transactions implementation is still young and not very
+optimized, yet it can accelerate short transactions up to 3-4 times while seamlessly
+falling back on software transactions when the hardware limits are exceeded.
+Experiments with hand-optimized code (not yet included in STMX) show that the
+maximum possible performance increase is 7-8 times.
+
+STMX also includes [SB-TRANSACTION](sb-transaction), a standalone library
+that does **not** depend on STMX and provides hardware-only memory transactions
+on CPUs from the list above.
+It is a low-level library providing raw access to the new CPU instructions
+for hardware transactions.
+Its performance reaches the theoretical peak supported by the underlying CPU,
+and it is obviously faster than STMX - it is usually even faster than
 hand-optimized compare-and-swap fine grained locking code (see benchmark
 results in [doc/benchmark.md](doc/benchmark.md)). The reason is that it avoids
 the overhead and the software compatibility requirements of STMX, providing
 only the raw features - and the limitations - of the underlying CPU.
 At the moment, SB-TRANSACTION only works on SBCL running in native 64-bit mode
 on a CPU with hardware transaction support (see the list above).
-
-The objective is to integrate SB-TRANSACTION with STMX in order
-to take advantage of hardware transactions when available,
-while falling back on software transactions in the following cases:
-- CPU not supporting hardware transactions
-- transactions exceed hardware limits
-- transactions use features not supported by the hardware (ORELSE, RETRY, allocating memory,
-  input/output, system calls...)
 
 General documentation
 ---------------------
@@ -108,7 +115,7 @@ described [here](http://www.quicklisp.org/beta) - search for "To get updated
 software" in the page.
   
 
-### Latest version - from GIT
+### Latest version - from GitHub
 
 In case you want to use the "latest and greatest" version directly
 from the author, which may contain new features, improvements, bug
@@ -571,6 +578,71 @@ features are available:
      bound to any value.
    - `(setf ($ var) value)` Set the value of VAR. Identical to `(setf ($-slot var) value)`
      and provided for simmetry with `($ var)`.
+
+Hardware transactions
+---------------------
+
+### How to tell if hardware transactions are supported
+
+There are several ways:
+- From **outside** transactions, run the macro `(HW-TRANSACTION-SUPPORTED?)`.
+  It will call CPUID and return T if hardware transactions are supported,
+  or NIL if they are not.
+- Try to use them, for example with `(ATOMIC (HW-TRANSACTION-SUPPORTED-AND-RUNNING?))`
+
+Note: as stated above, for hardware transactions to work you will need an Intel CPU
+that supports hardware transactions (TSX), a 64-bit unix-like operating system
+(tested on Linux x86_64) and a recent, 64-bit version of SBCL.
+
+Also, hardware transactions only work in compiled code - SBCL sometimes 
+interprets very short functions an code executed at REPL instead of compiling them,
+which may cause hardware transactions to fail.
+
+### How to use hardware transactions
+
+STMX automatically uses hardware transactions if they are supported.
+There is no need to use special commands, just execute the usual `(ATOMIC ...)`
+or `(RUN-ATOMIC ...)` forms.
+
+Hardware transactions have several limitations, and STMX will seamlessy switch to software
+transactions in the following cases:
+
+- hardware limits are exceeded, for example read-set or write-set larger than CPU L1 cache
+
+- a function or macro not supported by hardware transactions is executed.
+  The list is subject to change, it currently includes:
+  * STMX functions and macros: RETRY, ORELSE, RUN-ORELSE, BEFORE-COMMIT, AFTER-COMMIT,
+    CALL-BEFORE-COMMIT, CALL-AFTER-COMMIT
+  * any Common Lisp function or macro that signals an error, or allocates non-trivial amounts
+    of memory, or performs any kind of system calls - including input/output and context switching.
+
+- a CPU instruction not allowed inside hardware transaction is issued.
+  In particular, Intel TSX guarantees that CPU instructions
+  * CPUID, PAUSE, XABORT
+  will always abort a hardware transaction, but many other CPU instructions will typically
+  have the same effect, including possibly:
+  * Calls to the operating system and return from them:
+    SYSENTER, SYSCALL, SYSEXIT, SYSRET.
+  * Interrupts: INT n, INTO.
+  * Input/Output: IN, INS, REP INS, OUT, OUTS, REP OUTS and their variants.
+  * All X87 and MMX instructions. On the opposite, XMM and YMM registers and the MXCSR register
+    **can** be used inside a hardware transaction.
+  * CLI, STI, POPFD, POPFQ, CLTS.
+  * Instructions that update segment registers, debug registers and/or control
+    registers such as DF (CLD and STD instructions), DS/ES/FS/GS/SS and CR0/CR2/CR3/CR4/CR8
+  * TLB and Cacheability control: CLFLUSH, INVD, WBINVD, INVLPG, INVPCID, and
+    memory instructions with a non-temporal hint (MOVNTDQA, MOVNTDQ,
+    MOVNTI, MOVNTPD, MOVNTPS, and MOVNTQ).
+  * Processor state save: XSAVE, XSAVEOPT, and XRSTOR.
+  * VMX instructions: VMPTRLD, VMPTRST, VMCLEAR, VMREAD, VMWRITE, VMCALL, VMLAUNCH,
+    VMRESUME, VMXOFF, VMXON, INVEPT, and INVVPID.
+  * SMX instructions: GETSEC.
+  * Miscellaneous: UD2, RSM, RDMSR, WRMSR, HLT, MONITOR, MWAIT, XSETBV, VZEROUPPER,
+    MASKMOVQ, and V/MASKMOVDQU.
+
+  For details and up-to-date information, see Intel Instruction Set Programming Reference,
+  Chapter "Transactional Synchronization Extensions".
+
 
 Utilities and examples
 ---------------------

@@ -32,7 +32,7 @@ in June 2013:
 To actually use hardware transactions with STMX, you will need:
 * one of the above CPUs
 * a 64-bit unix-like OS (currently tested on Debian GNU/Linux x86_64)
-* a 64-bit installation of Steel Back Common Lisp (SBCL) version 1.0.55 or later
+* a 64-bit installation of Steel Bank Common Lisp (SBCL) version 1.0.55 or later
   (currently tested on SBCL for x86-64, version 1.1.9)
   Note: x86-64 is often named AMD64 - they are the same thing
 * the latest STMX version - download it from [GitHub](https://github.com/cosmos72/stmx)
@@ -93,8 +93,9 @@ Installation and loading
 
 ### Stable version - from [Quicklisp](http://www.quicklisp.org)
 
-STMX is now available from Quicklisp. The simplest way to obtain it is to first
-install [Quicklisp](http://www.quicklisp.org) then run these commands from REPL:
+The stable versione of STMX is available from Quicklisp.
+The simplest way to obtain it is to first install
+[Quicklisp](http://www.quicklisp.org) then run these commands from REPL:
 
     CL-USER> (ql:quickload "stmx")
     ;; lots of output...
@@ -108,6 +109,10 @@ If all goes well, this will automatically download and install the
 - `bordeaux-threads`
 - `trivial-garbage`
 
+Note: as of 27 July 2013, the stable version of STMX does **not**
+yet contain support for hardware transactions - if you want them,
+you will need to download the latest version from GitHub (see below).
+
 Since STMX was added to QuickLisp quite recently (15 June 2013), it
 may happen that your Quicklisp installation can't find it. In such
 case, you need to first update your QuickLisp installation as
@@ -118,10 +123,10 @@ software" in the page.
 ### Latest version - from GitHub
 
 In case you want to use the "latest and greatest" version directly
-from the author, which may contain new features, improvements, bug
-fixes (and occasionally new bugs), you need to download it
-into your Quicklisp local-projects folder. Open a shell and run the
-commands:
+from the author in order to get the newest features - for example
+hardware transactions - improvements, bug fixes (and occasionally new bugs),
+you need to download it into your Quicklisp local-projects folder.
+Open a shell and run the commands:
 
     $ cd ~/quicklisp/local-projects
     $ git clone git://github.com/cosmos72/stmx.git
@@ -173,8 +178,8 @@ run:
     ;; lots of output...
     CL-USER> (fiveam:run! 'stmx.test:suite)
     ;; even more output...
-     Did 4585 checks.    
-        Pass: 4585 (100%)
+     Did 7133 checks.
+        Pass: 7133 (100%)
         Skip: 0 ( 0%)
         Fail: 0 ( 0%)
         
@@ -591,7 +596,7 @@ There are several ways:
 - Try to use them, for example with `(ATOMIC (HW-TRANSACTION-SUPPORTED-AND-RUNNING?))`
 
 Note: as stated above, for hardware transactions to work you will need an Intel CPU
-that supports hardware transactions (TSX), a 64-bit unix-like operating system
+that supports hardware transactions (Intel TSX), a 64-bit unix-like operating system
 (tested on Linux x86_64) and a recent, 64-bit version of SBCL.
 
 Also, hardware transactions only work in compiled code - SBCL sometimes 
@@ -604,32 +609,35 @@ STMX automatically uses hardware transactions if they are supported.
 There is no need to use special commands, just execute the usual `(ATOMIC ...)`
 or `(RUN-ATOMIC ...)` forms.
 
-Hardware transactions have several limitations, and STMX will seamlessy switch to software
-transactions in the following cases:
+Hardware transactions have several limitations, and STMX will seamlessy switch
+to software transactions in the following cases:
 
-- hardware limits are exceeded, for example read-set or write-set larger than CPU L1 cache
+- hardware limits are exceeded, for example read-set or write-set larger than
+  CPU L1 cache
 
 - a function or macro not supported by hardware transactions is executed.
   The list is subject to change, it currently includes:
   * STMX functions and macros: RETRY, ORELSE, RUN-ORELSE, BEFORE-COMMIT, AFTER-COMMIT,
     CALL-BEFORE-COMMIT, CALL-AFTER-COMMIT
-  * any Common Lisp function or macro that signals an error, or allocates non-trivial amounts
-    of memory, or performs any kind of system calls - including input/output and context switching.
+  * any Common Lisp function or macro that signals an error, or allocates
+    non-trivial amounts of memory, or performs any kind of system calls,
+    including input/output, sleeping and context switching.
 
 - a CPU instruction not allowed inside hardware transaction is issued.
   In particular, Intel TSX guarantees that CPU instructions
   * CPUID, PAUSE, XABORT
-  will always abort a hardware transaction, but many other CPU instructions will typically
-  have the same effect, including possibly:
+  will always abort a hardware transaction, but many other CPU instructions
+  will typically have the same effect, including possibly:
   * Calls to the operating system and return from them:
     SYSENTER, SYSCALL, SYSEXIT, SYSRET.
   * Interrupts: INT n, INTO.
   * Input/Output: IN, INS, REP INS, OUT, OUTS, REP OUTS and their variants.
-  * All X87 and MMX instructions. On the opposite, XMM and YMM registers and the MXCSR register
-    **can** be used inside a hardware transaction.
+  * All X87 and MMX instructions. On the opposite, XMM and YMM registers
+    and the MXCSR register **can** be used inside a hardware transaction.
   * CLI, STI, POPFD, POPFQ, CLTS.
   * Instructions that update segment registers, debug registers and/or control
-    registers such as DF (CLD and STD instructions), DS/ES/FS/GS/SS and CR0/CR2/CR3/CR4/CR8
+    registers such as DF (CLD and STD instructions), DS/ES/FS/GS/SS and
+    CR0/CR2/CR3/CR4/CR8.
   * TLB and Cacheability control: CLFLUSH, INVD, WBINVD, INVLPG, INVPCID, and
     memory instructions with a non-temporal hint (MOVNTDQA, MOVNTDQ,
     MOVNTI, MOVNTPD, MOVNTPS, and MOVNTQ).
@@ -640,8 +648,8 @@ transactions in the following cases:
   * Miscellaneous: UD2, RSM, RDMSR, WRMSR, HLT, MONITOR, MWAIT, XSETBV, VZEROUPPER,
     MASKMOVQ, and V/MASKMOVDQU.
 
-  For details and up-to-date information, see Intel Instruction Set Programming Reference,
-  Chapter "Transactional Synchronization Extensions".
+  For details and up-to-date information, see Intel Instruction Set Programming
+  Reference, Chapter "Transactional Synchronization Extensions".
 
 
 Utilities and examples
@@ -785,21 +793,48 @@ use `(describe 'some-symbol)` at REPL:
 Performance
 -----------
 
-In order for STMX to reach its peak performance, four requirements need to be satisfied
-by the Lisp compiler being used:
-- it must have good multi-threading support
-- it must produce fast, highly optimized code
-- it must expose atomic compare-and-swap operations or, as slower alternative,
-  a function to retrieve the thread owning a lock
+STMX automatically discovers and takes advantage of many optional,
+non-standard features of the underlying Common Lisp compiler.
+It also performs graceful degradation, i.e. if the fastest version
+of a feature is not available, it automatically switches to a slower
+but available implementation.
+
+Depending on the available features, STMX performance can vary up to a factor 100
+or more.
+
+To reach its peak performance, one requirement needs to be satisfied by the hardware
+and five need to be satisfied by the Lisp compiler being used.
+They are listed here in order of importance:
+
+Hardware requirements:
+- support hardware transactions (Intel TSX). Without them, STMX is at least
+  3-4 times slower. Or, if you prefer since Intel TSX is still very rare,
+  **with* it STMX is at least 3-4 times faster. As of July 2013,
+  STMX can use hardware transactions only on 64-bit SBCL.
+
+Lisp compiler requirements:
+- it must have good multi-threading support. Without it, what would you need
+  a concurrency library as STMX for?
+- it must expose atomic compare-and-swap operations - a much slower alternative,
+  but still better than nothing, is to expose a function that returns
+  which thread is owning a lock.
+- it must produce fast, highly optimized code.
+- it must be 64-bit. 32-bit is much slower because transactional memory
+  version counters are then BIGNUMs instead of FIXNUMs.  
 - on unordered CPUs (i.e. on most CPUs except x86 and x86-64) it must expose
-  memory barrier operations
+  memory barrier operations.
+
 
 Among the non-commercial Lisp compilers, SBCL is the only one known to STMX author
-that satisfies all the four requirements. Actually, all the other tested free Lisp compilers
-(ABCL, CCL, CMUCL, ECL) are at least somewhat lacking in the second area, and none of them offers
+that satisfies all the four requirements, and the only one where STMX author
+has implemented support for hardware transactions.
+
+Actually, all the other tested free Lisp compilers (ABCL, CCL, CMUCL, ECL)
+are at least somewhat lacking in the third area, and none of them offers
 atomic compare-and-swap or memory barrier operations at all.
 One - CMUCL - produces relatively fast code, but does not support native threads.
-STMX is not tested on any commercial Lisp compiler, so performance on them is simply unknown.
+STMX is not tested on any commercial Lisp compiler, so performance on them
+is simply unknown.
 
 For these reasons, STMX will reach the highest known performance on SBCL by a large
 margin - possibly by a factor from 10 to 100 with respect to other tested systems.
@@ -808,26 +843,33 @@ For performance considerations and a lot of raw numbers produced by running micr
 see the included files [doc/benchmark.md](doc/benchmark.md), [doc/benchmark-abcl.md](doc/benchmark-abcl.md),
 [doc/benchmark-ccl64.md](doc/benchmark-ccl64.md) and [doc/benchmark-cmucl.md](doc/benchmark-cmucl.md).
 
-The short version is: as of June 2013, on a fast consumer PC (Core i7 4770 @ 3.5GHz or
-better) with SBCL 1.1.8 or better, STMX can execute more than 7 millions transactions
-per second per CPU core. The second platform in terms of performance is CCL (x64_64),
-that reaches 1.1 millions transactions per second per CPU core using two threads,
-but STMX performance quickly decreases with more threads.
+The short version is: as of July 2013, on a fast consumer PC (Core i7 4770 @ 3.5GHz
+or better) with SBCL 1.1.9 or better, STMX can execute more than 38 millions
+**hardware** transactions per second per CPU core, and more than 7 millions
+software transactions per second per CPU core.
+The second platform in terms of performance is CCL (x86_64),
+that reaches 1.1 millions software transactions per second per CPU core
+using two threads, but STMX performance quickly decreases with more threads
+(reason still needs to be investigated).
 
 A small example with very short transactions is the [dining philosophers](example/dining-philosophers-stmx.lisp),
 with 5 reads and 5 writes to transactional memory per atomic block,
-where each CPU core runs approximately 4.4 millions transactions per second -
-hyperthreading has very limited effects.
+where each CPU core runs approximately 4.4 millions software transactions
+per second - hyperthreading has very limited effects.
 
-Obviously, performance in other usage scenarios will depend on the complexity of the code
-inside transactions, on the number of reads and writes to transactional memory,
-and the rate of conflicts and retries.
+Obviously, performance in other usage scenarios will depend on the complexity
+of the code inside transactions, on the availability of hardware transactions,
+on the number of reads and writes to transactional memory, and the rate
+of conflicts and rollbacks.
 
 ### Note
-These result are **not** absolute performance considerations of the tested Lisp systems.
-They are simply the outcome of running micro-benchmarks of a particular library optimized for SBCL
-(see the atomic compare-and-swap and memory barriers considerations) on some other Lisp systems.
-Do **not** try to construct these results as STMX author's opinions on the mentioned Lisp systems.
+These result are **not** absolute performance considerations of the tested
+Lisp systems. They are simply the outcome of running micro-benchmarks
+of a particular library optimized for SBCL (see the hardware transactions,
+atomic compare-and-swap and memory barriers considerations) on several other
+Lisp systems.
+Do **not** try to construct these results as STMX author's opinions on the
+mentioned Lisp systems.
 
 ### Lee-STMX
 For a less artificial and hopefully more realistic benchmark, the author has ported

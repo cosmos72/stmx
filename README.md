@@ -593,24 +593,28 @@ Hardware transactions
 STMX versions 1.9.0 or later can take advantage of hardware transactions
 on Intel CPUs that support Transactional Synchronization Extensions
 (TSX) - as of Juy 2013 the only CPUs actually supporting it are:
-* Intel Core i5 4570
-* Intel Core i5 4670
-* Intel Core i7 4770
+
+- Intel Core i5 4570
+- Intel Core i5 4670
+- Intel Core i7 4770
+
 Quite surprisingly, the overclocker-friendly Intel Core i7 4770K (note
 the final K) does **not** support hardware transactions.
 
 To actually use hardware transactions from STMX, there are two more requirements:
-* a recent, 64-bit version of SBCL - at the moment only version 1.1.19 is tested
-* a 64-bit unix-like operating system - at the moment only Linux x86_64 is tested
+
+- a recent, 64-bit version of SBCL - at the moment only version 1.1.19 is tested
+- a 64-bit unix-like operating system - at the moment only Linux x86_64 is tested
 
 Also, hardware transactions only work in compiled code - SBCL sometimes
-interprets very short functions an code executed at REPL instead of compiling them,
-which may cause hardware transactions to fail.
+interprets very short functions and simple code executed at REPL
+instead of compiling them, which may cause hardware transactions to fail.
 
 
 ### How to tell if hardware transactions are supported
 
 There are several ways. The easiest are:
+
 - From **outside** transactions, run the macro `(HW-TRANSACTION-SUPPORTED?)`.
   It internally calls the CPUID assembler instruction and returns T if hardware
   transactions are supported, or NIL if they are not.
@@ -619,11 +623,11 @@ There are several ways. The easiest are:
 ### How to use hardware transactions
 
 STMX automatically uses hardware transactions if they are supported.
-There is no need to use special commands, just execute the usual `(ATOMIC ...)`
+There is no need for special commands, just execute the usual `(ATOMIC ...)`
 or `(RUN-ATOMIC ...)` forms.
 
 Hardware transactions have several limitations, and STMX will seamlessly switch
-to slower software transactions in the following cases:
+to (slower) software transactions in the following cases:
 
 - hardware limits are exceeded, for example read-set or write-set are
   larger than CPU L1 cache
@@ -642,6 +646,7 @@ to slower software transactions in the following cases:
 
   will always abort a hardware transaction, but many other CPU instructions
   typically have the same effect, including possibly:
+  
   * Calls to the operating system and returns from it:
     SYSENTER, SYSCALL, SYSEXIT, SYSRET.
   * Interrupts: INT n, INTO.
@@ -821,12 +826,14 @@ and five need to be satisfied by the Lisp compiler being used.
 They are listed here in order of importance:
 
 Hardware requirements:
+
 - support hardware transactions (Intel TSX). Without them, STMX is at least
   4-5 times slower. Or, if you prefer since Intel TSX is currently very rare,
   **with** it STMX is at least 4-5 times faster. As of July 2013,
   STMX can use hardware transactions only on 64-bit SBCL.
 
 Lisp compiler requirements:
+
 1. it must have good multi-threading support. Without it, what would you need
    a concurrency library as STMX for?
 2. it must expose atomic compare-and-swap operations - a much slower alternative,

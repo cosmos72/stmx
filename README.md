@@ -19,24 +19,27 @@ cannot be guaranteed, and effects of a memory transaction are not visible from o
 threads until it commits.
 
 Memory transactions gives freedom from deadlocks, automatic roll-back on failure,
-and it aims at resolving the tension between granularity and concurrency.
+and aim at resolving the tension between granularity and concurrency.
 
 ### Latest news, 27th July 2013
 
-STMX now supports hardware memory transactions. It uses Transactional Synchronization
-Extensions (TSX) available on the following Intel x86-64 processors released
-in June 2013:
-* Intel Core i5 4570
-* Intel Core i5 4670
-* Intel Core i7 4770
+STMX now supports hardware memory transactions in addition to
+classic software ones. It uses Transactional Synchronization
+Extensions (TSX) available on the following Intel x86_64 processors
+released in June 2013:
+
+- Intel Core i5 4570
+- Intel Core i5 4670
+- Intel Core i7 4770
 
 To actually use hardware memory transactions with STMX, you will need:
-* one of the above CPUs
-* a 64-bit unix-like OS (currently tested on Debian GNU/Linux x86_64)
-* a 64-bit installation of Steel Bank Common Lisp (SBCL) version 1.0.55 or later
-  (currently tested on SBCL for x86-64, version 1.1.9)
-  Note: x86-64 is often named AMD64 - they are the same thing
-* the latest STMX version - download it from [GitHub](https://github.com/cosmos72/stmx)
+
+- one of the above CPUs
+- a 64-bit unix-like OS (currently tested on Debian GNU/Linux x86_64)
+- a 64-bit installation of Steel Bank Common Lisp (SBCL) version 1.0.55 or later
+  (currently tested on SBCL for x86_64, version 1.1.9)
+  Note: x86_64 is often named AMD64 - they are the same thing
+- the latest STMX version - download it from [GitHub](https://github.com/cosmos72/stmx)
   as described in **Installation and loading** below
 
 The current hardware memory transactions implementation is still young and not very

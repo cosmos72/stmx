@@ -3,33 +3,34 @@ STMX
 
 Summary
 -------
-STMX is a high-performance implementation of composable Software Transactional
-Memory (STM) for Common Lisp. STM is a concurrency control mechanism aimed
-at making concurrent programming easier to write and understand. Instead of
-traditional lock-based programming, one programs with atomic transactions.
-Atomic transactions can be composed together to make larger atomic transactions.
+STMX is a high-performance implementation of composable Transactional
+Memory (TM) for Common Lisp. TM is a concurrency control mechanism aimed 
+at making concurrent programming easier to write and understand.
+Instead of traditional lock-based programming, one programs with
+atomic memory transactions, which can be composed together to make
+larger atomic memory transactions.
 
-A transaction gets committed if it returns normally, while it gets rolled
+A memory transaction gets committed if it returns normally, while it gets rolled
 back if it signals an error (and the error is propagated to the caller).
 
-Finally, transactions can safely run in parallel in different threads,
+Finally, memory transactions can safely run in parallel in different threads,
 are re-executed from the beginning in case of conflicts or if consistent reads
-cannot be guaranteed, and effects of a transaction are not visible from other
+cannot be guaranteed, and effects of a memory transaction are not visible from other
 threads until it commits.
 
-Transactional memory gives freedom from deadlocks, automatic roll-back on failure,
+Memory transactions gives freedom from deadlocks, automatic roll-back on failure,
 and it aims at resolving the tension between granularity and concurrency.
 
 ### Latest news, 27th July 2013
 
-STMX now supports hardware transactions. It uses Transactional Synchronization
+STMX now supports hardware memory transactions. It uses Transactional Synchronization
 Extensions (TSX) available on the following Intel x86-64 processors released
 in June 2013:
 * Intel Core i5 4570
 * Intel Core i5 4670
 * Intel Core i7 4770
 
-To actually use hardware transactions with STMX, you will need:
+To actually use hardware memory transactions with STMX, you will need:
 * one of the above CPUs
 * a 64-bit unix-like OS (currently tested on Debian GNU/Linux x86_64)
 * a 64-bit installation of Steel Bank Common Lisp (SBCL) version 1.0.55 or later
@@ -38,7 +39,7 @@ To actually use hardware transactions with STMX, you will need:
 * the latest STMX version - download it from [GitHub](https://github.com/cosmos72/stmx)
   as described in **Installation and loading** below
 
-The current hardware transactions implementation is still young and not very
+The current hardware memory transactions implementation is still young and not very
 optimized, yet it can accelerate short transactions up to 4-5 times while seamlessly
 falling back on software transactions when the hardware limits are exceeded.
 Experiments with hand-optimized code (not yet included in STMX) show that the
@@ -108,8 +109,8 @@ If all goes well, this will automatically download and install the
 - `bordeaux-threads`
 - `trivial-garbage`
 
-Note: as of 27 July 2013, the stable branch of STMX does **not**
-yet contain support for hardware transactions - to get them,
+Note: as of July 2013, the stable branch of STMX does **not**
+yet contain support for hardware memory transactions - to get them,
 download the latest version from GitHub (see below).
 
 Since STMX was added to QuickLisp quite recently (15 June 2013), it
@@ -123,9 +124,9 @@ software" in the page.
 
 In case you want to use the "latest and greatest" version directly
 from the author, in order to get the newest features - most notably
-hardware transactions - improvements, bug fixes, and occasionally new bugs,
-you need to download it into your Quicklisp local-projects folder.
-Open a shell and run the commands:
+hardware memory transactions - improvements, bug fixes, and
+occasionally new bugs, you need to download it into your Quicklisp
+local-projects folder. Open a shell and run the commands:
 
     $ cd ~/quicklisp/local-projects
     $ git clone git://github.com/cosmos72/stmx.git
@@ -223,8 +224,8 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   classes or, even better, a macro that can be defined to use either
   `slot-value` or slot accessors.
 
-- `ATOMIC` is the main macro: it wraps Lisp forms into an atomic transaction
-  then executes them. For example, defining
+- `ATOMIC` is the main macro: it wraps Lisp forms into an atomic
+   memory transaction then executes them. For example, defining
 
         (defun show-foo (obj)
           (declare (type foo obj))
@@ -273,25 +274,25 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   input/output. More details in the paragraph INPUT/OUTPUT DURING TRANSACTIONS
   below.
 
-  Note: STMX allows using transactional memory both inside and outside atomic
-  blocks, but be aware that accessing transactional memory from outside
+  Note: STMX allows using transactional data both inside and outside atomic
+  blocks, but be aware that accessing transactional data from outside
   atomic transactions is only intended for **debugging** purposes at the REPL:
   in a program it can cause a lot of problems, due to inconsistencies and due to
   other threads not being notified when a transactional memory location is
   updated.
   Future versions may remove this convenience hack and replace it with a cleaner,
   stricter mechanism.
-  In a program, **always** make sure that all code that uses transactional memory
+  In a program, **always** make sure that all code that accesses transactional data
   is directly or indirectly executed inside an `(atomic ...)` block.
 
-- `TRANSACTION` declares that a method or function is an atomic
+- `TRANSACTION` declares that a method or function is an atomic memory
   transaction, and is actually just a macro that wraps the body of a function
   or method in an `(atomic ...)` block.
   In the past, it was suggested as a more convenient alternative to `ATOMIC`,
   but for various stylistic reasons the current recommendation is to avoid it.
   The main reason is that it encourages performing too many operations inside
   an atomic block, including irreversible ones as input/output, which has
-  unpredictable behaviour and should be **really** avoided. Examples:
+  impredictable behaviour and should be **really** avoided. Examples:
 
         (transaction
           (defun get-foo-values (obj)
@@ -436,9 +437,8 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
 Input/Output during transactions
 --------------------------------
 **WARNING:** since transactions will be re-executed in case of conflicts with
-others and can also rollback or retry, all non-transactional code inside an
-atomic block may be executed more times than expected, or may be executed when
-**not** expected.
+others and can also rollback or retry, all code inside an atomic block
+may be executed more times than expected, or may be executed when **not** expected.
 
 Some transactional memory implementations, especially for statically-typed
 languages, forbid performing input/output during a transaction on the ground

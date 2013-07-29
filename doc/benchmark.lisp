@@ -35,7 +35,7 @@
          (hw-transaction-end))
        (stmx::sw-atomic ,@body)))
 
-(defmacro hw-atomic2 ((&optional tvar-write-version &key err (test-for-running-tx? nil))
+(defmacro hw-atomic ((&optional tvar-write-version &key err (test-for-running-tx? nil))
                       &optional (body nil body?) fallback)
   `(stmx::hw-atomic2 (,tvar-write-version :err ,err :test-for-running-tx? ,test-for-running-tx?)
                      ,@(when body? `(,body (sw-atomic ,fallback)))))
@@ -64,28 +64,28 @@
 
 (run10m (sw-atomic  ($-tx v)))
 (run10m (atomic     ($ v)))
-(run10m (hw-atomic2 ()
+(run10m (hw-atomic  ()
                     ($-hwtx v) ;; hw transaction
                     ($-tx v))) ;; sw transaction
 
 
 (run10m (sw-atomic  (setf ($-tx v) 1)))
 (run10m (atomic     (setf ($ v) 1)))
-(run10m (hw-atomic2 (wv)
+(run10m (hw-atomic  (wv)
                     (setf ($-hwtx v wv) 1)
                     (setf ($-tx v) 1)))
 
 
 (run10m (sw-atomic  (incf (the fixnum ($-tx v)))))
 (run10m (atomic     (incf (the fixnum ($ v)))))
-(run10m (hw-atomic2 (wv)
+(run10m (hw-atomic  (wv)
                     (incf (the fixnum ($-hwtx v wv)))
                     (incf (the fixnum ($-tx v)))))
 
 
 (run10m (sw-atomic  (dotimes (j 10) (incf (the fixnum ($-tx v))))))
 (run10m (atomic     (dotimes (j 10) (incf (the fixnum ($ v))))))
-(run10m (hw-atomic2 (wv)
+(run10m (hw-atomic  (wv)
                     (dotimes (j 10) (incf (the fixnum ($-hwtx v wv))))
                     (dotimes (j 10) (incf (the fixnum ($-tx v))))))
 (let ((n 0))
@@ -95,14 +95,14 @@
 
 (run10m (sw-atomic  (dotimes (j 100) (incf (the fixnum ($-tx v))))))
 (run10m (atomic     (dotimes (j 100) (incf (the fixnum ($ v))))))
-(run10m (hw-atomic2 (wv)
+(run10m (hw-atomic  (wv)
                     (dotimes (j 100) (incf (the fixnum ($-hwtx v wv))))
                     (dotimes (j 100) (incf (the fixnum ($-tx v))))))
 
 
 (run1m (sw-atomic  (dotimes (j 1000) (incf (the fixnum ($-tx v))))))
 (run1m (atomic     (dotimes (j 1000) (incf (the fixnum ($ v))))))
-(run1m (hw-atomic2 (wv)
+(run1m (hw-atomic  (wv)
                    (dotimes (j 1000) (incf (the fixnum ($-hwtx v wv))))
                    (dotimes (j 1000) (incf (the fixnum ($-tx v))))))
 

@@ -41,22 +41,48 @@ is reserved as \"prevent HW transactions\"")
   (defstruct (global-clock-gv156 (:include atomic-counter))
     (nohw-counter 0 :type atomic-counter-slot-type)
     (nohw-flag    0 :type bit)
-    ;; padding to put success-stat in a different cache line
+    ;; padding to put commit-stat and abort-stat in a different cache line
     ;; (assumes cache line size = 8 words: 64 bytes on 64-bit archs)
     (pad1 0) (pad2 0) (pad3 0)
     (pad4 0) (pad5 0) (pad6 0)
     (pad7 0)
-    (success-stat 0 :type fixnum)))
+    (commit-stat 0 :type fixnum)
+    (abort-stat 0 :type fixnum))
+
+  (defstruct local-clock-gv156
+    (commit-stat 0 :type fixnum)
+    (abort-stat 0 :type fixnum)))
+
+(declaim (type fixnum +gv-max-stat+))
+(defconstant +gv-max-stat+ 128)
+
 
            
-(declaim (type atomic-counter +global-clock-gv156+))
-(define-constant-eval-once +global-clock-gv156+ (make-global-clock-gv156))
+(declaim (type global-clock-gv156 +gv156+))
+(define-constant-eval-once +gv156+ (make-global-clock-gv156))
 
-(defmacro %global-clock-nohw-flag ()
-  `(global-clock-gv156-nohw-flag +global-clock-gv156+))
 
-(defmacro %global-clock-success-stat ()
-  `(global-clock-gv156-success-stat +global-clock-gv156+))
+(declaim (type local-clock-gv156 *lv156*))
+(defvar *lv156* (make-local-clock-gv156))
+(eval-always
+ (ensure-thread-initial-binding '*lv156* '(make-local-clock-gv156)))
+
+
+(defmacro %gv-nohw-flag ()
+  `(global-clock-gv156-nohw-flag +gv156+))
+
+(defmacro %gv-commit-stat ()
+  `(global-clock-gv156-commit-stat +gv156+))
+
+(defmacro %gv-abort-stat ()
+  `(global-clock-gv156-abort-stat +gv156+))
+
+(defmacro %lv-commit-stat ()
+  `(local-clock-gv156-commit-stat *lv156*))
+
+(defmacro %lv-abort-stat ()
+  `(local-clock-gv156-abort-stat *lv156*))
+
 
 
 (eval-always
@@ -131,9 +157,6 @@ is reserved as \"prevent HW transactions\"")
 
 (deftype gv1/version-type () 'global-clock-gv156/version-type)
 
-(define-symbol-macro +gv1+   +global-clock-gv156+)
-
-
 (defmacro gv1/features ()
   "This is GV1 implementation of GLOBAL-CLOCK/FEATURES.
 
@@ -145,8 +168,8 @@ and aborts when multiple hardware transactions are running simultaneously."
 
 (defmacro gv1/start-read ()
   "This is GV1 implementation of GLOBAL-CLOCK/START-READ.
-Return the current +gv1+ value."
-  `(get-atomic-counter +gv1+))
+Return the current +gv156+ value."
+  `(get-atomic-counter +gv156+))
 
 
 (defmacro gv1/valid-read? (tvar-version read-version)
@@ -157,10 +180,10 @@ Return (<= tvar-version read-version)"
 
 (defmacro gv1/start-write (read-version)
   "This is GV1 implementation of GLOBAL-CLOCK/START-WRITE.
-Atomically increment +gv1+ and return its new value."
+Atomically increment +gv156+ and return its new value."
   (declare (ignore read-version))
 
-  `(incf-atomic-counter +gv1+ +global-clock-delta+))
+  `(incf-atomic-counter +gv156+ +global-clock-delta+))
 
 
 (defmacro gv1/write (write-version)
@@ -171,7 +194,7 @@ Return WRITE-VERSION."
 
 (defmacro gv1/after-abort ()
   "This is GV1 implementation of GLOBAL-CLOCK/AFTER-ABORT.
-Return the current +gv1+ value."
+Return the current +gv156+ value."
   `(gv1/start-read))
 
 
@@ -188,9 +211,6 @@ Return the current +gv1+ value."
 
 (deftype gv5/version-type () 'global-clock-gv156/version-type)
 
-(define-symbol-macro +gv5+   +global-clock-gv156+)
-
-
 (defmacro gv5/features ()
   "This is GV5 implementation of GLOBAL-CLOCK/FEATURES.
 
@@ -205,8 +225,8 @@ in a single, isolated thread reading and writing its own transactional memory."
 
 (defmacro gv5/start-read ()
   "This is GV5 implementation of GLOBAL-CLOCK/START-READ.
-Return the current +gv5+ value."
-  `(get-atomic-counter +gv5+))
+Return the current +gv156+ value."
+  `(get-atomic-counter +gv156+))
 
 
 (defmacro gv5/valid-read? (tvar-version read-version)
@@ -217,10 +237,10 @@ Return (<= tvar-version read-version)"
 
 (defmacro gv5/start-write (read-version)
   "This is GV5 implementation of GLOBAL-CLOCK/START-WRITE.
-Return (1+ +gv5+) without incrementing it."
+Return (1+ +gv156+) without incrementing it."
   (declare (ignore read-version))
 
-  `(get-atomic-counter-plus-delta +gv5+ +global-clock-delta+))
+  `(get-atomic-counter-plus-delta +gv156+ +global-clock-delta+))
 
 
 (defmacro gv5/write (write-version)
@@ -230,32 +250,32 @@ Return WRITE-VERSION."
 
 (defmacro gv5/after-abort ()
   "This is GV5 implementation of GLOBAL-CLOCK/AFTER-ABORT.
-Increment +gv5+ and return its new value."
-  `(incf-atomic-counter +gv5+ +global-clock-delta+))
+Increment +gv156+ and return its new value."
+  `(incf-atomic-counter +gv156+ +global-clock-delta+))
 
 
 (defmacro gv5/get-nohw-counter ()
   "This is GV5 implementation of GLOBAL-CLOCK/GET-NOHW-COUNTER.
 Return the number of software-only transaction commits currently running."
-  `(get-atomic-place (global-clock-gv156-nohw-counter +gv5+)))
+  `(get-atomic-place (global-clock-gv156-nohw-counter +gv156+)))
 
 
 (defmacro gv5/incf-nohw-counter (&optional (delta +global-clock-nohw-delta+))
   "This is GV5 implementation of GLOBAL-CLOCK/INCF-NOHW-COUNTER.
-Increment by DELTA the slot NOHW-COUNTER of +gv5+ and return its new value."
-  `(incf-atomic-place (global-clock-gv156-nohw-counter +gv5+)
+Increment by DELTA the slot NOHW-COUNTER of +gv156+ and return its new value."
+  `(incf-atomic-place (global-clock-gv156-nohw-counter +gv156+)
                       ,delta
                       #?+atomic-counter-mutex :place-mutex
-                      #?+atomic-counter-mutex (atomic-counter-mutex +gv5+)))
+                      #?+atomic-counter-mutex (atomic-counter-mutex +gv156+)))
 
 
 (defmacro gv5/decf-nohw-counter (&optional (delta +global-clock-nohw-delta+))
   "This is GV5 implementation of GLOBAL-CLOCK/DECF-NOHW-COUNTER.
-Decrement by DELTA the slot NOHW-COUNTER of +gv5+ and return its new value."
-  `(incf-atomic-place (global-clock-gv156-nohw-counter +gv5+)
+Decrement by DELTA the slot NOHW-COUNTER of +gv156+ and return its new value."
+  `(incf-atomic-place (global-clock-gv156-nohw-counter +gv156+)
                       (- ,delta)
                       #?+atomic-counter-mutex :place-mutex
-                      #?+atomic-counter-mutex (atomic-counter-mutex +gv5+)))
+                      #?+atomic-counter-mutex (atomic-counter-mutex +gv156+)))
 
 
 ;; define stub macros (GV5/{HW,SW}/STAT-COMMITTED) and (GV5/{HW,SW}/STAT-ABORTED)
@@ -270,9 +290,6 @@ Decrement by DELTA the slot NOHW-COUNTER of +gv5+ and return its new value."
 ;;;; ** This is global-clock version GV6
 
 (deftype gv6/version-type () 'global-clock-gv156/version-type)
-
-(define-symbol-macro +gv6+   +global-clock-gv156+)
-
 
 (defmacro gv6/features ()
   "This is GV6 implementation of GLOBAL-CLOCK/FEATURES.
@@ -305,9 +322,12 @@ Calls (GV5/HW/START-READ), since GV1 mode forbids hardware transactions."
 (defmacro gv6/sw/start-read ()
   "This is GV6 implementation of GLOBAL-CLOCK/SW/START-READ.
 Calls either (GV5/SW/START-READ) or (GV1/SW/START-READ), depending on the current mode."
-  `(if (gv6/%is-gv5-mode?)
-       (gv5/sw/start-read)
-       (gv1/sw/start-read)))
+  (if (equalp (macroexpand '(gv5/sw/start-read))
+              (macroexpand '(gv1/sw/start-read)))
+      `(gv5/sw/start-read)
+      `(if (gv6/%is-gv5-mode?)
+           (gv5/sw/start-read)
+           (gv1/sw/start-read))))
 
 
 (defmacro gv6/valid-read? (tvar-version read-version)
@@ -325,9 +345,12 @@ Calls (GV5/HW/START-WRITE), since GV1 mode forbids hardware transactions."
 (defmacro gv6/sw/start-write (read-version)
   "This is GV6 implementation of GLOBAL-CLOCK/SW/START-WRITE.
 Calls either (GV5/START-WRITE) or (GV1/START-WRITE), depending on the current mode."
-  `(if (gv6/%is-gv5-mode?)
-       (gv5/sw/start-write ,read-version)
-       (gv1/sw/start-write ,read-version)))
+  (if (equalp (macroexpand `(gv5/sw/start-write ,read-version))
+              (macroexpand `(gv1/sw/start-write ,read-version)))
+      `(gv5/sw/start-write ,read-version)
+      `(if (gv6/%is-gv5-mode?)
+           (gv5/sw/start-write ,read-version)
+           (gv1/sw/start-write ,read-version))))
 
 
 (defmacro gv6/hw/write (write-version)
@@ -340,9 +363,12 @@ Calls (GV5/HW/START-WRITE), since GV1 mode is not used for hardware transactions
 (defmacro gv6/sw/write (write-version)
   "This is GV6 implementation of GLOBAL-CLOCK/HW/WRITE.
 Calls either (GV5/SW/WRITE) or (GV1/WRITE), depending on the current mode."
-  `(if (gv6/%is-gv5-mode?)
-       (gv5/sw/write ,write-version)
-       (gv1/sw/write ,write-version)))
+  (if (equalp (macroexpand `(gv5/sw/write ,write-version))
+              (macroexpand `(gv1/sw/write ,write-version)))
+      `(gv5/sw/write ,write-version)
+      `(if (gv6/%is-gv5-mode?)
+           (gv5/sw/write ,write-version)
+           (gv1/sw/write ,write-version))))
 
 
 (defmacro gv6/hw/after-abort ()
@@ -354,9 +380,12 @@ Calls (GV5/AFTER-ABORT), since GV1 mode is not used for hardware transactions."
 (defmacro gv6/sw/after-abort ()
   "This is GV6 implementation of GLOBAL-CLOCK/SW/AFTER-ABORT.
 Calls either (GV5/AFTER-ABORT) or (GV1/AFTER-ABORT), depending on the current mode."
-  `(if (gv6/%is-gv5-mode?)
-       (gv5/sw/after-abort)
-       (gv1/sw/after-abort)))
+  (if (equalp (macroexpand `(gv5/sw/after-abort))
+              (macroexpand `(gv1/sw/after-abort)))
+      `(gv5/sw/after-abort)
+      `(if (gv6/%is-gv5-mode?)
+           (gv5/sw/after-abort)
+           (gv1/sw/after-abort))))
 
 
 (defmacro gv6/get-nohw-counter ()
@@ -366,7 +395,7 @@ Return LOGIOR of two quantities:
 2. the global-clock slot NOHW-FLAG"
   `(logior
     (gv5/get-nohw-counter)
-    (%global-clock-nohw-flag)))
+    (%gv-nohw-flag)))
 
 
 (defmacro gv6/incf-nohw-counter (&optional (delta +global-clock-nohw-delta+))
@@ -389,59 +418,91 @@ Calls (GV5/DECF-NOHW-COUNTER)."
        ,counter)))
 
 
-(defun gv6/%update-stat (delta)
-  (declare (type (integer -100 100) delta))
-  (macrolet ((fixnum+ (a b) `(the fixnum (+ (the fixnum ,a) (the fixnum ,b))))
-             (fixnum* (a b) `(the fixnum (* (the fixnum ,a) (the fixnum ,b)))))
 
-    (let* ((old-stat (%global-clock-success-stat))
-           (new-stat (fixnum+ delta (ash (fixnum+ 16 (fixnum* 31 old-stat)) -5))))
+(defun gv6/%update-stat (lv-commit-stat lv-abort-stat)
+  (declare (type fixnum lv-commit-stat lv-abort-stat))
 
-      (if (zerop (%global-clock-nohw-flag))
-          ;; GV6 is currently allowing HW transactions (GV5 mode).
-          ;; if abort rates are high, disable them by switching to GV1 mode.
-          (when (< new-stat 0) ;; min with -20 is -625
-	    (log.debug "stat is ~S, switching to GV1 - forbid HW TXs" new-stat)
-            (setf (%global-clock-nohw-flag) 1)
+  (let* ((lv-commit-stat (ash lv-commit-stat -5))
+         (lv-abort-stat  (ash lv-abort-stat -5))
+         (new-commit-stat (the fixnum (incf (%gv-commit-stat) lv-commit-stat)))
+         (new-abort-stat  (the fixnum (incf (%gv-abort-stat)  lv-abort-stat))))
+
+    (setf (%lv-commit-stat) 0
+          (%lv-abort-stat) 0)
+
+    (when (and (< new-commit-stat +gv-max-stat+)
+               (< new-abort-stat  +gv-max-stat+))
+      (return-from gv6/%update-stat 0))
+      
+    (if (zerop (%gv-nohw-flag))
+        ;; GV6 is currently allowing HW transactions (GV5 mode)
+        ;; if success rates are <67% disable them by switching to GV1 mode.
+        (when (< (ash new-commit-stat -1) new-abort-stat)
+	    (log.debug "commit-stat = ~S, abort-stat = ~S, switching to GV1 - forbid HW TXs"
+                       new-commit-stat new-abort-stat)
+            (setf (%gv-nohw-flag) 1)
             ;; we just switched to GV1 mode, where aborts no longer increase
             ;; GLOBAL-CLOCK version.
-            ;; Manually increase GLOBAL-CLOCK version, otherwise transactions
+            ;; Manually increase GLOBAL-CLOCK version once, otherwise transactions
             ;; may livelock due to some TVAR version > GLOBAL-CLOCK version
-            (gv5/sw/after-abort)
-            (setf new-stat 200))
+            (gv5/sw/after-abort))
+
+        ;; GV6 is currently forbidding HW transactions (GV1 mode) due to high abort rates.
+        ;; re-enable HW transactions by switching to GV5 mode in two cases:
+        ;; 1. success rates become <67%
+        ;; 2. success rates become >89%
+        (when (or (< (ash new-commit-stat -1) new-abort-stat)
+                  (> (ash new-commit-stat -3) new-abort-stat))
           
-          ;; GV6 is currently forbidding HW transactions due to high abort (GV1 mode)
-          ;; re-enable HW transactions by switching to GV5 mode in two cases:
-          ;; 1. success rate becomes very high
-          ;; 2. abort rates remain high
-          (unless (< 0 new-stat 600) ;; max with +20 is 625
-	    (log.debug "stat is ~S, switching to GV5 - allow HW TXs" new-stat)
-            (setf (%global-clock-nohw-flag) 0)
-            (setf new-stat 100)))
+	    (log.debug "commit-stat = ~S, abort-stat = ~S, switching to GV5 - allow HW TXs"
+                       new-commit-stat new-abort-stat)
+            (setf (%gv-nohw-flag) 0)))
 
-      ;;(break)
-      (setf (%global-clock-success-stat) new-stat))))
+    (setf (%gv-commit-stat) 0
+          (%gv-abort-stat) 0)))
 
 
-(defmacro gv6/hw/stat-committed ()
-  "This is GV6 implementation of GLOBAL-CLOCK/HW/STAT-COMMITTED.
-It increases global-clock slot SUCCESS-STAT and may decide to switch between GV1 and GV5 modes."
-  `(gv6/%update-stat +80))
+
+(declaim (inline lv6/%update-commit-stat lv6/%update-abort-stat))
+
+(defun lv6/%update-commit-stat (delta)
+  (declare (type fixnum delta))
+
+  (let1 new-stat (the fixnum (incf (%lv-commit-stat) delta))
+
+    (when (>= new-stat +gv-max-stat+)
+      (gv6/%update-stat new-stat (%lv-abort-stat)))))
+
+
+(defun lv6/%update-abort-stat (delta)
+  (declare (type fixnum delta))
+
+  (let1 new-stat (the fixnum (incf (%lv-abort-stat) delta))
+
+    (when (>= new-stat +gv-max-stat+)
+      (gv6/%update-stat (%lv-commit-stat) new-stat))))
+      
+        
+
+
+(defmacro gv6/hw/stat-committed () "This is GV6 implementation of GLOBAL-CLOCK/HW/STAT-COMMITTED.
+It increases local-clock slot COMMIT-STAT and may decide to switch between GV1 and GV5 modes."
+  `(lv6/%update-commit-stat 5))
 
 (defmacro gv6/hw/stat-aborted ()
   "This is GV5 implementation of GLOBAL-CLOCK/HW/STAT-ABORTED.
-It decreases global-clock slot SUCCESS-STAT and may decide to switch between GV1 and GV5 modes."
-  `(gv6/%update-stat -20))
+It increases local-clock slot ABORT-STAT and may decide to switch between GV1 and GV5 modes."
+  `(lv6/%update-abort-stat 1))
 
 (defmacro gv6/sw/stat-committed ()
   "This is GV6 implementation of GLOBAL-CLOCK/SW/STAT-COMMITTED.
-It increases global-clock slot SUCCESS-STAT and may decide to switch between GV1 and GV5 modes."
-  `(gv6/%update-stat +20))
+It increases local-clock slot COMMIT-STAT and may decide to switch between GV1 and GV5 modes."
+  `(lv6/%update-commit-stat 1))
 
 (defmacro gv6/sw/stat-aborted ()
   "This is GV5 implementation of GLOBAL-CLOCK/SW/STAT-ABORTED.
-It decreases global-clock slot SUCCESS-STAT and may decide to switch between GV1 and GV5 modes."
-  `(gv6/%update-stat -80))
+It increases local-clock slot ABORT-STAT and may decide to switch between GV1 and GV5 modes."
+  `(lv6/%update-abort-stat 5))
 
 
 

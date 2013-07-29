@@ -331,7 +331,7 @@ Note: invokes HW-ATOMIC2, which in turn invokes GLOBAL-CLOCK/HW/STAT-{COMMITTED,
            (type txfifo changed))
 
   (the (member t nil :fail)
-    (hw-atomic2 (write-version :test-for-running-tx? nil)
+    (hw-atomic2 (write-version :test-for-running-tx? nil :update-stat :swtx)
 
       (block nil
         ;; hardware transaction. if you need to jump out of it
@@ -425,6 +425,7 @@ Note: internally invokes GLOBAL-CLOCK/{HW,SW}/STAT-{COMMITTED,ABORTED}"
          
     (when (zerop (txhash-table-count writes))
       (log.debug "Tlog ~A committed (nothing to write)" (~ log))
+      (global-clock/sw/stat-committed)
       (invoke-after-commit log)
       (return-from commit t))
 

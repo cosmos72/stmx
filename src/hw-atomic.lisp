@@ -22,7 +22,9 @@
 
 (defconstant +hw-atomic-max-attempts+ 10)
 
-(defmacro %hw-atomic2 ((&optional tvar-write-version &key err (test-for-running-tx? t))
+(defmacro %hw-atomic2 ((&optional tvar-write-version &key err
+                                  (test-for-running-tx? t)
+                                  (update-stat :hwtx))
                        body fallback)
   "Run BODY in a hardware memory transaction.
 If the transaction aborts, retry it as long as it has chances to succeed.
@@ -61,21 +63,27 @@ If it has no chances to succeed, execute BODY in a software memory transaction."
                    (multiple-value-prog1
                        ,body
                      (hw-transaction-end)
-                     (global-clock/hw/stat-committed)))))
+                     ,(if (eq update-stat :swtx)
+                          `(global-clock/sw/stat-committed)
+                          `(global-clock/hw/stat-committed))))))
 
              (unless (zerop (decf (the fixnum ,attempts)))
                (when (hw-transaction-rerun-may-succeed? ,err)
                  ;;(maybe-yield-before-rerun)
                  (go ,tx-begin)))
 
-             (global-clock/hw/stat-aborted)
+             ,(if (eq update-stat :swtx)
+                  `(global-clock/sw/stat-aborted)
+                  `(global-clock/hw/stat-aborted))
              
              ,tx-fallback
              (return ;; returns from (prog ...)
                ,fallback)))))))
 
 
-(defmacro hw-atomic2 ((&optional tvar-write-version &key err (test-for-running-tx? t))
+(defmacro hw-atomic2 ((&optional tvar-write-version &key err
+                                 (test-for-running-tx? t)
+                                 (update-stat :hwtx))
                      &optional (body nil body?) fallback)
   "Run BODY in a hardware memory transaction. All changes to transactional memory
 will be visible to other threads only after BODY returns normally (commits).
@@ -87,7 +95,8 @@ threads.
 If hardware memory transaction aborts for a conflict, rerun it.
 If it fails for some other reason, execute FALLBACK."
   (if body?
-      `(%hw-atomic2 (,tvar-write-version :err ,err :test-for-running-tx? ,test-for-running-tx?)
+      `(%hw-atomic2 (,tvar-write-version :err ,err :test-for-running-tx? ,test-for-running-tx?
+                                         :update-stat ,update-stat)
                    ,body ,fallback)
       `(values)))
 

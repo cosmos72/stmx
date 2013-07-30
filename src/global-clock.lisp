@@ -54,7 +54,7 @@ is reserved as \"prevent HW transactions\"")
     (abort-stat 0 :type fixnum)))
 
 (declaim (type fixnum +gv-max-stat+))
-(defconstant +gv-max-stat+ 128)
+(defconstant +gv-max-stat+ 256)
 
 
            
@@ -401,29 +401,21 @@ Return LOGIOR of two quantities:
 (defmacro gv6/incf-nohw-counter (&optional (delta +global-clock-nohw-delta+))
   "This is GV6 implementation of GLOBAL-CLOCK/INCF-NOHW-COUNTER.
 Calls (GV5/INCF-NOHW-COUNTER)."
-  (with-gensym counter
-    `(let1 ,counter (gv5/incf-nohw-counter ,delta)
-       (when (zerop ,counter)
-         (break (format nil "gv6/incf-nohw-counter returned zero")))
-       ,counter)))
+  `(gv5/incf-nohw-counter ,delta))
 
 
 (defmacro gv6/decf-nohw-counter (&optional (delta +global-clock-nohw-delta+))
   "This is GV6 implementation of GLOBAL-CLOCK/DECF-NOHW-COUNTER.
 Calls (GV5/DECF-NOHW-COUNTER)."
-  (with-gensym counter
-    `(let1 ,counter (gv5/decf-nohw-counter ,delta)
-       (when (> ,counter (- most-positive-fixnum 1000))
-         (break (format nil "gv6/decf-nohw-counter returned ~A" ,counter)))
-       ,counter)))
+  `(gv5/decf-nohw-counter ,delta))
 
 
 
 (defun gv6/%update-stat (lv-commit-stat lv-abort-stat)
   (declare (type fixnum lv-commit-stat lv-abort-stat))
 
-  (let* ((lv-commit-stat (ash lv-commit-stat -5))
-         (lv-abort-stat  (ash lv-abort-stat -5))
+  (let* ((lv-commit-stat  (ash lv-commit-stat -5))
+         (lv-abort-stat   (ash lv-abort-stat -5))
          (new-commit-stat (the fixnum (incf (%gv-commit-stat) lv-commit-stat)))
          (new-abort-stat  (the fixnum (incf (%gv-abort-stat)  lv-abort-stat))))
 
@@ -434,6 +426,9 @@ Calls (GV5/DECF-NOHW-COUNTER)."
                (< new-abort-stat  +gv-max-stat+))
       (return-from gv6/%update-stat 0))
       
+    (setf (%gv-commit-stat) 0
+          (%gv-abort-stat) 0)
+
     (if (zerop (%gv-nohw-flag))
         ;; GV6 is currently allowing HW transactions (GV5 mode)
         ;; if success rates are <67% disable them by switching to GV1 mode.
@@ -458,8 +453,8 @@ Calls (GV5/DECF-NOHW-COUNTER)."
                        new-commit-stat new-abort-stat)
             (setf (%gv-nohw-flag) 0)))
 
-    (setf (%gv-commit-stat) 0
-          (%gv-abort-stat) 0)))
+    0))
+
 
 
 

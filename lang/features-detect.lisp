@@ -113,8 +113,8 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
   (when (zerop (logand most-positive-fixnum (1+ most-positive-fixnum)))
     (add-feature 'fixnum-is-powerof2))
 
-  ;; fixnum is large enough to count 50 million transactions
-  ;; per second for at least 20 years?
+  ;; fixnum is large enough to count 20 million transactions
+  ;; per second for at least 50 years?
   (when (>= most-positive-fixnum #x7fffffffffffff)
     (add-feature 'fixnum-is-large))
 
@@ -148,7 +148,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
   ;; Note: global-clock GV6 is supposed to alleviate the problem above,
   ;; but is still under testing.
   (override-feature 'global-clock 
-     (if (feature? 'hw-transactions) :gv6 :gv1))
+     (if (feature? 'hw-transactions) :gv5 :gv1))
 
 
 

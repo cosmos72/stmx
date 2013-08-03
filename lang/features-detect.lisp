@@ -148,7 +148,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
   ;; Note: global-clock GV6 is supposed to alleviate the problem above,
   ;; but is still under testing.
   (override-feature 'global-clock 
-     (if (feature? 'hw-transactions) :gv5 :gv1))
+     (if (feature? 'hw-transactions) :gv6 :gv1))
 
 
 

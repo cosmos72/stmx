@@ -824,33 +824,33 @@ available alternative.
 Depending on the available features, STMX performance can vary up to a factor 100
 or more (!).
 
-To reach its peak performance, one requirement needs to be satisfied by the hardware
-and five need to be satisfied by the Lisp compiler being used.
+To reach its peak performance, one requirement needs to be satisfied by the
+hardware and five need to be satisfied by the Lisp compiler being used.
 They are listed here in order of importance:
 
 Hardware requirements:
 
 - support hardware transactions (Intel TSX). Without them, STMX is at least
   4-5 times slower. Or, if you prefer since Intel TSX is currently very rare,
-  **with** it STMX is at least 4-5 times faster. As of July 2013,
+  **with** it STMX is at least 4-5 times faster. As of August 2013,
   STMX can use hardware transactions only on 64-bit SBCL.
 
 Lisp compiler requirements:
 
 1. it must have good multi-threading support. Without it, what would you need
    a concurrency library as STMX for?
-2. it must expose atomic compare-and-swap operations - a much slower alternative,
-   but still better than nothing, is to expose a function that returns
-   which thread is owning a lock.
+2. it must expose atomic compare-and-swap operations, to implement fast mutexes.
+   A much slower alternative, but still better than nothing, is to expose
+   a function that returns which thread has acquired a bordeaux-threads lock.
 3. it must produce fast, highly optimized code.
 4. it must be 64-bit. 32-bit is much slower because transactional memory
    version counters are then BIGNUMs instead of FIXNUMs.  
-5. on unordered CPUs (i.e. on most CPUs except x86 and x86_64) it must expose
-   memory barrier operations.
+5. it must expose memory barrier operations. This is less important on x86 and
+   x86-64, and more important on unordered architectures (almost all others).
 
 
-Among the non-commercial Lisp compilers, SBCL is the only one known to STMX author
-that satisfies all the four requirements, and (guess why) the only
+Among the non-commercial Lisp compilers, SBCL is the only one known to STMX
+author that satisfies all the five requirements, and (guess why) the only
 one where STMX author has implemented support for hardware transactions.
 
 Actually, all the other tested free Lisp compilers (ABCL, CCL, CMUCL, ECL)
@@ -860,15 +860,16 @@ One - CMUCL - produces relatively fast code, but does not support native threads
 STMX is not tested on any commercial Lisp compiler, so performance on them
 is simply unknown.
 
-For these reasons, STMX will reach the highest known performance on SBCL by a large
-margin - possibly by a factor from 10 to 100 or more with respect to other tested systems.
+For these reasons, STMX will reach the highest known performance on SBCL by a
+large margin - possibly by a factor from 10 to 100 or more with respect to
+other tested systems.
 
 For more performance considerations and a lot of raw numbers produced by running micro-benchmarks,
 see the included files [doc/benchmark.md](doc/benchmark.md), [doc/benchmark-abcl.md](doc/benchmark-abcl.md),
 [doc/benchmark-ccl64.md](doc/benchmark-ccl64.md) and [doc/benchmark-cmucl.md](doc/benchmark-cmucl.md).
 
-The short version is: as of July 2013, on a fast consumer PC (Core i7 4770 @ 3.5GHz
-or better) with SBCL 1.1.9 or better, STMX can execute more than 38 millions
+The short version is: as of August 2013, on a fast consumer PC (Core i7 4770 @ 3.5GHz
+or better) with SBCL 1.1.9 or better, STMX can execute more than 39 millions
 **hardware** transactions per second per CPU core, and more than 7 millions
 **software** transactions per second per CPU core.
 The second platform in terms of performance is CCL (x86_64),

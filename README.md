@@ -123,7 +123,7 @@ described [here](http://www.quicklisp.org/beta) - search for "To get updated
 software" in the page.
   
 
-### Latest version - from GitHub
+### Latest version - from [GitHub](https://github.com/cosmos72/stmx)
 
 In case you want to use the "latest and greatest" version directly
 from the author, in order to get the newest features - most notably

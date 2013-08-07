@@ -368,7 +368,6 @@ The effect is the same as DEFCLASS, plus:
 
 (defmethod (setf slot-value-using-class) (value    (class transactional-class)
                                           instance (slot transactional-effective-slot))
-
   (if (and (transactional-slot? slot)
            (or (recording?) (hide-tvars?)))
     

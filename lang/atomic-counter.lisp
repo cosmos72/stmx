@@ -39,6 +39,11 @@
   (mutex (make-lock "ATOMIC-COUNTER")))
 
 
+#?+atomic-counter-mutex
+(defmethod make-load-form ((obj atomic-counter) &optional environment)
+  (declare (ignore environment))
+  `(%make-atomic-counter :version ,(atomic-counter-version obj)))
+
 
 (declaim (ftype (function () atomic-counter) make-atomic-counter)
          (inline
@@ -80,7 +85,7 @@
          (the atomic-counter-num
            #?+fixnum-is-large-powerof2
            ;; fast modulus arithmetic
-           (setf ,place (logand most-positive-fixnum (+ ,place ,delta)))
+           (setf ,place (logand most-positive-fixnum (+ ,place ,_delta)))
       
            #?-fixnum-is-large-powerof2
            (progn
@@ -91,7 +96,7 @@
                      (the atomic-counter-num
                        (if (> n (the atomic-counter-num (- most-positive-fixnum ,_delta)))
                            0
-                           (+ _,delta n)))))
+                           (+ ,_delta n)))))
 
              #?-fixnum-is-large
              ;; general version: slow bignum arithmetic
@@ -118,8 +123,10 @@
          (ftype (function (atomic-counter positive-fixnum) atomic-counter-num) get-atomic-counter-plus-delta)
          (ftype (function (atomic-counter atomic-counter-num) atomic-counter-num) set-atomic-counter)
 
+         (inline get-atomic-counter)
+
          #?+(and atomic-ops fixnum-is-large-powerof2)
-         (inline get-atomic-counter get-atomic-counter-plus-delta set-atomic-counter))
+         (inline get-atomic-counter-plus-delta set-atomic-counter))
 
 
 
@@ -142,7 +149,6 @@
   "Return current value of atomic COUNTER."
   (declare (type atomic-counter counter))
        
-  #?+(and atomic-ops fixnum-is-large-powerof2)
   (get-atomic-place (atomic-counter-version counter)))
 
 
@@ -199,9 +205,9 @@
 
   #?-(and atomic-ops fixnum-is-large-powerof2)
   ;; locking version
-  (the atomic-counter-num
-    (with-lock (,place-mutex)
-      (setf ,place ,value))))
+  `(the atomic-counter-num
+     (with-lock (,place-mutex)
+       (setf ,place ,value))))
 
 
 (defun set-atomic-counter (counter value)

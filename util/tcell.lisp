@@ -21,20 +21,19 @@
 
 (transactional
  (defclass tcell ()
-   ((value :accessor value-of
-           :initarg :value
+   ((value :initarg :value
            :initform *empty-tcell*))))
 
 ;; no need to wrap empty? in a transaction:
-;; value-of is atomic, transaction aware, and performs a single read
+;; (_ cell value) is atomic, transaction aware, and performs a single read
 (defmethod empty? ((cell tcell))
-  (eq (value-of cell) *empty-tcell*))
+  (eq (_ cell value) *empty-tcell*))
 
 
 (defmethod empty! ((cell tcell))
   "Remove value from CELL. Return CELL."
   (fast-atomic
-   (setf (value-of cell) *empty-tcell*)
+   (setf (_ cell value) *empty-tcell*)
    cell))
 
 ;; no need to specialize (full?) on CELLs: the method in cell.lisp is enough
@@ -44,9 +43,9 @@
 
 
 ;; no need to wrap peek in a transaction:
-;; value-of is atomic, transaction aware, and performs a single read
+;; (_ cell value) is atomic, transaction aware, and performs a single read
 (defmethod peek ((cell tcell) &optional default)
-  (let1 value (value-of cell)
+  (let1 value (_ cell value)
     (if (eq value *empty-tcell*)
         (values default nil)
         (values value t))))
@@ -54,18 +53,18 @@
 
 (defmethod take ((cell tcell))
   (fast-atomic
-   (let1 value (value-of cell)
+   (let1 value (_ cell value)
      (if (eq value *empty-tcell*)
          (retry)
          (progn
-           (setf (value-of cell) *empty-tcell*)
+           (setf (_ cell value) *empty-tcell*)
            value)))))
 
 
 (defmethod put ((cell tcell) value)
   (fast-atomic
    (if (empty? cell)
-       (setf (value-of cell) value)
+       (setf (_ cell value) value)
        (retry))))
 
 
@@ -75,11 +74,11 @@ less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
 Linux amd64) than the unspecialized (try-take place) which calls
 \(atomic (nonblocking (take place)))"
   (fast-atomic
-   (let1 value (value-of cell)
+   (let1 value (_ cell value)
      (if (eq value *empty-tcell*)
          nil
          (progn
-           (setf (value-of cell) *empty-tcell*)
+           (setf (_ cell value) *empty-tcell*)
            (values t value))))))
 
 
@@ -90,7 +89,7 @@ Linux amd64) than the unspecialized (try-put place) which calls
 \(atomic (nonblocking (put place value)))"
   (fast-atomic
    (if (empty? cell)
-       (values t (setf (value-of cell) value))
+       (values t (setf (_ cell value) value))
        nil)))
 
 
@@ -98,7 +97,7 @@ Linux amd64) than the unspecialized (try-put place) which calls
 
 (defprint-object (obj tcell)
   ;; (value-of obj) works both inside and outside transactions.
-  (let1 value (value-of obj)
+  (let1 value (_ obj value)
     (if (eq value *empty-tcell*)
         (format t "empty")
         (format t "[~A]" value))))

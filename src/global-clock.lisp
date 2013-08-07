@@ -51,7 +51,13 @@ is reserved as \"prevent HW transactions\"")
 
   (defstruct lv156
     (commits 0 :type fixnum)
-    (aborts  0 :type fixnum)))
+    (aborts  0 :type fixnum))
+
+  (defmethod make-load-form ((obj gv156) &optional environment)
+    (declare (ignore environment))
+    `(make-gv156)))
+
+
 
 
 (declaim (type fixnum +gv-max-stat+))

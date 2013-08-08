@@ -259,8 +259,8 @@ Return the number of software-only transaction commits currently running."
 Increment by DELTA the slot NOHW-COUNTER of +gv+ and return its new value."
   `(incf-atomic-place (gv156-nohw-counter +gv+)
                       ,delta
-                      #?+atomic-counter-mutex :place-mutex
-                      #?+atomic-counter-mutex (atomic-counter-mutex +gv+)))
+                      #?-fast-atomic-counter :place-mutex
+                      #?-fast-atomic-counter (atomic-counter-mutex +gv+)))
 
 
 (defmacro gv5/decf-nohw-counter (&optional (delta +global-clock-nohw-delta+))
@@ -268,8 +268,8 @@ Increment by DELTA the slot NOHW-COUNTER of +gv+ and return its new value."
 Decrement by DELTA the slot NOHW-COUNTER of +gv+ and return its new value."
   `(incf-atomic-place (gv156-nohw-counter +gv+)
                       (- ,delta)
-                      #?+atomic-counter-mutex :place-mutex
-                      #?+atomic-counter-mutex (atomic-counter-mutex +gv+)))
+                      #?-fast-atomic-counter :place-mutex
+                      #?-fast-atomic-counter (atomic-counter-mutex +gv+)))
 
 
 ;; define stub macros (GV5/{HW,SW}/STAT-COMMITTED)

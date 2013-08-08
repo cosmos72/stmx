@@ -71,7 +71,7 @@ the scenes the slots will be stored in transactional memory implemented by tvars
   (id +invalid-version+ :type fixnum :read-only t)       ;; tvar-id for debugging purposes
 
   (waiting-for nil :type (or null hash-table))           ;; tvar-waiting-for
-  (waiting-lock (make-lock "tvar-waiting") :read-only t));; tvar-waiting-lock
+  (waiting-lock (make-lock "TVAR-WAITING") :read-only t));; tvar-waiting-lock
 
 
 
@@ -186,15 +186,14 @@ for debugging purposes. please use ($-slot var) instead."
             (values value1 version1 fail)))))
 
     #?-(and mutex-owner mem-rw-barriers)
-    ;; no mutex owner, or no memory barriers - not even trivial ones.
-    ;; resort to locking TVAR... Horrible and slow
-    (if (try-acquire-mutex (the mutex var))
+    (let ((acquired (try-acquire-mutex/catch-recursion (the mutex var))))
+      (if acquired ;; possible values are t :recursion nil
+          (multiple-value-bind (version value) (%tvar-version-and-value var)
+            (when (eq acquired t)
+              (release-mutex (the mutex var)))
+            (values value version 0))
 
-        (multiple-value-bind (version value) (%tvar-version-and-value var)
-          (release-mutex (the mutex var))
-          (values value version 0))
-
-        (values nil +invalid-version+ 1))))
+          (values nil +invalid-version+ 1)))))
 
 
 

@@ -56,11 +56,25 @@
   (the mutex (%make-mutex)))
     
 
-(declaim (ftype (function (mutex) boolean)  try-acquire-mutex)
+(declaim #?-fast-mutex
+         (ftype (function (mutex) (values (member t nil :recursion) &optional))
+                          try-acquire-mutex/catch-recursion)
+
+         (ftype (function (mutex) (values boolean &optional))  try-acquire-mutex)
          (ftype (function (mutex) t)        release-mutex)
          (inline
            try-acquire-mutex release-mutex))
 
+
+#?-fast-mutex
+(defun try-acquire-mutex/catch-recursion (mutex)
+  "Try to acquire MUTEX. Return T if successful, or :RECURSION if MUTEX was already locked
+by current thread, or NIL if MUTEX was already locked by some other thread."
+  (declare (type mutex mutex))
+
+  (handler-case
+      (bt:acquire-lock (mutex-lock mutex) nil)
+    (condition () :recursion)))
 
 (defun try-acquire-mutex (mutex)
   "Try to acquire MUTEX. Return T if successful,

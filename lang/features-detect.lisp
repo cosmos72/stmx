@@ -138,6 +138,15 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
       (add-feature 'tvar-lock :mutex))
   
 
+  ;; atomic counters are (almost) 64 bit.
+  ;; if fixnums are (almost) 64 bit and memory barriers and atomic-ops are available,
+  ;; atomic counters use them and do not need locking.
+  ;; otherwise, atomic counters will need locking (using mutexes)
+  (when (all-features? 'atomic-ops 'mem-rw-barriers 'fixnum-is-large-powerof2)
+      (add-feature 'fast-atomic-counter))
+
+
+
   ;; use global-clock GV1 by default, but switch to GV5 for hardware transactions.
   ;;
   ;; Note: using the global-clock GV5 with software transactions

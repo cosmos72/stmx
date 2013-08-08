@@ -44,7 +44,7 @@
            #:cons^ #:free-cons^ #:free-list^
            #:push^ #:pop-free-cons^
 
-           ;; hardware memory transactions
+           ;; hardware memory transactions. see also feature #?+hw-transactions
            #:hw-transaction-supported?
            #:hw-transaction-begin
            #:hw-transaction-running?
@@ -66,6 +66,7 @@
 
            #:atomic-counter-slot-type #:atomic-counter-num
            #:atomic-counter #:make-atomic-counter
+           #:atomic-counter-mutex ;; exists only if feature #?+fast-atomic-counter is not set
 
            #:incf-atomic-counter #:incf-atomic-place
            #:set-atomic-counter  #:set-atomic-place
@@ -75,7 +76,8 @@
 
            #:mutex             #:make-mutex
            #:mutex-owner       #:mutex-lock
-           #:try-acquire-mutex #:release-mutex
+           #:try-acquire-mutex #:try-acquire-mutex/catch-recursion
+           #:release-mutex
            #:mutex-is-free?    #:mutex-is-own?
            #:mutex-is-own-or-free?
 

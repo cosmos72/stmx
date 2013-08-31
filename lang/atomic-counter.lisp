@@ -17,31 +17,29 @@
 
 (enable-#?-syntax)
 
-;;;; ** atomic counter
+;;;; ** thread-safe, atomic counter
 
 
-(deftype counter-num ()
+(deftype atomic-counter-num ()
   #?+fixnum-is-large 'fixnum
   #?-fixnum-is-large 'integer)
 
-;; public alias for 'counter-num type
-(deftype atomic-counter-num () 'counter-num)
 
-#?+(and atomic-ops fixnum-is-large-powerof2)
-(eval-always
-  (defstruct (atomic-counter (:constructor %make-atomic-counter))
-    (version 0 :type atomic-num))
-
-  (declaim (inline incf-atomic-counter
-                   get-atomic-counter)))
+(deftype atomic-counter-slot-type ()
+  #?+fast-atomic-counter 'atomic-num ;; sb-ext:word on SBCL...
+  #?-fast-atomic-counter 'atomic-counter-num)
 
 
-#?-(and atomic-ops fixnum-is-large-powerof2)
-(eval-always
-  (defstruct (atomic-counter (:constructor %make-atomic-counter))
-    (version 0 :type counter-num)
-    (lock (make-lock "ATOMIC-COUNTER"))))
+(defstruct (atomic-counter (:constructor %make-atomic-counter))
+  (version 0 :type atomic-counter-slot-type)
+  #?-fast-atomic-counter
+  (mutex (make-lock "ATOMIC-COUNTER")))
 
+
+#?-fast-atomic-counter
+(defmethod make-load-form ((obj atomic-counter) &optional environment)
+  (declare (ignore environment))
+  `(%make-atomic-counter :version ,(atomic-counter-version obj)))
 
 
 (declaim (ftype (function () atomic-counter) make-atomic-counter)
@@ -55,83 +53,183 @@
 
 (deftype positive-fixnum () '(and fixnum (integer 1)))
 
-(declaim (ftype (function (atomic-counter &optional positive-fixnum) counter-num)
-                incf-atomic-counter))
+(declaim (ftype (function (atomic-counter &optional positive-fixnum) atomic-counter-num)
+                incf-atomic-counter)
+         
+         #?+fast-atomic-counter
+         (inline incf-atomic-counter))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro incf-atomic-place (place &optional (delta 1) &key place-mutex)
+  "Increase atomic PLACE by DELTA and return its new value."
+  (declare (ignorable place-mutex))
+
+  #?+fast-atomic-counter
+  (with-gensym delta-var
+    `(let1 ,delta-var ,delta
+       (the atomic-counter-num
+         (logand most-positive-fixnum
+                 (+ ,delta-var ;; atomic-incf returns the OLD value!
+                    (logand most-positive-fixnum
+                            (atomic-incf ,place ,delta-var)))))))
+
+  #?-fast-atomic-counter
+  (with-gensym delta-var
+    `(let1 ,delta-var ,delta
+       ;; locking version
+       (with-lock (,place-mutex)
+         (the atomic-counter-num
+           ;; fast modulus arithmetic
+           #?+fixnum-is-large-powerof2
+           (setf ,place (logand most-positive-fixnum (+ ,place ,delta-var)))
+      
+           #?-fixnum-is-large-powerof2
+           (progn
+             ;; fixnum arithmetic
+             #?+fixnum-is-large
+             (setf ,place
+                   (let ((n ,place))
+                     (the atomic-counter-num
+                       (if (> n (the atomic-counter-num (- most-positive-fixnum ,delta-var)))
+                           0
+                           (+ ,delta-var n)))))
+
+             #?-fixnum-is-large
+             ;; general version: slow bignum arithmetic
+             (incf ,place ,delta-var)))))))
+
 
 (defun incf-atomic-counter (counter &optional (delta 1))
   "Increase atomic COUNTER by DELTA and return its new value."
   (declare (type atomic-counter counter)
-           (type positive-fixnum delta))
+           (type fixnum delta))
 
 
-  #?+(and atomic-ops fixnum-is-large-powerof2)
-  (the fixnum
-    (logand most-positive-fixnum
-            (+ delta ;; atomic-incf returns the OLD value!
-               (logand most-positive-fixnum
-                       (atomic-incf (atomic-counter-version counter) delta)))))
+  #?+fast-atomic-counter
+  (incf-atomic-place (atomic-counter-version counter) delta)
 
-  #?-(and atomic-ops fixnum-is-large-powerof2)
+  #?-fast-atomic-counter
   ;; locking version
-  (with-lock ((atomic-counter-lock counter))
-    (the counter-num
-      #?+fixnum-is-large-powerof2
-      ;; fast modulus arithmetic
-      (setf (atomic-counter-version counter)
-            (logand most-positive-fixnum
-                    (+ (atomic-counter-version counter) delta)))
-      
-      #?-fixnum-is-large-powerof2
-      (progn
-        #?+fixnum-is-large
-        ;; fixnum arithmetic
-        (setf (atomic-counter-version counter)
-              (let ((n (atomic-counter-version counter)))
-                (the fixnum
-                  (if (> n (the fixnum (- most-positive-fixnum delta)))
-                      0
-                      (+ delta n)))))
+  (incf-atomic-place (atomic-counter-version counter) delta
+                     :place-mutex (atomic-counter-mutex counter)))
 
-        #?-fixnum-is-large
-        ;; general version: slow bignum arithmetic
-        (incf (atomic-counter-version counter) delta)))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(declaim (ftype (function (atomic-counter) atomic-counter-num) get-atomic-counter)
+         (ftype (function (atomic-counter positive-fixnum) atomic-counter-num) get-atomic-counter-plus-delta)
+         (ftype (function (atomic-counter atomic-counter-num) atomic-counter-num) set-atomic-counter)
+
+         (inline get-atomic-counter)
+
+         #?+fast-atomic-counter
+         (inline get-atomic-counter-plus-delta set-atomic-counter))
 
 
-(declaim (ftype (function (atomic-counter) counter-num) get-atomic-counter)
-         (ftype (function (atomic-counter counter-num) counter-num) set-atomic-counter)
 
-         #?+(and atomic-ops fixnum-is-large-powerof2)
-         (inline get-atomic-counter set-atomic-counter))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro get-atomic-place (place &key place-mutex)
+  "Return current value of atomic PLACE."
+  (declare (ignorable place-mutex))
+       
+  #?+fast-atomic-counter
+  `(progn
+     #?+mem-rw-barriers (mem-read-barrier)
+
+     (the atomic-counter-num
+       (logand most-positive-fixnum ,place)))
+
+  #?-fast-atomic-counter
+  ;; locking version
+  `(with-lock (,place-mutex)
+     (the atomic-counter-num ,place)))
+
 
 
 (defun get-atomic-counter (counter)
   "Return current value of atomic COUNTER."
   (declare (type atomic-counter counter))
        
-  #?+(and atomic-ops fixnum-is-large-powerof2)
-  (let ((counter (mem-read-barrier counter)))
-    (the fixnum
-      (logand most-positive-fixnum
-              (atomic-counter-version counter))))
+  #?+fast-atomic-counter
+  (get-atomic-place (atomic-counter-version counter))
 
-  #?-(and atomic-ops fixnum-is-large-powerof2)
+  #?-fast-atomic-counter
   ;; locking version
-  (the counter-num
-    (with-lock ((atomic-counter-lock counter))
-      (atomic-counter-version counter))))
+  (get-atomic-place (atomic-counter-version counter)
+                    :place-mutex (atomic-counter-mutex counter)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro get-atomic-place-plus-delta (place delta)
+  "Return DELTA plus current value of atomic PLACE."
+       
+  #?+fixnum-is-large-powerof2
+  `(the atomic-counter-num
+     (logand most-positive-fixnum
+             (+ ,delta
+                (get-atomic-place ,place))))
+
+  #?-fixnum-is-large-powerof2
+  (progn
+    #?+fixnum-is-large
+    (with-gensyms (n delta-var)
+      `(let ((,n (get-atomic-place ,place))
+             (,delta-var delta))
+         (the fixnum
+           (if (> ,n (the fixnum (- most-positive-fixnum ,delta-var)))
+               0
+               (+ ,delta-var ,n)))))
+
+      #?-fixnum-is-large
+      `(+ ,delta (get-atomic-place ,place))))
+
+
+
+
+(defun get-atomic-counter-plus-delta (counter delta)
+  "Return DELTA plus current value of atomic COUNTER."
+  (declare (type atomic-counter counter)
+           (type positive-fixnum delta))
+       
+  (get-atomic-place-plus-delta (atomic-counter-version counter) delta))
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defmacro set-atomic-place (place value &key place-mutex)
+  "Set and return value of atomic PLACE."
+
+  #?+fast-atomic-counter
+  (declare (ignore place-mutex))
+       
+  #?+fast-atomic-counter
+  `(progn
+     #?+mem-rw-barriers (mem-write-barrier)
+     (the atomic-counter-num
+       (setf ,place ,value)))
+
+  #?-fast-atomic-counter
+  ;; locking version
+  `(the atomic-counter-num
+     (with-lock (,place-mutex)
+       (setf ,place ,value))))
 
 
 (defun set-atomic-counter (counter value)
   "Set and return value of atomic COUNTER."
   (declare (type atomic-counter counter)
-           (type counter-num value))
+           (type atomic-counter-num value))
        
-  #?+(and atomic-ops fixnum-is-large-powerof2)
-  (the counter-num
-    (setf (atomic-counter-version counter) value))
+  #?+fast-atomic-counter
+  (set-atomic-place (atomic-counter-version counter) value)
 
-  #?-(and atomic-ops fixnum-is-large-powerof2)
+  #?-fast-atomic-counter
   ;; locking version
-  (the counter-num
-    (with-lock ((atomic-counter-lock counter))
-      (setf (atomic-counter-version counter) value))))
+  (set-atomic-place (atomic-counter-version counter) value
+                    :place-mutex (atomic-counter-mutex counter)))

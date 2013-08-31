@@ -130,22 +130,35 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmacro get-atomic-place (place)
+(defmacro get-atomic-place (place &key place-mutex)
   "Return current value of atomic PLACE."
+  (declare (ignorable place-mutex))
        
+  #?+fast-atomic-counter
   `(progn
      #?+mem-rw-barriers (mem-read-barrier)
 
      (the atomic-counter-num
-       #?+fast-atomic-counter (logand most-positive-fixnum ,place)
-       #?-fast-atomic-counter ,place)))
+       (logand most-positive-fixnum ,place)))
+
+  #?-fast-atomic-counter
+  ;; locking version
+  `(with-lock (,place-mutex)
+     (the atomic-counter-num ,place)))
+
 
 
 (defun get-atomic-counter (counter)
   "Return current value of atomic COUNTER."
   (declare (type atomic-counter counter))
        
-  (get-atomic-place (atomic-counter-version counter)))
+  #?+fast-atomic-counter
+  (get-atomic-place (atomic-counter-version counter))
+
+  #?-fast-atomic-counter
+  ;; locking version
+  (get-atomic-place (atomic-counter-version counter)
+                    :place-mutex (atomic-counter-mutex counter)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

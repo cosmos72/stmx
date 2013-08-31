@@ -1,10 +1,10 @@
-Note: Bugs named #xyz are listed also at https://github.com/cosmos72/stmx/issues
-      Bugs named xyz) are historical bugs, and only listed in this file.
+Note: only historical bugs are listed in this file.
+For up-to-date buglist, see https://github.com/cosmos72/stmx/issues
 
 
 KNOWN BUGS
 
-#3 regression on CCL and CMUCL: test suite hangs
+see https://github.com/cosmos72/stmx/issues
 
 
 

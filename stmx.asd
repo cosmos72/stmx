@@ -61,14 +61,17 @@
 
                (:module :src
                 :components ((:file "package")
-                             (:file "tvar-fwd"       :depends-on ("package"))
+                             (:file "global-clock"   :depends-on ("package"))
+                             (:file "tvar-fwd"       :depends-on ("global-clock"))
                              (:file "classes"        :depends-on ("tvar-fwd"))
                              (:file "txhash"         :depends-on ("classes"))
                              (:file "tlog"           :depends-on ("txhash"))
                              (:file "tvar"           :depends-on ("tlog"))
                              (:file "tclass"         :depends-on ("tvar"))
-                             (:file "commit"         :depends-on ("tlog"))
-                             (:file "atomic"         :depends-on ("tclass" "commit"))
+                             (:file "hw-atomic"      :depends-on ("classes"))
+                             (:file "commit"         :depends-on ("tvar" "hw-atomic"))
+                             (:file "sw-atomic"      :depends-on ("commit"))
+                             (:file "atomic"         :depends-on ("hw-atomic" "sw-atomic"))
                              (:file "orelse"         :depends-on ("atomic")))
                 :depends-on (:lang))
 

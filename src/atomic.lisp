@@ -17,55 +17,7 @@
 
 (enable-#?-syntax)
 
-;;;; ** Defining
-
-(defmacro transactional ((defclass class-name direct-superclasses direct-slots &rest class-options))
-  "Define CLASS-NAME as a new transactional class.
-Use this macro to wrap a normal DEFCLASS as follows:
-\(TRANSACTIONAL (DEFCLASS class-name (superclasses) (slots) [options]))
-
-The effect is the same as DEFCLASS, plus:
-- by default, slots are transactional memory (implemented by TVARs)
-- it inherits also from TRANSACTIONAL-OBJECT
-- the metaclass is TRANSACTIONAL-CLASS"
-  `(,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
-     ,(adjust-transactional-slots-definitions direct-slots class-name direct-superclasses)
-     ,@class-options
-     #?+disable-optimize-slot-access (:optimize-slot-access nil)
-     (:metaclass transactional-class)))
-
-
-(defmacro transaction ((defun-or-defmethod func-name args &body body))
-  "Define FUNC-NAME as a new atomic function or method.
-Use this macro to wrap a normal DEFUN or DEFMETHOD as follows:
-\(TRANSACTION (DEFUN function-name (arguments) body))
-or
-\(TRANSACTION (DEFMETHOD function-name (arguments) body))
-
-The effect is the same as DEFUN - or DEFMETHOD - plus:
-- the BODY is wrapped inside (atomic ...)"
-  `(,defun-or-defmethod ,func-name ,args
-     ;; move docstring here
-     ,@(when (and (stringp (first body)) (rest body))
-             (list (pop body)))
-     ;; also copy all declarations
-     ,@(loop for form in body
-          while (and (listp form) (eq 'declare (first form)))
-          collect form)
-     
-     (atomic
-      ,(if (symbolp func-name)
-	   ;; support (return-from ,func-name ...)
-	   `(block ,func-name
-	      (locally ;; support (declare ...)
-                  ,@body))
-	   `(locally ;; support (declare ...)
-		,@body)))))
-
-
-
-;;;; ** Running
-
+;;;; ** Running hybrid SW/HW transactions
 
 (defmacro atomic (&rest body)
   "Main entry point for STMX.
@@ -102,100 +54,45 @@ For advanced features inside transactions, see RETRY, ORELSE, NONBLOCKING,
 
 For pre-defined transactional classes, see the package STMX.UTIL"
 
+#+never
+ "Run BODY in a hardware memory transaction. All changes to transactional memory
+will be visible to other threads only after BODY returns normally (commits).
+If BODY signals an error, its effects on transactional memory are rolled back
+and the error is propagated normally.
+Also, no work-in-progress transactional memory will ever be visible to other
+threads.
+
+If hardware memory transaction aborts for a conflict, rerun it.
+If it fails for some other reason, execute BODY in a software memory transaction."
+
   (if body
-      `(run-atomic (lambda () ,@body))
+      #?+hw-transactions
+      (let ((form `(block nil (locally ,@body))))
+        `(%hw-atomic2 () ,form (%run-sw-atomic (lambda () ,form))))
+      #?-hw-transactions
+      `(sw-atomic ,@body)
+
       `(values)))
 
 
 (defmacro fast-atomic (&rest body)
+  "Possibly slightly faster variant of ATOMIC.
+
+On systems supporting hardware transactions (as of July 2013, very few systems
+support them), FAST-ATOMIC and ATOMIC are identical.
+On other systems, multiple nested FAST-ATOMIC forms may be slightly faster than
+multiple nested ATOMIC blocks, at the price of compiling BODY more than once."
+  #?+hw-transactions
+  `(atomic ,@body)
+
+  #?-hw-transactions
   (if body
-      `(if (transaction?)
-           (locally ,@body)
-           (%run-atomic (lambda () ,@body)))
+      (let ((form `(block nil (locally ,@body))))
+	`(if (transaction?)
+	     ,form
+	     (%run-sw-atomic (lambda () ,form))))
       `(values)))
 
-       
-
-(defmacro maybe-yield-before-rerun ()
-  #+never nil
-  #-always (thread-yield))
-
-
-(declaim (inline run-once))
-
-(defun run-once (tx log)
-  "Internal function invoked by RUN-ATOMIC and RUN-ORELSE2.
-
-Run once the function TX inside a transaction,
-using LOG as its transaction log."
-  (declare (type function tx)
-           (type tlog log))
-
-  (with-recording-to-tlog log
-     (set-tlog-version log)
-
-     (log.debug "Tlog ~A {~A} starting~A" (~ log) (~ tx) 
-                (if-bind parent (tlog-parent log)
-                    (format nil ", parent is tlog ~A" (~ parent))
-                    ""))
-     (funcall tx)))
-
-
-
-
-
-(defun %run-atomic (tx)
-  "Function equivalent of the ATOMIC macro.
-
-Run the function TX inside a transaction.
-If the transaction is invalid (conflicts) re-run TX immediately, ignoring
-any error it may signal.
-
-Otherwise, commit if TX returns normally, or rollback if it signals an error.
-
-Finally, if TX called (retry), re-run it after at least some of the
-transactional memory it read has changed."
-
-  (declare (type function tx))
-
-  (prog ((log (new-tlog)))
-
-   run
-   (handler-case
-       (return
-         (multiple-value-prog1 (run-once tx log)
-
-           (log.trace "Tlog ~A {~A} wants to commit" (~ log) (~ tx))
-
-           ;; commit also checks if log is valid
-           (if (commit log)
-               ;; all done, prepare to return.
-               ;; we are not returning TLOGs to the pool in case tx signaled an error,
-               ;; but that's not a problem since the TLOG pool is just a speed optimization
-               (free-tlog log)
-
-               (progn
-                 (log.debug "Tlog ~A {~A} could not commit, re-running it" (~ log) (~ tx))
-                 (go rerun)))))
-
-     (retry-error () (go retry))
-     (rerun-error () (go rerun)))
-
-   retry
-   (log.debug "Tlog ~A {~A} will sleep, then retry" (~ log) (~ tx))
-   (wait-tlog log)
-   (go rerun-no-yield)
-
-   rerun
-   (log.debug "Tlog ~A {~A} will re-run" (~ log) (~ tx))
-   (maybe-yield-before-rerun)
-   ;; fallthrough
-
-   rerun-no-yield
-   (log.trace "before rerun tlog ~A {~A}, before (new-or-clear-tlog)" (~ log) (~ tx))
-   (new-or-clear-tlog log :parent (tlog-parent log))
-   (log.trace "before rerun tlog ~A {~A}, after (new-or-clear-tlog)" (~ log) (~ tx))
-   (go run)))
 
 
 (declaim (inline run-atomic))
@@ -203,7 +100,7 @@ transactional memory it read has changed."
 (defun run-atomic (tx)
   "Function equivalent of the ATOMIC macro.
 
-Run the function TX inside a transaction.
+Run the function TX inside a memory transaction.
 If the transaction is invalid (conflicts) re-run TX immediately, ignoring
 any error it may signal.
 
@@ -214,69 +111,9 @@ transactional memory it read has changed."
 
   (declare (type function tx))
 
-  (if (transaction?)
-      (funcall tx)
-      (%run-atomic tx)))
+  #?+hw-transactions
+  (%hw-atomic2 () (funcall tx) (%run-sw-atomic tx))
 
+  #?-hw-transactions
+  (run-sw-atomic tx))
 
-
-
-(defun %hw-run-atomic (tx fallback-tx)
-  "Run the function TX inside a hardware memory transaction.
-If the hardware memory transaction aborts, run FALLBACK-TX
-inside a software memory transaction."
-
-  (declare (type function tx)
-           (type function fallback-tx))
-
-  (with-hw-tlog-id (my-hw-tlog-id)
-    (when (hw-transaction-begin)
-      (return-from %hw-run-atomic
-        (multiple-value-prog1 (funcall tx)
-            
-          (if (> my-hw-tlog-id (get-tlog-counter))
-              (progn
-                (hw-transaction-end)
-                (set-tlog-counter my-hw-tlog-id))
-              (hw-transaction-abort))))))
-            
-  (run-atomic fallback-tx))
-
-
-
-(declaim (inline hw-run-atomic1 hw-run-atomic2))
-
-(defun hw-run-atomic1 (tx)
-  (declare (type function tx))
-
-  (if (hw-transaction-running?)
-      ;; already inside a HW transaction
-      (funcall tx)
-      ;; start a HW transaction
-      (%hw-run-atomic tx tx)))
-
-
-(defun hw-run-atomic2 (tx fallback-tx)
-  (declare (type function tx)
-           (type function fallback-tx))
-
-  (if (hw-transaction-running?)
-      ;; already inside a HW transaction
-      (funcall tx)
-      ;; start a HW transaction
-      (%hw-run-atomic tx fallback-tx)))
-
-
-
-(defmacro hw-atomic (&body body)
-  "Run BODY in a memory transaction. Try a hardware transaction first,
-and if it fails fall back on a software transaction."
-  (if body
-      `(hw-run-atomic1 (lambda () ,@body))
-      `(values)))
-
-
-(defmacro hw-atomic2 (hw-tx-body sw-tx-body)
-  "Run HW-TX-BODY in a hardware memory transaction.
-If it aborts and SW-TX-BODY is not NIL, run SW-TX-BODY in a software transaction."
-  `(hw-run-atomic (lambda () ,hw-tx-body) (lambda () ,sw-tx-body)))

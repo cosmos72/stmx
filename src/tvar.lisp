@@ -19,10 +19,9 @@
 
 ;;;; ** Transactional variables
 
-(declaim (inline tvar))
 (defun tvar (&optional (value +unbound-tvar+))
   (the tvar
-    (make-tvar :value value :id (next-id *tvar-id*))))
+    (make-tvar :value value :id (tvar-id/next))))
 
 (declaim (ftype (function (#-ecl tvar #+ecl t) t) $)
          (ftype (function (t tvar) t) (setf $)))
@@ -60,10 +59,12 @@
 (defun (setf raw-value-of) (value var)
   "Set the VALUE of VAR. Return VALUE.
 This function intentionally ignores transactions and it is only useful
-for debugging purposes. please use (setf ($ var) value) instead."
+for debugging purposes. Use (SETF ($-SLOT VAR) VALUE) or (SETF ($ VAR) VALUE) instead."
   (declare (type tvar var))
   (set-tvar-value-and-version var value
-                              (incf-tlog-counter)))
+                              (global-clock/sw/write
+                               (global-clock/sw/start-write
+                                (global-clock/sw/start-read)))))
 
   
   
@@ -85,11 +86,13 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
 
   (multiple-value-bind (value version fail) (tvar-value-and-version-or-fail var)
 
-    (declare (type fixnum version)
+    (declare (type atomic-counter-num version)
              (type bit fail))
 
-    (when (or (not (eql 0 fail)) ;; TVAR is locked or could not be read?
-              (> version (tlog-id log))) ;; TVAR changed after this TX started?
+    ;; TVAR is locked or could not be read?
+    (unless (and (eql 0 fail)
+                 ;; TVAR may have changed after this TX started?
+                 (global-clock/valid-read? version (tlog-read-version log)))
       ;; inconsistent data
       (rerun))
 
@@ -100,7 +103,7 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
 (defun tx-write-of (var value &optional (log (current-tlog)))
   "Store in transaction LOG the writing of VALUE into VAR; return VALUE.
 
-TX-WRITE-OF is an internal function called by (setf ($ VAR) VALUE)
+TX-WRITE-OF is an internal function called by (SETF ($ VAR) VALUE)
 and by writing TOBJs slots."
   (declare (type tvar var)
            (type tlog log))
@@ -129,33 +132,33 @@ Works ONLY inside software memory transactions."
 
 
 
-(declaim (notinline $-hwtx))
-(defun $-hwtx (var)
+
+(declaim (inline $-hwtx))
+#?+hw-transactions
+(defun $-hwtx (var &optional unused)
     "Get the value from the transactional variable VAR and return it.
 Return +unbound-tvar+ if VAR is not bound to a value.
-Works ONLY inside hardware memory transactions."
-  (declare (type tvar var))
+Works ONLY inside hardware memory transactions.
 
-  (multiple-value-bind (value version fail) (tvar-value-and-version-or-fail var)
-    (declare (type fixnum version)
-             (type bit fail))
-
-    (if (and (eql 0 fail) ;; TVAR is unlocked and could not be read?
-             (<= version *hw-tlog-id*)) ;; TVAR unchanged after this TX started?
-        ;; consistent data
-        value
-        ;; inconsistent data
-        (hw-transaction-abort))))
+The argument UNUSED is not used. It only exists for simmetry with
+\(SETF $-HWTX) to allow idioms as (INCF ($-HWTX var version))"
+  (declare (type tvar var)
+           (ignore unused))
+  (tvar-value var))
 
 
 (declaim (inline (setf $-hwtx)))
-(defun (setf $-hwtx) (value var)
+#?+hw-transactions
+(defun (setf $-hwtx) (value var &optional (version (hw-tlog-write-version)))
   "Store VALUE inside transactional variable VAR and return VALUE.
-Works ONLY inside hardware memory transactions."
-  (declare (type tvar var))
+Works ONLY inside hardware memory transactions.
 
-  ;; no need for memory barriers
-  (setf (tvar-version var) *hw-tlog-id*
+VERSION is an optional parameter that, if used, MUST be equal to the value
+returned by (HW-TLOG-WRITE-VERSION) - it is a per-transaction constant.
+Its purpose is to speed up this function, by removing the two nanoseconds
+required to retrieve such value from thread-local storage."
+  (declare (type tvar var))
+  (setf (tvar-version var) version
         (tvar-value var) value))
 
 
@@ -181,10 +184,12 @@ Works ONLY outside memory transactions."
   (setf (raw-value-of var) value))
 
 
-
 (defmacro use-$-hwtx? ()
   "Return T if $-hwtx and (setf $-hwtx) should be used, otherwise return NIL."
-  `(hw-transaction-supported-and-running?))
+  #?+hw-transactions
+  `(/= +invalid-version+ *hw-tlog-write-version*)
+  #?-hw-transactions
+  `nil)
 
 
 (defmacro use-$-tx? ()
@@ -192,21 +197,23 @@ Works ONLY outside memory transactions."
   `(recording?))
 
 
-(declaim (inline $-noerror))
-(defun $-noerror (var)
+(declaim (inline $))
+(defun $ (var)
   "Get the value from the transactional variable VAR and return it.
 Return +unbound-tvar+ if VAR is not bound to a value.
 
 Works both inside and outside transactions.
 During transactions, it uses transaction log to record the read
 and to check for any value stored in the log."
+  (declare (type tvar var))
 
-  (if t ;;(use-$-hwtx?) ($-hwtx var)
-      (if (use-$-tx?) ($-tx var)
-          ($-notx var))))
+  (cond
+    #?+hw-transactions ((use-$-hwtx?) ($-hwtx var))
+    ((use-$-tx?)   ($-tx   var))
+    (t             ($-notx var))))
 
                
-(defun $ (var)
+(defun $-slot (var)
   "Get the value from the transactional variable VAR and return it.
 Signal an error if VAR is not bound to a value.
 
@@ -215,9 +222,9 @@ During transactions, it uses transaction log to record the read
 and to check for any value stored in the log."
   (declare (type tvar var))
 
-  (let1 value ($-noerror var)
+  (let1 value ($ var)
     (unless (eq value +unbound-tvar+)
-      (return-from $ value))
+      (return-from $-slot value))
     (unbound-tvar-error var)))
 
 
@@ -229,11 +236,23 @@ Works both outside and inside transactions.
 During transactions, it uses transaction log to record the value."
   (declare (type tvar var))
 
-  (if t ;;(use-$-hwtx?) (setf ($-hwtx var) value)
-      (if (use-$-tx?) (setf ($-tx var) value)
-          (setf ($-notx var) value))))
+  #?+hw-transactions
+  (let ((hw-write-version *hw-tlog-write-version*))
+    (cond
+      ((/= +invalid-version+ hw-write-version) (setf ($-hwtx var hw-write-version) value))
+      ((use-$-tx?)                             (setf ($-tx   var) value))
+      (t                                       (setf ($-notx var) value))))
+
+  #?-hw-transactions
+  (cond
+    ((use-$-tx?) (setf ($-tx var) value))
+    (t           (setf ($-notx var) value))))
 
 
+(declaim (inline (setf $-slot)))
+(defun (setf $-slot) (value var)
+  (declare (type tvar var))
+  (setf ($ var) value))
 
   
 (defun bound-$? (var)
@@ -244,7 +263,7 @@ During transactions, it uses transaction log to record the read
 and to check for any value stored in the log."
   (declare (type tvar var))
 
-  (not (eq +unbound-tvar+ ($-noerror var))))
+  (not (eq +unbound-tvar+ ($ var))))
 
 
 (defun unbind-$ (var)
@@ -268,7 +287,7 @@ If VAR is not bound to a value, return (values DEFAULT nil).
 Works both inside and outside transactions."
   (declare (type tvar var))
 
-  (let1 value ($-noerror var)
+  (let1 value ($ var)
     (if (eq value +unbound-tvar+)
       (values default nil)
       (values value   t))))
@@ -279,14 +298,14 @@ Works both inside and outside transactions."
 unbind it and and return t and the original value as multiple values.
 If VAR is not bound to a value, return (values nil DEFAULT).
 
-Works only inside software transactions."
+Works both inside and outside transactions."
   (declare (type tvar var))
 
-  (let1 value ($-tx var)
+  (let1 value ($ var)
     (if (eq value +unbound-tvar+)
         (values nil default)
         (progn
-          (setf ($-tx var) +unbound-tvar+)
+          (setf ($ var) +unbound-tvar+)
           (values t value)))))
 
 
@@ -297,9 +316,9 @@ If VAR is already bound to a value, return (values DEFAULT nil).
 Works only inside software transactions."
   (declare (type tvar var))
 
-  (let1 old-value ($-tx var)
+  (let1 old-value ($ var)
     (if (eq old-value +unbound-tvar+)
-        (values t (setf ($-tx var) value))
+        (values t (setf ($ var) value))
         (values nil default))))
 
 
@@ -309,13 +328,13 @@ Works only inside software transactions."
 
 (defmethod value-of ((var tvar))
   "Return the value inside a TVAR. Works both outside and inside transactions.
-Equivalent to ($ var)"
-  ($ var))
+Equivalent to ($-slot var)"
+  ($-slot var))
 
 (defmethod (setf value-of) (value (var tvar))
   "Set the value inside a TVAR. Works both outside and inside transactions.
-Equivalent to (setf ($ var) value)"
-  (setf ($ var) value))
+Equivalent to (setf ($-slot var) value)"
+  (setf ($-slot var) value))
 
 
 
@@ -352,6 +371,7 @@ Return NIL if VAR has different value, or is locked by some other thread."
            (type tlog log)
            (ignorable log))
     
+
   (multiple-value-bind (value version fail) (tvar-value-and-version-or-fail var)
     (declare (ignore version)
              (type bit fail))
@@ -362,13 +382,16 @@ Return NIL if VAR has different value, or is locked by some other thread."
     (when (eql fail 0)
       (return-from tvar-valid-and-own-or-unlocked? t))
 
-    #?+(and mutex-owner (not fast-lock))
-    (mutex-is-own? (the mutex var))
-      
-    #?-(and mutex-owner (not fast-lock))
-    ;; check transaction log to detect if we're the ones that locked VAR
-    (let1 present? (nth-value 1 (get-txhash (tlog-writes log) var))
-      present?)))
+    (progn
+      #?+(and mutex-owner (eql tvar-lock :mutex))
+      (mutex-is-own? (the mutex var))
+
+      #?-(and mutex-owner (eql tvar-lock :mutex))
+      ;; check transaction log to detect if we're the ones that locked VAR.
+      ;; this may be needed both when TVAR-LOCK feature is :BIT
+      ;; and when TVAR-LOCK is :MUTEX but we have no MUTEX-OWNER implementation
+      (let1 present? (nth-value 1 (get-txhash (tlog-writes log) var))
+        present?))))
 
 
 ;;;; ** Listening and notifying
@@ -427,22 +450,20 @@ if VAR changes."
 
 (defprint-object (var tvar :identity nil)
 
-  (let ((value +unbound-tvar+)
-        (present? nil)
-        (id (~ var)))
+  (let ((value (tvar-value var))
+        (version (tvar-version var))
+        (id (~ var))
+        (log (current-tlog)))
 
-    (when (recording?)
+    (when log
       ;; extract transactional value without triggering a (rerun):
       ;; printing TVARs is _only_ for debugging purposes
       (multiple-value-bind (tx-value tx-present?)
-          (get-txhash (tlog-writes (current-tlog)) var)
+          (get-txhash (tlog-writes log) var)
         (when tx-present?
           (setf value    tx-value
-                present? tx-present?))))
-
-    (unless present?
-      (setf value (tvar-value var)))
+                version (tlog-read-version log)))))
 
     (if (eq value +unbound-tvar+)
-        (format t "~A unbound" id)
-        (format t "~A [~A]" id value))))
+        (format t "~A v~A unbound" id version)
+        (format t "~A v~A [~A]" id version value))))

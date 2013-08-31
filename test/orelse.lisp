@@ -33,6 +33,7 @@
  (defun take2 (c)
    (nonblocking (take c))))
 
+;; try-take is already a transaction, wrapping it again is redundant
 (transaction
  (defun take3 (c)
    (try-take c)))
@@ -47,6 +48,7 @@
  (defun put2 (c val)
    (nonblocking (put c val))))
 
+;; try-put is already a transaction, wrapping it again is redundant
 (transaction
  (defun put3 (c val)
    (try-put c val)))
@@ -56,26 +58,29 @@
        (loop for takef in (list #'take1 #'take2 #'take3) do
             (loop for putf in (list #'put1 #'put2 #'put3)
                for unique = (gensym) do
+                 (locally
 
-                 (multiple-value-bind (took? value) (funcall takef place)
-                   (are-true (not took?)
-                             (null value)
-                             (empty? place)))
+                     (declare (type function takef putf))
+                   
+                   (multiple-value-bind (took? value) (funcall takef place)
+                     (are-true (not took?)
+                               (null value)
+                               (empty? place)))
 
-                 (multiple-value-bind (put? value) (funcall putf place unique)
-                   (are-true put?
-                             (eq value unique)
-                             (full? place)))
+                   (multiple-value-bind (put? value) (funcall putf place unique)
+                     (are-true put?
+                               (eq value unique)
+                               (full? place)))
 
-                 (multiple-value-bind (put? value) (funcall putf place unique)
-                   (are-true (not put?)
-                             (null value)
-                             (full? place)))
+                   (multiple-value-bind (put? value) (funcall putf place unique)
+                     (are-true (not put?)
+                               (null value)
+                               (full? place)))
 
-                 (multiple-value-bind (took? value) (funcall takef place)
-                   (are-true took?
-                             (eq value unique)
-                             (empty? place)))))))
+                   (multiple-value-bind (took? value) (funcall takef place)
+                     (are-true took?
+                               (eq value unique)
+                               (empty? place))))))))
       
 (test orelse
   (orelse-test))
@@ -138,7 +143,7 @@
 (defun to-vector (seq)
   (coerce seq 'simple-vector))
 
-(defun orelse-thread4-test (&optional (iterations 1))
+(defun orelse-thread4 (&optional (iterations 1))
   "This test runs a pass-the-ball algorithm with 4 threads
 that take turns consuming (take) and producing (put) values in 4 cells.
 
@@ -204,17 +209,20 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
           (loop for cell in cells
              collect (take cell))))))))
 
+
+(defun orelse-thread4-test (&optional (iterations 1))
+  (multiple-value-bind (values cells)
+      (orelse-thread4 iterations)
+
+    (loop for list in (list values cells) do
+         (loop for e in list do
+              (is-true (numberp e))))
+
+    (let1 remainders (sort (loop for v in cells collect (mod v 1)) #'<)
+      (is-true (equalp '(0.0 0.25 0.5 0.75) remainders)))
+
+    (let1 total (apply #'+ cells)
+      (is-true (= total (+ 1.5 (* 4 iterations)))))))
+
 (test orelse-thread4
-  (let1 iterations 1000
-    (multiple-value-bind (values cells)
-        (orelse-thread4-test iterations)
-
-      (loop for list in (list values cells) do
-           (loop for e in list do
-                (is-true (numberp e))))
-
-      (let1 remainders (sort (loop for v in cells collect (mod v 1)) #'<)
-        (is-true (equalp '(0.0 0.25 0.5 0.75) remainders)))
-
-      (let1 total (apply #'+ cells)
-        (is-true (= total (+ 1.5 (* 4 iterations))))))))
+  (orelse-thread4-test 10000))

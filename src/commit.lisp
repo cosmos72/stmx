@@ -79,23 +79,18 @@ not even by the current thread."
   t)
 
 #?+hw-transactions
-(defun valid-and-unlocked-hw-assisted? (log)
-  "Return t if LOG is valid and unlocked, i.e. it contains an up-to-date view
-of TVARs that were read during the transaction and none of them is locked,
-not even by the current thread."
+(declaim (inline valid-hw-assisted?))
+
+#?+hw-transactions
+(defun valid-hw-assisted? (log)
+  "Return t if LOG is valid, i.e. it contains an up-to-date view
+of TVARs that were read during the transaction. Does not check for locked
+TVARs or version mismatches, since it is unnecessary."
   (declare (type tlog log))
-  (do-txhash (var expected-val) (tlog-reads log)
-    (multiple-value-bind (version val) (%tvar-version-and-value var)
-      (if (and (eq val expected-val)
-               (eql 0 (logand version 1)))
+  (do-txhash (var val) (tlog-reads log)
+    (unless (eq val (tvar-value var))
+      (return-from valid-hw-assisted? nil)))
 
-          (log.trace "Tlog ~A tvar ~A is up-to-date and unlocked" (~ log) (~ var))
-        
-          (progn
-            (log.debug "Tlog ~A tvar ~A conflict or locked: not valid" (~ log) (~ var))
-            (return-from valid-and-unlocked-hw-assisted? nil)))))
-
-  (log.trace "Tlog ~A ..is valid and unlocked" (~ log))
   t)
 
 
@@ -143,8 +138,11 @@ tvar-id and are considered \"larger\". Returns (> (tvar-id var1) (tvar-id var2))
 
 
 
+(declaim (inline try-lock-tvars unlock-tvars))
+
+
 (defun try-lock-tvars (writes locked log)
-  "Optionally sort VARS in (tvar> ...) order,
+  "Optionally sort WRITES in (tvar> ...) order,
 then non-blocking acquire their locks in such order.
 Reason: acquiring in unspecified order may cause livelock, as two transactions
 may repeatedly try acquiring the same two TVARs in opposite order.
@@ -171,7 +169,6 @@ After return, LOCKED will contain all TXPAIR entries of locked VARS."
 
 
 
-(declaim (inline unlock-tvars))
 (defun unlock-tvars (locked)
   "Release vars in LOCKED in same order of acquisition."
   (declare (type txfifo locked))
@@ -209,6 +206,12 @@ After return, LOCKED will contain all TXPAIR entries of locked VARS."
 IMPORTANT: See BEFORE-COMMIT for what FUNC must not do."
   (declare (type function func)
            (type tlog log))
+
+  #?+hw-transactions
+  (when (hw-transaction-supported-and-running?)
+    ;; hw transactions do not support before-commit
+    (hw-transaction-abort))
+
   (vector-push-extend func (ensure-tlog-before-commit log))
   func)
 
@@ -218,6 +221,12 @@ IMPORTANT: See BEFORE-COMMIT for what FUNC must not do."
 IMPORTANT: See AFTER-COMMIT for what FUNC must not do."
   (declare (type function func)
            (type tlog log))
+
+  #?+hw-transactions
+  (when (hw-transaction-supported-and-running?)
+    ;; hw transactions do not support after-commit
+    (hw-transaction-abort))
+
   (vector-push-extend func (ensure-tlog-after-commit log))
   func)
 
@@ -307,56 +316,42 @@ but the TLOG will remain committed."
 
 
 
-
+#?+hw-transactions
 (declaim (inline commit-hw-assisted))
+
 #?+hw-transactions
 (defun commit-hw-assisted (log changed)
   "Try to perform COMMIT using a hardware memory transaction.
 Return T if successful, NIL if transaction is invalid,
 or :fail if hardware memory transaction does not complete.
-After successful return, CHANGED contains the list of the TVARs actually written."
+After successful return, CHANGED contains the list of the TVARs actually written.
+
+Note: invokes HW-ATOMIC2, which in turn invokes GLOBAL-CLOCK/HW/STAT-{COMMITTED,ABORTED}"
   (declare (type tlog log)
            (type txfifo changed))
 
-  (let1 new-version (the fixnum (incf-tlog-counter))
+  (the (member t nil :fail)
+    (hw-atomic2 (write-version :test-for-running-tx? nil :update-stat :swtx)
 
-    (unless (hw-transaction-begin)
-      (return-from commit-hw-assisted :fail))
+      (block nil
+        ;; hardware transaction. if you need to jump out of it
+        ;; use (return ...), or it will abort and roll back!
+        (unless (valid-hw-assisted? log)
+          (return nil))
 
-    ;; we could read even locked TVARs: 
-    ;; the hardware transaction guarantees to abort if they change value.
-    ;;
-    ;; but we may read committed values from a newer SW transaction
-    ;; and uncommitted (original) values from an older SW transaction.
-    ;; See the 3rd picture in doc/consistent-reads.md for full explanation
-    ;;
-    ;; so we must check that tlog-reads are unlocked
-    (unless (valid-and-unlocked-hw-assisted? log)
-      (hw-transaction-end)
-      (return-from commit-hw-assisted nil))
+        (do-txhash-entries (entry) (tlog-writes log)
+          (let ((var (the tvar (txpair-key entry)))
+                (val           (txpair-value entry)))
 
-    (do-txhash-entries (entry) (tlog-writes log)
-      (let ((var (the tvar (txpair-key entry)))
-            (val           (txpair-value entry)))
+            ;; degrade "write the same value already present" to "read"
+            ;; the hardware transaction guarantees to abort if the tvar changes value
+            (unless (eq val (raw-value-of var))
+              (put-txfifo changed entry)
+              (setf ($-hwtx var write-version) val))))
+        t)
 
-        (let1 tvar-version (the fixnum (tvar-version var))
-
-          ;; is var locked? we cannot mess with a SW commit currently in progress
-          (when (or (not (eql 0 (logand tvar-version 1)))
-                    ;; some other transaction wrote a higher version?
-                    ;; actually this check seems unnecessary
-                    ;; (the SW-only commit does not check either)
-                    #+never (< new-version tvar-version))
-            (hw-transaction-abort)))
-
-        ;; degrade "write the same value already present" to "read"
-        ;; the hardware transaction guarantees to abort if the var changes value
-        (unless (eq val (raw-value-of var))
-          (put-txfifo changed entry)
-          (set-tvar-value-and-version var val new-version))))
-
-    (hw-transaction-end)
-    t))
+      ;; fallback
+      :fail)))
 
     
 
@@ -372,32 +367,34 @@ After successful return, CHANGED contains the list of the TVARs actually written
   
 
 
-(declaim (inline commit-update-tvars))
+(declaim (inline commit-sw-update-tvars))
 
-(defun commit-update-tvars (locked new-version)
-  "COMMIT, i.e. actually write new values into TVARs.
-Also unlock all TVARs."
-  (declare (type txfifo locked)
-           (type fixnum new-version))
+(defun commit-sw-update-tvars (locked)
+  "Actually COMMIT, i.e. write new values into TVARs. Also unlock all TVARs."
+  (declare (type txfifo locked))
 
-  (do-filter-txfifo (var val) locked
-    (if (eq val (raw-value-of var))
-        (progn
-          ;; fast-lock? then we need to manually unlock
-          #?+fast-lock
-          (unlock-tvar var)
-          (rem-current-txfifo-entry))
+  (let1 write-version (the version-type
+                        (global-clock/sw/start-write (tlog-read-version log)))
 
-        (progn
-          ;; if fast-lock, this also unlocks VAR.
-          (set-tvar-value-and-version var val new-version)
+    (do-filter-txfifo (var val) locked
+      (if (eq val (raw-value-of var))
+          (progn
+            ;; TVAR-LOCK is :BIT? then we need to manually unlock
+            #?+(eql tvar-lock :bit)
+            (unlock-tvar var)
+            (rem-current-txfifo-entry))
+          
+          (progn
+            ;; if TVAR-LOCK is :BIT?, this also unlocks VAR.
+            (set-tvar-value-and-version var val
+                                        (global-clock/sw/write write-version))
                    
-          (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
-                     (~ log) (~ var) current-val val)))
+            (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
+                       (~ log) (~ var) current-val val)))
 
-    ;; no fast-lock? then unlock manually in all cases
-    #?-fast-lock
-    (unlock-tvar var)))
+      ;; TVAR-LOCK is not :BIT? then unlock manually in all cases
+      #?-(eql tvar-lock :bit)
+      (unlock-tvar var))))
 
 
 (defun commit (log)
@@ -410,7 +407,9 @@ a) the TLOG is invalid - then the whole transaction must be re-executed
 b) another TLOG is writing the same TVARs being committed
    so that TVARs locks could not be aquired - also in this case
    the whole transaction will be re-executed, as there is little hope
-   that the TLOG will still be valid."
+   that the TLOG will still be valid.
+
+Note: internally invokes GLOBAL-CLOCK/{HW,SW}/STAT-{COMMITTED,ABORTED}"
    
   (declare (type tlog log))
 
@@ -422,46 +421,47 @@ b) another TLOG is writing the same TVARs being committed
 
 
   (let* ((writes     (the txhash-table (tlog-writes log)))
-         (locked     (the txfifo       (tlog-locked log)))
-         (success     nil))
-             
-    (declare (type boolean      success))
-
+         (locked     (the txfifo       (tlog-locked log))))
+         
     (when (zerop (txhash-table-count writes))
       (log.debug "Tlog ~A committed (nothing to write)" (~ log))
+      (global-clock/sw/stat-committed)
       (invoke-after-commit log)
       (return-from commit t))
 
-    (prog ()
+    (prog ((success))
+       (declare (type boolean success))
 
        #?+hw-transactions
-       (case (commit-hw-assisted log locked)
-         ((t)   (setf success t) (go committed))
-         ((nil) (return nil)))
-
+       (let1 committed (commit-hw-assisted log locked)
+         (log.debug "(commit-hw-assisted) returned ~S" committed)
+         (case committed
+           ((t)   (setf success t) (go committed))
+           ((nil) (return nil))))
+             
 
        ;; HW-assisted commit failed, but transaction may still be valid.
        ;; fall back on SW commit
-       (unwind-protect
-            (let1 new-version +invalid-version+
-              (declare (type fixnum new-version))
+       #?+hw-transactions (global-clock/incf-nohw-counter)
 
+       (unwind-protect
+            (progn
               ;; we must lock TVARs that will been written: expensive
               ;; but needed to ensure concurrent commits do not conflict.
               (log.trace "before (try-lock-tvars)")
 
               (unless (try-lock-tvars writes locked log)
+
                 (log.debug "Tlog ~A failed to lock tvars, not committed" (~ log))
                 (return))
             
               (log.trace "Tlog ~A acquired locks..." (~ log))
 
-              (setf new-version (incf-tlog-counter))
-
               ;; check for log validity one last time, with locks held.
               ;; Also ensure that TVARs in (tlog-reads log) are not locked
               ;; by other threads. For the reason, see doc/consistent-reads.md
               (unless (valid-and-own-or-unlocked? log)
+
                 (log.debug "Tlog ~A is invalid or reads are locked, not committed" (~ log))
                 (return))
 
@@ -469,13 +469,18 @@ b) another TLOG is writing the same TVARs being committed
 
               ;; COMMIT, i.e. actually write new values into TVARs.
               ;; Also unlock all TVARs.
-              (commit-update-tvars locked new-version)
 
+              (commit-sw-update-tvars locked)
+              (global-clock/sw/stat-committed)
               (setf success t))
+
+         ;; cleanup
+         #?+hw-transactions (global-clock/decf-nohw-counter)
          
          (unless success
            (unlock-tvars locked)
            (log.trace "Tlog ~A ...released locks" (~ log))
+           (global-clock/sw/stat-aborted)
            (return-from commit success)))
 
        

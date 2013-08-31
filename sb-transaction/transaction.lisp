@@ -20,10 +20,12 @@
          (ftype (function () (integer 0 0)) transaction-end)
          (ftype (function () (integer 0 0)) transaction-abort)
          (ftype (function () boolean)       transaction-running-p)
+         (ftype (function (fixnum) boolean) transaction-rerun-may-succeed-p)
          (inline transaction-begin
                  transaction-end
                  transaction-abort
-                 transaction-running-p))
+                 transaction-running-p
+                 transaction-rerun-may-succeed-p))
 
 
 
@@ -103,15 +105,25 @@ with an implementation-dependent value."
   (transaction-abort-macro))
 
 
-
-
-#+never
-(defun %transaction-running-p ()
-  (%transaction-running-p))
-
 (defun transaction-running-p ()
   "Return T if a hardware memory transaction
 is currently in progress, otherwise return NIL."
   (%transaction-running-p))
 
 
+
+
+(defun transaction-rerun-may-succeed-p (err-code)
+  "If ERR-CODE is the result returned by (TRANSACTION-BEGIN) of an *aborted* transaction,
+return T if re-running the same transaction has a possibility to succeed,
+i.e. if the abort reason was temporary (as for example a conflict with another thread).
+Return NIL if re-running the same transaction has no possibility to succeed."
+  (declare (type fixnum err-code))
+
+  ;; see Intel Instruction reference manual for all the possible bits...
+  ;; bit 0: set if abort caused by XABORT
+  ;; bit 1: set if the transaction may succeed on a retry. always zero if bit 0 is set
+  ;;
+  ;; Note: +transaction-started+ is equal to 3 exactly because a transaction abort
+  ;; (spontaneous or caused by XABORT) will never return an error code with bits 0 and 1 both set.
+  (/= 0 (logand err-code 2)))

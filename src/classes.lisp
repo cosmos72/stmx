@@ -18,50 +18,6 @@
 (enable-#?-syntax)
 
 
-
-;;;; ** tlog global versioning - exact, atomic counter
-
-(declaim (type atomic-counter *tlog-counter*))
-(defvar *tlog-counter* (make-atomic-counter))
-
-(declaim (inline incf-tlog-counter get-tlog-counter set-tlog-counter))
-
-(defun incf-tlog-counter ()
-  "Atomically increment the global versioning counter and return its new value."
-  (the atomic-counter-num (incf-atomic-counter *tlog-counter* 2)))
-
-(defun get-tlog-counter ()
-  "Return the current value of the global versioning counter."
-  (the atomic-counter-num (get-atomic-counter *tlog-counter*)))
-
-(defun set-tlog-counter (new-value)
-  (declare (type atomic-counter-num new-value))
-  "Set the global versioning counter to NEW-VALUE and return NEW-VALUE."
-  (set-atomic-counter *tlog-counter* new-value))
-
-;;;; ** tvar approximate counter (fast but not fully exact in multi-threaded usage)
-
-(declaim (type fixnum *tvar-id*))
-(defvar *tvar-id* -1)
-
-(declaim (inline get-next-id))
-(defun get-next-id (id)
-  (declare (type fixnum id))
-  (the fixnum
-    #?+fixnum-is-powerof2
-    (logand most-positive-fixnum (1+ id))
-
-    #?-fixnum-is-powerof2
-    (if (= id most-positive-fixnum)
-        0
-        (1+ id))))
-
-(defmacro next-id (place)
-  `(setf ,place (get-next-id ,place)))
-
-
-
-
 ;;;; * support classes for TXHASH-TABLE
 
 (declaim (inline txpair))
@@ -136,14 +92,14 @@ transactional objects (tobjs) or transactional variables (tvars),
 and are later committed to memory if the transaction completes successfully."
 
   ;; tlog-reads: tvars read during transaction, mapped to their read value
-  (reads (make-txhash-table) :type txhash-table)
+  (reads (make-txhash-table)      :type txhash-table)
 
   ;; tlog-writes: tvars written during transaction, mapped to their new values
-  (writes (make-txhash-table) :type txhash-table)
+  (writes (make-txhash-table)     :type txhash-table)
 
-  (locked (make-txfifo)       :type txfifo :read-only t)
+  (locked (make-txfifo)           :type txfifo :read-only t)
 
-  (id     +invalid-version+   :type fixnum) ;; tlog-id
+  (read-version +invalid-version+ :type version-type) ;; tlog-read-version
 
   ;; Parent of this TLOG. Used by ORELSE for nested transactions
   (parent    nil :type (or null tlog)) ;; tlog-parent
@@ -151,16 +107,16 @@ and are later committed to memory if the transaction completes successfully."
   (semaphore nil) ;; tlog-semaphore
 
   ;; Flag to prevent TLOGs from sleeping. Set by TVARs when they change.
-  (prevent-sleep nil :type boolean) ;; tlog-prevent-sleep
+  (prevent-sleep nil       :type boolean) ;; tlog-prevent-sleep
   ;; Functions to call immediately before committing TLOG.
-  (before-commit nil :type (or null tlog-func-vector)) ;; tlog-before-commit
+  (before-commit nil      :type (or null tlog-func-vector)) ;; tlog-before-commit
   ;; Functions to call immediately after committing TLOG.
-  (after-commit  nil :type (or null tlog-func-vector))) ;; tlog-after-commit
+  (after-commit  nil      :type (or null tlog-func-vector))) ;; tlog-after-commit
 
 
 
 (defmethod id-of ((log tlog))
-  (tlog-id log))
+  (tlog-read-version log))
 
 
 
@@ -199,8 +155,9 @@ while it is normally disabled in these cases:
 
 (declaim (inline transaction?))
 (defun transaction? ()
-  "Return true if inside a transaction."
-  *record-to-tlogs*)
+  "Return true if inside a software or hardware transaction."
+  (or (hw-transaction-supported-and-running?)
+      *record-to-tlogs*))
 
 
 
@@ -229,7 +186,7 @@ inside TOBJs slots while executing BODY."
 
 
 
-;;;; ** Current transaction log
+;;;; ** Current software transaction log
 
 (declaim (type (or null tlog) *tlog*))
 (defvar *tlog* nil
@@ -253,42 +210,28 @@ to TLOGs while executing BODY."
        ,@body)))
 
 
-(defmacro set-tlog-version (log)
-  `(setf (tlog-id ,log) (get-tlog-counter)))
+;;;; ** Current hardware transaction log
+
+(declaim (type version-type *hw-tlog-write-version*))
+(defvar *hw-tlog-write-version* +invalid-version+)
+
+(defmacro hw-tlog-write-version ()
+  "Return the WRITE-VERSION for the current hardware transaction"
+  '*hw-tlog-write-version*)
+
 
 
 (eval-when (:load-toplevel :execute)
-  (save-thread-initial-bindings *tlog* *record-to-tlogs* *hide-tvars*))
+  (save-thread-initial-bindings *tlog* *record-to-tlogs* *hide-tvars* *hw-tlog-write-version*))
 
-
-
-;;;; ** Hardware memory transactions: current transaction log id
-
-(declaim (type atomic-counter-num *hw-tlog-id* *last-hw-tlog-id*))
-(defvar *hw-tlog-id* +invalid-version+
-  "Current transaction log id, used by hardware memory transactions
-instead of the full TLOG structure.")
-
-
-(defvar *last-hw-tlog-id* +invalid-version+
-  "Transaction log id of the last hardware memory transactions
-that committed successfully.")
-
-
-(defconstant +max-sw-transactions-during-hw-one+ 512)
-
-(defmacro with-hw-tlog-id ((hw-tlog-id) &body body)
-  "Execute BODY with HW-TLOG-ID and *hw-tlog-id* dynamically bound
-to value of (get-tlog-counter) plus some safety margin.
-Used by hardware memory transactions."
-  `(let* ((,hw-tlog-id (the atomic-counter-num (+ (get-tlog-counter)
-                                                  (* +tlog-counter-delta+
-                                                     +max-sw-transactions-during-hw-one+))))
-          (*hw-tlog-id* ,hw-tlog-id))
-     ,@body))
 
 
 ;;;; ** Retrying
+
+(defmacro maybe-yield-before-rerun ()
+  #+never nil
+  #-always (thread-yield))
+
 
 (define-condition stmx.control-error (control-error)
   ()
@@ -327,13 +270,20 @@ to application code only in case of bugs"))
 
 Before re-executing, the transaction will wait on all variables that it read
 until at least one of them changes."
+    
+    #?+hw-transactions
+    (when (hw-transaction-supported-and-running?)
+      (hw-transaction-abort))
+
     (error retry-error-obj)))
+
 
 
 (let1 rerun-error-obj (make-condition 'rerun-error)
   (defun rerun ()
     "Abort the current transaction and immediately re-run it from the
-beginning without waiting. Used by ORELSE."
+beginning without waiting. Automatically invoked when a SW transaction detects
+a possibly inconsistent read."
     (error rerun-error-obj)))
 
   

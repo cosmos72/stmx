@@ -15,6 +15,8 @@
 
 (in-package :stmx)
 
+(enable-#?-syntax)
+
 ;;;; * Transaction logs
 
 ;;;; ** thread-local TLOGs pool
@@ -52,7 +54,9 @@ return LOG itself."
 (declaim (inline new-tlog))
 (defun new-tlog ()
   "Get a TLOG from pool or create one, and return it."
-  (the tlog (nth-value 0 (fast-vector-pop-macro *tlog-pool* (make-tlog)))))
+  (let1 log (the tlog (nth-value 0 (fast-vector-pop-macro *tlog-pool* (make-tlog))))
+    (setf (tlog-read-version log) +invalid-version+)
+    log))
 
 
 (declaim (inline free-tlog))
@@ -107,6 +111,7 @@ and its parent is set to PARENT."
 Return t if log is valid and wait-tlog should sleep, otherwise return nil."
 
   (declare (type tlog log))
+
   (let1 reads (tlog-reads log)
 
     (when (zerop (txhash-table-count reads))
@@ -146,10 +151,10 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   "Un-listen on tvars, i.e. deregister not to get notifications if they change."
 
   (declare (type tlog log))
+
   (do-txhash (var) (tlog-reads log)
     (unlisten-tvar var log))
   (values))
-
 
 
       
@@ -166,7 +171,7 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
     (with-lock (lock)
       (unless (setf prevent-sleep (tlog-prevent-sleep log))
         (condition-wait (tlog-semaphore log) lock)))
-
+      
     (when (log.debug)
       (if prevent-sleep
           (log.debug "Tlog ~A prevented from sleeping, some TVAR must have changed" (~ log))
@@ -189,9 +194,19 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
   (with-lock ((tlog-lock log))
     (setf (tlog-prevent-sleep log) nil))
 
-  (when (listen-tvars-of log)
-    (loop while (and (wait-once log) (valid? log))))
-  (unlisten-tvars-of log)
+  ;; TVAR change notifications are not supported by HW transactions,
+  ;; so we must disable them
+  #?+hw-transactions (global-clock/incf-nohw-counter)
+
+  (unwind-protect
+       (when (listen-tvars-of log)
+         (loop while (and (wait-once log) (valid? log))))
+
+    ;; re-enable HW transactions
+    #?+hw-transactions (global-clock/decf-nohw-counter)
+
+    ;; call UNLISTEN-TVARS-OF also if an error is signaled
+    (unlisten-tvars-of log))
   t)
       
 
@@ -213,4 +228,4 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
 ;;;; ** Printing
 
 (defprint-object (obj tlog)
-  (format t "~A" (~ obj)))
+  (format t "v~A" (~ obj)))

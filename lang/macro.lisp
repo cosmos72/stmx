@@ -27,6 +27,7 @@
      ,@body))
 
 
+
 ;;;; ** A minimal clean-room reimplementation of some macros found in ARNESI
 
 
@@ -101,3 +102,5 @@
 (defmacro log.make-logger (&rest args)
   (declare (ignore args))
   nil)
+
+

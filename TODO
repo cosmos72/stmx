@@ -1,21 +1,48 @@
-TO DO:
+========== TO DO ==========
+
+18bis) optimize adaptive global clock GV6 - currently it is horribly slow,
+    writes to global memory after each commit and rollback
+
+17) automatically expand $ to $-tx, $-hwtx or $-notx, and similarly expand
+    (setf $...) and user-defined functions
+
+16) implement with-lock-elision using hw-only transactions. It must abort if a SW
+    transaction is running, and it must check for a running HW transaction to make it nestable:
+    (with-lock-elision (lock1)
+      (with-lock-elision (lock2)
+      ...))
+    Implement it for both Bordeaux-threads locks and CAS fast mutexes (if available)
+
+15) rewrite GMAP methods as functions
 
 14) implement pools of RBNODE and TNODE - check if benchmarks improve or not
 
 8) optimize ORELSE. The current implementation is quite naive,
    it makes a full copy of the current transaction's read and write sets.
 
-DONE:
+========== DONE ==========
 
-13) optimize THASH-TABLE. The old implementation was very slow,
-    before committing it made a full copy of the original hash table.
+20) renamed $ and (SETF $) to $-SLOT and (SETF $-SLOT).
+    The functions $ and (SETF $) still exist but now ($ VAR) returns
+    +UNBOUND-TVAR+ instead of signaling an error if VAR is not bound.
 
-12) reduce consing in (commit): add changed TVARs to a TXPAIR list,
-    replace versioned-value cons with two TVAR slots - when writing,
+19) (HW-ATOMIC2) now checks for running HW or SW transactions as first thing:
+    HW transactions **cannot** be started from inside another transaction...
+    disaster would follow, as HW transactions do not check TVARs values stored
+    in the TLOG and when committing they write directly into TVARs globaly-visible value.
+
+18) implemented adaptive global clock GV6
+
+13) completely rewritten THASH-TABLE from scratch. The old implementation was very slow,
+    before committing it made a full copy of the original hash table then applied
+    the changes performed by the transaction.
+
+12) reduced consing in (commit): modified TVARs are added to a TXPAIR list,
+    replaced versioned-value CONS with two TVAR slots - when writing,
     update the version first, then the value - when reading, get the value first,
     then the version. Beware of reordering, memory barriers are needed.
 
-11) use global transaction counters to guarantee consistent memory reads.
+11) used global transaction counters to guarantee consistent memory reads.
     This solved a big problem that plagues many STM implementations:
     a transaction can see an inconsistent view of transactional memory
     and start behaving badly (illegal memory accesses, infinite loops...)
@@ -29,29 +56,29 @@ DONE:
    He said SW-STM was never finished, and to look elsewhere for STM implementations.
    He also agreed to remove SW-STM from cliki.net since it cannot be downloaded from anywhere.
 
-7bis) implement transactional red-black trees
+7bis) implemented transactional red-black trees
 
 7) implemented red-black trees (needed for transactional red-black trees)
 
-6bis) implement (thash-count)
+6bis) implemented (thash-count)
 
 6) implemented transactional hash tables
 
 5) implemented before-commit and after-commit (idea from SW-STM when-commit)
 
-4.2) optimize nested transaction. Copying all the parent TLOG reads and writes is slow,
+4.2) optimized nested transaction. Copying all the parent TLOG reads and writes is slow,
      so merge only reads-of log1 log2 when retrying a nested transaction
      and simply replace reads and writes of parent tlog when committing a nested transaction
 
-4.1) test that errors signalled by an invalid transaction are *not* propagated to the caller
+4.1) tested that errors signalled by an invalid transaction are *not* propagated to the caller
      and the transaction is re-executed
 
-4) orelse and nested transactions, including tests
+4) implemented orelse and nested transactions, including tests
 
-3) (error 'retry-error ...) shows message "attempt to RETRY outside ATOMIC block"
+3) (error 'retry-error ...) now shows the message "attempt to RETRY outside ATOMIC block"
    when printed
 
-2) in atomic.lisp (run-once) added handler-case to capture errors signaled by tx
+2) in atomic.lisp (run-once) added handler-case to capture errors signaled by a transaction
 
 1) implemented ($ tvar) and (setf ($ tvar) value)
    for transactional access to tvars.
@@ -59,7 +86,7 @@ DONE:
    for example in cases transactional objects are too heavyweight
 
 
-WON'T DO:
+========== WON'T DO ==========
 10) move locks and notifications from a per-slot tvar to per-object data.
     Use a single slot or several one in transactional-object ?
     FOR THE MOMENT, NO.
@@ -77,4 +104,3 @@ WON'T DO:
      (orelse ...), and the former is clearer to understand.
      Also, doing this would make orelse implementation slower and even more
      complicated than what already is.
-

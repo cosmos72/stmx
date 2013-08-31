@@ -38,10 +38,12 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
                'define-constant-once)
 
  #+cmucl
- (add-features '(bt/lock-owner . mp::lock-process))
+ (add-features '(bt/lock-owner . mp::lock-process)
+               'define-constant-once)
 
  #+ccl
  (add-features '(bt/lock-owner . ccl::%%lock-owner))
+ ;;            ;; on CCL, 'define-constant-once causes test-suite to hang!
 
  #+sbcl
  (add-features #+compare-and-swap-vops '(atomic-ops . :sbcl)

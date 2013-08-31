@@ -15,6 +15,8 @@
 
 (in-package :stmx)
 
+(enable-#?-syntax)
+
 ;;;; * Transactional classes
 
 ;;;; ** Metaclasses
@@ -294,6 +296,22 @@ and alter its :type to also accept TVARs"
 
 
 
+(defmacro transactional ((defclass class-name direct-superclasses direct-slots &rest class-options))
+  "Define CLASS-NAME as a new transactional class.
+Use this macro to wrap a normal DEFCLASS as follows:
+\(TRANSACTIONAL (DEFCLASS class-name (superclasses) (slots) [options]))
+
+The effect is the same as DEFCLASS, plus:
+- by default, slots are transactional memory (implemented by TVARs)
+- it inherits also from TRANSACTIONAL-OBJECT
+- the metaclass is TRANSACTIONAL-CLASS"
+  `(,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
+     ,(adjust-transactional-slots-definitions direct-slots class-name direct-superclasses)
+     ,@class-options
+     #?+disable-optimize-slot-access (:optimize-slot-access nil)
+     (:metaclass transactional-class)))
+
+
 
 ;;;; ** Signalling unbound slots
 
@@ -333,10 +351,10 @@ and alter its :type to also accept TVARs"
 
         ;; It is a TVAR, return its value.
         ;; During transactions, reading from tvars is recorded to the current tlog.
-        (multiple-value-bind (value bound?) (peek-$ (the tvar obj))
-          (if bound?
-              value
-              (unbound-slot-error class instance slot)))
+        (let1 value ($ (the tvar obj))
+          (if (eq value +unbound-tvar+)
+              (unbound-slot-error class instance slot)
+              value))
     
         ;; Return the plain slot-value.
         obj)))
@@ -350,7 +368,6 @@ and alter its :type to also accept TVARs"
 
 (defmethod (setf slot-value-using-class) (value    (class transactional-class)
                                           instance (slot transactional-effective-slot))
-
   (if (and (transactional-slot? slot)
            (or (recording?) (hide-tvars?)))
     

@@ -1,0 +1,12 @@
+Changes in STMX 1.9.0:
+* Added support for hardware transactions on CPUs that support Intel
+  Transactional Synchronization Extensions (TSX)
+  
+* Implemented global clock API and implementations for GV1, GV5, GV6.
+  The latter still needs to be optimized.
+
+* Small API change: renamed $ and (SETF $) to $-SLOT and (SETF $-SLOT) respectively.
+  They behaves as before the rename: ($-SLOT VAR) signals an error if VAR is unbound.
+
+  The functions $ and (SETF $) still exist but now have slightly different - and faster -
+  behaviour: if VAR is unbound, ($ VAR) returns +UNBOUND-TVAR+ instead of signaling an error.

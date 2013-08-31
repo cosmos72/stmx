@@ -1,8 +1,18 @@
+Note: only historical bugs are listed in this file.
+For up-to-date buglist, see https://github.com/cosmos72/stmx/issues
+
+
 KNOWN BUGS
 
-none :)
+see https://github.com/cosmos72/stmx/issues
+
+
 
 FIXED BUGS:
+
+7) fixed race condition in GV6/%UPDATE-STAT - it was also the cause of bug 6
+
+6) with HW-TRANSACTIONS enabled, test suite no longer hangs - thanks to bugfix 7.
 
 5) consistent reads were not fully guaranteed. The implementation allowed
    transactions to read inconsistent TVARs in some circumstances.

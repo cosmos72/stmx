@@ -123,7 +123,7 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.9 (x86_64), STMX 1.3.3
      <td>(0.142+N*0.0098)</td><td>(0.0226+N*0.0036)</td><td>(0.0260+N*0.0016)</td></tr>
 
  <tr><td>orelse empty     </td><td><code>(orelse)</code></td>
-     <td>0.043</td><td>0.025</td><td>0.021</td></tr>
+     <td>0.043</td><td>0.026</td><td>0.021</td></tr>
 
  <tr><td>orelse unary     </td><td><code>(orelse ($ v))</code></td>
      <td>0.234</td><td>0.266</td></tr>
@@ -143,11 +143,11 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.9 (x86_64), STMX 1.3.3
 
  <tr><td>tmap read-1</td>
      <td><code>(get-gmap tm 1)</code></td>
-     <td></td></td><td>0.180</td></tr>
+     <td>0.236</td><td>0.169</td></tr>
 
  <tr><td>tmap read-write-1</td>
      <td><code>(incf (get-gmap tm 1))</code></td>
-     <td>0.531</td><td>0.385</td></tr>
+     <td>0.531</td><td>0.372</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
      <td><code>(when (zerop (mod i   10)) (clear-gmap tm))<br>

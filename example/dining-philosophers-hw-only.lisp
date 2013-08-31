@@ -66,10 +66,9 @@
 
   ;; also keep track of failed lock attempts for demonstration purposes.
   
-  (prog ((attempts 0)
-         (hunger -1)) ;; unknown
+  (prog ((hunger -1)) ;; unknown
 
-   (declare (type fixnum attempts hunger))
+   (declare (type fixnum hunger))
 
    start
    (decf (the fixnum (rest plate)))
@@ -86,11 +85,7 @@
      (transaction-end))
     
    (when (= -1 hunger)
-     (incf attempts)
-     (cond
-       #+sbcl
-       ((<= attempts 4) (sb-ext:spin-loop-hint))
-       (t               (bt:thread-yield)))
+     (bt:thread-yield)
      (go start))
    
    (return hunger)))

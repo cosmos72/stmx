@@ -43,6 +43,11 @@
            #:retry
            #:orelse    #:run-orelse
 
+           ;; hardware transactions.
+           #:hw-atomic2
+	   #:hw-transaction-supported?
+	   #:hw-transaction-supported-and-running?
+
            #:transactional
            #:transaction
            #:transaction?
@@ -58,7 +63,11 @@
 
            ;; low-level API to use TVARs directly
            #:tvar #:+unbound-tvar+
-           #:$ #:$-tx #:$-notx ;; also (setf $), (setf $-tx) and (setf $-notx)
+           #:$-slot #:$ #:$-tx #:$-hwtx #:$-notx
+	   ;; also (setf $-slot) (setf $) (setf $-tx)
+	   ;; (setf $-hwtx) and (setf $-notx)
+
            #:bound-$? #:unbind-$
 
            #:fast-atomic))
+

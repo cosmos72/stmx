@@ -34,6 +34,7 @@
 
            #:transaction-begin #:transaction-end
            #:transaction-abort #:transaction-running-p
+           #:transaction-rerun-may-succeed-p
 
            #:+transaction-started+ #:+transaction-user-abort+))
 

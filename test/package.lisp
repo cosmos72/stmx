@@ -65,5 +65,5 @@
 
 (defun configure-log4cl ()
   (log:config :clear :sane :this-console ;; :daily "log.txt"
-              :pattern "[%D{%H:%M:%S}] [%-5P] <%c{}{}{:downcase}> {%t} %m%n")
+              :pattern "%D{%H:%M:%S} %-5p  <%c{}{}{:downcase}> {%t} %m%n")
   (log:config :info))

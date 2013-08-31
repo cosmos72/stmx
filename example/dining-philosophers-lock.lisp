@@ -15,7 +15,7 @@
 
 (in-package :cl-user)
 
-(defpackage #:stmx.example2
+(defpackage #:stmx.example4
   (:use #:cl)
 
   (:import-from #:stmx.lang
@@ -23,7 +23,7 @@
                 #:start-thread #:wait4-thread))
                 
 
-(in-package :stmx.example2)
+(in-package :stmx.example4)
 
 
 ;; standard bordeaux-threads lock. for this simple example,

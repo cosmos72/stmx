@@ -16,10 +16,10 @@
 (in-package :cl-user)
 
 
-(defpackage #:stmx.example4
+(defpackage #:stmx.example5
   (:use #:cl #:sb-transaction  #:stmx.lang))
                 
-(in-package :stmx.example4)
+(in-package :stmx.example5)
 
 
 (deftype non-negative-fixnum () '(and (integer 0) fixnum))

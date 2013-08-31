@@ -25,16 +25,17 @@ and aim at resolving the tension between granularity and concurrency.
 
 STMX now supports hardware memory transactions in addition to
 classic software ones. It uses Transactional Synchronization
-Extensions (TSX) available on the following Intel x86_64 processors
+Extensions (TSX) available at least on the following Intel x86_64 processors
 released in June 2013:
 
 - Intel Core i5 4570
 - Intel Core i5 4670
 - Intel Core i7 4770
+- ...
 
 To actually use hardware memory transactions with STMX, you will need:
 
-- one of the above CPUs
+- a CPU supporting Intel TSX, for example one from the above list
 - a 64-bit unix-like OS (currently tested on Debian GNU/Linux x86_64)
 - a 64-bit installation of Steel Bank Common Lisp (SBCL) version 1.0.55 or later
   (currently tested on SBCL for x86_64, version 1.1.9)
@@ -42,11 +43,12 @@ To actually use hardware memory transactions with STMX, you will need:
 - the latest STMX version - download it from [GitHub](https://github.com/cosmos72/stmx)
   as described in **Installation and loading** below
 
-The current hardware memory transactions implementation is still young and not very
-optimized, yet it can accelerate short transactions up to 4-5 times while seamlessly
-falling back on software transactions when the hardware limits are exceeded.
-Experiments with hand-optimized code (not yet included in STMX) show that the
-maximum possible performance increase is 7-8 times.
+The current hardware memory transactions implementation is very fast, yet it
+still has room for optimizations. Currently, it can accelerate short
+transactions up to 4-5 times while seamlessly falling back on software
+transactions when the hardware limits are exceeded. Experiments with
+hand-optimized code (not yet included in STMX) show that the maximum possible
+performance increase is 7-8 times.
 
 STMX also includes [SB-TRANSACTION](sb-transaction), a standalone library
 that does **not** depend on STMX and provides hardware-only memory transactions

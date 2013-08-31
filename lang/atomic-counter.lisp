@@ -81,14 +81,14 @@
        ;; locking version
        (with-lock (,place-mutex)
          (the atomic-counter-num
-           #?+fixnum-is-large-powerof2
            ;; fast modulus arithmetic
+           #?+fixnum-is-large-powerof2
            (setf ,place (logand most-positive-fixnum (+ ,place ,delta-var)))
       
            #?-fixnum-is-large-powerof2
            (progn
-             #?+fixnum-is-large
              ;; fixnum arithmetic
+             #?+fixnum-is-large
              (setf ,place
                    (let ((n ,place))
                      (the atomic-counter-num
@@ -100,7 +100,6 @@
              ;; general version: slow bignum arithmetic
              (incf ,place ,delta-var)))))))
 
-       
 
 (defun incf-atomic-counter (counter &optional (delta 1))
   "Increase atomic COUNTER by DELTA and return its new value."

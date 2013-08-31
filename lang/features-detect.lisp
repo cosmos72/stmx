@@ -30,10 +30,12 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
  (add-features 'disable-optimize-slot-access)
 
  #+abcl
- (add-features '(bt/lock-owner . :abcl))
+ (add-features '(bt/lock-owner . :abcl)
+               'define-constant-once)
 
  #+ecl
- (add-features '(bt/lock-owner . mp::lock-owner))
+ (add-features '(bt/lock-owner . mp::lock-owner)
+               'define-constant-once)
 
  #+cmucl
  (add-features '(bt/lock-owner . mp::lock-process))
@@ -45,14 +47,12 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
  (add-features #+compare-and-swap-vops '(atomic-ops . :sbcl)
                #+memory-barrier-vops   '(mem-rw-barriers . :sbcl)
                ;; usually, bt/lock-owner it not needed on SBCL: the combo
-               ;; ATOMIC-OPS + MEM-RW-BARRIERS provide FAST-MUTEX, which implements
+               ;; ATOMIC-OPS + MEM-RW-BARRIERS provides FAST-MUTEX, which implements
                ;; its own mutex-owner, without resorting to bt/lock-owner
                '(bt/lock-owner . sb-thread::mutex-owner)
 
-               #?+(symbol sb-ext defglobal)
-               '(define-global . sb-ext:defglobal)))
-
-
+               #?+(symbol sb-ext defglobal) '(define-global . sb-ext:defglobal)
+               'define-constant-once))
 
 
 
@@ -171,5 +171,22 @@ in all threads, i.e. it will not be special nor dynamically bound.
 This is implemented either with a compiler-specific macro (for example
 SB-EXT:DEFGLOBAL on SBCL), or as DEFVAR if no better implementation is available."
     
-    (let1 define-global-impl (get-feature 'define-global 'defvar)
-      `(,define-global-impl ,name ,value ,@(when docp `(,doc))))))
+    (let1 impl (get-feature 'define-global 'defvar)
+      `(,impl ,name ,value ,@(when docp `(,doc)))))
+
+  
+  (defmacro define-constant-once (name value &optional (doc nil docp))
+    "Same as DEFCONSTANT, but evaluate VALUE only once:
+re-executing again the same (DEFINE-CONSTANT-EVAL-ONCE name ...) has no effects."
+
+    (let1 impl (get-feature 'define-constant-once 'defvar)
+      (case impl
+        ((t)
+         `(defconstant ,name 
+            (if (boundp ',name) (symbol-value ',name) ,value)
+            ,@(when docp `(,doc))))
+        (otherwise
+          `(,impl ,name ,value ,@(when docp `(,doc))))))))
+
+
+

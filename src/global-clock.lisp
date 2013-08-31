@@ -66,7 +66,7 @@ is reserved as \"prevent HW transactions\"")
 
            
 (declaim (type gv156 +gv+))
-(define-constant-eval-once +gv+ (make-gv156))
+(define-constant-once +gv+ (make-gv156))
 
 
 (declaim (type lv156 *lv*))

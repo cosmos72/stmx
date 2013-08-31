@@ -76,6 +76,10 @@ Return T if F was present *FEATURE-LIST*, otherwise return NIL."
                         *feature-list*))
        t)))
 
+ (defun clear-features ()
+   "Remove all features from *FEATURE-LIST*."
+   (setf *feature-list* nil))
+
  (defun add-feature (f &optional (value t))
    "Add feature F and its VALUE into *FEATURE-LIST*, unless F is already present.
 Return (values T VALUE) if F was actually inserted in *FEATURE-LIST*,

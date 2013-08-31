@@ -59,7 +59,7 @@
 
 (eval-when (:compile-toplevel)
   
-  (define-constant-eval-once *bt/join-thread-tested*
+  (define-constant-once *bt/join-thread-tested*
     (progn
       (let ((x (gensym)))
         (when (eq x (bt:join-thread (bt:make-thread (lambda () x))))

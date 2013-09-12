@@ -21,9 +21,9 @@ threads until it commits.
 Memory transactions gives freedom from deadlocks, automatic roll-back on failure,
 and aim at resolving the tension between granularity and concurrency.
 
-### Latest news, 27th July 2013
+### Latest news, 31st August 2013
 
-STMX now supports hardware memory transactions in addition to
+Since version 1.9.0, STMX supports hardware memory transactions in addition to
 classic software ones. It uses Transactional Synchronization
 Extensions (TSX) available at least on the following Intel x86_64 processors
 released in June 2013:
@@ -50,9 +50,11 @@ transactions when the hardware limits are exceeded. Experiments with
 hand-optimized code (not yet included in STMX) show that the maximum possible
 performance increase is 7-8 times.
 
-STMX also includes [SB-TRANSACTION](sb-transaction), a standalone library
-that does **not** depend on STMX and provides hardware-only memory transactions
-on CPUs from the list above.
+### News, 27th July 2013
+
+Since version 1.3.3, STMX also includes [SB-TRANSACTION](sb-transaction), a
+standalone library that does **not** depend on STMX and provides hardware-only
+memory transactions on CPUs that support Intel TSX instructions.
 It is a low-level library providing raw access to the new CPU instructions
 for hardware transactions.
 Its performance reaches the theoretical peak supported by the underlying CPU,
@@ -114,9 +116,11 @@ If all goes well, this will automatically download and install the
 - `bordeaux-threads`
 - `trivial-garbage`
 
-Note: as of July 2013, the stable branch of STMX does **not**
-yet contain support for hardware memory transactions - to get them,
-download the latest version from GitHub (see below).
+Note: as of August 2013, Quicklisp contains STMX version 1.3.3, which does
+**not** yet contain support for hardware memory transactions - to get them,
+download the latest version from GitHub (see below). Quicklisp will probably
+include STMX 1.9.0, which supports hardware transactions, in the next
+update.
 
 Since STMX was added to QuickLisp quite recently (15 June 2013), it
 may happen that your Quicklisp installation can't find it. In such
@@ -147,6 +151,12 @@ If all goes well, it will automatically load STMX and its dependencies.
 Note: unless you know what you are doing, do not try to load different
 STMX versions one after the other from the same REPL - strange things
 may happen.
+
+### Other versions - from [Sourceforge](http://sourceforge.net/projects/stmx/)
+
+All the stable versions of STMX, present and past, are also available from
+[Sourceforge](http://sourceforge.net/projects/stmx/files/), including version
+1.9.0.
 
 ### Troubleshooting
 
@@ -576,9 +586,9 @@ features are available:
    methods:
    - `(tvar [initial-value])` Create a new TVAR, optionally bound to a value.
    - `($-slot var)` Get the value of VAR. Signals an error if VAR is not bound
-      to any value. Note: before STMX 2.0.0, this function was named `($ var)`.
+      to any value. Note: before STMX 1.9.0, this function was named `($ var)`.
    - `(setf ($-slot var) value)` Store VALUE into VAR.
-      Note: before STMX 2.0.0, this function was named `(setf ($ var) value)`.
+      Note: before STMX 1.9.0, this function was named `(setf ($ var) value)`.
    - `(bound-$? var)` Return true if VAR is bound to some value.
    - `(unbind-$ var)` Unbind VAR from its value.
    - `(value-of var)` getter method, equivalent to `($-slot var)`

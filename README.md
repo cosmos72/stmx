@@ -155,8 +155,8 @@ may happen.
 ### Other versions - from [Sourceforge](http://sourceforge.net/projects/stmx/)
 
 All the stable versions of STMX, present and past, are also available from
-[Sourceforge](http://sourceforge.net/projects/stmx/files/), including version
-1.9.0.
+[Sourceforge](http://sourceforge.net/projects/stmx/files/stmx/), including
+version 1.9.0.
 
 ### Troubleshooting
 

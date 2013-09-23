@@ -27,31 +27,45 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 (eval-always
   
  #+lispworks ;; incomplete porting
- (add-features 'disable-optimize-slot-access)
+ (add-features 'slot-access.disable-optimize)
 
  #+abcl
  (add-features '(bt/lock-owner . :abcl)
+               '(bt/with-lock . :fast)
+               #+(or x86 x8664 x86-64 x86_64) '(mem-rw-barriers . :trivial)
                'define-constant-once)
 
  #+ecl
  (add-features '(bt/lock-owner . mp::lock-owner)
-               'define-constant-once)
+               #+never 'define-constant-once) ;; bugged?
 
  #+cmucl
  (add-features '(bt/lock-owner . mp::lock-process)
+               '(bt/with-lock . :fast)
+               #+(or x86 x8664 x86-64 x86_64) '(mem-rw-barriers . :trivial)
                'define-constant-once)
 
  #+ccl
- (add-features '(bt/lock-owner . ccl::%%lock-owner))
- ;;            ;; on CCL, 'define-constant-once causes test-suite to hang!
+ (add-features '(bt/lock-owner . ccl::%%lock-owner)
+               '(bt/with-lock . :fast)
+               #+(or x86 x8664 x86-64 x86_64) '(mem-rw-barriers . :trivial)
+               ;; on CCL, 'define-constant-once causes test-suite to hang!
+               #+never 'define-constant-once)
+               
 
  #+sbcl
  (add-features #+compare-and-swap-vops '(atomic-ops . :sbcl)
                #+memory-barrier-vops   '(mem-rw-barriers . :sbcl)
+
+               ;; usually not needed, SBCL has #+memory-barrier-vops
+               #-memory-barrier-vops
+               #+(or x86 x8664 x86-64 x86_64) '(mem-rw-barriers . :trivial)
+
                ;; usually, bt/lock-owner it not needed on SBCL: the combo
                ;; ATOMIC-OPS + MEM-RW-BARRIERS provides FAST-MUTEX, which implements
                ;; its own mutex-owner, without resorting to bt/lock-owner
                '(bt/lock-owner . sb-thread::mutex-owner)
+               '(bt/with-lock . :fast)
 
                #?+(symbol sb-ext defglobal) '(define-global . sb-ext:defglobal)
                'define-constant-once))
@@ -76,20 +90,22 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
   ;;
   ;; note that in this case the memory barrier functions/macros do NOT
   ;; stop the compiler from reordering...
-  #+(or x86 x8664 x86-64 x86_64)
-  (unless (feature? 'mem-rw-barriers)
-    (add-feature 'mem-rw-barriers :trivial))
+  ;;
+  ;; Summarizing, for most Lisp compilers (ECL being a notable exception)
+  ;; 'mem-rw-barriers feature can be set to :trivial on x86 and x86-64
+  ;; (unless a better implementation is available, ovbviously)
 
 
   (unless (eql (get-feature 'mem-rw-barriers) :trivial)
-    ;; FAST-MUTEX requires atomic compare-and-swap plus real memory barriers.
+    ;; FAST-MUTEX requires atomic compare-and-swap plus *real* memory barriers.
     ;; Also, fast-mutex provides the preferred implementation of mutex-owner,
     ;;   which does not use bt/lock-owner
     (if (all-features? 'atomic-ops 'mem-rw-barriers)
-        (add-features 'fast-mutex '(mutex-owner . :fast-mutex))))
+        (add-features 'fast-mutex
+                      '(mutex-owner . :fast-mutex))))
 
 
-  ;; if at least fake memory read/write barriers are available, bt/lock-owner
+  ;; if mem-rw-barriers (even trivial ones) are available, bt/lock-owner
   ;; can be used as concurrency-safe mutex-owner even without atomic-ops
   (unless (feature? 'mutex-owner)
     (when (all-features? 'mem-rw-barriers 'bt/lock-owner)
@@ -97,9 +113,11 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 
 
 
-  ;; hardware transactions are still EXPERIMENTAL.
+  ;; hardware transactions need:
+  ;; 1) transactional CPU instructions (currently Intel TSX)
+  ;; 2) memory barriers (even trivial ones will do)
+  ;; 3) mutex-owner
   ;;
-  ;; do we have memory barriers (even trivial ones) and mutex-owner?
   (when (all-features? 'mem-rw-barriers 'mutex-owner)
     ;; do we also have the sb-transaction package exposing CPU hardware transactions?
     #?+(symbol sb-transaction transaction-supported-p)
@@ -149,15 +167,12 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
 
 
 
-  ;; use global-clock GV1 by default, but switch to GV5 for hardware transactions.
+  ;; use global-clock GV1 by default, but switch to GV6 for hardware transactions.
   ;;
-  ;; Note: using the global-clock GV5 with software transactions
-  ;; reduces performance by ~50% because it causes a lot of (rerun),
-  ;; so it makes sense to use it only together with hardware transactions
-  ;; (GV1 is not suitable for that)
-  ;;
-  ;; Note: global-clock GV6 is supposed to alleviate the problem above,
-  ;; but is still under testing.
+  ;; Note: GV6 adaptively switches between global-clock GV1 and GV5,
+  ;;       with GV1 being unsuitable for hardware transactions
+  ;;       and GV5 reducing performance of software transactions by ~50%
+  ;;       because it causes a lot of (rerun)
   (override-feature 'global-clock 
      (if (feature? 'hw-transactions) :gv6 :gv1))
 

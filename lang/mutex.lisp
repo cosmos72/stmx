@@ -21,13 +21,19 @@
 
 (defmacro with-lock ((lock) &body body)
   "Faster replacement for BORDEAUX-THREADS:WITH-LOCK-HELD."
+
+  #?+(eql bt/with-lock :fast)
   (with-gensym lock-var
     `(let ((,lock-var ,lock))
        (unwind-protect
             (progn
               (bt:acquire-lock ,lock-var)
               ,@body)
-         (bt:release-lock ,lock-var)))))
+         (bt:release-lock ,lock-var))))
+
+  #?-(eql bt/with-lock :fast)
+  `(bt:with-lock-held (,lock)
+     ,@body))
 
 
 

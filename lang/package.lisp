@@ -33,6 +33,7 @@
            #:log.trace    #:log.debug   #:log.make-logger
 
            ;; bordeaux-threads helpers
+           #:start-multithreading
            #:start-thread #:wait4-thread
            #:*current-thread*
            #:with-lock

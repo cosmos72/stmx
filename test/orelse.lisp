@@ -170,6 +170,9 @@ The test first creates the threads, then atomically puts the four values
 and finishes after each thread executed ITERATIONS loops, returning the final cell values."
 
   (declare (type fixnum iterations))
+
+  (start-multithreading)
+
   (let* ((names '("A" "B" "C" "D"))
          (cells (loop for n in names collect (new 'tcell)))
          

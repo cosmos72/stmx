@@ -54,51 +54,53 @@
 (defvar *current-thread* (current-thread))
 
 (eval-always
-  (ensure-thread-initial-bindings '(*current-thread* . (current-thread))))
+  (ensure-thread-initial-bindings '(*current-thread* . (current-thread)))
+
+  ;; on CMUCL, (bordeaux-threads:start-multiprocessing) is blocking!
+  #-cmucl (bt:start-multiprocessing))
 
 
-(eval-when (:compile-toplevel)
-  
-  (define-constant-once *bt/join-thread-tested*
-    (progn
-      (let ((x (gensym)))
-        (when (eq x (bt:join-thread (bt:make-thread (lambda () x))))
-          (add-feature 'bt/join-thread-is-sane)))
-      t)))
+(defun start-multithreading ()
+  ;; on CMUCL, (bordeaux-threads:start-multiprocessing) is blocking!
+  #-cmucl (bt:start-multiprocessing))
 
 
-
-#?-bt/join-thread-is-sane
 (defstruct wrapped-thread
   (result nil)
   (thread (current-thread) :type thread))
 
 
+
 (defun start-thread (function &key name (initial-bindings bt:*default-special-bindings*))
 
-  #?+bt/join-thread-is-sane
-  (make-thread function :name name :initial-bindings initial-bindings)
+  (unless (feature? 'bt/join-thread)
+    (add-feature 'bt/join-thread
+                 (let ((x (gensym)))
+                   (start-multithreading)
+                   (if (eq x (bt:join-thread (bt:make-thread (lambda () x))))
+                       :sane
+                       :broken))))
 
-  #?-bt/join-thread-is-sane
-  (let1 th (make-wrapped-thread)
-    (setf (wrapped-thread-thread th)
-          (make-thread (lambda ()
-                         (setf (wrapped-thread-result th)
-                               (funcall function)))
-                       :name name
-                       :initial-bindings initial-bindings))
-    th))
+  (if (eql :sane (get-feature 'bt/join-thread))
+      
+      (make-thread function :name name :initial-bindings initial-bindings)
 
-#?+bt/join-thread-is-sane
+      (let1 th (make-wrapped-thread)
+            (setf (wrapped-thread-thread th)
+                  (make-thread (lambda ()
+                                 (setf (wrapped-thread-result th)
+                                       (funcall function)))
+                               :name name
+                               :initial-bindings initial-bindings))
+            th)))
+
 (defun wait4-thread (th)
-  (declare (type thread th))
-  (join-thread th))
 
+  (if (eql :sane (get-feature 'bt/join-thread))
+      
+      (join-thread th)
 
-#?-bt/join-thread-is-sane
-(defun wait4-thread (th)
-  (declare (type wrapped-thread th))
-
-  (join-thread (wrapped-thread-thread th))
-  (wrapped-thread-result th))
+      (progn
+        (join-thread (wrapped-thread-thread th))
+        (wrapped-thread-result th))))
 

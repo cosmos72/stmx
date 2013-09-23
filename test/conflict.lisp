@@ -18,7 +18,7 @@
 (def-suite conflict-suite :in suite)
 (in-suite conflict-suite)
 
-(test conflict
+(defun conflict-test ()
   (let ((var (tvar 5))
         (counter 0))
     
@@ -39,8 +39,10 @@
           
     (is (= 11 ($ var))))) ;; 10 for "(setf (raw-value-of var) 10)" plus 1 for "(incf ($ var))"
 
+(test conflict
+  (conflict-test))
 
-(test conflict-1
+(defun conflict-test-1 ()
   (let ((var (tvar 0)))
 
     (atomic
@@ -72,8 +74,10 @@
 
     (is (= 2 ($ var)))))
 
+(test conflict-1
+  (conflict-test-1))
 
-(test conflict-2
+(defun conflict-test-2 ()
   (let ((a (tvar 0)) ;; transactions in this example maintain
         (b (tvar 0)) ;; the invariant (= ($ a) ($ b))
         (first-run t))
@@ -101,6 +105,9 @@
     (is (= 3 ($ a)))
     (is (= 3 ($ b)))))
 
+
+(test conflict-2
+  (conflict-test-2))
 
 (defstruct ipc
   (command  t   :type (or (member t nil) function))
@@ -170,7 +177,7 @@
 
         
 (defun ipc-start-thread (ipc)
-  (bt:make-thread (lambda () (ipc-run ipc))))
+  (start-thread (lambda () (ipc-run ipc))))
 
 (defun ipc-stop-thread (ipc)
   (ipc-call ipc nil))
@@ -179,6 +186,8 @@
             
 
 (defun conflict-locked-test ()
+  (start-multithreading)
+
   (let ((a (tvar 0)) ;; transactions in this example maintain
         (b (tvar 0)) ;; the invariant (= ($ a) ($ b))
 	(ipc (make-ipc))

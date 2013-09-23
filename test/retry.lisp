@@ -67,6 +67,9 @@
 
 (defun retry-thread4 (&key (two-tokens nil) (iterations 1))
   (declare (type fixnum iterations))
+
+  (start-multithreading)
+
   (let ((c1 (new 'tcell)) ;; cells have unbound value
         (c2 (new 'tcell)))
 

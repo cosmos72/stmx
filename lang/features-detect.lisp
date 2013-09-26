@@ -40,10 +40,10 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL."))
                #+never 'define-constant-once) ;; bugged?
 
  #+cmucl
- (add-features '(bt/lock-owner . mp::lock-process)
-               '(bt/with-lock . :fast)
-               #+(or x86 x8664 x86-64 x86_64) '(mem-rw-barriers . :trivial)
-               'define-constant-once)
+ (add-features '(bt/lock-owner . mp::lock-process))
+               ;; '(bt/with-lock . :fast)
+               ;; #+(or x86 x8664 x86-64 x86_64) '(mem-rw-barriers . :trivial)
+               ;; 'define-constant-once
 
  #+ccl
  (add-features '(bt/lock-owner . ccl::%%lock-owner)

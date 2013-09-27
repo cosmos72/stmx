@@ -97,7 +97,7 @@ for debugging purposes. please use ($-slot var) instead."
 
 
 
-(declaim (ftype (function (tvar) (values fixnum t)) %tvar-version-and-value)
+(declaim (ftype (function (tvar) (values atomic-counter-num t)) %tvar-version-and-value)
          (inline
            %tvar-version-and-value))
 
@@ -122,7 +122,8 @@ for debugging purposes. please use ($-slot var) instead."
 
 
 
-(declaim (ftype (function (tvar) (values t fixnum bit)) tvar-value-and-version-or-fail)
+(declaim (ftype (function (tvar) (values t atomic-counter-num bit))
+		tvar-value-and-version-or-fail)
          (inline
            tvar-value-and-version-or-fail))
 
@@ -141,7 +142,7 @@ for debugging purposes. please use ($-slot var) instead."
   (multiple-value-bind (version0+lock value) (%tvar-version-and-value var)
     (let1 version1+lock (progn (mem-read-barrier) (tvar-version var))
       
-      (declare (type fixnum version0+lock version1+lock))
+      (declare (type atomic-counter-num version0+lock version1+lock))
 
       (let* ((version1 (logand version1+lock (lognot 1)))
              (lock1    (logand version1+lock 1))
@@ -161,7 +162,7 @@ for debugging purposes. please use ($-slot var) instead."
             (version1 (tvar-version var)))
         
         (declare (type boolean free?)
-                 (type fixnum version0 version1))
+                 (type atomic-counter-num version0 version1))
 
         (let1 fail (if (and free? (= version0 version1)) 0 1)
 
@@ -176,7 +177,7 @@ for debugging purposes. please use ($-slot var) instead."
         (multiple-value-bind (version1 value1) (%tvar-version-and-value var)
 
           (declare (type boolean free?)
-                   (type fixnum version0 version1))
+                   (type atomic-counter-num version0 version1))
 
           (let1 fail (if (and free?
                               (eq value0 value1)
@@ -197,7 +198,8 @@ for debugging purposes. please use ($-slot var) instead."
 
 
 
-(declaim (ftype (function (tvar t fixnum) (values t)) set-tvar-value-and-version)
+(declaim (ftype (function (tvar t atomic-counter-num) (values t))
+		set-tvar-value-and-version)
          (inline
            set-tvar-value-and-version))
 
@@ -205,7 +207,7 @@ for debugging purposes. please use ($-slot var) instead."
   "Set the VALUE and VERSION of VAR. If lock is a bit inside TVAR version,
 also set it (which may unlock VAR!). Return VALUE."
   (declare (type tvar var)
-           (type fixnum version))
+           (type atomic-counter-num version))
 
   (progn
     ;; if we have memory barriers, we MUST use them
@@ -240,7 +242,7 @@ also set it (which may unlock VAR!). Return VALUE."
 
   #?+(eql tvar-lock :bit)
   (let1 version (progn (mem-read-barrier) (the version-type (tvar-version var)))
-    (declare (type fixnum version))
+    (declare (type atomic-counter-num version))
     (when (zerop (logand version 1))
       (let* ((new-version (the version-type (logior version 1)))
              (old-version (atomic-compare-and-swap (tvar-version var)

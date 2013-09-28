@@ -31,14 +31,12 @@ released in June 2013:
 - Intel Core i5 4570
 - Intel Core i5 4670
 - Intel Core i7 4770
-- ...
 
 To actually use hardware memory transactions with STMX, you will need:
 
 - a CPU supporting Intel TSX, for example one from the above list
-- a 64-bit unix-like OS (currently tested on Debian GNU/Linux x86_64)
+- a 64-bit OS (currently tested on Debian GNU/Linux x86_64)
 - a 64-bit installation of Steel Bank Common Lisp (SBCL) version 1.0.55 or later
-  (currently tested on SBCL for x86_64, version 1.1.9)
   Note: x86_64 is often named AMD64 - they are the same thing
 - the latest STMX version - download it from [GitHub](https://github.com/cosmos72/stmx)
   as described in **Installation and loading** below
@@ -90,10 +88,15 @@ STMX is currently tested on the following Common Lisp implementations:
 * CCL   version 1.9-r15769M  (x86)    on Debian GNU/Linux 7.0  (x86_64)
 * CCL   version 1.9-dev-r15475M-trunk (LinuxARM32) on Raspbian GNU/Linux (armhf) Raspberry Pi
 * CMUCL version 20d Unicode  (x86)    on Debian GNU/Linux 7.0  (x86_64)
-* ECL   version 13.5.1       (x86_64) on Debian GNU/Linux 7.0  (x86_64)
 
-It will probably work on several other Common Lisp implementations as long as they support
-log4cl, closer-mop, bordeaux-threads and trivial-garbage, but the author gives no guarantees.
+There are known problems running STMX on the following implementations,
+see (doc/supported-systems.md) for details:
+
+* ECL   version 13.5.1, on both x86 and x86_64
+
+STMX will probably work on several other Common Lisp implementations as long as
+they support log4cl, closer-mop, bordeaux-threads and trivial-garbage,
+but the author gives no guarantees.
 
 
 Installation and loading

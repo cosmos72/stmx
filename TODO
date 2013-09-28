@@ -1,5 +1,8 @@
 ========== TO DO ==========
 
+21) stop overriding method SHARED-INITIALIZE (not allowed by CLOS MOP standard)
+    override INITIALIZE-INSTANCE instead.
+
 17) automatically expand $ to $-tx, $-hwtx or $-notx, and similarly expand
     (setf $...) and user-defined functions
 
@@ -16,6 +19,12 @@
 
 8) optimize ORELSE. The current implementation is quite naive,
    it makes a full copy of the current transaction's read and write sets.
+   
+   Possible optimization: perform a shallow copy of transaction's read
+   and write sets, i.e. copy the vectors containing references to TXPAIR
+   but do NOT clone the TXPAIRs. It works because TXPAIRs are immutable
+   during a transaction.
+
 
 ========== DONE ==========
 

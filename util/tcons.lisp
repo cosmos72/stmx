@@ -132,5 +132,4 @@ Removes and returns the first element in PLACE."
          (write-string " ")
          (setf obj rest)))
   (write-string ")"))
-  
-       
+

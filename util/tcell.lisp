@@ -24,6 +24,12 @@
    ((value :initarg :value
            :initform *empty-tcell*))))
 
+(declaim (ftype (function (t) (values tcell &optional)) tcell))
+
+(defun tcell (value)
+  "Create and return a new TCELL."
+  (new 'tcell :value value))
+
 ;; no need to wrap empty? in a transaction:
 ;; (_ cell value) is atomic, transaction aware, and performs a single read
 (defmethod empty? ((cell tcell))

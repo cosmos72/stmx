@@ -413,12 +413,11 @@ The effect is the same as DEFCLASS, plus:
 
 ;;;; ** Transactional objects initialization
 
+(defun wrap-transactional-slots (instance initargs)
+  (declare (type transactional-object instance)
+           (type list initargs))
 
-(defmethod shared-initialize ((instance transactional-object)
-                              slot-names &rest initargs)
-  "For every transactional slot, wrap its initarg into a tvar."
-
-  ;;(log.trace "transactional-object ~A, slot-names = ~A~%  initargs = ~{~A~^ ~}" instance slot-names initargs)
+  ;;(log.trace "transactional-object ~A, initargs = ~{~A~^ ~}" instance initargs)
 
   (let1 initargs (copy-list initargs)
     (dolist (slot (class-slots (class-of instance)))
@@ -433,8 +432,28 @@ The effect is the same as DEFCLASS, plus:
               (return))))))
 
     ;;(log.trace "updated initargs = ~{~A~^ ~}" initargs)
-              
+    initargs))
+
+
+
+(defmethod initialize-instance ((instance transactional-object)
+                                &rest initargs &key &allow-other-keys)
+  "For every transactional slot, wrap its initarg into a tvar."
+
+  (let1 initargs (wrap-transactional-slots instance initargs)
+
     ;; Disable recording so that slots initialization is NOT recorded to the log.
     ;; Show-tvars so that (setf slot-value) will set the tvar, not its contents
     (without-recording-with-show-tvars
-      (apply #'call-next-method instance slot-names initargs))))
+      (apply #'call-next-method instance initargs))))
+
+(defmethod reinitialize-instance ((instance transactional-object)
+                                  &rest initargs &key &allow-other-keys)
+  "For every transactional slot, wrap its initarg into a tvar."
+
+  (let1 initargs (wrap-transactional-slots instance initargs)
+
+    ;; Disable recording so that slots initialization is NOT recorded to the log.
+    ;; Show-tvars so that (setf slot-value) will set the tvar, not its contents
+    (without-recording-with-show-tvars
+      (apply #'call-next-method instance initargs))))

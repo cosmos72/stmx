@@ -33,15 +33,13 @@
            :type function :reader pred-of))
 
    (:documentation "Priority queue implemented with a binary min-heap.
-Elements that compare smaller than others will be the first (top) in the heap."))
-
+Elements that compare smaller will be the first (top) in the heap."))
 
 
 (defmethod initialize-instance :after ((q bheap) &key &allow-other-keys)
   "Initialize bheap Q."
   (setf (length-of q) (length (vector-of q)))
   (heapify-bheap q))
-             
 
 ;;;; ** bheap private functions
 

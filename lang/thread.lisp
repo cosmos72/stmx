@@ -57,24 +57,28 @@
   (ensure-thread-initial-bindings '(*current-thread* . (current-thread)))
 
   (defun start-multithreading ()
-    ;; on CMUCL, (bordeaux-threads:start-multiprocessing) is blocking!
+    ;; on CMUCL, (bt:start-multiprocessing) is blocking!
     #-cmucl (bt:start-multiprocessing))
 
   (start-multithreading)
 
-  #?-bt/join-thread
-  (add-feature 'bt/join-thread
-               (let ((x (gensym)))
-                 (if (eq x (bt:join-thread (bt:make-thread (lambda () x))))
-                     :sane
-                     :broken))))
+  (defvar *bt/join-thread/tested* nil)
+
+  ;; testing (feature? 'bt/join-thread) signals an error on CMUCL :(
+  (unless *bt/join-thread/tested*
+    (setf *bt/join-thread/tested* t)
+    (add-feature 'bt/join-thread
+                 (let ((x (gensym)))
+                   (if (eq x (bt:join-thread (bt:make-thread (lambda () x))))
+                       :sane
+                       :broken)))))
 
 
 
 #?+(eql bt/join-thread :broken)
 (defstruct wrapped-thread
   (result nil)
-  (thread (current-thread) :type thread))
+  (thread (current-thread) :type bt:thread))
 
 
 

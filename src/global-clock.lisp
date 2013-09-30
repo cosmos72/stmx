@@ -653,11 +653,11 @@ to let the latter run, since their current implementations are mutually incompat
     "Publish (GLOBAL-CLOCK/FEATURES) to stmx.lang::*feature-list*
 so they can be tested with #?+ and #?- reader macros."
     (loop for pair in (global-clock/features) do
-         (let* ((feature (if (consp pair) (first pair) pair))
-                (value   (if (consp pair) (rest  pair) t))
+         (let* ((feature (if (consp pair) (first  pair) pair))
+                (value   (if (consp pair) (second pair) t))
                 (gv-feature (%gvx-expand0-f 'global-clock feature)))
 
-           (stmx.lang::add-feature gv-feature value))))
+           (stmx.lang::set-feature gv-feature value))))
 
   (global-clock/publish-features))
      

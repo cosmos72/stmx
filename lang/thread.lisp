@@ -67,7 +67,7 @@
   ;; testing (feature? 'bt/join-thread) signals an error on CMUCL :(
   (unless *bt/join-thread/tested*
     (setf *bt/join-thread/tested* t)
-    (add-feature 'bt/join-thread
+    (set-feature 'bt/join-thread
                  (let ((x (gensym)))
                    (if (eq x (bt:join-thread (bt:make-thread (lambda () x))))
                        :sane

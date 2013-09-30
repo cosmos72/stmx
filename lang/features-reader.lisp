@@ -91,7 +91,8 @@ Arguments are: package-name symbol-name."
   (defun compile-if-eval (ch args)
     (the (values boolean &optional)
       (cond
-        ((symbolp args)            (feature? args))
+        ((or (keywordp args) (numberp args))             args)
+        ((symbolp args)            (if (get-feature args) t nil))
         ((not (listp args))        (compile-if-error  ch args))
         ((eq 'and    (first args)) (compile-if-and    ch args))
         ((eq 'or     (first args)) (compile-if-or     ch args))

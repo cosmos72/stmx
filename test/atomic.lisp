@@ -30,7 +30,7 @@
     (is (= 1 (raw-value-of var)))
     (is (= 2 (tx-read-of var log)))))
 
-(test valid?
+(defun valid?-test ()
   (let ((log (make-tlog))
         (var  (tvar 1)))
     (is-true (valid? log))
@@ -43,8 +43,11 @@
     (is-false (valid? log))
     (set-tvar-value-and-version var 1 +invalid-version+)
     (is-true (valid? log))))
-    
-(test commit
+
+(test valid?
+  (valid?-test))
+
+(defun commit-test ()
   (let ((log (make-tlog))
         (var (tvar 1)))
     (tx-write-of var 2 log)
@@ -52,7 +55,10 @@
     (is-true (commit log))
     (is (= 2 (raw-value-of var)))))
 
-(test $
+(test commit
+  (commit-test))
+
+(defun $-test ()
   (let ((log (make-tlog))
         (var (tvar 1)))
     (is (= 1 ($ var)))
@@ -66,10 +72,15 @@
       (is (= 2 (raw-value-of var))))
     (is (= 2 ($ var)))))
 
-(test atomic
-  (let ((var (tvar 0)))
+(test $
+  ($-test))
+
+(defun atomic-test ()
+  (let ((var (tvar 0))
+        (counter 0))
 
     (atomic
+      (is (= 1 (incf counter)))
       (is (= 0 (raw-value-of var)))
       (is (= 0 ($ var)))
       (setf ($ var) 1)
@@ -78,7 +89,8 @@
 
     (is (= 1 ($ var)))))
 
-
+(test atomic
+  (atomic-test))
 
 
 

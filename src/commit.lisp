@@ -369,9 +369,11 @@ Note: invokes HW-ATOMIC2, which in turn invokes GLOBAL-CLOCK/HW/STAT-{COMMITTED,
 
 (declaim (inline commit-sw-update-tvars))
 
-(defun commit-sw-update-tvars (locked)
+(defun commit-sw-update-tvars (locked log)
   "Actually COMMIT, i.e. write new values into TVARs. Also unlock all TVARs."
-  (declare (type txfifo locked))
+  (declare (type txfifo locked)
+           (type tlog log)
+           (ignorable log))
 
   (let1 write-version (the version-type
                         (global-clock/sw/start-write (tlog-read-version log)))
@@ -390,7 +392,7 @@ Note: invokes HW-ATOMIC2, which in turn invokes GLOBAL-CLOCK/HW/STAT-{COMMITTED,
                                         (global-clock/sw/write write-version))
                    
             (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
-                       (~ log) (~ var) current-val val)))
+                       (~ log) (~ var) (raw-value-of var) val)))
 
       ;; TVAR-LOCK is not :BIT? then unlock manually in all cases
       #?-(eql tvar-lock :bit)
@@ -470,7 +472,7 @@ Note: internally invokes GLOBAL-CLOCK/{HW,SW}/STAT-{COMMITTED,ABORTED}"
               ;; COMMIT, i.e. actually write new values into TVARs.
               ;; Also unlock all TVARs.
 
-              (commit-sw-update-tvars locked)
+              (commit-sw-update-tvars locked log)
               (global-clock/sw/stat-committed)
               (setf success t))
 

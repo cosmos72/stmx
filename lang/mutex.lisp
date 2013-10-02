@@ -72,39 +72,6 @@
            try-acquire-mutex release-mutex))
 
 
-#?-fast-mutex
-(defun try-acquire-mutex/catch-recursion (mutex)
-  "Try to acquire MUTEX. Return T if successful, or :RECURSION if MUTEX was already locked
-by current thread, or NIL if MUTEX was already locked by some other thread."
-  (declare (type mutex mutex))
-
-  (handler-case
-      (bt:acquire-lock (mutex-lock mutex) nil)
-    (condition () :recursion)))
-
-(defun try-acquire-mutex (mutex)
-  "Try to acquire MUTEX. Return T if successful,
-or NIL if MUTEX was already locked."
-  (declare (type mutex mutex))
-  #?+fast-mutex
-  (mem-write-barrier
-    (null
-     (atomic-compare-and-swap (mutex-owner mutex) nil *current-thread*)))
-  #?-fast-mutex
-  (bt:acquire-lock (mutex-lock mutex) nil))
-
-
-(defun release-mutex (mutex)
-  "Release MUTEX. Return NIL. Consequences are undefined if MUTEX
-is locked by another thread or is already unlocked."
-  #?+fast-mutex
-  (progn
-    (mem-write-barrier)
-    (setf (mutex-owner mutex) nil))
-  #?-fast-mutex
-  (progn
-    (bt:release-lock (mutex-lock mutex))
-    nil))
 
    
 
@@ -206,6 +173,48 @@ Return NIL if MUTEX is currently locked by some other thread."
 
 
 
-;; avoid "unexpected end-of-file" compile errors
-;; if none of the above conditional features is present
-nil
+
+(defun try-acquire-mutex (mutex)
+  "Try to acquire MUTEX. Return T if successful,
+or NIL if MUTEX was already locked."
+  (declare (type mutex mutex))
+  #?+fast-mutex
+  (mem-write-barrier
+    (null
+     (atomic-compare-and-swap (mutex-owner mutex) nil *current-thread*)))
+  #?-fast-mutex
+  (bt:acquire-lock (mutex-lock mutex) nil))
+
+
+
+#?-fast-mutex
+(defun try-acquire-mutex/catch-recursion (mutex)
+  "Try to acquire MUTEX. Return T if successful, or :RECURSION if MUTEX was already locked
+by current thread, or NIL if MUTEX was already locked by some other thread."
+  (declare (type mutex mutex))
+
+  ;; at least on CMUCL, acquiring twice a lock from the same thread
+  ;; simply returns nil instead of raising a signal.
+  ;; So it's better to use (mutex-is-own?) if available
+  #?+mutex-owner
+  (if (mutex-is-own? mutex)
+      :recursion
+      (try-acquire-mutex mutex))
+
+  #?-mutex-owner
+  (handler-case
+      (bt:acquire-lock (mutex-lock mutex) nil)
+    (condition () :recursion)))
+
+
+(defun release-mutex (mutex)
+  "Release MUTEX. Return NIL. Consequences are undefined if MUTEX
+is locked by another thread or is already unlocked."
+  #?+fast-mutex
+  (progn
+    (mem-write-barrier)
+    (setf (mutex-owner mutex) nil))
+  #?-fast-mutex
+  (progn
+    (bt:release-lock (mutex-lock mutex))
+    nil))

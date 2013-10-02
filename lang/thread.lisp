@@ -50,7 +50,7 @@
 ;;;; * Wrappers around Bordeaux Threads to capture
 ;;;; * the return value of functions executed in threads
 
-(declaim (type bt:thread *current-thread*))
+(declaim (type t *current-thread*))
 (defvar *current-thread* (current-thread))
 
 (eval-always

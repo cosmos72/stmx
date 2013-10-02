@@ -41,13 +41,11 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
 
  #+ccl
  (set-features '(bt/lock-owner ccl::%%lock-owner)
-               ;; on CCL, 'define-constant-once causes test-suite to hang!
-               '(define-constant-once nil))
+               #+x86 '(mem-rw-barriers nil) ;; causes "bogus object" errors.
+               '(define-constant-once nil)) ;; causes deadlocks
                
-
  #+cmucl
  (set-features '(bt/lock-owner mp::lock-process))
-
 
  #+ecl
  (set-features '(bt/lock-owner mp::lock-owner)
@@ -74,6 +72,10 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
 
 (eval-always
 
+  (default-feature 'bt/with-lock :fast)
+
+  (default-feature 'define-constant-once)
+
   ;; on x86 and x86_64, memory read-after-read and write-after-write barriers
   ;; are NOP (well, technically except for SSE)
   ;;
@@ -89,7 +91,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
   ;;
   ;; Summarizing, for most Lisp compilers (ECL being a notable exception)
   ;; 'mem-rw-barriers feature can be set to :trivial on x86 and x86-64
-  ;; (unless a better implementation is available, ovbviously)
+  ;; (unless a better implementation is available, obviously)
 
 
   #+(or x86 x8664 x86-64 x86_64)
@@ -138,11 +140,6 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
   ;; both the above two features
   (set-feature 'fixnum-is-large-powerof2
                (all-features? 'fixnum-is-large 'fixnum-is-powerof2))
-
-
-  (default-feature 'bt/with-lock :fast)
-
-  (default-feature 'define-constant-once)
 
 
   ;; which kind of locking shall we use for TVARs?
@@ -194,9 +191,9 @@ SB-EXT:DEFGLOBAL on SBCL), or as DEFVAR if no better implementation is available
   
   (defmacro define-constant-once (name value &optional (doc nil docp))
     "Same as DEFCONSTANT, but evaluate VALUE only once:
-re-executing again the same (DEFINE-CONSTANT-EVAL-ONCE name ...) has no effects."
+re-executing again the same (DEFINE-CONSTANT-ONCE name ...) has no effects."
 
-    (let1 impl (get-feature 'define-constant-once 'defvar)
+    (let1 impl (get-feature 'define-constant-once 'define-global)
       (case impl
         ((t)
          `(defconstant ,name 

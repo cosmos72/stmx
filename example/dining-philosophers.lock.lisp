@@ -15,90 +15,89 @@
 
 (in-package :cl-user)
 
-
-;; This version of the dining-philosophers uses SB-TRANSACTION
-;; to take advantage of hardware transactional memory.
-
-(defpackage #:stmx.example3
-  (:use #:cl #:sb-transaction)
+(defpackage #:stmx.example.dining-philosophers.lock
+  (:use #:cl)
 
   (:import-from #:stmx.lang
                 #:eval-always
                 #:start-thread #:wait4-thread))
                 
 
-(in-package :stmx.example3)
+(in-package :stmx.example.dining-philosophers.lock)
 
 
-(deftype lock  () 'cons)
-(deftype plate () 'cons)
+;; standard bordeaux-threads lock. for this simple example,
+;; they are up to 3 times faster than STMX transactions
+#+never
+(eval-always
+ (deftype lock () 't)
 
-(declaim (ftype (function (lock) boolean) acquire-lock)
-         (ftype (function (lock) null)    release-lock)
-         (inline acquire-lock
-                 release-lock))
+ (defmacro make-lock (&optional name)
+   `(bt:make-lock ,name))
 
-(defun acquire-lock (lock)
-  (declare (type lock lock))
-  (when (null (first lock))
-    (setf (first lock) t)))
+ (defmacro acquire-lock (lock)
+   `(bt:acquire-lock ,lock nil))
 
-(defun release-lock (lock)
-  (declare (type lock lock))
-  (setf (first lock) nil))
-  
+ (defmacro release-lock (lock)
+   `(bt:release-lock ,lock)))
 
-(declaim (ftype (function (plate) fixnum) eat-from-plate)
+
+;; fast locks using atomic compare-and-swap if available.
+;; for this simple example, they are up to 10 times faster than STMX transactions
+#-always
+(eval-always
+ (deftype lock () 'stmx::mutex)
+
+ (defmacro make-lock (&optional name)
+   (declare (ignore name))
+   `(stmx.lang::make-mutex))
+ 
+ (defmacro acquire-lock (lock)
+   `(stmx.lang::try-acquire-mutex ,lock))
+
+ (defmacro release-lock (lock)
+   `(stmx.lang::release-mutex ,lock)))
+
+
+(declaim (ftype (function (cons) fixnum) eat-from-plate)
          (inline eat-from-plate))
 (defun eat-from-plate (plate)
-  "Decrease by one (FIRST plate) and return the updated value."
-  (declare (type plate plate))
-  (decf (the fixnum (first plate))))
+  "Decrease by one TVAR in plate."
+  (declare (type cons plate))
+  (decf (the fixnum (car plate))))
 
 
-(declaim (ftype (function (lock lock plate) fixnum) philosopher-eats)
+(declaim (ftype (function (lock lock cons) fixnum) philosopher-eats)
          (inline philosopher-eats))
-                
+
 (defun philosopher-eats (fork1 fork2 plate)
-  "Try to eat once. Return remaining hunger."
+  "Try to eat once. return remaining hunger"
   (declare (type lock fork1 fork2)
-           (type plate plate))
+           (type cons plate))
 
   ;; also keep track of failed lock attempts for demonstration purposes.
-  
-  (prog ((hunger -1)) ;; unknown
+  (decf (the fixnum (cdr plate)))
 
-   (declare (type fixnum hunger))
+  (let ((hunger -1)) ;; unknown
+    (when (acquire-lock fork1)
+      (when (acquire-lock fork2)
+        (setf hunger (eat-from-plate plate))
+        (release-lock fork2))
+      (release-lock fork1))
 
-   start
-   (decf (the fixnum (rest plate)))
+    (when (= -1 hunger)
+      (bt:thread-yield))
 
-   ;; On a 3.5GHz Intel Core i7 4770, the overhead of each
-   ;; hardware transaction is approximately 11 nanoseconds.
-   ;; Fast, but definitely not zero.
-   (when (= (transaction-begin) +transaction-started+)
-     (when (acquire-lock fork1)
-       (when (acquire-lock fork2)
-         (setf hunger (eat-from-plate plate))
-         (release-lock fork2))
-       (release-lock fork1))
-     (transaction-end))
-    
-   (when (= -1 hunger)
-     (bt:thread-yield)
-     (go start))
-   
-   (return hunger)))
+    hunger))
 
-    
-    
+
 
 
 
 (defun dining-philosopher (i fork1 fork2 plate)
   "Eat until not hungry anymore."
   (declare (type lock fork1 fork2)
-           (type plate plate)
+           (type cons plate)
            (type fixnum i))
   ;;(with-output-to-string (out)
   ;;  (let ((*standard-output* out))
@@ -122,7 +121,7 @@ Note: the default initial hunger is 10 millions,
 
   (let* ((n philosophers-count)
          (nforks (max n 2))
-         (forks (loop for i from 1 to nforks collect (cons nil nil)))
+         (forks (loop for i from 1 to nforks collect (make-lock (format nil "~A" i))))
          (plates (loop for i from 1 to n collect
                       (cons philosophers-initial-hunger
                             philosophers-initial-hunger)))
@@ -132,9 +131,8 @@ Note: the default initial hunger is 10 millions,
                      (fork2 (nth (mod i nforks) forks))
                      (plate (nth (1- i)         plates))
                      (j i))
-                 
+
                  ;; make the last philospher left-handed
-                 ;; to help transactional memory machinery
                  (when (= i n)
                    (rotatef fork1 fork2))
 
@@ -152,22 +150,17 @@ Note: the default initial hunger is 10 millions,
              (when result
                (print result))))
 
-      (let ((end (get-internal-real-time)))
+      (let* ((end (get-internal-real-time))
+             (elapsed-secs (/ (- end start) (float internal-time-units-per-second)))
+             (tx-count (/ (* n philosophers-initial-hunger) elapsed-secs))
+	     (tx-unit ""))
+	(when (>= tx-count 100000)
+	  (setf tx-count (/ tx-count 1000000)
+		tx-unit " millions"))
+        (log:info "~3$~A iterations per second, elapsed time: ~3$ seconds"
+		  tx-count tx-unit elapsed-secs))
 
-        (loop for (plate . attempts) in plates
-           for i from 1 do
-             (let* ((commits (- philosophers-initial-hunger plate))
-                    (fails   (- attempts))
-                    (aborts% (* 100 (/ (float fails) commits))))
-               (log:debug "philosopher ~A: aborts = ~2$%" i aborts%)))
-
-        (let* ((elapsed-secs (/ (- end start) (float internal-time-units-per-second)))
-               (tx-count (if (zerop elapsed-secs) most-positive-single-float
-                             (/ (* n philosophers-initial-hunger) elapsed-secs)))
-               (tx-unit ""))
-          (when (>= tx-count 1000000)
-            (setf tx-count (/ tx-count 1000000)
-                  tx-unit " millions"))
-          (log:info "~$~A iterations per second, elapsed time: ~3$ seconds"
-                    tx-count tx-unit elapsed-secs))))))
-
+      (loop for (plate . fails) in plates
+	 for i from 1 do
+	   (log:debug "philosopher ~A: ~A successful attempts, ~A failed"
+		     i (- philosophers-initial-hunger plate) (- fails))))))

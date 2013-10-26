@@ -14,6 +14,9 @@
 (defmacro 10m (&rest body)
   `(time (dotimes (i 10000000)
            ,@body)))
+(defmacro 1g (&rest body)
+  `(time (dotimes (i 10000000000)
+           ,@body)))
 (defvar v (tvar 0))
 (defvar m  (new 'rbmap :pred #'fixnum<)) 
 (defvar tm (new 'tmap  :pred #'fixnum<)) 
@@ -55,6 +58,14 @@
          (h h)
          (th th))
      (x3 (10m ,@body))))
+
+(defmacro run1g (&rest body)
+  `(let ((v v)
+         (m m)
+         (tm tm)
+         (h h)
+         (th th))
+     (x3 (1g ,@body))))
 
 
 (run10m (sw-atomic nil))

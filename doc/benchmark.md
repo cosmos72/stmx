@@ -188,18 +188,18 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.9 (x86_64), STMX 1.3.3
 
  <table>
  
- <tr><th colspan="7">
+ <tr><th colspan="8">
        Concurrent benchmarks on a 4-core CPU. They already iterate
        ten million times, do not wrap them in <code>(1m ...)</code>.
      </th></tr>
 
- <tr><th colspan="7">
+ <tr><th colspan="8">
        Dining philosophers, load with<br>
-       <code>(load "stmx/example/dining-philosophers-stmx.lisp")</code><br>
-       <code>(load "stmx/example/dining-philosophers-stmx-hw.lisp")</code><br>
-       <code>(load "stmx/example/dining-philosophers-hw-only.lisp")</code><br>
-       <code>(load "stmx/example/dining-philosophers-lock.lisp")</code><br>
-       <code>(in-package :stmx.example{1|2|3})</code>
+       <code>(load "stmx/example/dining-philosophers.stmx.lisp")</code><br>
+       <code>(load "stmx/example/dining-philosophers.stmx-hw.lisp")</code><br>
+       <code>(load "stmx/example/dining-philosophers.hw-only.lisp")</code><br>
+       <code>(load "stmx/example/dining-philosophers.lock.lisp")</code><br>
+       <code>(in-package :stmx.example.dining-philosophers.[...])</code>
      </th></tr>
 
  <tr><th rowspan="2"><b>number of threads</b></th>

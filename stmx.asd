@@ -17,10 +17,10 @@
 
 (asdf:defsystem :stmx
   :name "STMX"
-  :version "1.3.3"
+  :version "1.9.0"
   :license "LLGPL"
   :author "Massimiliano Ghilardi"
-  :description "Composable Software Transactional Memory"
+  :description "Composable Transactional Memory"
 
   :depends-on (:log4cl
                :closer-mop
@@ -59,7 +59,7 @@
                              (:file "class-precedence-list" :depends-on ("macro")))
                 :depends-on (:sb-transaction))
 
-               (:module :src
+               (:module :main
                 :components ((:file "package")
                              (:file "global-clock"   :depends-on ("package"))
                              (:file "tvar-fwd"       :depends-on ("global-clock"))
@@ -105,7 +105,7 @@
 
 (asdf:defsystem :stmx.test
   :name "STMX.TEST"
-  :version "1.3.3"
+  :version "1.9.0"
   :author "Massimiliano Ghilardi"
   :license "LLGPL"
   :description "test suite for STMX"
@@ -135,3 +135,50 @@
   (asdf:load-system :stmx.test)
   (eval (read-from-string "(fiveam:run! 'stmx.test:suite)")))
 
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+
+
+(asdf:defsystem :stmx-persist
+  :name "STMX-PERSIST"
+  :version "0.0.1"
+  :license "LLGPL"
+  :author "Massimiliano Ghilardi"
+  :description "Persistent, Transactional Object Store"
+
+  :depends-on (:log4cl
+               :cffi
+               :trivial-garbage)
+
+  :components ((:static-file "stmx-persist.asd")
+
+               (:module :persist
+                :components ((:file "package")
+                             (:file "mem"         :depends-on ("package"))
+                             (:file "abi"         :depends-on ("mem"))))))
+
+
+(asdf:defsystem :stmx-persist.test
+  :name "STMX-PERSIST.TEST"
+  :version "0.0.1"
+  :author "Massimiliano Ghilardi"
+  :license "LLGPL"
+  :description "test suite for STMX-PERSIST"
+
+  :depends-on (:log4cl
+               :fiveam
+               :stmx-persist)
+
+  :components ((:module :test-persist
+                :components ((:file "package")
+                             (:file "mem"           :depends-on ("package"))))))
+
+
+(defmethod asdf:perform ((op asdf:test-op) (system (eql (asdf:find-system :stmx-persist))))
+  (asdf:load-system :stmx-persist.test)
+  (eval (read-from-string "(fiveam:run! 'stmx-persist.test:suite)")))

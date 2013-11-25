@@ -18,8 +18,16 @@
 (deftype ufixnum () '(and fixnum (integer 0)))
 (deftype mpointer () 'cffi-sys:foreign-pointer)
 
+(defconstant +null-pointer+ (if (boundp '+null-pointer+)
+                                (symbol-value '+null-pointer+)
+                                (cffi-sys:null-pointer)))
+
+(defconstant +bad-fd+ -1)
 
 (eval-when (:compile-toplevel :load-toplevel)
+
+  (pushnew :stmx-persist/debug *features*)
+
   (defun parse-type (type)
     (case type
       (:uchar  :unsigned-char)
@@ -59,21 +67,12 @@
 (defconstant +msizeof-ullong+  (msizeof :ullong))
 (defconstant +msizeof-word+    (msizeof :word))
 
-(defmacro malloc (size)
-  `(cffi-sys:%foreign-alloc ,size))
 
-(defmacro mfree (ptr)
-  `(cffi-sys:foreign-free ,ptr))
-
-
-(defmacro mget-t (type ptr &optional (offset 0))
+(defmacro %mget-t (type ptr &optional (offset 0))
   `(cffi-sys:%mem-ref ,ptr ,(parse-type type) ,offset))
 
-(defmacro mset-t (value type ptr &optional (offset 0))
+(defmacro %mset-t (value type ptr &optional (offset 0))
   `(cffi-sys:%mem-set ,value ,ptr ,(parse-type type) ,offset))
-
-(defsetf mget-t (type ptr &optional (offset 0)) (value)
-  `(mset-t ,value ,type ,ptr ,offset))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -85,40 +84,71 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-  (let ((most-positive-word 1)
-        (bits-per-word 1))
-    
-    ;; we need at least a 32-bit architecture
-    (when (< +msizeof-word+ 4)
-      (error "cannot build STMX-PERSIST: unsupported architecture.
+  ;; we need at least a 32-bit architecture
+  (when (/= +msizeof-uchar+ 1)
+    (error "cannot build STMX-PERSIST: unsupported architecture.
+    size of unsigned-char is ~S bytes, expecting exactly 1 byte" +msizeof-uchar+))
+
+
+  (when (< +msizeof-word+ 4)
+    (error "cannot build STMX-PERSIST: unsupported architecture.
     size of CPU word is ~S bytes, expecting at least 4 bytes" +msizeof-word+))
 
-    ;; determine number of bits per CPU word
-    (cffi-sys:with-foreign-pointer (p +msizeof-word+)
-      (loop for i = 1 then (logior (ash i 1) 1)
-         for bits = 1 then (1+ bits)
-         do
-           (handler-case
-               (progn
-                 (setf (mget-t :word p) i)
-                 (let ((j (mget-t :word p)))
-                   (unless (eql i j)
-                     (error "reading value '~S' stored in a CPU word returns '~S'" i j)))
+  ;; determine number of bits per CPU word
+  (defun %detect-bits-per-word ()
+    (declare (optimize (speed 0) (safety 3))) ;; ABSOLUTELY NECESSARY!
 
-                 (setf most-positive-word i
-                       bits-per-word bits))
+    (let ((bits-per-word 1))
+    
+      (cffi-sys:with-foreign-pointer (p +msizeof-word+)
+        (loop for i = 1 then (logior (ash i 1) 1)
+           for bits = 1 then (1+ bits)
+           do
+             (handler-case
+                 (progn
+                   (%mset-t i :word p)
+                   
+                   #+stmx-persist/debug
+                   (progn
+                     (format t "(i #x~X) (bits ~D) ..." i bits)
+                     (finish-output))
+                 
+                   (let ((j (%mget-t :word p)))
+                     #+stmx-persist/debug
+                     (progn
+                       (format t " read back: #x~X ..." j)
+                       (finish-output))
+                     
+                     (unless (eql i j)
+                       (error "reading value '~S' stored in a CPU word returned '~S'" i j))
+                   
+                     #+stmx-persist/debug
+                     (format t " ok~%"))
 
-             (condition ()
-               (defconstant +most-positive-word+ most-positive-word)
-               (defconstant +mem-word/mask+  most-positive-word)
-               (defconstant +mem-word/bits+  bits-per-word)
-               (return)))))))
-               
-;;  8 bits reserved for tags on 32-bit architectures
-;; 16 bits reserved for tags on 64-bit architectures
-;; ...
-(defconstant +mem-fulltag/bits+ (truncate +mem-word/bits+ 4))
-(defconstant +mem-pointer/bits+ (- +mem-word/bits+ +mem-fulltag/bits+))
+                   (setf bits-per-word bits))
+
+               (condition ()
+                 (return-from %detect-bits-per-word bits-per-word))))))))
+
+
+
+(defconstant +mem-word/bits+ (%detect-bits-per-word))
+(defconstant +mem-word/mask+  (1- (ash 1 +mem-word/bits+)))
+(defconstant +most-positive-word+ +mem-word/mask+)
+
+(defconstant +mem-byte/bits+  (truncate +mem-word/bits+ +msizeof-word+))
+(defconstant +mem-byte/mask+     (1- (ash 1 +mem-byte/bits+)))
+(defconstant +most-positive-byte+ +mem-byte/mask+)
+
+
+
+;; we need at least 7 bits per byte (to store ASCII characters in a single byte)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (when (< +mem-byte/bits+ 7)
+    (error "cannot build STMX-PERSIST: unsupported architecture.
+    each byte contains only ~S bits, expecting at least 8 bits" +mem-byte/bits+))) 
+
+
 
 ;; we need at least a 32-bit architecture
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -126,16 +156,36 @@
     (error "cannot build STMX-PERSIST: unsupported architecture.
     size of CPU word is ~S bits, expecting at least 32 bits" +mem-word/bits+))) 
 
+
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+
+  (defun %detect-endianity ()
+    (cffi-sys:with-foreign-pointer (p +msizeof-word+)
+      (loop for i from 0 below +msizeof-word+ do
+           (%mset-t (logand (1+ i) +mem-byte/mask+)
+                    :uchar p i))
+
+      (%mget-t :word p))))
+
+
+(defconstant +mem-word/endianity+ (%detect-endianity))
+               
+
+
+
+
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmacro mget-word (ptr &optional (index 0))
-  `(mget-t :word ,ptr (logand +mem-word/mask+ (* ,index +msizeof-word+))))
+(defmacro mget-word (ptr index)
+  `(%mget-t :word ,ptr (logand +mem-word/mask+ (* ,index +msizeof-word+))))
 
-(defmacro mset-word (value ptr &optional (index 0))
-  `(mset-t ,value :word ,ptr (logand +mem-word/mask+ (* ,index +msizeof-word+))))
+(defmacro mset-word (ptr index value)
+  `(%mset-t ,value :word ,ptr (logand +mem-word/mask+ (* ,index +msizeof-word+))))
 
-(defsetf mget-word (ptr &optional (index 0)) (value)
-  `(mset-word ,value ,ptr ,index))
+(defsetf mget-word mset-word)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -144,7 +194,7 @@
   (declare (type mpointer ptr)
            (type fixnum offset-start offset-end))
   (loop for offset from offset-start below offset-end do
-       (format stream "~2,'0X " (mget-t :uchar ptr offset))))
+       (format stream "~2,'0X " (%mget-t :uchar ptr offset))))
 
 
 (defun !mdump-reverse (stream ptr &optional (offset-start 0) (offset-end (1+ offset-start)))
@@ -152,7 +202,7 @@
   (declare (type mpointer ptr)
            (type fixnum offset-start offset-end))
   (loop for offset from offset-end above offset-start do
-       (format stream "~2,'0X " (mget-t :uchar ptr (1- offset)))))
+       (format stream "~2,'0X " (%mget-t :uchar ptr (1- offset)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -163,24 +213,63 @@
            (type ufixnum size)
            (type (unsigned-byte 8) value increment))
   (loop for offset from 0 below size do
-       (setf (mget-t :uchar ptr offset) value)
+       (%mset-t value :uchar ptr offset)
        (setf value (logand #xFF (+ value increment)))))
 
 
-(cffi:defcfun ("memset" %memset) :void (ptr :pointer) (fill-char :int) (size :unsigned-long))
+(declaim (inline null-pointer? memset mzero memcpy))
 
-(declaim (inline memset mzero))
+(defun null-pointer? (ptr)
+  (declare (type mpointer ptr))
+  (cffi-sys:null-pointer-p ptr))
+           
 
 (defun memset (ptr fill-byte size)
   (declare (type mpointer ptr)
-           (type ufixnum size)
-           (type (unsigned-byte 8) fill-byte))
-  (%memset ptr fill-byte size))
+           (type (unsigned-byte 8) fill-byte)
+           (type ufixnum size))
+  (osicat-posix:memset ptr fill-byte size))
 
 (defun mzero (ptr size)
   (declare (type mpointer ptr)
            (type ufixnum size))
   (memset ptr 0 size))
            
+(defun memcpy (dst src size)
+  (declare (type mpointer dst src)
+           (type ufixnum size))
+  (osicat-posix:memcpy dst src size))
+  
+           
 
+(declaim (notinline malloc mfree))
 
+(defun malloc (size)
+  (cffi-sys:%foreign-alloc size))
+
+(defun mfree (ptr)
+  (cffi-sys:foreign-free ptr))
+
+(defun open-fd (filename &optional (truncate-len -1))
+  (declare (type integer truncate-len))
+
+  (let ((fd (osicat-posix:open filename (logior osicat-posix:o-rdwr osicat-posix:o-creat))))
+    (declare (type integer fd))
+    (unless (eql truncate-len -1)
+      (osicat-posix:ftruncate fd truncate-len))
+    fd))
+
+(defun close-fd (fd)
+  (declare (type (integer 0) fd))
+  (osicat-posix:close fd))
+
+(defun mmap (fd len)
+  (declare (type (integer 0) fd len))
+  (osicat-posix:mmap +null-pointer+ len
+                     (logior osicat-posix:prot-read osicat-posix:prot-write)
+                     osicat-posix:map-shared
+                     fd 0))
+
+(defun munmap (ptr len)
+  (osicat-posix:munmap ptr len))
+  

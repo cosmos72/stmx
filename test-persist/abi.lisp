@@ -1,6 +1,6 @@
 ;; -*- lisp -*-
 
-;; This file is part of STMX-PERSIST.
+;; This file is part of STMX-PERSIST.TEST.
 ;; Copyright (c) 2013 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
@@ -13,17 +13,6 @@
 ;; See the Lisp Lesser General Public License for more details.
 
 
-;;;; * STMX-PERSIST
-
-(in-package :cl-user)
-
-(defpackage #:stmx-persist
-
-  (:use #:cl)
-
-  (:export #:+null-pointer+ #:+bad-fd+
-           #:open-fd #:close-fd #:mmap #:munmap
-           #:mget-primitive #:mset-primitive
-           #:mwrite-n-chars #:mwrite-n-byte-chars))
+(in-package :stmx-persist.test)
 
 

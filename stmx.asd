@@ -99,7 +99,7 @@
 
                              (:file "ghash-table"    :depends-on ("print"))
                              (:file "thash-table"    :depends-on ("ghash-table" "simple-tvector")))
-                :depends-on (:lang :src))))
+                :depends-on (:lang :main))))
 
 
 
@@ -153,6 +153,7 @@
 
   :depends-on (:log4cl
                :cffi
+               :osicat
                :trivial-garbage)
 
   :components ((:static-file "stmx-persist.asd")
@@ -160,7 +161,9 @@
                (:module :persist
                 :components ((:file "package")
                              (:file "mem"         :depends-on ("package"))
-                             (:file "abi"         :depends-on ("mem"))))))
+                             (:file "constants"   :depends-on ("mem"))
+                             (:file "abi"         :depends-on ("constants"))
+                             (:file "store"       :depends-on ("abi"))))))
 
 
 (asdf:defsystem :stmx-persist.test

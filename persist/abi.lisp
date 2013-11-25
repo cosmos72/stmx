@@ -16,33 +16,12 @@
 (in-package :stmx-persist)
 
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (when (< +most-positive-pointer+ +most-positive-character+)
+    
+    (error "cannot compile STMX-PERSIST: assuming ~S-bit characters (i.e. Unicode),
+    cannot fit them in the ~S bits reserved by ABI." +character-bits+ +mem-pointer/bits+)))
 
-(defconstant +mem-pointer/shift+ 0)
-(defconstant +mem-pointer/mask+  (1- (ash 1 +mem-pointer/bits+)))
-(defconstant +most-positive-pointer+ +mem-pointer/mask+)
-
-(defconstant +mem-fulltag/shift+ +mem-pointer/bits+)
-(defconstant +mem-fulltag/mask+  (1- (ash 1 +mem-fulltag/bits+)))
-(defconstant +most-positive-fulltag+ +mem-fulltag/mask+)
-
-;; reserve most significant bit to mark integers
-(defconstant +mem-tag/bits+      (1- +mem-fulltag/bits+))
-(defconstant +mem-tag/mask+      (1- (ash 1 +mem-tag/bits+)))
-;; fulltags larger than +most-positive-tag+ indicate an integer (actually, mem-int) value
-(defconstant +most-positive-tag+ +mem-tag/mask+)
-
-
-(defconstant +mem-int/bits+      (1-  +mem-word/bits+))
-(defconstant +mem-int/mask+      (ash +mem-word/mask+ -1))
-;; most significant bit in a word. if set, means the other bits are a signed integer
-(defconstant +mem-int/flag+      (1+  +mem-int/mask+))
-;; value bits in a signed integer
-(defconstant +mem-int/value-mask+ (ash +mem-int/mask+ -1))
-;; sign bit in a signed integer
-(defconstant +mem-int/sign-mask+  (1+ +mem-int/value-mask+))
-
-(defconstant +most-positive-int+ (ash +mem-int/mask+ -1))
-(defconstant +most-negative-int+ (- -1 +most-positive-int+))
 
 
 (deftype mem-word    () '(unsigned-byte #.+mem-word/bits+))
@@ -52,12 +31,30 @@
 (deftype mem-int     () '(integer #.+most-negative-int+ #.+most-positive-int+))
 
 
+(defun get-abi ()
+  '((:file-version  . 1)
+    (:bits-per-byte . #.+mem-byte/bits+)
+    (:bits-per-tag  . #.+mem-tag/bits+)
+    (:bits-per-pointer . #.+mem-pointer/bits+)
+    (:bits-per-word . #.+mem-word/bits+)
+    (:sizeof-word   . #.+msizeof-word+)
+    (:word-endianity . #.(let ((fmt (format nil "~A~D~A" "#x~" (* 2 +msizeof-word+) ",'0X")))
+                           (format nil fmt +mem-word/endianity+)))))
+    
+  
+  
+(defmacro %to-value (value)
+  `(logand +mem-pointer/mask+ (ash ,value ,(- +mem-pointer/shift+))))
+
+(defmacro %to-fulltag (value)
+  `(logand +mem-fulltag/mask+ (ash ,value ,(- +mem-fulltag/shift+))))
+
 (defmacro %to-value-and-fulltag (val)
   (let ((value     (gensym "VALUE-")))
     `(let ((,value ,val))
        (values
-        (logand +mem-pointer/mask+ (ash ,value (- +mem-pointer/shift+)))
-        (logand +mem-fulltag/mask+ (ash ,value (- +mem-fulltag/shift+)))))))
+        (%to-value ,value)
+        (%to-fulltag ,value)))))
        
   
 (defun mget-value-and-fulltag (ptr index)
@@ -110,21 +107,7 @@
 
 
 
-(defconstant +mem-unallocated+ 0)
-(defconstant +mem-nil+ 1)
-(defconstant +mem-t+   2)
-
-(defconstant +mem-fulltag-keyword+  0)
-(defconstant +mem-fulltag-character+ 1)
-(defconstant +mem-fulltag-last+      +mem-tag/bits+)
-
-(defconstant +mem-character/mask+ #x1FFFFF) ;; assume Unicode
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (when (< +most-positive-pointer+ #x100FFF) ;; assume Unicode
-    
-    (error "cannot compile STMX-PERSIST: characters are at least ~S bits,
-    cannot fit them in the ~S bits reserved by ABI." 21 +mem-pointer/bits+)))
+(declaim (inline mset-character mget-character))
 
 (defun mset-character (ptr index value)
   (declare (type mpointer ptr)
@@ -132,6 +115,13 @@
            (type character value))
 
   (mset-value-and-fulltag ptr index (char-code value) +mem-fulltag-character+))
+
+
+(defun mget-character (ptr index)
+  (declare (type mpointer ptr)
+           (type fixnum index))
+
+  (code-char (%to-value (mget-word ptr index))))
 
 
 (defun mset-primitive (ptr index value &optional fulltag)
@@ -187,7 +177,7 @@
                (otherwise (values value fulltag)))) ;; found a keyword
 
             (#.+mem-fulltag-character+ ;; found a character
-             (code-char (logand value +mem-character/mask+)))
+             (code-char (logand value +character/mask+)))
 
             (otherwise ;; found a pointer
              (values value fulltag))))
@@ -195,3 +185,137 @@
         ;; found a mem-int
         (%to-int value))))
 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun bignum-words (n)
+  "Return the number of words needed to store bignum N in memory."
+  (declare (type integer n))
+
+  (let* ((len (integer-length n))
+         (words (truncate (+ len +mem-word/bits+ -1) ;; round up
+                          +mem-word/bits+)))
+    (unless (typep words 'mem-int)
+      (error "bignum too large for object store: it requires ~S words, maximum supported is ~S words"
+             words +most-positive-int+))
+    (the mem-int words)))
+
+
+(defun mwrite-bignum (ptr index n &optional (n-words (bignum-words n)))
+  "Write bignum N into the memory starting at (PTR+INDEX)."
+  (declare (type mpointer ptr)
+           (type fixnum index)
+           (type integer n)
+           (type mem-int n-words))
+
+  (when (< n 0)
+    ;; FIXME: write N, not (LOGNOT N)
+    (setf n (lognot n))
+    (setf n-words (lognot n-words)))
+
+  (mset-int ptr index n-words)
+
+  (let ((bits +mem-word/bits+)
+        (mask +mem-word/mask+)
+        (i n))
+    
+    (loop do
+         (mset-word ptr (incf (the mem-int index)) (logand i mask))
+         (setf i (ash i (- bits)))
+         (when (or (= 0 i) (= -1 i))
+           (return)))))
+
+
+
+(defun mread-bignum (ptr index)
+  "Read a bignum from the memory starting at (PTR+INDEX)."
+  (declare (type mpointer ptr)
+           (type fixnum index))
+
+  (let* ((bits +mem-word/bits+)
+         (n-words (mget-int ptr index))
+         (negative (< n-words 0))
+         (n 0))
+
+    (when negative
+      (setf n-words (lognot n-words)))
+
+    (loop for shift from 0 below (the fixnum (* bits n-words)) by bits
+       for i = (mget-word ptr (incf (the fixnum index))) do
+         (setf n (logior n (ash i shift))))
+
+    (if negative
+        ;; FIXME: read N, not (LOGNOT N)
+        (lognot n)
+        n)))
+
+
+
+  
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun mwrite-string (ptr index string &optional (start 0) (end (length string)))
+  "Write (END-START) characters from STRING to the memory starting at (PTR+INDEX).
+Characters will be stored using the general-purpose representation."
+  (declare (type mpointer ptr)
+           (type fixnum index)
+           (type simple-array string)
+           (type ufixnum start end))
+
+  (loop for i from start below end do
+       (mset-character ptr (the fixnum (+ index i))
+                       (svref string i))))
+
+
+(defun mread-string (ptr index result-string &optional (start 0) (end (length result-string)))
+  "Read (END-START) characters from the memory starting at (PTR+INDEX)
+and write them into RESULT-STRING. Return RESULT-STRING.
+Characters will be read using the general-purpose representation."
+  (declare (type mpointer ptr)
+           (type fixnum index)
+           (type simple-array result-string)
+           (type ufixnum start end))
+
+  (loop for i from start below end do
+       (setf (svref result-string i)
+             (mget-character ptr (the fixnum (+ index i)))))
+  result-string)
+
+
+(defun mwrite-base-string (ptr index string &optional (start 0) (end (length string)))
+  "Write (END-START) single-byte characters from STRING into the memory starting at (PTR+INDEX).
+Characters are written using the compact, single-byte representation.
+For this reason the codes of all characters to be stored must be in the range
+0 ... +most-positive-byte+ (typically 0 ... 255)"
+  (declare (type mpointer ptr)
+           (type fixnum index)
+           (type simple-array string)
+           (type ufixnum start end))
+
+  (loop for i from start below end do
+       (%mset-t (the (unsigned-byte #.+mem-byte/bits+)
+                  (char-code
+                   (svref string i))) :uchar
+                ptr (the fixnum (+ index i)))))
+
+
+
+(defun mread-base-string (ptr index result-string &optional (start 0) (end (length result-string)))
+  "Read (END-START) single-byte characters from the memory starting at (PTR+INDEX)
+and write them into RESULT-STRING.  Return RESULT-STRING.
+Characters are read from memory using the compact, single-byte representation.
+For this reason only codes in the range 0 ... +most-positive-byte+ can be read
+\(typically 0 ... 255)"
+  (declare (type mpointer ptr)
+           (type fixnum index)
+           (type simple-array result-string)
+           (type ufixnum start end))
+
+  (loop for i from start below end do
+       (setf (svref result-string i)
+             (code-char
+              (the (unsigned-byte #.+mem-byte/bits+)
+                (%mget-t :uchar ptr (the fixnum (+ index i)))))))
+  result-string)

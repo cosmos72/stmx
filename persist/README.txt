@@ -56,24 +56,24 @@ Notes:
    The rest are pointers:
    2 = pointer to bignum   
    
-   4 = pointer to single-float
-   5 = pointer to double-float
-   6 = pointer to complex of single-float
-   7 = pointer to complex of double-float
+   3 = pointer to single-float
+   4 = pointer to double-float
+   5 = pointer to complex of single-float
+   6 = pointer to complex of double-float
+
+   7 = pointer to ratio of fixnums (which does NOT contain pointers, i.e. both numerator and denominator are fixnums)
+   8 = pointer to complex of fixnums (which does NOT contain pointers, i.e. both real and imag parts are fixnums)
+   9 = pointer to cons or list (which contains no pointers)
+   10 = pointer to array (which does NOT contain pointers)
+   11 = pointer to hash-table (which does NOT contain pointers)
    
-   8 = pointer to ratio (which contains no pointers, i.e. both numerator and denominator are mem-int)
-   9 = pointer to complex of fixnum (which contains no pointers, i.e. both real and imag parts are mem-int)
-   10 = pointer to cons or list (which contains no pointers)
-   11 = pointer to array (which contains no pointers)
-   
-   12 = pointer to ratio (which contains pointers, i.e. numerator or denominator are bignums)
-   13 = pointer to complex of pointer (which contains pointers, i.e. real or imag parts are bignums or ratios)
+   12 = pointer to ratio of bignums (contains pointers, i.e. numerator or denominator are bignums)
+   13 = pointer to complex of rational (contain pointers, i.e. real or imag parts are bignums or ratios)
    14 = pointer to cons or list (which contains pointers)
    15 = pointer to array (which contains pointers)
+   16 = pointer to hash-table (which contains pointers)
    
-   HASH-TABLE ??? must be added...
-   
-   16... pointer to user-defined persistent type
+   17... pointer to user-defined persistent type
 
    tag >= 12 indicate that object pointed-to may contain itself pointers.
 

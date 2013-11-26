@@ -48,9 +48,62 @@ Notes:
                                ; s = sign (1 bit)
                                ; x = value (30 bits)
 
+4) tags
 
+   0 = reserved (unallocated, keyword or symbol)
+   1 = character
+   
+   The rest are pointers:
+   2 = pointer to bignum   
+   
+   4 = pointer to single-float
+   5 = pointer to double-float
+   6 = pointer to complex of single-float
+   7 = pointer to complex of double-float
+   
+   8 = pointer to ratio (which contains no pointers, i.e. both numerator and denominator are mem-int)
+   9 = pointer to complex of fixnum (which contains no pointers, i.e. both real and imag parts are mem-int)
+   10 = pointer to cons or list (which contains no pointers)
+   11 = pointer to array (which contains no pointers)
+   
+   12 = pointer to ratio (which contains pointers, i.e. numerator or denominator are bignums)
+   13 = pointer to complex of pointer (which contains pointers, i.e. real or imag parts are bignums or ratios)
+   14 = pointer to cons or list (which contains pointers)
+   15 = pointer to array (which contains pointers)
+   
+   HASH-TABLE ??? must be added...
+   
+   16... pointer to user-defined persistent type
 
-4) arrays ABI.
+   tag >= 12 indicate that object pointed-to may contain itself pointers.
+
+   
+5) allocated  areas ABI
+
+   word 0: tag = type of this area. tag = 0 means unallocated area (see paragraph 6)
+           value = number of allocated words. also counts the header (i.e. words 0 and 1)
+           
+   word 1: tag = type of owner      \ the object that points to this one.
+           value = pointer to owner / used to simplify GC. tag = 0 means eligible for GC.
+           
+   word 2... : payload. depends on type
+   
+   
+6) unallocated areas ABI.
+
+   word 0: tag = always 0, means unallocated area
+           value = number of words in this area. also counts the header (i.e. words 0 and 1)
+           
+   word 1: tag = always 0, means unallocated area
+           value = pointer to next unallocated area (it is a circular list)
+
+   word 2... : not used
+ 
+
+   
+7) arrays ABI.
+
+   they start with allocated areas ABI, then:
 
    CONS: easy, just store the CAR and CDR
 
@@ -62,8 +115,7 @@ Notes:
            store the element type (it's a small non-negative number,
                                    implies the element size to allow bit arrays),
                  with the 1-dimensional, adjustable and fill-pointer flags (merge them with element type),
-           then the fill pointer,
-           then the allocated size,
+           then the length (= number of elements),
            then the elements
 
    multi-dimensional arrays:
@@ -74,20 +126,3 @@ Notes:
            then the actual dimensions,
            then the elements
 
-5) unallocated areas ABI.
-
-   for fixed-size general maps (currently, only CONS) set CAR to +unallocated+
-   and CDR to pointer to next free CONS.
-
-   for fixed-size specialized maps (currently SINGLE-FLOAT, DOUBLE-FLOAT, COMPLEX-SINGLE-FLOAT,
-   COMPLEX-DOUBLE-FLOAT)
-   ******no clear solution! *******
-   For COMPLEX-* we could set REALPART to +not-a-number+ and IMAGPART to pointer to next free element,
-   but what about SINGLE-FLOAT and DOUBLE-FLOAT?
-
-   for variable-size general maps (i.e. vectors and arrays):
-           store +unallocated+ as the element type
-           then the area length in units of a CPU word
-           then the pointer to next unallocated area
-
-   

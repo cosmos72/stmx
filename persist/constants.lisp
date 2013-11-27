@@ -73,13 +73,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defconstant +mem-float/bits+  (* +msizeof-float+ +mem-byte/bits+))
-(defconstant +mem-double/bits+ (* +msizeof-double+ +mem-byte/bits+))
+(defconstant +mem-sfloat/bits+ (* +msizeof-sfloat+ +mem-byte/bits+))
+(defconstant +mem-dfloat/bits+ (* +msizeof-dfloat+ +mem-byte/bits+))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
   (defun %mem-float/inline (type)
-    (declare (type (member :float :double type)))
+    (declare (type (member :float :double :sfloat :dfloat type)))
     (let ((size (msizeof type)))
       (<= (* size +mem-byte/bits+) +mem-pointer/bits+))))
 
@@ -88,8 +88,8 @@
       (%mem-float/inline type)
       `(%mem-float/inline ,type)))
 
-(defconstant +mem-float/inline+  (mem-float/inline :float))
-(defconstant +mem-double/inline+ (mem-float/inline :double))
+(defconstant +mem-sfloat/inline+ (mem-float/inline :sfloat))
+(defconstant +mem-dfloat/inline+ (mem-float/inline :dfloat))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -102,10 +102,10 @@
 (defconstant +mem-nil+          2 "persistent representation of T")
 (defconstant +mem-t+            3 "persistent representation of NIL")
 
-(defconstant +mem-tag-keyword+   0)
+(defconstant +mem-tag-symbol+    0)
 (defconstant +mem-tag-character+ 1 "tag for inline characters")
-(defconstant +mem-tag-float+     2 "tag for inline floats")
-(defconstant +mem-tag-double+    3 "tag for inline doubles")
+(defconstant +mem-tag-sfloat+    2 "tag for inline single-floats")
+(defconstant +mem-tag-dfloat+    3 "tag for inline double-floats")
 (defconstant +mem-tag-box+       4 "tag for boxed values that do NOT contain pointers")
 (defconstant +mem-tag-box-gc+    5 "tag for boxed values that may contain pointers")
 (defconstant +mem-tag-last+      +mem-tag/bits+)

@@ -32,15 +32,17 @@
 
 
 (defun get-abi ()
-  '((:file-version  . 1)
-    (:bits-per-byte . #.+mem-byte/bits+)
-    (:bits-per-tag  . #.+mem-tag/bits+)
+  '((:stmx-persist-magic . #.(coerce '(#\u0000 #\u0004 #\s #\t #\m #\x
+                                       #\u0007 #\p #\e #\r #\s #\i #\s #\t #\u000a) 'string))
+    (:file-version   . 1)
+    (:bits-per-byte  . #.+mem-byte/bits+)
+    (:bits-per-tag   . #.+mem-tag/bits+)
     (:bits-per-pointer . #.+mem-pointer/bits+)
-    (:bits-per-word . #.+mem-word/bits+)
-    (:sizeof-byte   . #.+msizeof-byte+)
-    (:sizeof-word   . #.+msizeof-word+)
-    (:sizeof-float  . #.+msizeof-float+)
-    (:sizeof-double . #.+msizeof-double+)
+    (:bits-per-word  . #.+mem-word/bits+)
+    (:sizeof-byte    . #.+msizeof-byte+)
+    (:sizeof-word    . #.+msizeof-word+)
+    (:sizeof-single-float . #.+msizeof-sfloat+)
+    (:sizeof-double-float . #.+msizeof-dfloat+)
     (:word-endianity . #.(let ((fmt (format nil "~A~D~A" "#x~" (* 2 +msizeof-word+) ",'0X")))
                            (format nil fmt +mem-word/endianity+)))))
     
@@ -79,7 +81,7 @@
         (logior
          (ash value   +mem-pointer/shift+)
          (ash fulltag +mem-fulltag/shift+)))
-  nil)
+  t)
 
 
 (declaim (inline mset-int))
@@ -91,7 +93,7 @@
   (setf (mget-word ptr index)
         (logand +mem-word/mask+
                 (logior +mem-int/flag+ value)))
-  nil)
+  t)
 
 
 (defmacro %to-int (val)
@@ -133,37 +135,37 @@
 
 
 (defmacro mget-float-0 (type ptr index)
-  (declare (type (member :float :double) type))
+  (declare (type (member :float :double :sfloat :dfloat) type))
   `(%mget-t ,type ,ptr (logand +mem-word/mask+ (* ,index +msizeof-word+))))
 
 (defmacro mget-float-N (type ptr index)
-  (declare (type (member :float :double) type))
+  (declare (type (member :float :double :sfloat :dfloat) type))
   `(%mget-t ,type ,ptr (logand +mem-word/mask+
-                               (+ ,(- +msizeof-word+ +msizeof-float+)
+                               (+ ,(- +msizeof-word+ (msizeof type))
                                   (logand +mem-word/mask+
                                           (* ,index +msizeof-word+))))))
 
 (defmacro mset-float-0 (type ptr index value)
-  (declare (type (member :float :double) type))
+  (declare (type (member :float :double :sfloat :dfloat) type))
   `(%mset-t ,value ,type ,ptr (logand +mem-word/mask+ (* ,index +msizeof-word+))))
 
 (defmacro mset-float-N (type ptr index value)
-  (declare (type (member :float :double) type))
+  (declare (type (member :float :double :sfloat :dfloat) type))
   `(%mset-t ,value ,type ,ptr (logand +mem-word/mask+
-                                       (+ ,(- +msizeof-word+ +msizeof-float+)
+                                       (+ ,(- +msizeof-word+ (msizeof type))
                                           (logand +mem-word/mask+
                                                   (* ,index +msizeof-word+))))))
 
-(defmacro mget-float-inline (type ptr index)
-  (declare (type (member :float :double) type))
+(defmacro mget-float/inline (type ptr index)
+  (declare (type (member :float :double :sfloat :dfloat) type))
   (if (mem-float/inline type)
       (if +mem/little-endian+
           `(mget-float-0 ,type ,ptr ,index)
           `(mget-float-N ,type ,ptr ,index))
       `(error "STMX-PERSIST: cannot use inline ~As on this architecture" ,(cffi-type-name type))))
 
-(defmacro mset-float-inline (type ptr index value)
-  (declare (type (member :float :double) type))
+(defmacro mset-float/inline (type ptr index value)
+  (declare (type (member :float :double :sfloat :dfloat) type))
   (if (mem-float/inline type)
       (if +mem/little-endian+
           `(mset-float-0 ,type ,ptr ,index ,value)
@@ -182,7 +184,7 @@ boolean, unbound slots, character and medium-size integer
            (type fixnum index)
            (type (or boolean symbol character mem-int single-float double-float) value))
 
-  (let ((tag +mem-tag-keyword+)
+  (let ((tag +mem-tag-symbol+)
         (val +mem-nil+))
 
     (cond
@@ -203,20 +205,20 @@ boolean, unbound slots, character and medium-size integer
       ((eq value stmx::+unbound-tvar+) (setf val +mem-unbound+))
 
       ;; value is a single-float?
-      ((and +mem-float/inline+ (typep value 'single-float))
-       (mset-value-and-fulltag ptr index 0 +mem-tag-float+)
-       (mset-float-inline :float ptr index value)
-       (return-from mset-unboxed value))
+      ((and +mem-sfloat/inline+ (typep value 'single-float))
+       (mset-value-and-fulltag ptr index 0 +mem-tag-sfloat+)
+       (mset-float/inline :sfloat ptr index value)
+       (return-from mset-unboxed t))
 
       ;; value is a double-float?
       #-(and)
-      ((and +mem-double/inline+ (typep value 'double-float))
+      ((and +mem-dfloat/inline+ (typep value 'double-float))
        (mset-value-and-fulltag ptr index 0 +mem-tag-double+)
-       (mset-float-inline :double ptr index value)
-       (return-from mset-unboxed value))
+       (mset-float-inline :dfloat ptr index value)
+       (return-from mset-unboxed t))
 
-      ;; default case
-      (t (error "STMX-PERSIST: value ~S cannot be stored as unboxed type" value)))
+      ;; default case: value cannot be be stored as unboxed type, return NIL
+      (t (return-from mset-unboxed nil)))
 
     (mset-value-and-fulltag ptr index val tag)))
 
@@ -237,22 +239,23 @@ medium-size integer) or a pointer from memory store.
         (multiple-value-bind (value fulltag) (%to-value-and-fulltag value)
 
           (case fulltag
-            (#.+mem-tag-keyword+ ;; found a boolean or a keyword
+            (#.+mem-tag-symbol+ ;; found a symbol
 
              (case value
+               (#.+mem-unallocated+ nil) ;; should not happen :(
                (#.+mem-unbound+ stmx::+unbound-tvar+) ;; unbound slot
                (#.+mem-t+       t)
                (#.+mem-nil+     nil)
-               (otherwise       (values value fulltag)))) ;; found a keyword
+               (otherwise       (values value fulltag)))) ;; generic symbol
 
             (#.+mem-tag-character+ ;; found a character
              (code-char (logand value +character/mask+)))
 
-            (#.+mem-tag-float+ ;; found a float
-             (mget-float-inline :float ptr index))
+            (#.+mem-tag-sfloat+ ;; found a single-float
+             (mget-float/inline :sfloat ptr index))
 
-            (#.+mem-tag-double+ ;; found a double
-             (mget-float-inline :double ptr index))
+            (#.+mem-tag-dfloat+ ;; found a double-float
+             (mget-float/inline :dfloat ptr index))
 
             (otherwise ;; found a boxed value or a pointer
              (values value fulltag))))

@@ -35,6 +35,8 @@
       (:uint   :unsigned-int)
       (:ulong  :unsigned-long)
       (:ullong :unsigned-long-long)
+      (:sfloat :float)         ;; this is the ONLY code mapping :sfloat to a CFFI type
+      (:dfloat :double)        ;; this is the ONLY code mapping :dfloat to a CFFI type
       (:byte   :unsigned-char) ;; this is the ONLY code mapping :byte to a CFFI type
       (:word   :unsigned-long) ;; this is the ONLY code mapping :word to a CFFI type
       (otherwise type))))
@@ -67,6 +69,8 @@
 (defconstant +msizeof-ulong+   (msizeof :ulong))
 (defconstant +msizeof-ullong+  (msizeof :ullong))
 
+(defconstant +msizeof-sfloat+   (msizeof :sfloat))
+(defconstant +msizeof-dfloat+   (msizeof :dfloat))
 (defconstant +msizeof-byte+    (msizeof :byte))
 (defconstant +msizeof-word+    (msizeof :word))
 

@@ -16,7 +16,7 @@
 (in-package :stmx-persist.test)
 
 
-(defun test-mwrite-float-inline (ptr count)
+(defun test-mset-float/inline (ptr count)
   (declare (type fixnum count))
 
   ;; on Core i7-4770,
@@ -36,6 +36,6 @@
   (stmx::hw-atomic2 ()
    (loop for idx from 0 below count
       for value from 0.0 by 0.1 do
-        (sp::mset-float-inline :float ptr idx value)
+        (sp::mset-float/inline :sfloat ptr idx value)
         finally (return :hw-tx))
    :fallback))

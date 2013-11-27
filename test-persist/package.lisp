@@ -19,6 +19,8 @@
 
 (defpackage #:stmx-persist.test
 
+  (:nicknames #:sp.test)
+
   (:use #:cl
         #:stmx-persist)
 

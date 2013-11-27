@@ -20,7 +20,7 @@
 ;;;; ** constants
 
 (declaim (type symbol +unbound-tvar+))
-(define-global +unbound-tvar+ (gensym (symbol-name 'unbound-tvar-)))
+(define-constant-once +unbound-tvar+ (gensym (symbol-name 'unbound-tvar-)))
 
 (declaim (type version-type +invalid-version+))
 (defconstant +invalid-version+ (- +global-clock-delta+))

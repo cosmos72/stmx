@@ -179,7 +179,8 @@
 
   :components ((:module :test-persist
                 :components ((:file "package")
-                             (:file "mem"           :depends-on ("package"))))))
+                             (:file "mem"           :depends-on ("package"))
+                             (:file "abi"           :depends-on ("mem"))))))
 
 
 (defmethod asdf:perform ((op asdf:test-op) (system (eql (asdf:find-system :stmx-persist))))

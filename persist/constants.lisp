@@ -70,14 +70,44 @@
 (defconstant +most-negative-int+ (lognot +most-positive-int+))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defconstant +mem-unallocated+ 0)
-(defconstant +mem-nil+ 1)
-(defconstant +mem-t+   2)
+(defconstant +mem-float/bits+  (* +msizeof-float+ +mem-byte/bits+))
+(defconstant +mem-double/bits+ (* +msizeof-double+ +mem-byte/bits+))
 
-(defconstant +mem-fulltag-keyword+  0)
-(defconstant +mem-fulltag-character+ 1)
-(defconstant +mem-fulltag-last+      +mem-tag/bits+)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+
+  (defun %mem-float/inline (type)
+    (declare (type (member :float :double type)))
+    (let ((size (msizeof type)))
+      (<= (* size +mem-byte/bits+) +mem-pointer/bits+))))
+
+(defmacro mem-float/inline (type)
+  (if (keywordp type)
+      (%mem-float/inline type)
+      `(%mem-float/inline ,type)))
+
+(defconstant +mem-float/inline+  (mem-float/inline :float))
+(defconstant +mem-double/inline+ (mem-float/inline :double))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Hard-coded constants. DO NOT CHANGE!                                       ;;
+;; They are read from and written to the store, so they are part of the ABI   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defconstant +mem-unallocated+  0)
+(defconstant +mem-unbound+      1 "persistent representation of unbound slot")
+(defconstant +mem-nil+          2 "persistent representation of T")
+(defconstant +mem-t+            3 "persistent representation of NIL")
+
+(defconstant +mem-tag-keyword+   0)
+(defconstant +mem-tag-character+ 1 "tag for inline characters")
+(defconstant +mem-tag-float+     2 "tag for inline floats")
+(defconstant +mem-tag-double+    3 "tag for inline doubles")
+(defconstant +mem-tag-box+       4 "tag for boxed values that do NOT contain pointers")
+(defconstant +mem-tag-box-gc+    5 "tag for boxed values that may contain pointers")
+(defconstant +mem-tag-last+      +mem-tag/bits+)
 
 

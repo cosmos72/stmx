@@ -26,8 +26,8 @@
 
 (deftype mem-word    () '(unsigned-byte #.+mem-word/bits+))
 (deftype mem-pointer () '(unsigned-byte #.+mem-pointer/bits+))
-(deftype mem-fulltag () '(unsigned-byte #.+mem-fulltag/bits+))
 (deftype mem-tag     () '(unsigned-byte #.+mem-tag/bits+))
+(deftype mem-fulltag () '(unsigned-byte #.+mem-fulltag/bits+))
 (deftype mem-int     () '(integer #.+most-negative-int+ #.+most-positive-int+))
 
 
@@ -37,7 +37,10 @@
     (:bits-per-tag  . #.+mem-tag/bits+)
     (:bits-per-pointer . #.+mem-pointer/bits+)
     (:bits-per-word . #.+mem-word/bits+)
+    (:sizeof-byte   . #.+msizeof-byte+)
     (:sizeof-word   . #.+msizeof-word+)
+    (:sizeof-float  . #.+msizeof-float+)
+    (:sizeof-double . #.+msizeof-double+)
     (:word-endianity . #.(let ((fmt (format nil "~A~D~A" "#x~" (* 2 +msizeof-word+) ",'0X")))
                            (format nil fmt +mem-word/endianity+)))))
     
@@ -56,7 +59,8 @@
         (%to-value ,value)
         (%to-fulltag ,value)))))
        
-  
+
+(declaim (inline mget-value-and-fulltag))
 (defun mget-value-and-fulltag (ptr index)
   (declare (type mpointer ptr)
            (type fixnum index))
@@ -64,7 +68,7 @@
 
 
 
-       
+(declaim (inline mset-value-and-fulltag))
 (defun mset-value-and-fulltag (ptr index value fulltag)
   (declare (type mpointer ptr)
            (type fixnum index)
@@ -78,7 +82,7 @@
   nil)
 
 
-
+(declaim (inline mset-int))
 (defun mset-int (ptr index value)
   (declare (type mpointer ptr)
            (type fixnum index)
@@ -99,6 +103,7 @@
             (,sign (logand +mem-int/sign-mask+ ,value)))
        (the mem-int (- ,int-value ,sign)))))
   
+(declaim (inline mget-int))
 (defun mget-int (ptr index)
   (declare (type mpointer ptr)
            (type fixnum index))
@@ -114,7 +119,7 @@
            (type fixnum index)
            (type character value))
 
-  (mset-value-and-fulltag ptr index (char-code value) +mem-fulltag-character+))
+  (mset-value-and-fulltag ptr index (char-code value) +mem-tag-character+))
 
 
 (defun mget-character (ptr index)
@@ -124,40 +129,103 @@
   (code-char (%to-value (mget-word ptr index))))
 
 
-(defun mset-primitive (ptr index value &optional fulltag)
-  "Copy a primitive value (boolean, character, medium-size integer or pointer) to memory store."
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defmacro mget-float-0 (type ptr index)
+  (declare (type (member :float :double) type))
+  `(%mget-t ,type ,ptr (logand +mem-word/mask+ (* ,index +msizeof-word+))))
+
+(defmacro mget-float-N (type ptr index)
+  (declare (type (member :float :double) type))
+  `(%mget-t ,type ,ptr (logand +mem-word/mask+
+                               (+ ,(- +msizeof-word+ +msizeof-float+)
+                                  (logand +mem-word/mask+
+                                          (* ,index +msizeof-word+))))))
+
+(defmacro mset-float-0 (type ptr index value)
+  (declare (type (member :float :double) type))
+  `(%mset-t ,value ,type ,ptr (logand +mem-word/mask+ (* ,index +msizeof-word+))))
+
+(defmacro mset-float-N (type ptr index value)
+  (declare (type (member :float :double) type))
+  `(%mset-t ,value ,type ,ptr (logand +mem-word/mask+
+                                       (+ ,(- +msizeof-word+ +msizeof-float+)
+                                          (logand +mem-word/mask+
+                                                  (* ,index +msizeof-word+))))))
+
+(defmacro mget-float-inline (type ptr index)
+  (declare (type (member :float :double) type))
+  (if (mem-float/inline type)
+      (if +mem/little-endian+
+          `(mget-float-0 ,type ,ptr ,index)
+          `(mget-float-N ,type ,ptr ,index))
+      `(error "STMX-PERSIST: cannot use inline ~As on this architecture" ,(cffi-type-name type))))
+
+(defmacro mset-float-inline (type ptr index value)
+  (declare (type (member :float :double) type))
+  (if (mem-float/inline type)
+      (if +mem/little-endian+
+          `(mset-float-0 ,type ,ptr ,index ,value)
+          `(mset-float-N ,type ,ptr ,index ,value))
+      `(error "STMX-PERSIST: cannot use inline ~As on this architecture" ,(cffi-type-name type))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defun mset-unboxed (ptr index value)
+  "Write an unboxed value to memory store. Supported types are:
+boolean, unbound slots, character and medium-size integer
+\(on 64bit architectures can also write single-floats)"
   (declare (type mpointer ptr)
            (type fixnum index)
-           (type (or boolean character mem-int mem-pointer) value)
-           (type (or null mem-fulltag) fulltag))
+           (type (or boolean symbol character mem-int single-float double-float) value))
 
-  (let ((tag +mem-fulltag-keyword+)
+  (let ((tag +mem-tag-keyword+)
         (val +mem-nil+))
 
     (cond
-      ;; value is tagged pointer?
-      (fulltag (setf tag fulltag
-                     val (the mem-pointer value)))
+      ;; value is an integer?
+      ((typep value 'mem-int)
+       (return-from mset-unboxed (mset-int ptr index value)))
 
-      ;; value is integer?
-      ((typep value 'mem-int) (return-from mset-primitive (mset-int ptr index value)))
-
-      ;; value is character?
-      ((characterp value) (setf tag +mem-fulltag-character+
+      ;; value is a character?
+      ((characterp value) (setf tag +mem-tag-character+
                                 val (char-code value)))
+      ;; value is T ?
+      ((eq value t)       (setf val +mem-t+))
 
-      ;; assume value is boolean
-      ((eq t value)       (setf val +mem-t+))
+      ;; value is NIL ?
+      ((eq value nil))
+
+      ;; value is +unbound-tvar+ ?
+      ((eq value stmx::+unbound-tvar+) (setf val +mem-unbound+))
+
+      ;; value is a single-float?
+      ((and +mem-float/inline+ (typep value 'single-float))
+       (mset-value-and-fulltag ptr index 0 +mem-tag-float+)
+       (mset-float-inline :float ptr index value)
+       (return-from mset-unboxed value))
+
+      ;; value is a double-float?
+      #-(and)
+      ((and +mem-double/inline+ (typep value 'double-float))
+       (mset-value-and-fulltag ptr index 0 +mem-tag-double+)
+       (mset-float-inline :double ptr index value)
+       (return-from mset-unboxed value))
 
       ;; default case
-      (t))
+      (t (error "STMX-PERSIST: value ~S cannot be stored as unboxed type" value)))
 
     (mset-value-and-fulltag ptr index val tag)))
 
      
 
-(defun mget-primitive (ptr index)
-  "Get a primitive value (boolean, character, medium-size integer or pointer) from memory store."
+(defun mget-unboxed (ptr index)
+  "Read an unboxed value (boolean, unbound slot, character or
+medium-size integer) or a pointer from memory store.
+\(on 64bit architectures can also read single-floats)"
   (declare (type mpointer ptr)
            (type fixnum index))
 
@@ -169,17 +237,24 @@
         (multiple-value-bind (value fulltag) (%to-value-and-fulltag value)
 
           (case fulltag
-            (#.+mem-fulltag-keyword+ ;; found a boolean or a keyword
+            (#.+mem-tag-keyword+ ;; found a boolean or a keyword
 
              (case value
-               (#.+mem-t+   t)
-               (#.+mem-nil+ nil)
-               (otherwise (values value fulltag)))) ;; found a keyword
+               (#.+mem-unbound+ stmx::+unbound-tvar+) ;; unbound slot
+               (#.+mem-t+       t)
+               (#.+mem-nil+     nil)
+               (otherwise       (values value fulltag)))) ;; found a keyword
 
-            (#.+mem-fulltag-character+ ;; found a character
+            (#.+mem-tag-character+ ;; found a character
              (code-char (logand value +character/mask+)))
 
-            (otherwise ;; found a pointer
+            (#.+mem-tag-float+ ;; found a float
+             (mget-float-inline :float ptr index))
+
+            (#.+mem-tag-double+ ;; found a double
+             (mget-float-inline :double ptr index))
+
+            (otherwise ;; found a boxed value or a pointer
              (values value fulltag))))
 
         ;; found a mem-int
@@ -297,7 +372,7 @@ For this reason the codes of all characters to be stored must be in the range
   (loop for i from start below end do
        (%mset-t (the (unsigned-byte #.+mem-byte/bits+)
                   (char-code
-                   (svref string i))) :uchar
+                   (svref string i))) :byte
                 ptr (the fixnum (+ index i)))))
 
 
@@ -317,5 +392,5 @@ For this reason only codes in the range 0 ... +most-positive-byte+ can be read
        (setf (svref result-string i)
              (code-char
               (the (unsigned-byte #.+mem-byte/bits+)
-                (%mget-t :uchar ptr (the fixnum (+ index i)))))))
+                (%mget-t :byte ptr (the fixnum (+ index i)))))))
   result-string)

@@ -19,6 +19,8 @@
 
 (defpackage #:stmx-persist
 
+  (:nicknames #:sp)
+
   (:use #:cl)
 
   (:export #:+null-pointer+ #:+bad-fd+

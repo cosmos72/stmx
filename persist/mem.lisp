@@ -35,6 +35,7 @@
       (:uint   :unsigned-int)
       (:ulong  :unsigned-long)
       (:ullong :unsigned-long-long)
+      (:byte   :unsigned-char) ;; this is the ONLY code mapping :byte to a CFFI type
       (:word   :unsigned-long) ;; this is the ONLY code mapping :word to a CFFI type
       (otherwise type))))
 
@@ -65,6 +66,8 @@
 (defconstant +msizeof-uint+    (msizeof :uint))
 (defconstant +msizeof-ulong+   (msizeof :ulong))
 (defconstant +msizeof-ullong+  (msizeof :ullong))
+
+(defconstant +msizeof-byte+    (msizeof :byte))
 (defconstant +msizeof-word+    (msizeof :word))
 
 
@@ -84,15 +87,21 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
+  (defun cffi-type-name (sym)
+    (declare (type symbol sym))
+    (string-downcase (symbol-name (parse-type sym))))
+
   ;; we need at least a 32-bit architecture
-  (when (/= +msizeof-uchar+ 1)
+  (when (/= +msizeof-byte+ 1)
     (error "cannot build STMX-PERSIST: unsupported architecture.
-    size of unsigned-char is ~S bytes, expecting exactly 1 byte" +msizeof-uchar+))
+    size of ~S is ~S bytes, expecting exactly 1 byte"
+           (cffi-type-name :byte) +msizeof-byte+))
 
 
   (when (< +msizeof-word+ 4)
     (error "cannot build STMX-PERSIST: unsupported architecture.
-    size of CPU word is ~S bytes, expecting at least 4 bytes" +msizeof-word+))
+    size of ~S is ~S bytes, expecting at least 4 bytes"
+           (cffi-type-name :byte) +msizeof-word+))
 
   ;; determine number of bits per CPU word
   (defun %detect-bits-per-word ()
@@ -162,11 +171,28 @@
 
   (defun %detect-endianity ()
     (cffi-sys:with-foreign-pointer (p +msizeof-word+)
-      (loop for i from 0 below +msizeof-word+ do
-           (%mset-t (logand (1+ i) +mem-byte/mask+)
-                    :uchar p i))
+      (let ((little-endian 0)
+            (big-endian 0))
 
-      (%mget-t :word p))))
+        (loop for i from 0 below +msizeof-word+
+             for bits = (logand (1+ i) +mem-byte/mask+) do
+
+             (setf little-endian (logior little-endian (ash bits (* i +mem-byte/bits+)))
+                   big-endian    (logior bits (ash big-endian +mem-byte/bits+)))
+
+             (%mset-t bits :byte p i))
+
+        (let ((endianity (%mget-t :word p)))
+          (unless (or (eql endianity little-endian)
+                      (eql endianity big-endian))
+            (error "cannot build STMX-PERSIST: unsupported architecture.
+    CPU word endianity is #x~X, expecting either #x~X (little-endian) or #x~X (big-endian)"
+                   endianity little-endian big-endian))
+
+          (defconstant +mem/little-endian+ (eql little-endian endianity))
+          
+          endianity)))))
+
 
 
 (defconstant +mem-word/endianity+ (%detect-endianity))
@@ -187,33 +213,40 @@
 
 (defsetf mget-word mset-word)
 
+
+
+
+
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
 (defun !mdump (stream ptr &optional (offset-start 0) (offset-end (1+ offset-start)))
-  "mdump is only used for debugging. it assumes sizeof(char) == 1"
+  "mdump is only used for debugging. it assumes sizeof(byte) == 1"
   (declare (type mpointer ptr)
            (type fixnum offset-start offset-end))
   (loop for offset from offset-start below offset-end do
-       (format stream "~2,'0X " (%mget-t :uchar ptr offset))))
+       (format stream "~2,'0X " (%mget-t :byte ptr offset))))
 
 
 (defun !mdump-reverse (stream ptr &optional (offset-start 0) (offset-end (1+ offset-start)))
-  "mdump-reverse is only used for debugging. it assumes sizeof(char) == 1"
+  "mdump-reverse is only used for debugging. it assumes sizeof(byte) == 1"
   (declare (type mpointer ptr)
            (type fixnum offset-start offset-end))
   (loop for offset from offset-end above offset-start do
-       (format stream "~2,'0X " (%mget-t :uchar ptr (1- offset)))))
+       (format stream "~2,'0X " (%mget-t :byte ptr (1- offset)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun !mfill (ptr size &key (value 0) (increment 0))
-  "mfill is only used for debugging. it assumes sizeof(char) == 1 and 8 bits in a char"
+  "mfill is only used for debugging. it assumes sizeof(byte) == 1 and 8 bits in a byte"
   (declare (type mpointer ptr)
            (type ufixnum size)
            (type (unsigned-byte 8) value increment))
   (loop for offset from 0 below size do
-       (%mset-t value :uchar ptr offset)
+       (%mset-t value :byte ptr offset)
        (setf value (logand #xFF (+ value increment)))))
 
 

@@ -16,7 +16,7 @@
 (in-package :stmx-persist)
 
 (deftype ufixnum () '(and fixnum (integer 0)))
-(deftype mpointer () 'cffi-sys:foreign-pointer)
+(deftype maddress () 'cffi-sys:foreign-pointer)
 
 (defconstant +null-pointer+ (if (boundp '+null-pointer+)
                                 (symbol-value '+null-pointer+)
@@ -26,6 +26,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel)
 
+  #-(and)
   (pushnew :stmx-persist/debug *features*)
 
   (defun parse-type (type)
@@ -228,7 +229,7 @@
 
 (defun !mdump (stream ptr &optional (offset-start 0) (offset-end (1+ offset-start)))
   "mdump is only used for debugging. it assumes sizeof(byte) == 1"
-  (declare (type mpointer ptr)
+  (declare (type maddress ptr)
            (type fixnum offset-start offset-end))
   (loop for offset from offset-start below offset-end do
        (format stream "~2,'0X " (%mget-t :byte ptr offset))))
@@ -236,7 +237,7 @@
 
 (defun !mdump-reverse (stream ptr &optional (offset-start 0) (offset-end (1+ offset-start)))
   "mdump-reverse is only used for debugging. it assumes sizeof(byte) == 1"
-  (declare (type mpointer ptr)
+  (declare (type maddress ptr)
            (type fixnum offset-start offset-end))
   (loop for offset from offset-end above offset-start do
        (format stream "~2,'0X " (%mget-t :byte ptr (1- offset)))))
@@ -246,7 +247,7 @@
 
 (defun !mfill (ptr size &key (value 0) (increment 0))
   "mfill is only used for debugging. it assumes sizeof(byte) == 1 and 8 bits in a byte"
-  (declare (type mpointer ptr)
+  (declare (type maddress ptr)
            (type ufixnum size)
            (type (unsigned-byte 8) value increment))
   (loop for offset from 0 below size do
@@ -257,23 +258,23 @@
 (declaim (inline null-pointer? memset mzero memcpy))
 
 (defun null-pointer? (ptr)
-  (declare (type mpointer ptr))
+  (declare (type maddress ptr))
   (cffi-sys:null-pointer-p ptr))
            
 
 (defun memset (ptr fill-byte size)
-  (declare (type mpointer ptr)
+  (declare (type maddress ptr)
            (type (unsigned-byte 8) fill-byte)
            (type ufixnum size))
   (osicat-posix:memset ptr fill-byte size))
 
 (defun mzero (ptr size)
-  (declare (type mpointer ptr)
+  (declare (type maddress ptr)
            (type ufixnum size))
   (memset ptr 0 size))
            
 (defun memcpy (dst src size)
-  (declare (type mpointer dst src)
+  (declare (type maddress dst src)
            (type ufixnum size))
   (osicat-posix:memcpy dst src size))
   

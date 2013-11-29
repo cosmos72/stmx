@@ -26,14 +26,16 @@
 
 (deftype mem-word    () '(unsigned-byte #.+mem-word/bits+))
 (deftype mem-pointer () '(unsigned-byte #.+mem-pointer/bits+))
+(deftype mem-size    () 'mem-pointer)
 (deftype mem-tag     () '(unsigned-byte #.+mem-tag/bits+))
 (deftype mem-fulltag () '(unsigned-byte #.+mem-fulltag/bits+))
 (deftype mem-int     () '(integer #.+most-negative-int+ #.+most-positive-int+))
 
 
 (defun get-abi ()
-  '((:stmx-persist-magic . #.(coerce '(#\u0000 #\u0004 #\s #\t #\m #\x
-                                       #\u0007 #\p #\e #\r #\s #\i #\s #\t #\u000a) 'string))
+  '((:stmx-persist-magic . (#\u0004 #\s #\t #\m #\x
+                            #\u0007 #\p #\e #\r #\s #\i #\s #\t
+                            #\u0002 #\u000D #\u000A #\u0000))
     (:file-version   . 1)
     (:bits-per-byte  . #.+mem-byte/bits+)
     (:bits-per-tag   . #.+mem-tag/bits+)
@@ -49,45 +51,55 @@
   
   
 (defmacro %to-value (value)
-  `(logand +mem-pointer/mask+ (ash ,value ,(- +mem-pointer/shift+))))
+  `(logand +mem-size/mask+ (ash ,value ,(- +mem-size/shift+))))
 
 (defmacro %to-fulltag (value)
   `(logand +mem-fulltag/mask+ (ash ,value ,(- +mem-fulltag/shift+))))
 
-(defmacro %to-value-and-fulltag (val)
+(defmacro %to-fulltag-and-value (val)
   (let ((value     (gensym "VALUE-")))
     `(let ((,value ,val))
        (values
-        (%to-value ,value)
-        (%to-fulltag ,value)))))
+        (%to-fulltag ,value)
+        (%to-value ,value)))))
        
 
-(declaim (inline mget-value-and-fulltag))
-(defun mget-value-and-fulltag (ptr index)
-  (declare (type mpointer ptr)
-           (type fixnum index))
-  (%to-value-and-fulltag (mget-word ptr index)))
+(declaim (inline mget-fulltag mget-value mget-fulltag-and-value))
+
+(defun mget-fulltag (ptr index)
+  (declare (type maddress ptr)
+           (type mem-size index))
+  (%to-fulltag (mget-word ptr index)))
+
+(defun mget-value (ptr index)
+  (declare (type maddress ptr)
+           (type mem-size index))
+  (%to-value (mget-word ptr index)))
+
+(defun mget-fulltag-and-value (ptr index)
+  (declare (type maddress ptr)
+           (type mem-size index))
+  (%to-fulltag-and-value (mget-word ptr index)))
 
 
 
-(declaim (inline mset-value-and-fulltag))
-(defun mset-value-and-fulltag (ptr index value fulltag)
-  (declare (type mpointer ptr)
-           (type fixnum index)
-           (type mem-pointer value)
+(declaim (inline mset-fulltag-and-value))
+(defun mset-fulltag-and-value (ptr index fulltag value)
+  (declare (type maddress ptr)
+           (type mem-size index value)
            (type mem-fulltag fulltag))
 
   (setf (mget-word ptr index)
         (logior
-         (ash value   +mem-pointer/shift+)
-         (ash fulltag +mem-fulltag/shift+)))
+         (ash fulltag +mem-fulltag/shift+)
+         (ash value   +mem-size/shift+)))
   t)
 
 
 (declaim (inline mset-int))
 (defun mset-int (ptr index value)
-  (declare (type mpointer ptr)
-           (type fixnum index)
+  (declare (type maddress ptr)
+           (type mem-size index)
            (type mem-int value))
 
   (setf (mget-word ptr index)
@@ -107,8 +119,8 @@
   
 (declaim (inline mget-int))
 (defun mget-int (ptr index)
-  (declare (type mpointer ptr)
-           (type fixnum index))
+  (declare (type maddress ptr)
+           (type mem-size index))
 
   (%to-int (mget-word ptr index)))
 
@@ -117,16 +129,16 @@
 (declaim (inline mset-character mget-character))
 
 (defun mset-character (ptr index value)
-  (declare (type mpointer ptr)
-           (type fixnum index)
+  (declare (type maddress ptr)
+           (type mem-size index)
            (type character value))
 
-  (mset-value-and-fulltag ptr index (char-code value) +mem-tag-character+))
+  (mset-fulltag-and-value ptr index +mem-tag-character+ (char-code value)))
 
 
 (defun mget-character (ptr index)
-  (declare (type mpointer ptr)
-           (type fixnum index))
+  (declare (type maddress ptr)
+           (type mem-size index))
 
   (code-char (%to-value (mget-word ptr index))))
 
@@ -180,8 +192,8 @@
   "Write an unboxed value to memory store. Supported types are:
 boolean, unbound slots, character and medium-size integer
 \(on 64bit architectures can also write single-floats)"
-  (declare (type mpointer ptr)
-           (type fixnum index)
+  (declare (type maddress ptr)
+           (type mem-size index)
            (type (or boolean symbol character mem-int single-float double-float) value))
 
   (let ((tag +mem-tag-symbol+)
@@ -206,21 +218,21 @@ boolean, unbound slots, character and medium-size integer
 
       ;; value is a single-float?
       ((and +mem-sfloat/inline+ (typep value 'single-float))
-       (mset-value-and-fulltag ptr index 0 +mem-tag-sfloat+)
+       (mset-fulltag-and-value ptr index +mem-tag-sfloat+ 0)
        (mset-float/inline :sfloat ptr index value)
        (return-from mset-unboxed t))
 
       ;; value is a double-float?
       #-(and)
       ((and +mem-dfloat/inline+ (typep value 'double-float))
-       (mset-value-and-fulltag ptr index 0 +mem-tag-double+)
-       (mset-float-inline :dfloat ptr index value)
+       (mset-fulltag-and-value ptr index +mem-tag-dfloat+ 0)
+       (mset-float/inline :dfloat ptr index value)
        (return-from mset-unboxed t))
 
       ;; default case: value cannot be be stored as unboxed type, return NIL
       (t (return-from mset-unboxed nil)))
 
-    (mset-value-and-fulltag ptr index val tag)))
+    (mset-fulltag-and-value ptr index tag val)))
 
      
 
@@ -228,15 +240,15 @@ boolean, unbound slots, character and medium-size integer
   "Read an unboxed value (boolean, unbound slot, character or
 medium-size integer) or a pointer from memory store.
 \(on 64bit architectures can also read single-floats)"
-  (declare (type mpointer ptr)
-           (type fixnum index))
+  (declare (type maddress ptr)
+           (type mem-size index))
 
   (let ((value (mget-word ptr index)))
 
     (if (zerop (ash value (- +mem-int/bits+))) ;; found a mem-int?
 
         ;; not a mem-int
-        (multiple-value-bind (value fulltag) (%to-value-and-fulltag value)
+        (multiple-value-bind (fulltag value) (%to-fulltag-and-value value)
 
           (case fulltag
             (#.+mem-tag-symbol+ ;; found a symbol
@@ -267,66 +279,117 @@ medium-size integer) or a pointer from memory store.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+(defmacro mwrite-box-0 (ptr index boxed-type owner)
+  "Write to memory the 0-th word of a boxed value"
+  `(mset-fulltag-and-value ,ptr ,index ,boxed-type ,owner))
+
+(defmacro mwrite-box-1 (ptr index tag-payload-specific allocated-words-count)
+  "Write to memory the 1-st word of a boxed value"
+  `(mset-fulltag-and-value ,ptr ,index ,tag-payload-specific ,allocated-words-count))
+
+(defmacro mread-box-0 (ptr index)
+  `(mget-fulltag-and-value ,ptr ,index))
+
+(defmacro mread-box-1 (ptr index)
+  `(mget-fulltag-and-value ,ptr ,index))
+
+
+  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  
 (defun bignum-words (n)
   "Return the number of words needed to store bignum N in memory."
   (declare (type integer n))
 
   (let* ((len (integer-length n))
-         (words (truncate (+ len +mem-word/bits+ -1) ;; round up
-                          +mem-word/bits+)))
-    (unless (typep words 'mem-int)
-      (error "bignum too large for object store: it requires ~S words, maximum supported is ~S words"
-             words +most-positive-int+))
-    (the mem-int words)))
+         (words (truncate (+ len +mem-int/bits+ -1) ;; round up
+                          +mem-int/bits+)))
+    (unless (typep words 'mem-size)
+      (error "STMX-PERSIST: bignum too large for object store,
+    it requires ~S words, maximum supported is ~S words"
+             words +most-positive-size+))
+    (the mem-size words)))
 
 
-(defun mwrite-bignum (ptr index n &optional (n-words (bignum-words n)))
-  "Write bignum N into the memory starting at (PTR+INDEX)."
-  (declare (type mpointer ptr)
-           (type fixnum index)
-           (type integer n)
-           (type mem-int n-words))
+(defun %mwrite-box/bignum (ptr index allocated-words-count n
+                           &optional (n-words (bignum-words n)))
+  "Write bignum N into the boxed memory starting at (PTR+INDEX).
+Does NOT write 0-th word of box.
+ABI: bignum is stored as (bignum-words n) followed by an array of mem-int"
+  (declare (type maddress ptr)
+           (type mem-size index allocated-words-count n-words)
+           (type integer n))
 
-  (when (< n 0)
-    ;; FIXME: write N, not (LOGNOT N)
-    (setf n (lognot n))
-    (setf n-words (lognot n-words)))
 
-  (mset-int ptr index n-words)
+  (let ((sign (if (< n 0) -1 0))
+        (shift (- +mem-int/bits+))
+        (mask +mem-int/mask+))
 
-  (let ((bits +mem-word/bits+)
-        (mask +mem-word/mask+)
-        (i n))
+    (mwrite-box-1 ptr (incf (the mem-size index)) ; skip 0-th word 
+                  (logand 1 sign) allocated-words-count)
     
-    (loop do
-         (mset-word ptr (incf (the mem-int index)) (logand i mask))
-         (setf i (ash i (- bits)))
-         (when (or (= 0 i) (= -1 i))
-           (return)))))
+    (mset-fulltag-and-value ptr (incf (the mem-size index))
+                            0 n-words)
+
+    (loop until (eql sign n) do
+         (mset-word ptr (incf (the mem-size index)) (logand n mask))
+         (setf n (ash n shift)))))
 
 
 
-(defun mread-bignum (ptr index)
-  "Read a bignum from the memory starting at (PTR+INDEX)."
-  (declare (type mpointer ptr)
-           (type fixnum index))
+(defun mread-box/bignum (ptr index)
+  "Read a bignum from the boxed memory starting at (PTR+INDEX)."
+  (declare (type maddress ptr)
+           (type mem-size index))
 
-  (let* ((bits +mem-word/bits+)
-         (n-words (mget-int ptr index))
-         (negative (< n-words 0))
+  (let* ((bits +mem-int/bits+)
+         (mask +mem-int/mask+)
+         (negative (if (zerop (mread-box-1 ptr (incf (the mem-size index)))) ; skip 0-th word 
+                       0 -1))
+         (n-words (the mem-size (mget-value ptr (incf (the mem-size index)))))
          (n 0))
+    
+    (if (zerop negative)
 
-    (when negative
-      (setf n-words (lognot n-words)))
+        ;; read unsigned bignum
+        (loop for shift from 0 below (the fixnum (* bits n-words)) by bits
+           for i = (logand mask (mget-word ptr (incf (the mem-size index)))) do
+             (setf n (logior n (ash i shift))))
 
-    (loop for shift from 0 below (the fixnum (* bits n-words)) by bits
-       for i = (mget-word ptr (incf (the fixnum index))) do
-         (setf n (logior n (ash i shift))))
+        ;; read negative bignum
+        (let ((shift 0))
+          
+          ;; !!!!!!!  FIXME  !!!!!!!!
+          ;; !!!!!!!  BROKEN !!!!!!!!
+          ;; test with:
+          #-(and)
+          (loop for i from 0 below 256
+             for n = 0 then (- (logior (ash (- n) 8) i)) do
+               (mzero *p* 1000)
+               (%mwrite-box/bignum *p* 0 256 n)
+               (let ((m (mread-box/bignum *p* 0)))
+                 (unless (eql m n)
+                   (error "wrote ~S but read ~S" n m))))
 
-    (if negative
-        ;; FIXME: read N, not (LOGNOT N)
-        (lognot n)
-        n)))
+          
+          ;; read all words normally, except last one
+          (when (>= n-words 2)
+            (decf (the mem-size n-words))
+            (let ((limit (* bits n-words)))
+              (loop for i = (logand mask (mget-word ptr (incf (the mem-size index)))) do
+                   (setf n (logior n (ash i shift)))
+                   (incf (the fixnum shift) bits)
+                   (when (= shift limit)
+                     (return)))))
+
+          ;; change last word sign while maintaining its bits
+          (let* ((unsigned-last-word (logand mask (mget-word ptr (incf (the mem-size index)))))
+                 (last-word (logior unsigned-last-word +most-negative-int+)))
+
+            (setf n (logior n (ash last-word shift))))))
+    n))
+            
 
 
 
@@ -337,13 +400,13 @@ medium-size integer) or a pointer from memory store.
 (defun mwrite-string (ptr index string &optional (start 0) (end (length string)))
   "Write (END-START) characters from STRING to the memory starting at (PTR+INDEX).
 Characters will be stored using the general-purpose representation."
-  (declare (type mpointer ptr)
-           (type fixnum index)
+  (declare (type maddress ptr)
+           (type mem-size index)
            (type simple-array string)
            (type ufixnum start end))
 
   (loop for i from start below end do
-       (mset-character ptr (the fixnum (+ index i))
+       (mset-character ptr (the mem-size (+ index i))
                        (svref string i))))
 
 
@@ -351,14 +414,14 @@ Characters will be stored using the general-purpose representation."
   "Read (END-START) characters from the memory starting at (PTR+INDEX)
 and write them into RESULT-STRING. Return RESULT-STRING.
 Characters will be read using the general-purpose representation."
-  (declare (type mpointer ptr)
-           (type fixnum index)
+  (declare (type maddress ptr)
+           (type mem-size index)
            (type simple-array result-string)
            (type ufixnum start end))
 
   (loop for i from start below end do
        (setf (svref result-string i)
-             (mget-character ptr (the fixnum (+ index i)))))
+             (mget-character ptr (the mem-size (+ index i)))))
   result-string)
 
 
@@ -367,8 +430,8 @@ Characters will be read using the general-purpose representation."
 Characters are written using the compact, single-byte representation.
 For this reason the codes of all characters to be stored must be in the range
 0 ... +most-positive-byte+ (typically 0 ... 255)"
-  (declare (type mpointer ptr)
-           (type fixnum index)
+  (declare (type maddress ptr)
+           (type mem-size index)
            (type simple-array string)
            (type ufixnum start end))
 
@@ -376,7 +439,7 @@ For this reason the codes of all characters to be stored must be in the range
        (%mset-t (the (unsigned-byte #.+mem-byte/bits+)
                   (char-code
                    (svref string i))) :byte
-                ptr (the fixnum (+ index i)))))
+                ptr (the mem-size (+ index i)))))
 
 
 
@@ -386,8 +449,8 @@ and write them into RESULT-STRING.  Return RESULT-STRING.
 Characters are read from memory using the compact, single-byte representation.
 For this reason only codes in the range 0 ... +most-positive-byte+ can be read
 \(typically 0 ... 255)"
-  (declare (type mpointer ptr)
-           (type fixnum index)
+  (declare (type maddress ptr)
+           (type mem-size index)
            (type simple-array result-string)
            (type ufixnum start end))
 
@@ -395,5 +458,5 @@ For this reason only codes in the range 0 ... +most-positive-byte+ can be read
        (setf (svref result-string i)
              (code-char
               (the (unsigned-byte #.+mem-byte/bits+)
-                (%mget-t :byte ptr (the fixnum (+ index i)))))))
+                (%mget-t :byte ptr (the mem-size (+ index i)))))))
   result-string)

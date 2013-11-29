@@ -86,10 +86,10 @@ Design:
        it reuses pointer offset to store the double value)
 
    4 = boxed value not containing pointers
-       (bignum, ratio, float, complex, cons/list, array or hash-table)
+       (bignum, ratio, float, complex, cons/list, path, array or hash-table)
 
    5 = boxed value containing pointers
-       (bignum, ratio, float, complex, cons/list, array or hash-table)
+       (ratio, complex, cons/list, path, array or hash-table)
 
    6.. pointer to persistent object with user-defined type
 
@@ -104,7 +104,7 @@ Design:
            value = pointer to previous unallocated area (it is a circular list)
            
    word 1: tag = not used, can have any value
-           value = number of allocated words. does NOT count the header (i.e. words 0 and 1)
+           value = number of allocated words. also counts the header (i.e. words 0 and 1)
 
    payload:
 
@@ -119,7 +119,7 @@ Design:
            value = pointer to owner.
 
    word 1: tag = available for value-specific data, for example sign bits
-           value = number of allocated words. does NOT count the header (i.e. words 0 and 1)
+           value = number of allocated words. also counts the header (i.e. words 0 and 1)
    
    word 2... : payload. depends on type
 
@@ -134,10 +134,11 @@ Design:
    6 = complex of double-float
    7 = complex of rationals (fixnums, bignums or ratios)
    8 = cons or list
-   9 = 1-dimensional array, vector or string
-   10 = multi-dimensional array
-   11 = hash-table
-   12...15 reserved for future use
+   9 = filesystem path
+   10 = 1-dimensional array, vector or string
+   11 = multi-dimensional array
+   12 = hash-table
+   13...15 reserved for future use
 
    the remaining bits of the type are used as flags:
 
@@ -150,7 +151,8 @@ Design:
 
    word 0: as boxed values
    word 1: tag is used as sign bit. 0 means positive, 1 for means negative
-   word 2... : little-endian array of words, in two's complement representation,
+   word 2: value is number of words in the bignum (may be less than allocated words)
+   word 3... : little-endian array of words, in two's complement representation,
                of bignum value
 
 6.2. boxed ratio

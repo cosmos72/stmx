@@ -42,10 +42,6 @@
 ;; and the constants above                                                    ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defconstant +mem-pointer/shift+ 0)
-(defconstant +mem-pointer/mask+  (1- (ash 1 +mem-pointer/bits+)))
-(defconstant +most-positive-pointer+ +mem-pointer/mask+)
-
 (defconstant +mem-fulltag/shift+ +mem-pointer/bits+)
 (defconstant +mem-fulltag/mask+  (1- (ash 1 +mem-fulltag/bits+)))
 (defconstant +most-positive-fulltag+ +mem-fulltag/mask+)
@@ -55,6 +51,20 @@
 (defconstant +mem-tag/bits+      (1- +mem-fulltag/bits+))
 (defconstant +mem-tag/mask+      (1- (ash 1 +mem-tag/bits+)))
 (defconstant +most-positive-tag+ +mem-tag/mask+)
+
+
+(defconstant +mem-pointer/shift+ 0)
+(defconstant +mem-pointer/mask+  (1- (ash 1 +mem-pointer/bits+)))
+(defconstant +most-positive-pointer+ +mem-pointer/mask+)
+
+;; pointers and memory sizes must have the same bits
+(defconstant +mem-size/bits+     +mem-pointer/bits+)
+(defconstant +mem-size/shift+    +mem-pointer/shift+)
+(defconstant +mem-size/mask+     +mem-pointer/mask+)
+(defconstant +most-positive-size+ +most-positive-pointer+)
+
+
+
 
 (defconstant +mem-int/mask+      (1- (ash 1 +mem-int/bits+)))
 ;; bits in a word that exceed a mem-int. if all set to one,
@@ -110,4 +120,18 @@
 (defconstant +mem-tag-box-gc+    5 "tag for boxed values that may contain pointers")
 (defconstant +mem-tag-last+      +mem-tag/bits+)
 
+
+(defconstant +mem-box-free+      0 "box is not allocated")
+(defconstant +mem-box-bignum+    1 "box is a bignum")
+(defconstant +mem-box-ratio+     2 "box is a ratio")
+(defconstant +mem-box-sfloat+    3 "box is a single-float")
+(defconstant +mem-box-dfloat+    4 "box is a double-float")
+(defconstant +mem-box-complex-sfloat+   5 "box is a complex of single-float")
+(defconstant +mem-box-complex-dfloat+   6 "box is a complex of double-float")
+(defconstant +mem-box-complex-rational+ 7 "box is a complex of fixnum, bignum or ratio")
+(defconstant +mem-box-list+             8 "box is a complex of fixnum, bignum or ratio")
+(defconstant +mem-box-path+             9 "box is a filesystem path")
+(defconstant +mem-box-vector+          10 "box is a 1-dimensional array, vector or string")
+(defconstant +mem-box-array+           11 "box is a N-dimensional array")
+(defconstant +mem-box-hash-table+      12 "box is a hash-table")
 

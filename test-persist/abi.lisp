@@ -19,14 +19,14 @@
 (defun test-mset-float/inline (ptr count)
   (declare (type fixnum count))
 
-  ;; on Core i7-4770,
+  ;; on Intel Core i7-4770,
   ;; HW transactions succeed very often when writing up to 16KBytes
   ;; as long as the mmapped RAM is already dirty:
   ;; each RAM page must be written to *before* the HW transaction.
 
   ;; WARNING:
   ;; calling (sp::mset-unboxed) instead of (sp::mset-float-inline)
-  ;; at low settings of (optimize (speed)) causes *all*  HW transactions to fail!
+  ;; at low settings of (optimize (speed)) sometimes causes *all*  HW transactions to fail!
   ;; the problem disappears by setting (optimize (speed 3)) before loading STMX-PERSIST
 
   (loop for idx from 0 below count by 512
@@ -36,6 +36,7 @@
   (stmx::hw-atomic2 ()
    (loop for idx from 0 below count
       for value from 0.0 by 0.1 do
-        (sp::mset-float/inline :sfloat ptr idx value)
+        #-(and) (sp::mset-float/inline :sfloat ptr idx value)
+        #+(and) (sp::mset-unboxed ptr idx value)
         finally (return :hw-tx))
    :fallback))

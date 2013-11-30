@@ -33,9 +33,9 @@
 
 
 (defun get-abi ()
-  '((:stmx-persist-magic . (#\u0004 #\s #\t #\m #\x
-                            #\u0007 #\p #\e #\r #\s #\i #\s #\t
-                            #\u0002 #\u000D #\u000A #\u0000))
+  '((:stmx-persist-magic . (#.(code-char 4) #\s #\t #\m #\x
+                            #.(code-char 7) #\p #\e #\r #\s #\i #\s #\t
+                            #.(code-char 2) #.(code-char 13) #.(code-char 10) #.(code-char 0)))
     (:file-version   . 1)
     (:bits-per-byte  . #.+mem-byte/bits+)
     (:bits-per-tag   . #.+mem-tag/bits+)
@@ -284,9 +284,9 @@ medium-size integer) or a pointer from memory store.
   "Write to memory the 0-th word of a boxed value"
   `(mset-fulltag-and-value ,ptr ,index ,boxed-type ,owner))
 
-(defmacro mwrite-box-1 (ptr index tag-payload-specific allocated-words-count)
+(defmacro mwrite-box-1 (ptr index tag-payload-specific allocated-words)
   "Write to memory the 1-st word of a boxed value"
-  `(mset-fulltag-and-value ,ptr ,index ,tag-payload-specific ,allocated-words-count))
+  `(mset-fulltag-and-value ,ptr ,index ,tag-payload-specific ,allocated-words))
 
 (defmacro mread-box-0 (ptr index)
   `(mget-fulltag-and-value ,ptr ,index))
@@ -297,99 +297,171 @@ medium-size integer) or a pointer from memory store.
 
   
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-  
+
+(defconstant +mem-bignum-word/bits+ (1- +mem-int/bits+))
+(defconstant +mem-bignum-word/mask+ (1- (ash 1 +mem-bignum-word/bits+)))
+
+(defconstant +mem-bignum/max-words+ (- +most-positive-size+ 3)
+  "Maximum number of CPU words in a mem-bignum")
+
 (defun bignum-words (n)
   "Return the number of words needed to store bignum N in memory."
   (declare (type integer n))
 
   (let* ((len (integer-length n))
-         (words (truncate (+ len +mem-int/bits+ -1) ;; round up
-                          +mem-int/bits+)))
-    (unless (typep words 'mem-size)
+         (words (truncate (+ len +mem-word/bits+ -1) ;; round up
+                          +mem-word/bits+)))
+    (unless (<= words +mem-bignum/max-words+)
       (error "STMX-PERSIST: bignum too large for object store,
     it requires ~S words, maximum supported is ~S words"
              words +most-positive-size+))
-    (the mem-size words)))
+
+    (the (integer 0 #.+mem-bignum/max-words+) words)))
 
 
-(defun %mwrite-box/bignum (ptr index allocated-words-count n
-                           &optional (n-words (bignum-words n)))
-  "Write bignum N into the boxed memory starting at (PTR+INDEX).
-Does NOT write 0-th word of box.
-ABI: bignum is stored as (bignum-words n) followed by an array of mem-int"
+
+(defun %mwrite-bignum-loop (ptr index n-words n)
   (declare (type maddress ptr)
-           (type mem-size index allocated-words-count n-words)
+           (type mem-size index n-words)
            (type integer n))
 
+  (let ((shift (- +mem-word/bits+))
+        (mask +mem-word/mask+))
 
-  (let ((sign (if (< n 0) -1 0))
-        (shift (- +mem-int/bits+))
-        (mask +mem-int/mask+))
-
-    (mwrite-box-1 ptr (incf (the mem-size index)) ; skip 0-th word 
-                  (logand 1 sign) allocated-words-count)
-    
-    (mset-fulltag-and-value ptr (incf (the mem-size index))
-                            0 n-words)
-
-    (loop until (eql sign n) do
+    (loop for i-word from n-words downto 1 do
          (mset-word ptr (incf (the mem-size index)) (logand n mask))
          (setf n (ash n shift)))))
 
+
+(defun %mwrite-bignum-recurse (ptr index n-words n)
+  (declare (type maddress ptr)
+           (type mem-size index n-words)
+           (type integer n))
+
+  (log.trace "index: ~S n-words: ~S n: #x~X" index n-words n)
+
+  (if (<= n-words 16)
+      (%mwrite-bignum-loop ptr index n-words n)
+
+      (let* ((n-words-high (truncate n-words 2))
+             (n-words-low  (- n-words n-words-high))
+             (high-shift (the fixnum (* n-words-low +mem-word/bits+)))
+             (low-mask (1- (ash 1 high-shift))))
+
+        (%mwrite-bignum-recurse ptr index n-words-low (logand n low-mask))
+        (%mwrite-bignum-recurse ptr (the mem-size (+ index n-words-low))
+                                n-words-high (ash n (- high-shift))))))
+
+
+(defun mwrite-box/bignum (ptr index owner n)
+  "Try to reuse the memory starting at (PTR+INDEX) and write bignum N into it.
+TODO: if memory cannot be reused, free it and allocate a new block.
+
+ABI: bignum is stored as box prefix, followed by (bignum-words n) and sign,
+followed by an array of words."
+  (declare (type maddress ptr)
+           (type mem-pointer owner)
+           (type mem-size index)
+           (type integer n))
+
+  (let* ((n-words (bignum-words n))
+         ;; box prefix: 2 words. bignum-words prefix: 1 word
+         (allocated-words (the mem-size (+ 3 n-words))))
+
+    ;; TODO: if memory is not large enough, allocate a new block
+
+    (mwrite-box-0 ptr index +mem-box-bignum+ owner)
+
+    (mwrite-box-1 ptr (incf (the mem-size index))
+                  0 allocated-words)
+    
+    (mset-fulltag-and-value ptr (incf (the mem-size index))
+                            (if (< n 0) 1 0) n-words)
+
+    (%mwrite-bignum-recurse ptr index n-words n)))
+      
+
+(defun mread-box/bignum (ptr index)
+  "Read a bignum from the boxed memory starting at (PTR+INDEX)."
+  (declare (type maddress ptr)
+           (type mem-size index))
+  
+  ;; read sign and bignum-words from 2-nd word
+  (multiple-value-bind (sign n-words)
+      (mget-fulltag-and-value ptr (incf (the mem-size index) 2))
+
+    (%mread-bignum-recurse ptr index n-words sign)))
+
+
+(defun %mread-pos-bignum-loop (ptr index n-words)
+  "Read unsigned bignum"
+  (declare (type maddress ptr)
+           (type mem-size index n-words))
+
+  (let* ((bits +mem-word/bits+)
+         (limit (the fixnum (* bits n-words)))
+         (n 0))
+    (declare (type integer n))
+
+    (loop for shift from 0 below limit by bits
+       for word = (mget-word ptr (incf (the mem-size index))) do
+         (setf n (logior n (ash word shift))))
+
+    (the integer n)))
+
+
+(defun %mread-neg-bignum-loop (ptr index n-words)
+  "Read negative bignum"
+  (declare (type maddress ptr)
+           (type mem-size index n-words))
+
+  (decf (the mem-size n-words))
+
+  (let* ((n (%mread-pos-bignum-loop ptr index n-words))
+         ;; read last word as negative
+         (bits  +mem-word/bits+)
+         (limit (the fixnum (* bits n-words)))
+         (word  (mget-word ptr (the mem-size (+ n-words (incf (the mem-size index)))))))
+
+    (the integer (logior n (ash (logior word #.(- -1 +mem-word/mask+)) limit)))))
+
+
+
+
+(defun %mread-bignum-recurse (ptr index n-words sign)
+  (declare (type maddress ptr)
+           (type mem-size index n-words)
+           (type mem-fulltag sign))
+
+  (if (<= n-words 16)
+      (if (zerop sign)
+          (%mread-pos-bignum-loop ptr index n-words)
+          (%mread-neg-bignum-loop ptr index n-words))
+
+      (let* ((n-words-high (truncate n-words 2))
+             (n-words-low  (- n-words n-words-high))
+
+             (n-low  (%mread-bignum-recurse ptr index n-words-low 0))
+             (n-high (%mread-bignum-recurse ptr (the mem-size (+ index n-words-low))
+                                            n-words-high sign))
+
+             (high-shift (the fixnum (* n-words-low +mem-word/bits+))))
+
+        (log.trace "n-low: #x~X n-high: #x~X" n-low n-high)
+
+        (logior n-low (ash n-high high-shift)))))
 
 
 (defun mread-box/bignum (ptr index)
   "Read a bignum from the boxed memory starting at (PTR+INDEX)."
   (declare (type maddress ptr)
            (type mem-size index))
+  
+  ;; read sign and bignum-words from 2-nd word
+  (multiple-value-bind (sign n-words)
+      (mget-fulltag-and-value ptr (incf (the mem-size index) 2))
 
-  (let* ((bits +mem-int/bits+)
-         (mask +mem-int/mask+)
-         (negative (if (zerop (mread-box-1 ptr (incf (the mem-size index)))) ; skip 0-th word 
-                       0 -1))
-         (n-words (the mem-size (mget-value ptr (incf (the mem-size index)))))
-         (n 0))
-    
-    (if (zerop negative)
-
-        ;; read unsigned bignum
-        (loop for shift from 0 below (the fixnum (* bits n-words)) by bits
-           for i = (logand mask (mget-word ptr (incf (the mem-size index)))) do
-             (setf n (logior n (ash i shift))))
-
-        ;; read negative bignum
-        (let ((shift 0))
-          
-          ;; !!!!!!!  FIXME  !!!!!!!!
-          ;; !!!!!!!  BROKEN !!!!!!!!
-          ;; test with:
-          #-(and)
-          (loop for i from 0 below 256
-             for n = 0 then (- (logior (ash (- n) 8) i)) do
-               (mzero *p* 1000)
-               (%mwrite-box/bignum *p* 0 256 n)
-               (let ((m (mread-box/bignum *p* 0)))
-                 (unless (eql m n)
-                   (error "wrote ~S but read ~S" n m))))
-
-          
-          ;; read all words normally, except last one
-          (when (>= n-words 2)
-            (decf (the mem-size n-words))
-            (let ((limit (* bits n-words)))
-              (loop for i = (logand mask (mget-word ptr (incf (the mem-size index)))) do
-                   (setf n (logior n (ash i shift)))
-                   (incf (the fixnum shift) bits)
-                   (when (= shift limit)
-                     (return)))))
-
-          ;; change last word sign while maintaining its bits
-          (let* ((unsigned-last-word (logand mask (mget-word ptr (incf (the mem-size index)))))
-                 (last-word (logior unsigned-last-word +most-negative-int+)))
-
-            (setf n (logior n (ash last-word shift))))))
-    n))
-            
+    (%mread-bignum-recurse ptr index n-words sign)))
 
 
 

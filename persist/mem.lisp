@@ -123,21 +123,17 @@
                    (%mset-t i :word p)
                    
                    #+stmx-persist/debug
-                   (progn
-                     (format t "(i #x~X) (bits ~D) ..." i bits)
-                     (finish-output))
+                   (log:debug "(i #x~X) (bits ~D) ..." i bits)
                  
                    (let ((j (%mget-t :word p)))
                      #+stmx-persist/debug
-                     (progn
-                       (format t " read back: #x~X ..." j)
-                       (finish-output))
+                     (log:debug " read back: #x~X ..." j)
                      
                      (unless (eql i j)
                        (error "reading value '~S' stored in a CPU word returned '~S'" i j))
                    
                      #+stmx-persist/debug
-                     (format t " ok~%"))
+                     (log:debug "ok"))
 
                    (setf bits-per-word bits))
 
@@ -227,30 +223,30 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defun !mdump (stream ptr &optional (offset-start 0) (offset-end (1+ offset-start)))
+(defun !mdump (stream ptr &optional (start-byte 0) (end-byte (1+ start-byte)))
   "mdump is only used for debugging. it assumes sizeof(byte) == 1"
   (declare (type maddress ptr)
-           (type fixnum offset-start offset-end))
-  (loop for offset from offset-start below offset-end do
+           (type fixnum start-byte end-byte))
+  (loop for offset from start-byte below end-byte do
        (format stream "~2,'0X " (%mget-t :byte ptr offset))))
 
 
-(defun !mdump-reverse (stream ptr &optional (offset-start 0) (offset-end (1+ offset-start)))
+(defun !mdump-reverse (stream ptr &optional (start-byte 0) (end-byte (1+ start-byte)))
   "mdump-reverse is only used for debugging. it assumes sizeof(byte) == 1"
   (declare (type maddress ptr)
-           (type fixnum offset-start offset-end))
-  (loop for offset from offset-end above offset-start do
-       (format stream "~2,'0X " (%mget-t :byte ptr (1- offset)))))
+           (type fixnum start-byte end-byte))
+  (loop for offset from end-byte above start-byte do
+       (format stream "~2,'0X" (%mget-t :byte ptr (1- offset)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun !mfill (ptr size &key (value 0) (increment 0))
+(defun !mfill (ptr n-bytes &key (value 0) (increment 0))
   "mfill is only used for debugging. it assumes sizeof(byte) == 1 and 8 bits in a byte"
   (declare (type maddress ptr)
-           (type ufixnum size)
+           (type ufixnum n-bytes)
            (type (unsigned-byte 8) value increment))
-  (loop for offset from 0 below size do
+  (loop for offset from 0 below n-bytes do
        (%mset-t value :byte ptr offset)
        (setf value (logand #xFF (+ value increment)))))
 
@@ -262,28 +258,28 @@
   (cffi-sys:null-pointer-p ptr))
            
 
-(defun memset (ptr fill-byte size)
+(defun memset (ptr fill-byte n-bytes)
   (declare (type maddress ptr)
            (type (unsigned-byte 8) fill-byte)
-           (type ufixnum size))
-  (osicat-posix:memset ptr fill-byte size))
+           (type ufixnum n-bytes))
+  (osicat-posix:memset ptr fill-byte n-bytes))
 
-(defun mzero (ptr size)
+(defun mzero (ptr n-bytes)
   (declare (type maddress ptr)
-           (type ufixnum size))
-  (memset ptr 0 size))
+           (type ufixnum n-bytes))
+  (memset ptr 0 n-bytes))
            
-(defun memcpy (dst src size)
+(defun memcpy (dst src n-bytes)
   (declare (type maddress dst src)
-           (type ufixnum size))
-  (osicat-posix:memcpy dst src size))
+           (type ufixnum n-bytes))
+  (osicat-posix:memcpy dst src n-bytes))
   
            
 
 (declaim (notinline malloc mfree))
 
-(defun malloc (size)
-  (cffi-sys:%foreign-alloc size))
+(defun malloc (n-bytes)
+  (cffi-sys:%foreign-alloc n-bytes))
 
 (defun mfree (ptr)
   (cffi-sys:foreign-free ptr))

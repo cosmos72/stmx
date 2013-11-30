@@ -23,6 +23,12 @@
 
   (:use #:cl)
 
+  (:import-from #:stmx.lang
+                #:define-global                #:define-constant-once
+                #:with-gensym  #:with-gensyms  #:eval-always  #:new      #:let1
+                #:when-bind    #:if-bind       #:awhen #:aif 
+                #:log.debug    #:log.trace     #:log.make-logger)
+
   (:export #:+null-pointer+ #:+bad-fd+
            #:open-fd #:close-fd #:mmap #:munmap
            #:mget-primitive #:mset-primitive

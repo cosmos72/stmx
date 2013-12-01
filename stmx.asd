@@ -163,7 +163,8 @@
                              (:file "mem"         :depends-on ("package"))
                              (:file "constants"   :depends-on ("mem"))
                              (:file "abi"         :depends-on ("constants"))
-                             (:file "store"       :depends-on ("abi"))))))
+                             (:file "box"         :depends-on ("abi"))
+                             (:file "store"       :depends-on ("box"))))))
 
 
 (asdf:defsystem :stmx-persist.test

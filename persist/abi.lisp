@@ -25,11 +25,40 @@
 
 
 (deftype mem-word    () '(unsigned-byte #.+mem-word/bits+))
-(deftype mem-pointer () '(unsigned-byte #.+mem-pointer/bits+))
-(deftype mem-size    () 'mem-pointer)
-(deftype mem-tag     () '(unsigned-byte #.+mem-tag/bits+))
+(deftype mem-int     () '(  signed-byte #.+mem-int/bits+))
+(deftype mem-uint    () '(unsigned-byte #.+mem-int/value-bits+))
+
 (deftype mem-fulltag () '(unsigned-byte #.+mem-fulltag/bits+))
-(deftype mem-int     () '(integer #.+most-negative-int+ #.+most-positive-int+))
+(deftype mem-tag     () '(unsigned-byte #.+mem-tag/bits+))
+
+;; pointer offsets stored in MMAP area. To better use the available bits,
+;; they are in units of the type pointed to, i.e. increasing them by 1
+;; makes them point to the next object of the same type
+(deftype mem-pointer () '(unsigned-byte #.+mem-pointer/bits+))
+
+;; pointer offsets used internally by STMX-PERSIST. They are in units of a CPU word,
+;; so to convert from mem-pointer to mem-size you must multiply by the number of words
+;; required to store the object pointed to.
+(deftype mem-size    () '(unsigned-byte #.(- +mem-word/bits+ (integer-length (1- +msizeof-word+)))))
+
+
+(declaim (inline mem-size+ mem-size+1 mem-size-))
+(defun mem-size+ (a &optional (b 0))
+  (declare (type mem-size a b))
+  (the mem-size (+ a b)))
+
+
+(defun mem-size+1 (a &optional (b 1))
+  (mem-size+ a b))
+
+
+(defun mem-size- (a b)
+  (declare (type mem-size a b))
+  (the mem-size (- a b)))
+
+
+(defmacro incf-mem-size (place &optional (delta 1))
+  `(incf (the mem-size ,place) ,delta))
 
 
 (defun get-abi ()
@@ -50,11 +79,11 @@
     
   
   
-(defmacro %to-value (value)
-  `(logand +mem-size/mask+ (ash ,value ,(- +mem-size/shift+))))
-
 (defmacro %to-fulltag (value)
   `(logand +mem-fulltag/mask+ (ash ,value ,(- +mem-fulltag/shift+))))
+
+(defmacro %to-value (value)
+  `(logand +mem-pointer/mask+ (ash ,value ,(- +mem-pointer/shift+))))
 
 (defmacro %to-fulltag-and-value (val)
   (let ((value     (gensym "VALUE-")))
@@ -86,13 +115,14 @@
 (declaim (inline mset-fulltag-and-value))
 (defun mset-fulltag-and-value (ptr index fulltag value)
   (declare (type maddress ptr)
-           (type mem-size index value)
-           (type mem-fulltag fulltag))
+           (type mem-size index)
+           (type mem-fulltag fulltag)
+           (type mem-pointer value))
 
   (setf (mget-word ptr index)
         (logior
          (ash fulltag +mem-fulltag/shift+)
-         (ash value   +mem-size/shift+)))
+         (ash value   +mem-pointer/shift+)))
   t)
 
 
@@ -108,21 +138,38 @@
   t)
 
 
-(defmacro %to-int (val)
-  (let ((value     (gensym "VALUE-"))
-        (int-value (gensym "INT-VALUE-"))
-        (sign      (gensym "SIGN-")))
-    `(let* ((,value ,val)
-            (,int-value (logand +mem-int/value-mask+ ,value))
-            (,sign (logand +mem-int/sign-mask+ ,value)))
-       (the mem-int (- ,int-value ,sign)))))
+(defmacro %to-int/sign (value)
+  `(logand +mem-int/sign-mask+ ,value))
+
+(defmacro %to-int/value (value)
+  `(logand +mem-int/value-mask+ ,value))
+
+(defmacro %to-int (value)
+  (with-gensyms (word int-value int-sign)
+    `(let* ((,word ,value)
+            (,int-value (%to-int/value ,word))
+            (,int-sign  (%to-int/sign  ,word)))
+       (the mem-int (- ,int-value ,int-sign)))))
   
-(declaim (inline mget-int))
+
+(declaim (inline mget-int/value mget-int))
 (defun mget-int (ptr index)
+  "Return the mem-int stored at (PTR+INDEX)"
   (declare (type maddress ptr)
            (type mem-size index))
 
   (%to-int (mget-word ptr index)))
+
+
+(defun mget-int/value (ptr index)
+  "Return the two's complement value of mem-int stored at (PTR+INDEX),
+ignoring any sign bit"
+  (declare (type maddress ptr)
+           (type mem-size index))
+
+  (the mem-uint (%to-int/value (mget-word ptr index))))
+
+
 
 
 
@@ -170,7 +217,7 @@
 
 (defmacro mget-float/inline (type ptr index)
   (declare (type (member :float :double :sfloat :dfloat) type))
-  (if (mem-float/inline type)
+  (if (mem-float/inline? type)
       (if +mem/little-endian+
           `(mget-float-0 ,type ,ptr ,index)
           `(mget-float-N ,type ,ptr ,index))
@@ -178,7 +225,7 @@
 
 (defmacro mset-float/inline (type ptr index value)
   (declare (type (member :float :double :sfloat :dfloat) type))
-  (if (mem-float/inline type)
+  (if (mem-float/inline? type)
       (if +mem/little-endian+
           `(mset-float-0 ,type ,ptr ,index ,value)
           `(mset-float-N ,type ,ptr ,index ,value))
@@ -217,14 +264,13 @@ boolean, unbound slots, character and medium-size integer
       ((eq value stmx::+unbound-tvar+) (setf val +mem-unbound+))
 
       ;; value is a single-float?
-      ((and +mem-sfloat/inline+ (typep value 'single-float))
+      ((and +mem-sfloat/inline?+ (typep value 'single-float))
        (mset-fulltag-and-value ptr index +mem-tag-sfloat+ 0)
        (mset-float/inline :sfloat ptr index value)
        (return-from mset-unboxed t))
 
       ;; value is a double-float?
-      #-(and)
-      ((and +mem-dfloat/inline+ (typep value 'double-float))
+      ((and +mem-dfloat/inline?+ (typep value 'double-float))
        (mset-fulltag-and-value ptr index +mem-tag-dfloat+ 0)
        (mset-float/inline :dfloat ptr index value)
        (return-from mset-unboxed t))
@@ -277,32 +323,11 @@ medium-size integer) or a pointer from memory store.
 
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-(defmacro mwrite-box-0 (ptr index boxed-type owner)
-  "Write to memory the 0-th word of a boxed value"
-  `(mset-fulltag-and-value ,ptr ,index ,boxed-type ,owner))
-
-(defmacro mwrite-box-1 (ptr index tag-payload-specific allocated-words)
-  "Write to memory the 1-st word of a boxed value"
-  `(mset-fulltag-and-value ,ptr ,index ,tag-payload-specific ,allocated-words))
-
-(defmacro mread-box-0 (ptr index)
-  `(mget-fulltag-and-value ,ptr ,index))
-
-(defmacro mread-box-1 (ptr index)
-  `(mget-fulltag-and-value ,ptr ,index))
 
 
   
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defconstant +mem-bignum-word/bits+ (1- +mem-int/bits+))
-(defconstant +mem-bignum-word/mask+ (1- (ash 1 +mem-bignum-word/bits+)))
-
-(defconstant +mem-bignum/max-words+ (- +most-positive-size+ 3)
-  "Maximum number of CPU words in a mem-bignum")
 
 (defun bignum-words (n)
   "Return the number of words needed to store bignum N in memory."

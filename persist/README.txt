@@ -75,7 +75,7 @@ Design:
 
 4. pointer tags
 
-   0 = reserved (unallocated, unbound, boolean, keyword or symbol)
+   0 = reserved (one of: unallocated, unbound, boolean, keyword or symbol)
 
    1 = character
 
@@ -86,10 +86,10 @@ Design:
        it reuses pointer offset to store the double value)
 
    4 = boxed value not containing pointers
-       (bignum, ratio, float, complex, cons/list, path, array or hash-table)
+       (bignum, ratio, float, complex, cons/list, pathname, array or hash-table)
 
    5 = boxed value containing pointers
-       (ratio, complex, cons/list, path, array or hash-table)
+       (ratio, complex, cons/list, pathname, array or hash-table)
 
    6.. pointer to persistent object with user-defined type
 
@@ -101,16 +101,12 @@ Design:
    Applies to both unallocated boxed values and to unallocated user-defined persistent types.
 
    word 0: tag = always 0, means unallocated area
-           value = pointer to previous unallocated area (it is a circular list)
+           value = pointer to next unallocated area
            
    word 1: tag = not used, can have any value
-           value = number of allocated words. also counts the header (i.e. words 0 and 1)
+           value = number of allocated words /4. also counts the header (i.e. words 0, 1 and 2)
 
-   payload:
-
-   word 2: tag = not used, can have any value
-           value = pointer to next unallocated area (it is a circular list)
-   word 3... : not used
+   word 2... : not used, can have any value
 
    
 6. boxed values
@@ -119,7 +115,7 @@ Design:
            value = pointer to owner.
 
    word 1: tag = available for value-specific data, for example sign bits
-           value = number of allocated words. also counts the header (i.e. words 0 and 1)
+           value = number of allocated words /4. also counts the header (i.e. words 0 and 1)
    
    word 2... : payload. depends on type
 
@@ -134,7 +130,7 @@ Design:
    6 = complex of double-float
    7 = complex of rationals (fixnums, bignums or ratios)
    8 = cons or list
-   9 = filesystem path
+   9 = pathname
    10 = 1-dimensional array, vector or string
    11 = multi-dimensional array
    12 = hash-table

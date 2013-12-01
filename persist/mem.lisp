@@ -22,20 +22,33 @@
                                 (symbol-value '+null-pointer+)
                                 (cffi-sys:null-pointer)))
 
-(defconstant +bad-fd+ -1)
+
+
+(declaim (inline null-pointer?))
+
+(defun null-pointer? (ptr)
+  (declare (type maddress ptr))
+  (cffi-sys:null-pointer-p ptr))
+
 
 (eval-when (:compile-toplevel :load-toplevel)
 
   #-(and)
   (pushnew :stmx-persist/debug *features*)
 
+  (defun expr-is-constant? (expr)
+    (or (keywordp expr)
+        (and (consp expr)
+             (eq 'quote (first expr)))))
+
+  (defun unquote (expr)
+    (if (and (consp expr)
+             (eq 'quote (first expr)))
+        (second expr)
+        expr))
+
   (defun parse-type (type)
     (case type
-      (:uchar  :unsigned-char)
-      (:ushort :unsigned-short)
-      (:uint   :unsigned-int)
-      (:ulong  :unsigned-long)
-      (:ullong :unsigned-long-long)
       (:sfloat :float)         ;; this is the ONLY code mapping :sfloat to a CFFI type
       (:dfloat :double)        ;; this is the ONLY code mapping :dfloat to a CFFI type
       (:byte   :unsigned-char) ;; this is the ONLY code mapping :byte to a CFFI type
@@ -43,15 +56,26 @@
       (otherwise type))))
 
 
+;; not really used, but handy
+(cffi:defctype mfloat  #.(parse-type :sfloat))
+(cffi:defctype mdouble #.(parse-type :dfloat))
+(cffi:defctype mbyte   #.(parse-type :byte))
+(cffi:defctype mword   #.(parse-type :word))
+
+
+
 (defmacro %msizeof (type)
-  `(cffi-sys:%foreign-type-size ,(if (keywordp type)
-                                     (parse-type type) 
-                                     `(parse-type ,type))))
+  "Wrapper for (CFFI:FOREIGN-TYPE-SIZE), interprets :SFLOAT :DFLOAT :BYTE AND :WORD"
+  `(cffi:foreign-type-size ,(if (expr-is-constant? type)
+                                (parse-type type)
+                                `(parse-type ,type))))
 
 (defmacro msizeof (type)
-  (if (keywordp type)
-      (%msizeof type)
+  "Wrapper for (%MSIZEOF), computes (CFFI:FOREIGN-TYPE-SIZE) at compile time whenever possible"
+  (if (expr-is-constant? type)
+      (%msizeof (unquote type))
       `(%msizeof ,type)))
+
 
 
 
@@ -70,8 +94,8 @@
 (defconstant +msizeof-ulong+   (msizeof :ulong))
 (defconstant +msizeof-ullong+  (msizeof :ullong))
 
-(defconstant +msizeof-sfloat+   (msizeof :sfloat))
-(defconstant +msizeof-dfloat+   (msizeof :dfloat))
+(defconstant +msizeof-sfloat+  (msizeof :sfloat))
+(defconstant +msizeof-dfloat+  (msizeof :dfloat))
 (defconstant +msizeof-byte+    (msizeof :byte))
 (defconstant +msizeof-word+    (msizeof :word))
 
@@ -142,11 +166,11 @@
 
 
 
-(defconstant +mem-word/bits+ (%detect-bits-per-word))
-(defconstant +mem-word/mask+  (1- (ash 1 +mem-word/bits+)))
+(defconstant +mem-word/bits+      (%detect-bits-per-word))
+(defconstant +mem-word/mask+      (1- (ash 1 +mem-word/bits+)))
 (defconstant +most-positive-word+ +mem-word/mask+)
 
-(defconstant +mem-byte/bits+  (truncate +mem-word/bits+ +msizeof-word+))
+(defconstant +mem-byte/bits+     (truncate +mem-word/bits+ +msizeof-word+))
 (defconstant +mem-byte/mask+     (1- (ash 1 +mem-byte/bits+)))
 (defconstant +most-positive-byte+ +mem-byte/mask+)
 
@@ -156,7 +180,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (when (< +mem-byte/bits+ 7)
     (error "cannot build STMX-PERSIST: unsupported architecture.
-    each byte contains only ~S bits, expecting at least 8 bits" +mem-byte/bits+))) 
+    each byte contains only ~S bits, expecting at least 7 bits" +mem-byte/bits+))) 
 
 
 
@@ -206,11 +230,11 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmacro mget-word (ptr index)
-  `(%mget-t :word ,ptr (logand +mem-word/mask+ (* ,index +msizeof-word+))))
+(defmacro mget-word (ptr word-index)
+  `(%mget-t :word ,ptr (logand +mem-word/mask+ (* ,word-index +msizeof-word+))))
 
-(defmacro mset-word (ptr index value)
-  `(%mset-t ,value :word ,ptr (logand +mem-word/mask+ (* ,index +msizeof-word+))))
+(defmacro mset-word (ptr word-index value)
+  `(%mset-t ,value :word ,ptr (logand +mem-word/mask+ (* ,word-index +msizeof-word+))))
 
 (defsetf mget-word mset-word)
 
@@ -220,6 +244,8 @@
 
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;      debugging utilities       ;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
@@ -251,59 +277,31 @@
        (setf value (logand #xFF (+ value increment)))))
 
 
-(declaim (inline null-pointer? memset mzero memcpy))
-
-(defun null-pointer? (ptr)
-  (declare (type maddress ptr))
-  (cffi-sys:null-pointer-p ptr))
+(declaim (inline !memset !mzero !memcpy))
            
 
-(defun memset (ptr fill-byte n-bytes)
+(defun !memset (ptr fill-byte n-bytes)
   (declare (type maddress ptr)
            (type (unsigned-byte 8) fill-byte)
            (type ufixnum n-bytes))
   (osicat-posix:memset ptr fill-byte n-bytes))
 
-(defun mzero (ptr n-bytes)
+(defun !mzero (ptr n-bytes)
   (declare (type maddress ptr)
            (type ufixnum n-bytes))
-  (memset ptr 0 n-bytes))
+  (!memset ptr 0 n-bytes))
            
-(defun memcpy (dst src n-bytes)
+(defun !memcpy (dst src n-bytes)
   (declare (type maddress dst src)
            (type ufixnum n-bytes))
   (osicat-posix:memcpy dst src n-bytes))
   
            
+(declaim (notinline !malloc !free))
 
-(declaim (notinline malloc mfree))
-
-(defun malloc (n-bytes)
+(defun !malloc (n-bytes)
   (cffi-sys:%foreign-alloc n-bytes))
 
-(defun mfree (ptr)
+(defun !free (ptr)
   (cffi-sys:foreign-free ptr))
 
-(defun open-fd (filename &optional (truncate-len -1))
-  (declare (type integer truncate-len))
-
-  (let ((fd (osicat-posix:open filename (logior osicat-posix:o-rdwr osicat-posix:o-creat))))
-    (declare (type integer fd))
-    (unless (eql truncate-len -1)
-      (osicat-posix:ftruncate fd truncate-len))
-    fd))
-
-(defun close-fd (fd)
-  (declare (type (integer 0) fd))
-  (osicat-posix:close fd))
-
-(defun mmap (fd len)
-  (declare (type (integer 0) fd len))
-  (osicat-posix:mmap +null-pointer+ len
-                     (logior osicat-posix:prot-read osicat-posix:prot-write)
-                     osicat-posix:map-shared
-                     fd 0))
-
-(defun munmap (ptr len)
-  (osicat-posix:munmap ptr len))
-  

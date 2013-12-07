@@ -28,19 +28,40 @@
 
 
 (defvar *fd* +bad-fd+)
-;; example MMAP length: 1GB on 32bit archs, 4TB on 64bit archs
-(defvar *flen* (ash 1 (+ 18 (truncate (* 12 (/ +mem-word/bits+ 32))))))
+
+(defvar *flen* 0)
+
+;; example MMAP length: 256MB on 32bit archs, 16TB on 64bit archs
+(defconstant +max-flen+
+  (let* ;; assume 1/4 of addressable memory can be mmapped
+      ((arch-max-bytes (ash 1 (- +mem-word/bits+ 2)))
+       
+       ;; compute maximum bytes addressable by a stmx-persist:mem-pointer
+       (persist-max-bytes (* +msizeof-word+ (box-pointer->size +most-positive-pointer+)))
+                    
+       ;; assume maximum size of a file is (1- 16TB). this is just an example, and not really needed
+       (file-max-bytes (1- (ash 1 44)))
+
+       (max-bytes (min arch-max-bytes persist-max-bytes file-max-bytes)))
+    
+    ;; assume mmap pagesize is 4k. this is just an example, and not really needed
+    (logand (1- max-bytes) -4096)))
+
+
 (defvar *p* +null-pointer+)
 
 
-(defun open-fd (filename &optional (truncate-bytes -1))
-  (declare (type integer truncate-bytes))
+(defun open-fd (filename &optional (min-bytes 0))
+  (declare (type (integer 0) min-bytes))
 
-  (let ((fd (osicat-posix:open filename (logior osicat-posix:o-rdwr osicat-posix:o-creat))))
+  (let* ((fd (osicat-posix:open filename (logior osicat-posix:o-rdwr osicat-posix:o-creat)))
+         (file-bytes (osicat-posix:stat-size (osicat-posix:fstat fd))))
     (declare (type fd fd))
-    (unless (eql truncate-bytes -1)
-      (osicat-posix:ftruncate fd truncate-bytes))
-    fd))
+    (unless (zerop min-bytes)
+      (when (< file-bytes min-bytes)
+        (osicat-posix:ftruncate fd min-bytes)
+        (setf file-bytes min-bytes)))
+    (values fd file-bytes)))
 
 (defun close-fd (fd)
   (declare (type fd fd))
@@ -60,34 +81,32 @@
   (osicat-posix:munmap ptr n-bytes))
   
 
-(defun init-store (ptr head total-n-words)
+(defun init-store (ptr total-n-words)
   "Initialize the free-list when loading a file full of zeros,
 and write it back to file"
-  (let ((next (new-mfree-cell +mem-box/min-words+
-                              (mem-size- total-n-words +mem-box/min-words+))))
-    
-    (setf (mfree-cell-next head) next)
-    (mwrite-free-cell ptr next)
-    (mwrite-free-cell ptr head)))
+  (declare (type maddress ptr)
+           (type mem-size total-n-words))
+  (mem-free ptr +mem-box/min-words+ (mem-size- total-n-words +mem-box/min-words+)))
 
 
 
-(defun open-store (&key (filename "mmap") (truncate-bytes *flen*))
-  (declare (type mem-word truncate-bytes))
+(defun open-store (&key (filename "mmap") (min-bytes 4096))
+  (declare (type mem-word min-bytes))
 
-  (let* (;; open and truncate file
-         (fd (setf *fd* (open-fd filename truncate-bytes)))
+  ;; open file and (if needed) extend it
+  (multiple-value-bind (fd bytes) (open-fd filename min-bytes)
+    (setf *fd* fd
+          *flen* bytes)
+                                        
+    (let* (;; MMAP opened file
+           (ptr (setf *p* (mmap fd bytes)))
+           ;; load free-list from MMAP area
+           (head (setf *mfree* (mread-free-list ptr 0))))
 
-         ;; MMAP opened file
-         (ptr (setf *p* (mmap fd truncate-bytes)))
+      (when (mfree-cell-null? head)
+        (init-store ptr (truncate bytes +msizeof-word+)))
 
-         ;; load free-list from MMAP area
-         (head (setf *mfree* (mread-free-list ptr 0))))
-
-    (when (mfree-cell-null? head)
-      (init-store ptr head (truncate truncate-bytes +msizeof-word+)))
-
-    head))
+      head)))
 
     
 
@@ -102,7 +121,8 @@ and write it back to file"
   (setf *mfree* nil)
   (unless (eql +bad-fd+ *fd*)
     (close-fd *fd*)
-    (setf *fd* +bad-fd+)))
+    (setf *fd* +bad-fd+
+          *flen* 0)))
 
 
 

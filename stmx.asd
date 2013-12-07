@@ -162,9 +162,10 @@
                 :components ((:file "package")
                              (:file "mem"         :depends-on ("package"))
                              (:file "constants"   :depends-on ("mem"))
-                             (:file "abi"         :depends-on ("constants"))
-                             (:file "box"         :depends-on ("abi"))
-                             (:file "store"       :depends-on ("box"))))))
+                             (:file "unboxed"     :depends-on ("constants"))
+                             (:file "box"         :depends-on ("unboxed"))
+                             (:file "boxed"       :depends-on ("box"))
+                             (:file "store"       :depends-on ("boxed"))))))
 
 
 (asdf:defsystem :stmx-persist.test

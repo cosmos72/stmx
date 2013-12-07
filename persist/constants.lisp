@@ -95,16 +95,19 @@
 ;;;;        boxed values          ;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defconstant +mem-box/min-words+    4 "boxed values are allocated in multiples of 4 CPU-words")
+(defconstant +mem-box/min-words+    4 "boxed values are allocated in multiples of 4 CPU-words.
+    This value must be a power of two.")
 (defconstant +mem-box/max-words+    (* +most-positive-pointer+ +mem-box/min-words+))
 (defconstant +mem-box/header-words+ 2 "boxed values have a 2 CPU-word header")
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;   bignums, i.e. mem-bignum   ;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defconstant +mem-bignum/max-words+ (- +mem-box/max-words+ +mem-box/header-words+ 1)
-  "Maximum number of CPU words in a mem-bignum")
+(defconstant +mem-bignum/max-words+ (min +most-positive-int+
+                                         (- +mem-box/max-words+ +mem-box/header-words+ 1))
+  "Maximum number of CPU words in a mem-bignum.")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; single-float and double-foat ;;;;
@@ -114,6 +117,9 @@
 (defconstant +mem-dfloat/bits+ (* +msizeof-dfloat+ +mem-byte/bits+))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+
+  (unless (zerop (logand +mem-box/min-words+ (1- +mem-box/min-words+)))
+    (error "+mem-box/min-words+ is ~S, instead it must be a power of two!" +mem-box/min-words+))
 
   (defun %mem-float/inline? (type)
     (declare (type (member :float :double :sfloat :dfloat type)))
@@ -127,6 +133,11 @@
 
 (defconstant +mem-sfloat/inline?+ (mem-float/inline? :sfloat))
 (defconstant +mem-dfloat/inline?+ (mem-float/inline? :dfloat))
+
+(eval-always
+ (set-feature 'sp/sfloat/inline +mem-sfloat/inline?+)
+ (set-feature 'sp/dfloat/inline +mem-dfloat/inline?+))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

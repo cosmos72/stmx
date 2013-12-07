@@ -24,6 +24,13 @@
   (:use #:cl)
 
   (:import-from #:stmx.lang
+
+                #:eval-always
+
+                #:enable-#?-syntax
+                #:set-feature  #:set-features #:default-feature #:default-features
+                #:get-feature  #:all-features?
+
                 #:define-global                #:define-constant-once
                 #:with-gensym  #:with-gensyms  #:eval-always  #:new      #:let1
                 #:when-bind    #:if-bind       #:awhen #:aif 

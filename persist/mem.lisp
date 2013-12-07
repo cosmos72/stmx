@@ -256,6 +256,13 @@
   (loop for offset from start-byte below end-byte do
        (format stream "~2,'0X " (%mget-t :byte ptr offset))))
 
+(defun !mdump-forward (stream ptr &optional (start-byte 0) (end-byte (1+ start-byte)))
+  "mdump-forward is only used for debugging. it assumes sizeof(byte) == 1"
+  (declare (type maddress ptr)
+           (type fixnum start-byte end-byte))
+  (loop for offset from start-byte below end-byte do
+       (format stream "~2,'0X" (%mget-t :byte ptr offset))))
+
 
 (defun !mdump-reverse (stream ptr &optional (start-byte 0) (end-byte (1+ start-byte)))
   "mdump-reverse is only used for debugging. it assumes sizeof(byte) == 1"
@@ -291,6 +298,7 @@
            (type ufixnum n-bytes))
   (!memset ptr 0 n-bytes))
            
+
 (defun !memcpy (dst src n-bytes)
   (declare (type maddress dst src)
            (type ufixnum n-bytes))
@@ -305,3 +313,14 @@
 (defun !free (ptr)
   (cffi-sys:foreign-free ptr))
 
+(defun !hex (n)
+  (format t "~x" n))
+
+(defun !readable (n &optional (stream t))
+  "Print N in human-readable format."
+  (let* ((bits (integer-length n))
+         (log-1024 (truncate bits 10))
+         (mantissa (ash n (* -10 (1- log-1024)))))
+    (format stream "~$ * 10.08^~D" (/ (float mantissa) 1024.0) (* 3 log-1024))))
+
+    

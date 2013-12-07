@@ -24,13 +24,15 @@
   (:export #:define-global    #:define-constant-once
 
            #:with-gensym  #:with-gensyms
-           #:eval-always  #:new     #:let1
+           #:eval-always  #:new          #:let1
            #:when-bind    #:awhen
            #:if-bind      #:aif
 
            #:enable-#?-syntax
-
-           #:log.trace    #:log.debug   #:log.make-logger
+           #:set-feature  #:set-features #:default-feature #:default-features
+           #:get-feature  #:all-features?
+           
+           #:log.trace    #:log.debug    #:log.make-logger
 
            ;; bordeaux-threads helpers
            #:start-multithreading

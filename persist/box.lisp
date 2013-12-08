@@ -76,7 +76,7 @@
 (defun mfree-cell-null? (cell)
   "Return T if cell is full of zeroes, for example when loaded from a newly created file."
   (declare (type mfree-cell cell))
-  (and (eql   (mfree-cell-index cell) +mem-unallocated+)
+  (and (<     (mfree-cell-index cell) +mem-box/min-words+)
        (zerop (mfree-cell-n-words cell))
        (null  (mfree-cell-next    cell))))
 
@@ -94,7 +94,7 @@ at (+ PTR (mfree-cell-index CELL))"
          (next  (mfree-cell-next cell))
          (next-index (if next (mfree-cell-index next) 0)))
 
-    (mwrite-box-0 ptr index +mem-unallocated+ (size->box-pointer next-index))))
+    (mwrite-box-0 ptr (mem-size+ 2 index) +mem-unallocated+ (size->box-pointer next-index))))
 
 
 (defun mwrite-box-n-words (ptr index n-words)
@@ -113,7 +113,7 @@ at (+ PTR (mfree-cell-index CELL))"
 
   (let ((index (mfree-cell-index cell)))
 
-    (mwrite-box-n-words ptr index n-words)))
+    (mwrite-box-n-words ptr (mem-size+ 2 index) n-words)))
 
 
 
@@ -151,20 +151,33 @@ Note: NEXT slot of returned object always contains NIL,
   (declare (type maddress ptr)
            (type mem-size index))
 
-  (let ((next    (box-pointer->size (mget-value ptr index)))
-        (n-words (mread-box-n-words ptr index)))
+  (let* ((index+2 (mem-size+ 2 index))
+         (next-index (box-pointer->size (mget-value ptr index+2)))
+         (n-words    (mread-box-n-words ptr index+2)))
     (values
      (new-mfree-cell index n-words)
-     (the mem-size next))))
+     (the mem-size next-index))))
 
 
 
-(defun mread-free-list (ptr index)
-  "Read a list of MFREE-CELL from memory starting at (PTR+INDEX) and return it.
+(defvar *mfree* nil "thread-local list of unallocated mmap memory")
+
+
+(defun init-free-list (ptr total-n-words)
+  "Create and return a new free list containing ALL the words up to TOTAL-N-WORDS."
+  (declare (type maddress ptr)
+           (type mem-size total-n-words))
+  (setf *mfree* (new-mfree-cell 0 0))
+  (mem-free ptr +mem-box/min-words+ (mem-size- total-n-words +mem-box/min-words+)))
+
+
+(defun mread-free-list (ptr)
+  "Read a list of MFREE-CELL from memory starting at (PTR + +MEM-BOX/HEADER-WORDS+) and return it.
 FIXME: it currently loads the whole free-list in RAM (bad!)"
-  (declare (type mem-size index))
+  (declare (type maddress ptr))
 
-  (let ((head)
+  (let ((index 0)
+        (head)
         (prev))
     (loop
        (multiple-value-bind (this next-index) (mread-free-cell ptr index)
@@ -177,20 +190,17 @@ FIXME: it currently loads the whole free-list in RAM (bad!)"
                  (mfree-cell-n-words this) 0))
 
          (when (zerop next-index)
-           (return head))
+           (return (setf *mfree* head)))
 
          (setf prev this
                index next-index)))))
 
 
-
-(defvar *mfree* nil "thread-local list of unallocated mmap memory")
-
 (defun mem-free (ptr index &optional (n-words
                                       (mread-box-n-words ptr index)))
   "A very naive deallocator. Useful only for debugging and development."
   (declare (type maddress ptr)
-           (type mem-size index))
+           (type mem-size index n-words))
 
   (let ((head *mfree*))
     

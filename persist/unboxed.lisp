@@ -85,25 +85,9 @@
   `(incf (the mem-size ,place) ,delta))
 
 
-
-(defun get-abi ()
-  '((:stmx-persist-magic . (#.(code-char 4) #\s #\t #\m #\x
-                            #.(code-char 7) #\p #\e #\r #\s #\i #\s #\t
-                            #.(code-char 2) #.(code-char 13) #.(code-char 10) #.(code-char 0)))
-    (:file-version   . 1)
-    (:bits-per-byte  . #.+mem-byte/bits+)
-    (:bits-per-tag   . #.+mem-tag/bits+)
-    (:bits-per-pointer . #.+mem-pointer/bits+)
-    (:bits-per-word  . #.+mem-word/bits+)
-    (:sizeof-byte    . #.+msizeof-byte+)
-    (:sizeof-word    . #.+msizeof-word+)
-    (:sizeof-single-float . #.+msizeof-sfloat+)
-    (:sizeof-double-float . #.+msizeof-dfloat+)
-    (:word-endianity . #.(let ((fmt (format nil "~A~D~A" "#x~" (* 2 +msizeof-word+) ",'0X")))
-                           (format nil fmt +mem-word/endianity+)))))
     
   
-  
+
 (defmacro %to-fulltag (value)
   `(logand +mem-fulltag/mask+ (ash ,value ,(- +mem-fulltag/shift+))))
 

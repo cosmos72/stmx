@@ -18,47 +18,43 @@
 ;; wrapper for values that cannot be stored as unboxed
 (deftype box () 'cons)
 
-(defun make-box (index value)
+(defun make-box (value index n-words)
   "Create a new box to wrap VALUE. Assumes VALUE will be stored at INDEX in memory store."
-  (declare (type mem-size index))
-  (cons index value))
+  (declare (type mem-size index n-words))
+  (cons value (cons index n-words)))
 
-(declaim (inline box-index box-value (setf box-index) (setf box-value)))
-
-(defun box-index (box)
-  (declare (type box box))
-  (the mem-size (car box)))
-
-(defun (setf box-index) (index box)
-  (declare (type box box)
-           (type mem-size index))
-  (setf (car box) index))
-
+(declaim (inline box-value box-index box-n-words))
 
 (defun box-value (box)
   (declare (type box box))
-  (cdr box))
+  (first box))
 
-(defun (setf box-value) (value box)
+(defun box-index (box)
   (declare (type box box))
-  (setf (cdr box) value))
+  (the mem-size (second box)))
+
+(defun box-n-words (box)
+  (declare (type box box))
+  (the mem-size (rest (rest box))))
+
 
 
 
 (declaim (inline mwrite-box/header))
 
-(defun mwrite-box/header (ptr owner index boxed-type value-specific-fulltag)
+(defun mwrite-box/header (ptr owner box boxed-type value-specific-fulltag)
   "Write to mmap area the header common to all boxed values.
-Return INDEX pointing to payload"
+Return INDEX pointing to box payload"
   (declare (type maddress ptr)
-           (type mem-size index)
+           (type box box)
            (type mem-fulltag boxed-type value-specific-fulltag))
 
-  (mwrite-box-0 ptr index boxed-type owner)
-  (incf (the mem-size index))
-  ;; read allocated-words/4 and write it back adding value-specific-fulltag
-  (mwrite-box-1 ptr index value-specific-fulltag (mget-value ptr index))
-  (incf (the mem-size index)))
+  (let ((index (box-index box)))
+    (mwrite-box-0 ptr index boxed-type owner)
+    (incf (the mem-size index))
+    (mwrite-box-1 ptr index value-specific-fulltag (size->box-pointer (box-n-words box)))
+    (incf (the mem-size index))))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -115,20 +111,21 @@ Return INDEX pointing to payload"
                                 n-words-high (ash n (- high-shift))))))
 
 
-(defun mwrite-box/bignum (ptr owner index n)
+(defun mwrite-box/bignum (ptr owner box)
   "Reuse the memory block starting at (PTR+INDEX) and write bignum N into it.
 
 ABI: bignum is stored as box prefix (with N's sign as value-specific-tag),
 followed by mem-int (bignum-words N), followed by an array of words."
   (declare (type maddress ptr)
            (type mem-pointer owner)
-           (type mem-size index)
-           (type integer n))
+           (type box box))
 
-  (let ((n-words (bignum-words n)))
+  (let* ((index (box-index box))
+         (n (the integer (box-value box)))
+         (n-words (bignum-words n)))
 
     (setf index
-          (mwrite-box/header ptr owner index +mem-box-bignum+ (if (< n 0) 1 0)))
+          (mwrite-box/header ptr owner box +mem-box-bignum+ (if (< n 0) 1 0)))
 
     (mset-int ptr index n-words)
     (%mwrite-bignum-recurse ptr index n-words n)))
@@ -194,18 +191,19 @@ followed by mem-int (bignum-words N), followed by an array of words."
 
 
 (defun mread-box/bignum (ptr index)
-  "Read a bignum from the boxed memory starting at (PTR+INDEX)."
+  "Read a bignum from the boxed memory starting at (PTR+INDEX).
+Return a new BOX wrapping the bignum"
   (declare (type maddress ptr)
            (type mem-size index))
   
   ;; read sign at INDEX+1 and bignum-words at INDEX+2
-  (let ((sign    (mget-fulltag ptr (mem-size+1 index)))
-        (n-words (mget-int     ptr (incf-mem-size index +mem-box/header-words+))))
+  (multiple-value-bind (sign allocated-words/4)
+      (mget-fulltag-and-value ptr (mem-size+1 index))
 
-    (%mread-bignum-recurse ptr index n-words sign)))
+    (let* ((n-words (mget-int              ptr (mem-size+ index +mem-box/header-words+)))
+           (n       (%mread-bignum-recurse ptr index n-words sign)))
 
-
-
+      (make-box n index (box-pointer->size allocated-words/4)))))
 
 
   

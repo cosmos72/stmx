@@ -230,6 +230,18 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defmacro mget-byte (ptr byte-index)
+  `(%mget-t :byte ,ptr ,byte-index))
+
+(defmacro mset-byte (ptr byte-index value)
+  `(%mset-t ,value :byte ,ptr ,byte-index))
+
+(defsetf mget-byte mset-byte)
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defmacro mget-word (ptr word-index)
   `(%mget-t :word ,ptr (logand +mem-word/mask+ (* ,word-index +msizeof-word+))))
 

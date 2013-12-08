@@ -179,7 +179,7 @@
                :fiveam
                :stmx-persist)
 
-  :components ((:module :test-persist
+  :components ((:module :persist.test
                 :components ((:file "package")
                              (:file "mem"           :depends-on ("package"))
                              (:file "abi"           :depends-on ("mem"))))))

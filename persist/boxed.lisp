@@ -15,27 +15,6 @@
 
 (in-package :stmx-persist)
 
-;; wrapper for values that cannot be stored as unboxed
-(deftype box () 'cons)
-
-(defun make-box (value index n-words)
-  "Create a new box to wrap VALUE. Assumes VALUE will be stored at INDEX in memory store."
-  (declare (type mem-size index n-words))
-  (cons value (cons index n-words)))
-
-(declaim (inline box-value box-index box-n-words))
-
-(defun box-value (box)
-  (declare (type box box))
-  (first box))
-
-(defun box-index (box)
-  (declare (type box box))
-  (the mem-size (second box)))
-
-(defun box-n-words (box)
-  (declare (type box box))
-  (the mem-size (rest (rest box))))
 
 
 
@@ -54,6 +33,21 @@ Return INDEX pointing to box payload"
     (incf (the mem-size index))
     (mwrite-box-1 ptr index value-specific-fulltag (size->box-pointer (box-n-words box)))
     (incf (the mem-size index))))
+
+
+(defun mread-box/header (ptr index)
+  "Read from mmap area the header common to all boxed values. Return BOX
+and value-specific-tag as multiple values"
+  (declare (type maddress ptr)
+           (type mem-size index))
+
+  ;; read value-specific-tag at INDEX+1
+  (multiple-value-bind (fulltag allocated-words/4) (mread-box-1 ptr (mem-size+1 index))
+
+    (values
+     (make-box index (box-pointer->size allocated-words/4))
+     fulltag)))
+
 
 
 
@@ -76,6 +70,12 @@ Return INDEX pointing to box payload"
 
     (the (integer 0 #.+mem-bignum/max-words+) words)))
 
+
+(defun box-words/bignum (n)
+  "Return the number of words needed to store a BOX containing bignum N in memory."
+  (declare (type integer n))
+  (the mem-size (mem-size+ 1 +mem-box/header-words+ (bignum-words n))))
+  
 
 
 (defun %mwrite-bignum-loop (ptr index n-words n)
@@ -197,13 +197,15 @@ Return a new BOX wrapping the bignum"
            (type mem-size index))
   
   ;; read sign at INDEX+1 and bignum-words at INDEX+2
-  (multiple-value-bind (sign allocated-words/4)
-      (mget-fulltag-and-value ptr (mem-size+1 index))
+  (multiple-value-bind (box sign) (mread-box/header ptr index)
 
-    (let* ((n-words (mget-int              ptr (mem-size+ index +mem-box/header-words+)))
+    (incf-mem-size index +mem-box/header-words+)
+
+    (let* ((n-words (mget-int              ptr index))
            (n       (%mread-bignum-recurse ptr index n-words sign)))
 
-      (make-box n index (box-pointer->size allocated-words/4)))))
+      (setf (box-value box) n)
+      box)))
 
 
   

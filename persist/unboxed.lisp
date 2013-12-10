@@ -66,19 +66,25 @@
        (format stream " ")))
 
 
-(declaim (inline mem-size+ mem-size+1 mem-size-))
-(defun mem-size+ (a &optional (b 0))
-  (declare (type mem-size a b))
-  (the mem-size (+ a b)))
+(declaim (inline mem-size+ mem-size+1 mem-size+2 mem-size- mem-size-1))
 
+(defun mem-size+ (a &optional (b 0) (c 0))
+  (declare (type mem-size a b c))
+  (the mem-size (+ a b c)))
 
 (defun mem-size+1 (a)
   (mem-size+ a 1))
 
+(defun mem-size+2 (a)
+  (mem-size+ a 2))
 
 (defun mem-size- (a b)
   (declare (type mem-size a b))
   (the mem-size (- a b)))
+
+(defun mem-size-1 (a)
+  (mem-size- a 1))
+
 
 
 (defmacro incf-mem-size (place &optional (delta 1))

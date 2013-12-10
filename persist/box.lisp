@@ -33,7 +33,74 @@
 ;;;;   word 2... : payload. depends on type
 
 
+(declaim (inline box-index   (setf box-index)
+                 box-n-words (setf box-n-words)
+                 box-value   (setf box-value)
+                 box-next    (setf box-next)))
 
+
+#|
+;; wrapper for values that cannot be stored as unboxed
+(deftype box () 'cons)
+
+(defun make-box (value index n-words)
+  "Create a new box to wrap VALUE. Assumes VALUE will be stored at INDEX in memory store."
+  (declare (type mem-size index n-words))
+  `(,value ,index . ,n-words)))
+
+(defun box-value (box)
+  (declare (type box box))
+  (first box))
+
+(defun (setf box-value) (value box)
+  (declare (type box box))
+  (setf (first box) value))
+
+(defun box-index (box)
+  (declare (type box box))
+  (the mem-size (second box)))
+
+(defun (setf box-index) (index box)
+  (declare (type box box)
+           (type mem-size index))
+  (setf (second box) index))
+
+(defun box-n-words (box)
+  (declare (type box box))
+  (the mem-size (rest (rest box))))
+
+(defun (setf box-n-words) (n-words box)
+  (declare (type box box)
+           (type mem-size n-words))
+  (setf (rest (rest box)) n-words))
+|#
+
+
+(declaim (inline %make-box))
+(defstruct (box (:constructor %make-box))
+  (index   0 :type mem-size)
+  (n-words 0 :type mem-size)
+  (value   nil))
+
+
+(defun make-box (index n-words &optional value)
+  "Create a new box to wrap VALUE. Assumes VALUE will be stored at INDEX in memory store."
+  (declare (type mem-size index n-words))
+  (%make-box :index index :n-words n-words :value value))
+
+(defun box-next (box)
+  (declare (type box box))
+  (box-value box))
+
+(defun (setf box-next) (value box)
+  (declare (type box box))
+  (setf (box-value box) value))
+
+           
+
+;; TODO: remove unnecessary owner from BOXes
+;; reduces overhead to 1 word: fulltag = type, value = (/ allocated-words +mem-box/min-words+)
+;; TODO: turn BOXes into CONS cells
 
 (defmacro mwrite-box-0 (ptr index boxed-type owner)
   "Write to memory the 0-th word of a boxed value"
@@ -61,44 +128,32 @@
   (the mem-pointer (nth-value 0 (truncate index +mem-box/min-words+))))
 
 
-(declaim (inline %make-mfree-cell mfree-cell-index mfree-cell-n-words mfree-cell-next))
-
-(defstruct (mfree-cell (:constructor %make-mfree-cell))
-  (index   +mem-unallocated+ :type mem-size)
-  (n-words 0                 :type mem-size)
-  (next    nil               :type (or null mfree-cell)))
-
-
-(defun new-mfree-cell (index n-words &optional next)
-  (%make-mfree-cell :index index :n-words n-words :next next))
+(defun box-null? (box)
+  "Return T if box is full of zeroes, for example when loaded from a newly created file."
+  (declare (type box box))
+  (and (<     (box-index   box) +mem-box/min-words+)
+       (zerop (box-n-words box))
+       (null  (box-value   box))))
 
 
-(defun mfree-cell-null? (cell)
-  "Return T if cell is full of zeroes, for example when loaded from a newly created file."
-  (declare (type mfree-cell cell))
-  (and (<     (mfree-cell-index cell) +mem-box/min-words+)
-       (zerop (mfree-cell-n-words cell))
-       (null  (mfree-cell-next    cell))))
+(declaim (inline mwrite-box-next mwrite-box-n-words mwrite-box-n-words))
 
-
-(declaim (inline mwrite-free-cell-next mwrite-box-n-words mwrite-free-cell-n-words))
-
-(defun mwrite-free-cell-next (ptr cell)
-  "Write the NEXT slot of a mfree-cell into mmap memory starting
-at (+ PTR (mfree-cell-index CELL))"
+(defun mwrite-box-next/free (ptr box)
+  "Write the NEXT slot of a free box into mmap memory starting
+at (+ PTR (box-index BOX))"
 
   (declare (type maddress ptr)
-           (type mfree-cell cell))
+           (type box box))
 
-  (let* ((index (mfree-cell-index cell))
-         (next  (mfree-cell-next cell))
-         (next-index (if next (mfree-cell-index next) 0)))
+  (let* ((index (box-index box))
+         (next  (box-next box))
+         (next-index (if next (box-index next) 0)))
 
-    (mwrite-box-0 ptr (mem-size+ 2 index) +mem-unallocated+ (size->box-pointer next-index))))
+    (mwrite-box-0 ptr index +mem-unallocated+ (size->box-pointer next-index))))
 
 
-(defun mwrite-box-n-words (ptr index n-words)
-  "Write the N-WORDS slot of a box or free-cell into mmap memory starting
+(defun %mwrite-box-n-words (ptr index n-words)
+  "Write the N-WORDS slot of a box or box into mmap memory starting
 at (+ PTR INDEX)"
 
   (declare (type maddress ptr)
@@ -107,24 +162,21 @@ at (+ PTR INDEX)"
   (mwrite-box-1 ptr (mem-size+1 index) +mem-unallocated+ (size->box-pointer n-words)))
 
 
-(defun mwrite-free-cell-n-words (ptr cell &optional (n-words (mfree-cell-n-words cell)))
-  "Write the N-WORDS slot of a mfree-cell into mmap memory starting
-at (+ PTR (mfree-cell-index CELL))"
+(defun mwrite-box-n-words (ptr box &optional (n-words (box-n-words box)))
+  "Write the N-WORDS slot of a box into mmap memory starting
+at (+ PTR (box-index BOX))"
 
-  (let ((index (mfree-cell-index cell)))
-
-    (mwrite-box-n-words ptr (mem-size+ 2 index) n-words)))
+  (%mwrite-box-n-words ptr (box-index box) n-words))
 
 
 
-(defun mwrite-free-cell (ptr cell)
-  "Write a mfree-cell into mmap memory starting at (+ PTR (mfree-cell-index CELL))"
-
+(defun mwrite-box/free (ptr box)
+  "Write a free box into mmap memory starting at (+ PTR (box-index BOX))"
   (declare (type maddress ptr)
-           (type mfree-cell cell))
+           (type box box))
 
-  (mwrite-free-cell-next    ptr cell)
-  (mwrite-free-cell-n-words ptr cell))
+  (mwrite-box-next/free ptr box)
+  (mwrite-box-n-words   ptr box))
 
 
 
@@ -135,7 +187,7 @@ at (+ PTR (mfree-cell-index CELL))"
 (declaim (inline mread-box-n-words))
 
 (defun mread-box-n-words (ptr index)
-  "Read N-WORDS from box or free cell in mmap memory starting at (PTR+INDEX) and return it."
+  "Read N-WORDS from box in mmap memory starting at (PTR+INDEX) and return it."
 
   (declare (type maddress ptr)
            (type mem-size index))
@@ -143,19 +195,19 @@ at (+ PTR (mfree-cell-index CELL))"
   (box-pointer->size (mget-value ptr (mem-size+1 index))))
 
 
-(defun mread-free-cell (ptr index)
-  "Read a mfree-cell from mmap memory starting at (PTR+INDEX) and return it.
+(defun mread-box/free (ptr index)
+  "Read a free box from mmap memory starting at (PTR+INDEX) and return it.
 Note: NEXT slot of returned object always contains NIL,
       instead NEXT value stored in mmap is returned as multiple values."
 
   (declare (type maddress ptr)
            (type mem-size index))
 
-  (let* ((index+2 (mem-size+ 2 index))
-         (next-index (box-pointer->size (mget-value ptr index+2)))
-         (n-words    (mread-box-n-words ptr index+2)))
+  (let* ((next-index (mem-size+ +mem-box/payload-words+
+                                (box-pointer->size (mget-value ptr index))))
+         (n-words    (mread-box-n-words ptr index)))
     (values
-     (new-mfree-cell index n-words)
+     (make-box index n-words)
      (the mem-size next-index))))
 
 
@@ -166,68 +218,118 @@ Note: NEXT slot of returned object always contains NIL,
 (defun init-free-list (ptr total-n-words)
   "Create and return a new free list containing ALL the words up to TOTAL-N-WORDS."
   (declare (type maddress ptr)
+           (ignore ptr)
            (type mem-size total-n-words))
-  (setf *mfree* (new-mfree-cell 0 0))
-  (mem-free ptr +mem-box/min-words+ (mem-size- total-n-words +mem-box/min-words+)))
+  (let ((lo +mem-box/payload-words+)
+        (hi (mem-size- total-n-words +mem-box/header-words+)))
+
+    (setf *mfree*
+          (make-box +mem-box/payload-words+ 0
+                    (make-box hi (mem-size- hi lo))))))
 
 
 (defun mread-free-list (ptr)
-  "Read a list of MFREE-CELL from memory starting at (PTR + +MEM-BOX/HEADER-WORDS+) and return it.
+  "Read a list of BOX from memory starting at (PTR + +MEM-BOX/PAYLOAD-WORDS+) and return it.
 FIXME: it currently loads the whole free-list in RAM (bad!)"
   (declare (type maddress ptr))
 
-  (let ((index 0)
+  (let ((index +mem-box/payload-words+)
         (head)
         (prev))
     (loop
-       (multiple-value-bind (this next-index) (mread-free-cell ptr index)
+       (multiple-value-bind (this next-index) (mread-box/free ptr index)
          (declare (type mem-size next-index))
 
          (if prev
-           (setf (mfree-cell-next prev) this)
+           (setf (box-next prev) this)
            (setf head this
-                 ;; head is just a pointer to next cell, it must have zero free words
-                 (mfree-cell-n-words this) 0))
+                 ;; head is just a pointer to next box, it must have zero free words
+                 (box-n-words this) 0))
 
-         (when (zerop next-index)
+         (when (< next-index +mem-box/min-words+)
            (return (setf *mfree* head)))
 
          (setf prev this
                index next-index)))))
 
 
-(defun mem-free (ptr index &optional (n-words
-                                      (mread-box-n-words ptr index)))
+(defun minsert-box/free (ptr prev box lo hi)
+  (declare (type maddress ptr)
+           (type box prev box)
+           (type mem-size lo hi))
+
+  (let ((curr (box-next prev)))
+    ;; boxes are written at the end of the free mmap area they represent!
+    (setf (box-index   box) hi
+          (box-n-words box) (mem-size- hi lo)
+          (box-next    box) curr
+          (box-next    prev) box)
+
+    (mwrite-box/free ptr box)
+    (mwrite-box-next ptr prev)
+    prev))
+
+
+(defun %box-free (ptr head box lo hi)
+  (declare (type maddress ptr)
+           (type box head box)
+           (type mem-size lo hi))
+
+  (loop
+     for prev = head then curr
+     for curr = (box-next prev)
+     while curr
+     for curr-hi = (box-index curr)
+     for curr-n  = (box-n-words curr)
+     for curr-lo = (mem-size- curr-hi curr-n)
+     do
+       (cond
+         ((> lo curr-hi)
+          nil)
+         ((= lo curr-hi)
+          (setf lo curr-lo)
+          (setf (box-next prev) (box-next curr))
+          (mwrite-box-next ptr prev)
+          (setf curr prev))
+         ((= hi curr-lo)
+          (setf hi curr-hi)
+          (setf (box-next prev) (box-next curr))
+          (mwrite-box-next ptr prev)
+          (setf curr prev))
+         ((< hi curr-lo)
+          (loop-finish)))
+     finally
+       (minsert-box/free ptr prev box lo hi)))
+
+
+(defun box-free (ptr box)
   "A very naive deallocator. Useful only for debugging and development."
   (declare (type maddress ptr)
-           (type mem-size index n-words))
+           (type box box))
 
-  (let ((head *mfree*))
+  (let ((head *mfree*)
+        (n-words (box-n-words box)))
     
     (unless (zerop n-words)
-      ;; mfree-cells are written at the end of the free mmap area they represent!
-      (incf-mem-size index (mem-size- n-words +mem-box/min-words+))
+      (let* ((lo (mem-size- (box-index box) +mem-box/header-words+))
+             (hi (mem-size+ lo n-words)))
+        (%box-free ptr head box lo hi)))
 
-      (let* ((next (mfree-cell-next head))
-             (this (new-mfree-cell index n-words next)))
-    
-        (setf (mfree-cell-next head) this)
-        (mwrite-free-cell      ptr this)
-        (mwrite-free-cell-next ptr head)))
-    
     head))
 
 
 
 
-(defun mem-alloc (ptr n-words)
+
+
+(defun box-alloc (ptr n-words)
   "A very naive first-fit allocator for mmap areas. Useful only for debugging and development."
   (declare (type maddress ptr)
            (type mem-size n-words))
 
   ;; trying to allocate zero words? then return invalid pointer
   (when (zerop n-words)
-    (return-from mem-alloc +mem-unallocated+))
+    (return-from box-alloc nil))
 
   (when (> n-words +mem-box/max-words+)
     (error "cannot allocate ~S consecutive words from mmap area. Maximum supported is ~S words"
@@ -239,42 +341,42 @@ FIXME: it currently loads the whole free-list in RAM (bad!)"
       (incf-mem-size n-words (- +mem-box/min-words+ remainder))))
 
   (loop for prev = *mfree* then this
-     for this = (mfree-cell-next prev) then next
+     for this = (box-next prev) then next
      while this
-     for this-len = (mfree-cell-n-words this)
-     for next = (mfree-cell-next this)
+     for this-len = (box-n-words this)
+     for next = (box-next this)
      do
        (when (>= this-len n-words)
-         ;; mfree-cells are written at the end of the free mmap area they represent!
-         (let ((result (mem-size- (mfree-cell-index this) (mem-size- this-len +mem-box/min-words+))))
+         ;; boxes are written at the end of the free mmap area they represent!
+         (let ((result (mem-size- (box-index this) (mem-size- this-len +mem-box/header-words+)))
+               (box nil))
            ;; update this length
            (decf this-len n-words)
 
            (if (zerop this-len)
                ;; exact match? then remove THIS from free list (it cannot be the head)
-               (let ((next (mfree-cell-next this)))
-                 (setf (mfree-cell-next prev) next)
+               (let ((next (box-next this)))
+                 (setf (box-next prev) next)
                  ;; write back the new link PREV->NEXT that bypasses THIS
-                 (mwrite-free-cell-next ptr prev))
+                 (mwrite-box-next ptr prev)
+                 (setf box this
+                       (box-index box) result))
 
                ;; otherwise update THIS n-words
                (progn
-                 (setf (mfree-cell-n-words this) this-len)
-                 ;; also write back THIS n-words in mmap area
-                 (mwrite-free-cell-n-words ptr this this-len)))
+                 (setf (box-n-words this) this-len
+                       ;; create and return a new box
+                       box (make-box result n-words))
+                 (mwrite-box-n-words ptr this)))
 
-           ;; we have an allocated n-words block starting at RESULT
-           ;; write to mmap its number of words
-           (mwrite-box-n-words ptr result n-words)
-
-           (return-from mem-alloc result))))
+           (return-from box-alloc box))))
 
   (error "out of memory! failed to allocate ~S words from mmap area ~S" n-words ptr))
 
              
                  
 
-(defun mem-alloc-rounded (ptr n-words)
+(defun box-alloc-rounded (ptr n-words)
   "Round up N-WORDS somewhat (typically 25%) then allocate that many words from mmap area."
   (declare (type maddress ptr)
            (type mem-size n-words))
@@ -285,5 +387,10 @@ FIXME: it currently loads the whole free-list in RAM (bad!)"
              (mem-size- +mem-box/max-words+ n-words))))
 
     (the (values mem-size &optional)
-      (mem-alloc ptr (mem-size+ n-words (ash delta 2))))))
+      (box-alloc ptr (mem-size+ n-words (ash delta 2))))))
+
+
+
+
+
 

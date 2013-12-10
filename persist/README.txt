@@ -100,16 +100,20 @@ Design:
 
    Applies to both unallocated boxed values and to unallocated user-defined persistent types.
 
-   word 0: tag = always 0, means unallocated area
+   word 0...N-3 : not used, can have any value
+
+   word N-2: tag = always 0, means unallocated area
            value = pointer to next unallocated area
            
-   word 1: tag = not used, can have any value
-           value = number of allocated words /4. also counts the header (i.e. words 0, 1 and 2)
-
-   word 2... : not used, can have any value
+   word N-1: tag = not used, can have any value
+           value = number of allocated words /4. also counts the footer (i.e. words N-2 and N-1)
 
    
 6. boxed values
+
+;; TODO: remove unnecessary owner from BOXes
+;; reduces overhead to 1 word: fulltag = type, value = (/ allocated-words +mem-box/min-words+)
+;; TODO: turn BOXes into CONS cells
 
    word 0: tag = type. it uses a different coding than pointer tags (see table below)
            value = pointer to owner.

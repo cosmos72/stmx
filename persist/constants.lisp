@@ -101,6 +101,7 @@
     This value must be a power of two.")
 (defconstant +mem-box/max-words+    (* +most-positive-pointer+ +mem-box/min-words+))
 (defconstant +mem-box/header-words+ 2 "boxed values have a 2 CPU-word header")
+(defconstant +mem-box/payload-words+ (- +mem-box/min-words+ +mem-box/header-words+))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

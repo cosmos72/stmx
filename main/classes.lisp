@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; this file is part of stmx.
-;; copyright (c) 2013 massimiliano ghilardi
+;; copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; this library is free software: you can redistribute it and/or
 ;; modify it under the terms of the lisp lesser general public license

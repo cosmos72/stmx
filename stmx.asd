@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -61,6 +61,7 @@
 
                (:module :main
                 :components ((:file "package")
+                             (:file "version"        :depends-on ("package"))
                              (:file "global-clock"   :depends-on ("package"))
                              (:file "tvar-fwd"       :depends-on ("global-clock"))
                              (:file "classes"        :depends-on ("tvar-fwd"))

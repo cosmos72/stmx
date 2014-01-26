@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; this file is part of stmx.
-;; copyright (c) 2013 massimiliano ghilardi
+;; copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; this library is free software: you can redistribute it and/or
 ;; modify it under the terms of the lisp lesser general public license
@@ -20,7 +20,9 @@
 ;;;; ** constants
 
 (declaim (type symbol +unbound-tvar+))
-(define-constant-once +unbound-tvar+ (gensym (symbol-name 'unbound-tvar-)))
+(defconstant +unbound-tvar+ (if (boundp '+unbound-tvar+)
+                                (symbol-value '+unbound-tvar+)
+                                (gensym (symbol-name 'unbound-tvar-))))
 
 (declaim (type version-type +invalid-version+))
 (defconstant +invalid-version+ (- +global-clock-delta+))

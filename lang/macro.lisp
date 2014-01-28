@@ -35,17 +35,17 @@
   `(make-instance ,class ,@initargs))
 
 
-(defmacro eval-always (&rest body)
+(defmacro eval-always (&body body)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      ,@body))
 
 
-(defmacro let1 (var value &rest body)
+(defmacro let1 (var value &body body)
   `(let ((,var ,value))
      ,@body))
 
 
-(defmacro when-bind (var test &rest body)
+(defmacro when-bind (var test &body body)
   `(let1 ,var ,test
      (when ,var
        ,@body)))
@@ -53,7 +53,7 @@
 
 (defvar +it+ (symbol-name 'it))
 
-(defmacro awhen (test &rest body)
+(defmacro awhen (test &body body)
   (let1 it (intern +it+ *package*)
     `(when-bind ,it ,test
        ,@body)))

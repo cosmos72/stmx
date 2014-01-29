@@ -68,16 +68,19 @@ initialize all its elements to NIL and return it."))
 
 (defclass ghash-table ()
   ((vec          :type (or ghash-vector tvar))
-   (test-fun     :type ghash-test-fun  :initarg :test  :initform #'eql)
-   (hash-fun     :type ghash-hash-fun  :initarg :hash)
+   (test-fun     :type ghash-test-fun)
+   (hash-fun     :type ghash-hash-fun)
    (aref-fun     :type ghash-aref-fun     :initform #'svref)
    (set-aref-fun :type ghash-set-aref-fun :initform #+(or sbcl cmucl) #'(setf svref)
                                                     #-(or sbcl cmucl) #'%setf-svref)
-   (count        :type (or fixnum tvar)   :initform 0))
+   (count        :type (or fixnum tvar)   :initform 0)
+
+   (test-sym     :type symbol             :initarg :test  :initform 'eql)
+   (hash-sym     :type symbol             :initarg :hash  :initform nil))
 
   (:documentation
-   "Generic hash-table. Allows custom :test argument at creation - default is #'eql.
-If :test is not one of #'eq #'eql or #'equal, also requires explicit :hash
+   "Generic hash-table. Allows custom :test argument at creation - default is 'eql.
+If :test is not one of 'eq 'eql or 'equal, also requires explicit :hash
 argument at creation.
 
 Not so useful by itself (standard CL:HASH-TABLE is usually faster),
@@ -95,17 +98,22 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
     ;; initial-capacity is not a power of 2: round up to nearset power of 2
     (setf initial-capacity (ash 1 (integer-length initial-capacity))))
 
-  (unless (slot-boundp hash 'hash-fun)
-    ;; provide default hash-fun when test-fun is #'eq #'eql or #'equal
-    (let1 test-fun (_ hash test-fun)
-      (if (or (eq test-fun #'eq)
-              (eq test-fun #'eql)
-              (eq test-fun #'equal))
-          (setf (_ hash hash-fun) #'sxhash)
-          (error "missing ~S argument, cannot instantiate ~S with custom ~S"
-                 :hash (type-of hash) :test))))
+  ;; provide default hash-fun when test-fun is one of: 'eq 'eql or 'equal
+  (with-ro-slots (test-sym) hash
+    (with-rw-slots (hash-sym) hash
+      (unless hash-sym
+        (if (or (eq test-sym 'eq)
+                (eq test-sym 'eql)
+                (eq test-sym 'equal))
+            (setf hash-sym 'sxhash)
+            (error "missing ~S argument, cannot instantiate ~S with custom ~S ~S"
+                   :hash (type-of hash) :test test-sym)))
 
-  (setf (_ hash vec) (ghash/new-vec hash initial-capacity)))
+      ;; convert :test and :hash from symbols to actual functions
+      (setf (_ hash test-fun) (fdefinition test-sym)
+            (_ hash hash-fun) (fdefinition hash-sym)
+            ;; allocate internal vector
+            (_ hash vec) (ghash/new-vec hash initial-capacity)))))
         
 
 

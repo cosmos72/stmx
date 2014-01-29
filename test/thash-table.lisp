@@ -21,7 +21,7 @@
 
 
 (test new-thash-table
-  (let1 h (new 'thash-table :test #'= :hash #'identity)
+  (let1 h (new 'thash-table :test '= :hash 'identity)
     (is (= 0 (ghash-table-count h)))
     (do-ghash (key value) h
       (fail "unexpected entry ~A = ~A in empty thash-table" key value))))
@@ -31,14 +31,14 @@
 (defun test-new-thash-table (pred &key (count 16))
   (dolist (thash
             (list
-             (new 'thash-table :test #'eql)
-             (new 'thash-table :test #'eql     :hash #'identity)
-             (new 'thash-table :test #'equal)
-             (new 'thash-table :test #'equal   :hash #'identity)
-             (new 'thash-table :test #'=       :hash #'sxhash)
-             (new 'thash-table :test #'=       :hash #'identity)
-             (new 'thash-table :test #'fixnum= :hash #'sxhash)
-             (new 'thash-table :test #'fixnum= :hash #'identity)))
+             (new 'thash-table :test 'eql)
+             (new 'thash-table :test 'eql     :hash 'identity)
+             (new 'thash-table :test 'equal)
+             (new 'thash-table :test 'equal   :hash 'identity)
+             (new 'thash-table :test '=       :hash 'sxhash)
+             (new 'thash-table :test '=       :hash 'identity)
+             (new 'thash-table :test 'fixnum= :hash 'sxhash)
+             (new 'thash-table :test 'fixnum= :hash 'identity)))
     (test-ghash-table thash pred :count count)))
 
       

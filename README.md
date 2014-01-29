@@ -804,7 +804,8 @@ use `(describe 'some-symbol)` at REPL:
   Methods: `GHASH-TABLE-COUNT` `GHASH-TABLE-EMPTY?` `CLEAR-GHASH`
            `GET-GHASH` `(SETF GET-GHASH)` `SET-GHASH` `REM-GHASH` 
            `MAP-GHASH` `DO-GHASH` `COPY-GHASH`
-           `GHASH-KEYS` `GHASH-VALUES` `GHASH-PAIRS`.
+           `GHASH-KEYS` `GHASH-VALUES` `GHASH-PAIRS`
+           `GHASH-TEST` `GHASH-HASH`.
 
   Note: THASH-TABLE test functions and hash functions changed in STMX 2.0.0.
   They now must be function names (i.e. symbols), previously they were actual functions.

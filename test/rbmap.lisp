@@ -85,7 +85,7 @@ bmap-count must be the actual nodes count, root must be black."
 
 
 (test new-rbmap
-  (let1 m (new 'rbmap :pred #'fixnum<)
+  (let1 m (new 'rbmap :pred 'fixnum<)
     (is-true (gmap-empty? m))
     (is (= 0 (gmap-count m)))
     (do-gmap (key value) m
@@ -144,7 +144,7 @@ bmap-count must be the actual nodes count, root must be black."
 (defun test-rbmap-class (class-name &key (count 100))
   (declare (type symbol class-name)
            (type fixnum count))
-  (let* ((m1    (new class-name :pred #'fixnum<))
+  (let* ((m1    (new class-name :pred 'fixnum<))
          (m2    (copy-gmap m1))
          (hash  (make-hash-table :test 'eql)))
     (dotimes (i count)

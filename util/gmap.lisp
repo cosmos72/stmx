@@ -31,10 +31,10 @@
 (defclass gmap ()
   ;; allow ROOT to also be a TVAR, otherwise subclass TMAP cannot work
   ((root  :initform nil  :type (or null gmap-node tvar) :accessor root-of)
-   (pred  :initarg :pred :type function             :accessor pred-of
-          :initform (error "missing :pred argument instantiating ~A or a subclass" 'gmap))
+   (pred-func            :type function                 :accessor pred-function-of)
    ;; allow COUNT to also be a TVAR, otherwise subclass TMAP cannot work
-   (count :initform 0    :type (or fixnum tvar)     :accessor count-of))
+   (count :initform 0    :type (or fixnum tvar)         :accessor count-of)
+   (pred  :initarg :pred :type symbol                   :accessor pred-of))
   (:documentation "Generic binary tree"))
 
 
@@ -48,15 +48,32 @@ bad style; I prefer to be notified early if I try to do something plainly wrong.
     (error "Cannot instantiate abstract class ~A" class)))
 
 
+(defmethod initialize-instance :after ((m gmap) &key)
+  (with-ro-slots (pred) m
+    (unless pred
+      (error "missing ~S argument instantiating ~A" :pred (type-of m)))
+    (unless (symbolp pred)
+      (break)
+      (error "unsupported ~S argument instantiating ~A:
+expecting a function name \(i.e. a symbol), got the ~S ~S"
+             :pred (type-of m) (type-of pred) pred))
+    (setf (_ m pred-func) (fdefinition pred))))
+
+  
 
 
 ;;;; ** Public API
 
 
 (defun gmap-pred (m)
-  "Return predicate used by binary tree M to sort keys."
+  "Return the predicate symbol used by binary tree M to sort keys."
   (declare (type gmap m))
-  (the function (_ m pred)))
+  (the symbol (_ m pred)))
+
+(defun gmap-pred-function (m)
+  "Return the predicate function used by binary tree M to sort keys."
+  (declare (type gmap m))
+  (the function (_ m pred-func)))
 
 
 (defun gmap-count (m)
@@ -275,7 +292,7 @@ return := if KEY1 and KEY2 compare as equal."
 If M does not contain KEY, return (values DEFAULT NIL)."
   (declare (type gmap m))
   (let ((node (_ m root))
-        (pred (_ m pred)))
+        (pred (_ m pred-func)))
     (loop while node 
        for xkey = (_ node key) do
          (case (gmap-compare-keys pred key xkey)
@@ -293,7 +310,7 @@ and comparison between the KEY to insert and last visited node's key,
 as multiple values"
    (declare (type gmap m))
    (let ((node (_ m root))
-         (pred (the function (_ m pred)))
+         (pred (the function (_ m pred-func)))
          (comp nil))
      (loop while node
         for xkey = (_ node key) do

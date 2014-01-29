@@ -22,7 +22,7 @@
   ())
 
 (defun test-tmap-rollback ()
-  (let* ((m1 (new 'tmap :pred #'fixnum<))
+  (let* ((m1 (new 'tmap :pred 'fixnum<))
          (m2 (copy-gmap m1)))
 
     (add-to-gmap m1 1 "x" 2 "y")

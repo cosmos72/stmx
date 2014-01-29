@@ -793,13 +793,12 @@ use `(describe 'some-symbol)` at REPL:
 
 - `THASH-TABLE` is a transactional hash table.
   It is created with
-  `(make-instance 'thash-table [:test #'some-test-function] [:hash #'some-hash-function])`.
+  `(make-instance 'thash-table [:test 'some-test-function] [:hash 'some-hash-function])`.
 
-  Two differences from standard Common Lisp HASH-TABLE:
-  - `:test` argument must be an actual function, not a symbol. The default is `#'eql`.
-  - a hash function can be specified explicitly with `:hash #'some-hash-function`
-  For the usual test functions, i.e. `#'eq` `#'eql` and `#'equal` the hash function
-  can be omitted and a safe default (usually `#'sxhash`) will be used.
+  One difference from standard Common Lisp HASH-TABLE:
+  - a hash function can be specified explicitly with `:hash 'some-hash-function`
+  For the usual test functions, i.e. `'eq` `'eql` and `'equal` the hash function
+  can be omitted and a safe default (usually `'sxhash`) will be used.
   For other test functions, the hash function becomes mandatory.
 
   Methods: `GHASH-TABLE-COUNT` `GHASH-TABLE-EMPTY?` `CLEAR-GHASH`
@@ -807,24 +806,31 @@ use `(describe 'some-symbol)` at REPL:
            `MAP-GHASH` `DO-GHASH` `COPY-GHASH`
            `GHASH-KEYS` `GHASH-VALUES` `GHASH-PAIRS`.
 
+  Note: THASH-TABLE test functions and hash functions changed in STMX 2.0.0.
+  They now must be function names (i.e. symbols), previously they were actual functions.
+
   Note: THASH-TABLE has been completely rewritten in STMX 1.3.3 and
   has now much better performance. Previously its methods contained
   `THASH` instead of `GHASH` in their names.
 
 - `TMAP` is a transactional sorted map, backed by a red-black tree.
   It is created with `(make-instance 'tmap :pred compare-function)`
-  where COMPARE-FUNCTION must be a function accepting two arguments, KEY1 and
-  KEY2, and returning t if KEY1 is smaller that KEY2. For numeric keys, typical
-  COMPARE-FUNCTIONs are `#'<` or `#'>` and the faster `#'fixnum<` or `#'fixnum>`.
-  For string keys, typical COMPARE-FUNCTIONs are `#'string<` and `#'string>`.
+  where COMPARE-FUNCTION must be the name of a function accepting two arguments,
+  KEY1 and KEY2, and returning t if KEY1 is smaller that KEY2.
+  For numeric keys, typical COMPARE-FUNCTIONs are `'<` or `'>` and the faster
+  `'fixnum<` or `'fixnum>`.
+  For string keys, typical COMPARE-FUNCTIONs are `'string<` and `'string>`.
 
   Methods: `GMAP-PRED` `GMAP-COUNT` `GMAP-EMPTY?` `CLEAR-GMAP`
            `GET-GMAP` `(SETF GET-GMAP)` `SET-GMAP` `REM-GMAP` 
            `MIN-GMAP` `MAX-GMAP` `MAP-GMAP` `DO-GMAP`
            `GMAP-KEYS` `GMAP-VALUES` `GMAP-PAIRS`.
 
-  Note: TMAP methods were renamed in STMX 1.3.3, they previously contained
-  `BMAP` instead of `GMAP` in their names.
+  Note: COMPARE-FUNCTIONs changed in STMX 2.0.0. They now must be function names
+  (i.e. symbols), previously they were actual functions.
+
+  Note: TMAP methods changed in STMX 1.3.3. They now contain `GMAP` in their names,
+  previously they contained `BMAP` in the name.
 
 - `GHASH-TABLE` is the non-transactional version of `THASH-TABLE`. Not so
   interesting by itself, as Common Lisp offers a standard (and usually faster)

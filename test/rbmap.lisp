@@ -94,7 +94,7 @@ bmap-count must be the actual nodes count, root must be black."
 
 
 (defun build-gmap (class-name pred &optional list)
-  (declare (type function pred)
+  (declare (type symbol pred)
            (type list list))
 
   (let1 m (new class-name :pred pred)

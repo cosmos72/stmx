@@ -20,9 +20,9 @@
 ;;;; ** constants
 
 (declaim (type symbol +unbound-tvar+))
-(defconstant +unbound-tvar+ (if (boundp '+unbound-tvar+)
-                                (symbol-value '+unbound-tvar+)
-                                (gensym (symbol-name 'unbound-tvar-))))
+;; do NOT use (define-constant ... (if (boundp '...) (symbol-value '...) <actual-definition>))
+;; as it causes bugs at least on SBCL
+(define-global +unbound-tvar+ (gensym (symbol-name 'unbound-tvar-)))
 
 (declaim (type version-type +invalid-version+))
 (defconstant +invalid-version+ (- +global-clock-delta+))

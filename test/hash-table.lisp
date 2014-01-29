@@ -17,20 +17,21 @@
 
 
 (defun hash-table-to-sorted-keys (hash pred)
-  (declare (type hash-table hash)
-           (type function pred))
-  (sort (hash-table-keys hash) pred))
+  (declare (type hash-table hash))
+  (let ((pred-func (if (functionp pred) pred (fdefinition pred))))
+    
+    (sort (hash-table-keys hash) pred-func)))
 
 
 (defun hash-table-to-sorted-pairs (hash pred)
-  (declare (type hash-table hash)
-           (type function pred))
-  (sort (hash-table-pairs hash) pred :key #'first))
+  (declare (type hash-table hash))
+  (let ((pred-func (if (functionp pred) pred (fdefinition pred))))
+
+    (sort (hash-table-pairs hash) pred-func :key #'first)))
 
 
 (defun hash-table-to-sorted-values (hash pred)
-  (declare (type hash-table hash)
-           (type function pred))
+  (declare (type hash-table hash))
   (loop for pair in (hash-table-to-sorted-pairs hash pred)
      collect (rest pair)))
          

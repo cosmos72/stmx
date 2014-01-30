@@ -30,11 +30,11 @@
 
 (defclass gmap ()
   ;; allow ROOT to also be a TVAR, otherwise subclass TMAP cannot work
-  ((root  :initform nil  :type (or null gmap-node tvar) :accessor root-of)
-   (pred-func            :type function                 :accessor pred-function-of)
+  ((root     :initform nil  :type (or null gmap-node tvar))
+   (pred-func            :type function                    :reader pred-function-of)
    ;; allow COUNT to also be a TVAR, otherwise subclass TMAP cannot work
-   (count :initform 0    :type (or fixnum tvar)         :accessor count-of)
-   (pred  :initarg :pred :type symbol                   :accessor pred-of))
+   (count    :initform 0    :type (or fixnum tvar)         :reader count-of)
+   (pred-sym :initform nil  :type symbol   :initarg :pred  :reader pred-of))
   (:documentation "Generic binary tree"))
 
 
@@ -49,15 +49,11 @@ bad style; I prefer to be notified early if I try to do something plainly wrong.
 
 
 (defmethod initialize-instance :after ((m gmap) &key)
-  (with-ro-slots (pred) m
-    (unless pred
+  (with-ro-slots (pred-sym) m
+    (unless pred-sym
       (error "missing ~S argument instantiating ~A" :pred (type-of m)))
-    (unless (symbolp pred)
-      (break)
-      (error "unsupported ~S argument instantiating ~A:
-expecting a function name \(i.e. a symbol), got the ~S ~S"
-             :pred (type-of m) (type-of pred) pred))
-    (setf (_ m pred-func) (fdefinition pred))))
+    (check-type pred-sym symbol)
+    (setf (_ m pred-func) (fdefinition pred-sym))))
 
   
 
@@ -68,12 +64,7 @@ expecting a function name \(i.e. a symbol), got the ~S ~S"
 (defun gmap-pred (m)
   "Return the predicate symbol used by binary tree M to sort keys."
   (declare (type gmap m))
-  (the symbol (_ m pred)))
-
-(defun gmap-pred-function (m)
-  "Return the predicate function used by binary tree M to sort keys."
-  (declare (type gmap m))
-  (the function (_ m pred-func)))
+  (the symbol (_ m pred-sym)))
 
 
 (defun gmap-count (m)
@@ -442,7 +433,7 @@ or (values nil nil nil) if M is empty"
   "Create and return a copy of binary tree M.
 Keys and values in M are shallow copied."
   (declare (type gmap m))
-  (let1 mcopy (new (class-of m) :pred (_ m pred))
+  (let1 mcopy (new (class-of m) :pred (gmap-pred m))
     (copy-gmap-into mcopy m)))
 
 
@@ -593,5 +584,6 @@ Return t if left child was replaced, nil if right child was replaced"
           (setf (_ parent right) new-node))
       left-child?)))
 
+
 (defprint-object (obj gmap)
-  (format t "~S ~S ~S ~S" :count (_ obj count) :pred (_ obj pred)))
+  (format t "~S ~S ~S ~S" :count (gmap-count obj) :pred (gmap-pred obj)))

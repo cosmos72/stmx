@@ -98,27 +98,40 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
     ;; initial-capacity is not a power of 2: round up to nearset power of 2
     (setf initial-capacity (ash 1 (integer-length initial-capacity))))
 
-  ;; provide default hash-fun when test-fun is one of: 'eq 'eql or 'equal
-  (with-ro-slots (test-sym) hash
-    (with-rw-slots (hash-sym) hash
-      (unless hash-sym
-        (if (or (eq test-sym 'eq)
-                (eq test-sym 'eql)
-                (eq test-sym 'equal))
-            (setf hash-sym 'sxhash)
-            (error "missing ~S argument, cannot instantiate ~S with custom ~S ~S"
-                   :hash (type-of hash) :test test-sym)))
+  (with-rw-slots (test-sym hash-sym) hash
+    (check-type test-sym symbol)
+    (check-type hash-sym symbol)
 
-      ;; convert :test and :hash from symbols to actual functions
-      (setf (_ hash test-fun) (fdefinition test-sym)
-            (_ hash hash-fun) (fdefinition hash-sym)
-            ;; allocate internal vector
-            (_ hash vec) (ghash/new-vec hash initial-capacity)))))
+    (unless hash-sym
+      ;; provide default hash-fun when test-fun is one of: 'eq 'eql or 'equal
+      (if (or (eq test-sym 'eq)
+              (eq test-sym 'eql)
+              (eq test-sym 'equal))
+          (setf hash-sym 'sxhash)
+          (error "missing ~S argument, cannot instantiate ~S with custom ~S ~S"
+                 :hash (type-of hash) :test test-sym)))
+    
+    ;; convert :test and :hash from symbols to actual functions
+    (setf (_ hash test-fun) (fdefinition test-sym)
+          (_ hash hash-fun) (fdefinition hash-sym)
+          ;; allocate internal vector
+          (_ hash vec) (ghash/new-vec hash initial-capacity))))
         
+
+(defun ghash-table-test (hash)
+  "Return the symbol used by ghash-table HASH to compare keys."
+  (declare (type ghash-table hash))
+  (the symbol (_ hash test-sym)))
+
+
+(defun ghash-table-hash (hash)
+  "Return the symbol used by ghash-table HASH to hash keys."
+  (declare (type ghash-table hash))
+  (the symbol (_ hash hash-sym)))
 
 
 (defun ghash-table-count (hash)
-  "Return the number of KEY/VALUE entries in GHASH-TABLE hash."
+  "Return the number of KEY/VALUE entries in ghash-table HASH."
   (declare (type ghash-table hash))
   (the (integer 0 #.most-positive-fixnum) (_ hash count)))
 
@@ -377,6 +390,10 @@ TO-ALIST contents is not destructively modified."
     (push (cons key value) to-alist))
   to-alist)
   
+
+(defprint-object (obj ghash-table)
+  (format t "~S ~S ~S ~S ~S ~S" :count (ghash-table-count obj)
+          :test (ghash-table-test obj) :hash (ghash-table-hash obj)))
 
 
 (defprint-object (obj ghash-pair :type t :identity nil)

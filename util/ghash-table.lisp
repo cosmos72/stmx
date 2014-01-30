@@ -351,7 +351,7 @@ Return T if KEY was present in HASH, otherwise return NIL."
   "Return a copy of ghash-table HASH.
 The copy will have the same class, test and hash functions, and elements."
   (declare (type ghash-table hash))
-  (let1 copy (new (class-of hash) :test (_ hash test-fun) :hash (_ hash hash-fun))
+  (let1 copy (new (class-of hash) :test (_ hash test-sym) :hash (_ hash hash-sym))
     (do-ghash (key value) hash
       (set-ghash copy key value))
     copy))

@@ -118,8 +118,7 @@
 
   :components ((:module :test
                 :components ((:file "package")
-                             (:file "misc"           :depends-on ("package"))
-			     (:file "hash-table"     :depends-on ("misc"))
+			     (:file "hash-table"     :depends-on ("package"))
                              (:file "txhash"         :depends-on ("hash-table"))
                              (:file "ghash-table"    :depends-on ("hash-table"))
                              (:file "thash-table"    :depends-on ("hash-table"))

@@ -49,6 +49,7 @@
                 #:get-txhash #:set-txhash #:do-txhash)
 
   (:import-from #:stmx.util
+                #:_
                 #:print-object-contents
                 #:print-gmap
                 #:gmap-node #:rbnode #:tnode #:color-of

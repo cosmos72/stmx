@@ -41,14 +41,13 @@
   nil)
                   
 
-(transaction
- (defmethod peek ((s tstack) &optional default)
-   "Return the first value in tstack S without removing it, and t as multiple values.
+(defmethod peek ((s tstack) &optional default)
+  "Return the first value in tstack S without removing it, and t as multiple values.
 Return (values DEFAULT nil) if S contains no values."
-   (with-ro-slots (top) s
-     (if (null top)
-         (values default nil)
-         (values (first top) t)))))
+  (with-ro-slots (top) s
+    (if (null top)
+        (values default nil)
+        (values (first top) t))))
 
 
 (transaction
@@ -91,6 +90,6 @@ Since fifo can contain unlimited values, this method never fails."
 (defprint-object (obj tstack :identity nil)
   (with-ro-slots (top) obj
     (if top
-        (format t "~A" (reverse top))
+        (format t "~S" (reverse top))
         (write-string "()"))))
 

@@ -104,8 +104,8 @@ Since tfifo can contain unlimited values, this method never fails."
          for rest = (trest list)
          do
            (when (eq rest end)
-             (format t "~A" value)
+             (format t "~S" value)
              (return))
-           (format t "~A " value)
+           (format t "~S " value)
            (setf list rest))))
   (write-string ")"))

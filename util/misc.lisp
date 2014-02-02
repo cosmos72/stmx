@@ -53,8 +53,11 @@
 ;; UNLESS the DECLARED class for the object has the flag :optimize-slot-access nil
 ;; Instead, (slot-value ...) works fine in LispWorks.
 
-(defmacro _ (obj slot-name)
-  `(slot-value ,obj ',slot-name))
+(let ((pkg (find-package (symbol-name 'stmx.util))))
+  (defmacro _ (obj slot)
+    `(slot-value ,obj ',(if (eq pkg (symbol-package slot))
+                            slot
+                            (intern (symbol-name slot) pkg)))))
 
 #|
 (eval-always

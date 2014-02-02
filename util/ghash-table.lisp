@@ -92,11 +92,17 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
                                        (initial-capacity +ghash-default-capacity+))
 
   (declare (ignore other-keys)
-           (type (integer #.+ghash-default-capacity+ #.+ghash-max-capacity+) initial-capacity))
+           (type (and fixnum (integer 0)) initial-capacity))
 
-  (unless (zerop (logand (1- initial-capacity) initial-capacity))
-    ;; initial-capacity is not a power of 2: round up to nearest power of 2
-    (setf initial-capacity (ash 1 (integer-length initial-capacity))))
+  (cond
+    ((< initial-capacity +ghash-default-capacity+)
+     (setf initial-capacity +ghash-default-capacity+))
+    ((> initial-capacity +ghash-max-capacity+)
+     (setf initial-capacity +ghash-max-capacity+))
+    (t
+     (unless (zerop (logand (1- initial-capacity) initial-capacity))
+       ;; initial-capacity is not a power of 2: round up to nearest power of 2
+       (setf initial-capacity (ash 1 (integer-length initial-capacity))))))
 
   (with-rw-slots (test-sym hash-sym) hash
     (check-type test-sym symbol)

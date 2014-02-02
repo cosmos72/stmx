@@ -17,29 +17,29 @@
 
 ;;;; ** Transactional cell, it can be empty or hold a single value
 
-(defvar *empty-tcell* (gensym "EMPTY"))
+(define-global +empty-tcell+ (gensym "EMPTY"))
 
 (transactional
  (defclass tcell ()
    ((value :initarg :value
-           :initform *empty-tcell*))))
+           :initform +empty-tcell+))))
 
-(declaim (ftype (function (t) (values tcell &optional)) tcell))
+(declaim (ftype (function (&optional t) (values tcell &optional)) tcell))
 
-(defun tcell (value)
+(defun tcell (&optional (value +empty-tcell+))
   "Create and return a new TCELL."
   (new 'tcell :value value))
 
 ;; no need to wrap empty? in a transaction:
 ;; (_ cell value) is atomic, transaction aware, and performs a single read
 (defmethod empty? ((cell tcell))
-  (eq (_ cell value) *empty-tcell*))
+  (eq (_ cell value) +empty-tcell+))
 
 
 (defmethod empty! ((cell tcell))
   "Remove value from CELL. Return CELL."
   (fast-atomic
-   (setf (_ cell value) *empty-tcell*)
+   (setf (_ cell value) +empty-tcell+)
    cell))
 
 ;; no need to specialize (full?) on CELLs: the method in cell.lisp is enough
@@ -52,7 +52,7 @@
 ;; (_ cell value) is atomic, transaction aware, and performs a single read
 (defmethod peek ((cell tcell) &optional default)
   (let1 value (_ cell value)
-    (if (eq value *empty-tcell*)
+    (if (eq value +empty-tcell+)
         (values default nil)
         (values value t))))
 
@@ -60,10 +60,10 @@
 (defmethod take ((cell tcell))
   (fast-atomic
    (let1 value (_ cell value)
-     (if (eq value *empty-tcell*)
+     (if (eq value +empty-tcell+)
          (retry)
          (progn
-           (setf (_ cell value) *empty-tcell*)
+           (setf (_ cell value) +empty-tcell+)
            value)))))
 
 
@@ -81,10 +81,10 @@ Linux amd64) than the unspecialized (try-take place) which calls
 \(atomic (nonblocking (take place)))"
   (fast-atomic
    (let1 value (_ cell value)
-     (if (eq value *empty-tcell*)
+     (if (eq value +empty-tcell+)
          nil
          (progn
-           (setf (_ cell value) *empty-tcell*)
+           (setf (_ cell value) +empty-tcell+)
            (values t value))))))
 
 
@@ -104,6 +104,6 @@ Linux amd64) than the unspecialized (try-put place) which calls
 (defprint-object (obj tcell)
   ;; (value-of obj) works both inside and outside transactions.
   (let1 value (_ obj value)
-    (if (eq value *empty-tcell*)
+    (if (eq value +empty-tcell+)
         (format t "empty")
         (format t "[~A]" value))))

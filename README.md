@@ -707,7 +707,7 @@ related methods and functions, all in the STMX.UTIL package - for more details,
 use `(describe 'some-symbol)` at REPL:
 
 - `TCELL` is the simplest transactional class. It is created with
-  `(make-instance 'tcell [:value initial-value])` and it can be empty or hold a
+  `(tcell [initial-value])` and it can be empty or hold a
   single value.
 
   Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
@@ -737,7 +737,7 @@ use `(describe 'some-symbol)` at REPL:
   it becomes needed only to support transactional destructive modifications.
 
 - `TSTACK` is a transactional first-in-last-out buffer. It is created with
-  `(make-instance 'tstack)` and it can be empty or hold unlimited values.
+  `(tstack)` and it can be empty or hold unlimited values.
 
   Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
 

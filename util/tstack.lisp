@@ -21,6 +21,12 @@
  (defclass tstack ()
    ((top  :type list :initform nil :accessor top-of))))
 
+(declaim (ftype (function () (values tstack &optional)) tstack))
+
+(defun tstack ()
+  "Create and return a new TSTACK."
+  (new 'tstack))
+
 
 (defmethod empty? ((s tstack))
   (null (_ s top)))

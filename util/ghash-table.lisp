@@ -95,7 +95,7 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
            (type (integer #.+ghash-default-capacity+ #.+ghash-max-capacity+) initial-capacity))
 
   (unless (zerop (logand (1- initial-capacity) initial-capacity))
-    ;; initial-capacity is not a power of 2: round up to nearset power of 2
+    ;; initial-capacity is not a power of 2: round up to nearest power of 2
     (setf initial-capacity (ash 1 (integer-length initial-capacity))))
 
   (with-rw-slots (test-sym hash-sym) hash

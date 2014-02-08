@@ -25,12 +25,12 @@ and aim at resolving the tension between granularity and concurrency.
 
 Since version 1.9.0, STMX supports hardware memory transactions in addition to
 classic software ones. It uses Transactional Synchronization
-Extensions (TSX) available at least on the following Intel x86_64 processors
-released in June 2013:
-
-- Intel Core i5 4570
-- Intel Core i5 4670
-- Intel Core i7 4770
+Extensions (TSX) available on the following Intel x86_64 processors:
+- Intel Core i7 4771
+- Intel Core i7 4770, 4770S, 4770T, 4770TE
+- Intel Core i7 4765T
+- Intel Core i5 4670, 4670S, 4670T 
+- Intel Core i5 4570, 4570S, 4570T, 4570TE
 
 To actually use hardware memory transactions with STMX, you will need:
 

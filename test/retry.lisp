@@ -19,7 +19,7 @@
 (in-suite retry-suite)
 
 (defun cell-test ()
-  (let1 c (new 'tcell :value 1)
+  (let1 c (tcell 1)
     (is-true (full? c))
     (empty! c)
     (is-true (empty? c))
@@ -70,8 +70,8 @@
 
   (start-multithreading)
 
-  (let ((c1 (new 'tcell)) ;; cells have unbound value
-        (c2 (new 'tcell)))
+  (let ((c1 (tcell)) ;; cells have unbound value
+        (c2 (tcell)))
 
     (multiple-value-bind (f1 f2) (retry-funs iterations c1 c2)
 

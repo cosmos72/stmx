@@ -50,7 +50,7 @@
 	   #:hw-transaction-supported?
 	   #:hw-transaction-supported-and-running?
 
-           #:transactional
+           #:transactional  #:transactional-struct
            #:transaction
            #:transaction?
 

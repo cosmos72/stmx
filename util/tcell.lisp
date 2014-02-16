@@ -17,41 +17,30 @@
 
 ;;;; ** Transactional cell, it can be empty or hold a single value
 
-(declaim (inline make-tcell))
+(define-global +empty-tcell+ (gensym "EMPTY"))
 
-(defstruct (tcell (:conc-name %tcell-))
-  (value (tvar) :type tvar))
-
+(transactional
+ (defclass tcell ()
+   ((value :initarg :value
+           :initform +empty-tcell+))))
 
 (declaim (ftype (function (&optional t) (values tcell &optional)) tcell))
 
-(defun tcell (&optional (value +unbound-tvar+))
+(defun tcell (&optional (value +empty-tcell+))
   "Create and return a new TCELL."
-  (make-tcell :value (tvar value)))
-
-
-(declaim (inline tcell-value set-tcell-value))
-
-(defun tcell-value (c)
-  (declare (type tcell c))
-  ($ (%tcell-value c)))
-
-(defun (setf tcell-value) (value c)
-  (declare (type tcell c))
-  (setf ($ (%tcell-value c)) value))
+  (new 'tcell :value value))
 
 ;; no need to wrap empty? in a transaction:
-;; (tcell-value c) is atomic and transaction aware
-(defmethod empty? ((c tcell))
-  (eq (tcell-value c) +unbound-tvar+))
+;; (_ cell value) is atomic, transaction aware, and performs a single read
+(defmethod empty? ((cell tcell))
+  (eq (_ cell value) +empty-tcell+))
 
 
-;; no need to wrap empty! in a transaction:
-;; (setf (tcell-value c) value) is atomic and transaction aware
-(defmethod empty! ((c tcell))
+(defmethod empty! ((cell tcell))
   "Remove value from CELL. Return CELL."
-  (setf (tcell-value c) +unbound-tvar+)
-  c)
+  (fast-atomic
+   (setf (_ cell value) +empty-tcell+)
+   cell))
 
 ;; no need to specialize (full?) on CELLs: the method in cell.lisp is enough
 ;;
@@ -60,61 +49,61 @@
 
 
 ;; no need to wrap peek in a transaction:
-;; (tcell-value c) is atomic and transaction aware
-(defmethod peek ((c tcell) &optional default)
-  (let1 value (tcell-value c)
-    (if (eq value +unbound-tvar+)
+;; (_ cell value) is atomic, transaction aware, and performs a single read
+(defmethod peek ((cell tcell) &optional default)
+  (let1 value (_ cell value)
+    (if (eq value +empty-tcell+)
         (values default nil)
         (values value t))))
 
 
-(defmethod take ((c tcell))
+(defmethod take ((cell tcell))
   (fast-atomic
-   (let1 value (tcell-value c)
-     (if (eq value +unbound-tvar+)
+   (let1 value (_ cell value)
+     (if (eq value +empty-tcell+)
          (retry)
          (progn
-           (setf (tcell-value c) +unbound-tvar+)
+           (setf (_ cell value) +empty-tcell+)
            value)))))
 
 
-(defmethod put ((c tcell) value)
+(defmethod put ((cell tcell) value)
   (fast-atomic
-   (if (empty? c)
-       (setf (tcell-value c) value)
+   (if (empty? cell)
+       (setf (_ cell value) value)
        (retry))))
 
 
-(defmethod try-take ((c tcell))
+(defmethod try-take ((cell tcell))
   "hand-made, nonblocking version of (take place) for cells.
 less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
 Linux amd64) than the unspecialized (try-take place) which calls
 \(atomic (nonblocking (take place)))"
   (fast-atomic
-   (let1 value (tcell-value c)
-     (if (eq value +unbound-tvar+)
+   (let1 value (_ cell value)
+     (if (eq value +empty-tcell+)
          nil
          (progn
-           (setf (tcell-value c) +unbound-tvar+)
+           (setf (_ cell value) +empty-tcell+)
            (values t value))))))
 
 
-(defmethod try-put ((c tcell) value)
+(defmethod try-put ((cell tcell) value)
   "hand-made, nonblocking version of (put place) for tcells.
 less general but approx. 3 times faster (on SBCL 1.0.57.0.debian,
 Linux amd64) than the unspecialized (try-put place) which calls
 \(atomic (nonblocking (put place value)))"
   (fast-atomic
-   (if (empty? c)
-       (values t (setf (tcell-value c) value))
+   (if (empty? cell)
+       (values t (setf (_ cell value) value))
        nil)))
 
 
 ;;;; ** Printing
 
-(defprint-object (c tcell)
+(defprint-object (obj tcell)
   ;; (value-of obj) works both inside and outside transactions.
-  (let1 value (tcell-value c)
-    (if (eq value +unbound-tvar+)
+  (let1 value (_ obj value)
+    (if (eq value +empty-tcell+)
         (format t "empty")
         (format t "[~A]" value))))

@@ -17,18 +17,9 @@
 
 ;;;; * Transactional structures
 
-(defgeneric transactional-struct-defs (struct-type)
-  (:documentation "Return the list of TRANSACTIONAL-STRUCT-DEF containing the definition
-of STRUCT-TYPE"))
-
-(defmethod transactional-struct-defs (struct-type)
-  ;; default implementation
-  nil)
-
-
 (define-global +default+ (gensym "DEFAULT"))
 
-(defstruct transactional-struct-def
+(defstruct tstruct-def
   (name             nil :type symbol)
   (conc-name  +default+ :type t)
   (constructors     nil :type list)
@@ -41,14 +32,36 @@ of STRUCT-TYPE"))
   (tx-slots         nil :type list))
                   
 
-(defun transactional-struct-def->form (struct-def)
-  (declare (type transactional-struct-def struct-def))
+(defgeneric tstruct-defs (struct-type)
+  (:documentation "Return the list of TSTRUCT-DEF containing the definition
+of STRUCT-TYPE"))
 
-  (let ((name           (transactional-struct-def-name           struct-def))
-        (tx-conc-name   (transactional-struct-def-tx-conc-name   struct-def))
-        (tx-constructor (transactional-struct-def-tx-constructor struct-def))
-        (tx-copier      (transactional-struct-def-tx-copier      struct-def))
-        (other-options  (transactional-struct-def-other-options  struct-def)))
+(defmethod tstruct-defs (struct-type)
+  ;; default implementation
+  nil)
+
+
+(defun tstruct-def-all-slots (struct-def)
+  "Return all slots of a struct, including inherited ones."
+  (declare (type tstruct-def struct-def))
+
+  (let1 slots nil
+    (dolist (struct (cons struct-def (tstruct-defs (tstruct-def-superclass struct-def))))
+      (dolist (slot (tstruct-def-tx-slots struct))
+        (push slot slots)))
+
+    (nreverse slots)))
+    
+
+
+(defun tstruct-def->form (struct-def)
+  (declare (type tstruct-def struct-def))
+
+  (let ((name           (tstruct-def-name           struct-def))
+        (tx-conc-name   (tstruct-def-tx-conc-name   struct-def))
+        (tx-constructor (tstruct-def-tx-constructor struct-def))
+        (tx-copier      (tstruct-def-tx-copier      struct-def))
+        (other-options  (tstruct-def-other-options  struct-def)))
     `(,name
       ;; respect order documented by DEFSTRUCT
       (:conc-name   ,tx-conc-name)
@@ -64,7 +77,7 @@ of STRUCT-TYPE"))
      package)))
   
 
-(defun parse-transactional-struct-def (name-and-options)
+(defun parse-tstruct-def (name-and-options)
   (declare (type (or symbol cons) name-and-options))
 
   (let* ((symbol? (symbolp name-and-options))
@@ -96,7 +109,7 @@ of STRUCT-TYPE"))
              (the (values symbol &optional)
                (apply #'names-to-symbol pkg (symbol-name '%stmx-impl/) names))))
       
-      (make-transactional-struct-def
+      (make-tstruct-def
        :name           name
        :copier         (if (eq copier +default+)
                            (names-to-symbol pkg 'copy- name) ;; defauly copier
@@ -111,14 +124,13 @@ of STRUCT-TYPE"))
                                        (nreverse constructors))
                           (list default-constructor)))
        :other-options  (nreverse other-options)
-       :superclass     (unless (eq superclass +default+)
-                         superclass)
+       :superclass     (unless (eq superclass +default+) superclass)
        :tx-conc-name   (%impl/names-to-symbol name "-")
        :tx-constructor (%impl/names-to-symbol 'make- name)
        :tx-copier      (when copier (%impl/names-to-symbol 'copy- name))))))
 
 
-(defstruct transactional-struct-slot
+(defstruct tstruct-slot
   (name           nil :type symbol)
   (initform       nil :type t)
   (type           t   :type (or symbol cons))
@@ -127,140 +139,264 @@ of STRUCT-TYPE"))
   (other-options  nil :type list))
                   
 
-(defun transactional-struct-slot->form (slot-obj)
-  (declare (type (or string transactional-struct-slot) slot-obj))
+(defun tstruct-slot->form (slot-obj)
+  (declare (type (or string tstruct-slot) slot-obj))
 
-  (let ((name           (transactional-struct-slot-name slot-obj))
-        (initform       (transactional-struct-slot-initform      slot-obj))
-        (transactional? (transactional-struct-slot-transactional slot-obj)))
+  (let ((name           (tstruct-slot-name slot-obj))
+        (initform       (tstruct-slot-initform      slot-obj))
+        (transactional? (tstruct-slot-transactional slot-obj)))
     `(,name
       ,(if transactional? `(tvar ,initform) initform)
-      :type ,(if transactional? 'tvar (transactional-struct-slot-type slot-obj))
-      :read-only ,(transactional-struct-slot-read-only slot-obj)
-      ,@(transactional-struct-slot-other-options slot-obj))))
+      :type ,(if transactional? 'tvar (tstruct-slot-type slot-obj))
+      :read-only ,(tstruct-slot-read-only slot-obj)
+      ,@(tstruct-slot-other-options slot-obj))))
      
 
-(defun transactional-struct-slot-accessor (slot struct-def)
+(defun tstruct-slot-accessor (slot struct-def)
   "Return the accessor symbol of given struct slot"
-  (declare (type transactional-struct-slot slot)
-           (type transactional-struct-def  struct-def))
+  (declare (type tstruct-slot slot)
+           (type tstruct-def  struct-def))
 
-  (let* ((struct-name   (transactional-struct-def-name  struct-def))
-         (conc-name     (transactional-struct-def-conc-name struct-def))
+  (let* ((struct-name   (tstruct-def-name  struct-def))
+         (conc-name     (tstruct-def-conc-name struct-def))
          (pkg           (symbol-package struct-name))
-         (slot-name     (transactional-struct-slot-name slot)))
+         (slot-name     (tstruct-slot-name slot)))
     (names-to-symbol pkg conc-name slot-name)))
 
 
-(defun transactional-struct-slot-tx-accessor (slot struct-def)
+(defun tstruct-slot-tx-accessor (slot struct-def)
   "Return the %stmx-impl accessor symbol of given struct slot"
-  (declare (type transactional-struct-slot slot)
-           (type transactional-struct-def  struct-def))
+  (declare (type tstruct-slot slot)
+           (type tstruct-def  struct-def))
 
-  (let* ((struct-name   (transactional-struct-def-name  struct-def))
-         (tx-conc-name  (transactional-struct-def-tx-conc-name struct-def))
+  (let* ((struct-name   (tstruct-def-name  struct-def))
+         (tx-conc-name  (tstruct-def-tx-conc-name struct-def))
          (pkg           (symbol-package struct-name))
-         (slot-name     (transactional-struct-slot-name slot))
+         (slot-name     (tstruct-slot-name slot))
          (tx-accessor-name (names-to-symbol pkg tx-conc-name slot-name)))
-    (break)
     tx-accessor-name))
            
 
 
-(defun parse-transactional-struct-slot (slot)
+(defun parse-tstruct-slot (slot)
   (declare (type (or string symbol cons) slot))
 
   ;; documentation?
   (when (stringp slot)
-    (return-from parse-transactional-struct-slot slot))
+    (return-from parse-tstruct-slot slot))
    
   (when (symbolp slot)
     (setf slot (list slot nil)))
 
-  (make-transactional-struct-slot
-   :name       (first  slot)
-   :initform   (second slot)
-   :type       (getf slot :type t)
-   :read-only  (getf slot :read-only)
-   ;; transactional-struct direct slots are transactional by default.
-   ;; to make them non-transactional, add the option :transactional nil
-   :transactional (getf slot :transactional t)
-   :other-options (let1 other-options (copy-list (rest (rest slot)))
-                    (dolist (option '(:type :read-only :transactional))
-                      (remf other-options option))
-                    other-options)))
+  (let1 read-only (getf slot :read-only)
+    (check-type read-only boolean)
+
+    (make-tstruct-slot
+     :name       (first  slot)
+     :initform   (second slot)
+     :type       (getf slot :type t)
+     :read-only  read-only
+     ;; transactional-struct direct slots are transactional by default.
+     ;; to make them non-transactional, add the option :transactional nil
+     ;;
+     ;; exception: read-only slots are never transactional
+     :transactional (let1 transactional (getf slot :transactional +default+)
+                      (unless (member transactional `(t nil ,+default+))
+                        (error "STMX: unexpected slot option :TRANSACTIONAL ~S,
+expecting :TRANSACTIONAL T or :TRANSACTIONAL NIL" transactional))
+                      
+                      (when (and read-only
+                                 (eq t transactional))
+                        (error "STMX: incompatible slot options :READ-ONLY ~S and :TRANSACTIONAL ~S,
+read-only slots cannot be transactional" read-only transactional))
+
+                      (when (eq transactional +default+)
+                        (setf transactional (not read-only)))
+
+                      transactional)
+
+     :other-options (let1 other-options (copy-list (rest (rest slot)))
+                      (dolist (option '(:type :read-only :transactional))
+                        (remf other-options option))
+                      other-options))))
                        
-
    
-
-(defun parse-transactional-struct-slots (slots)
+(defun parse-tstruct-slots (slots)
   (declare (type list slots))
   (loop for slot in slots
-     collect (parse-transactional-struct-slot slot)))
+     collect (parse-tstruct-slot slot)))
 
 
-(defun transactional-struct-def->defun-copier (struct-def)
+(defun make-load-form/tstruct-slot (obj)
+  (declare (type tstruct-slot obj))
+
+  `(make-tstruct-slot
+    :name       ',(tstruct-slot-name obj)
+    :initform   ',(tstruct-slot-initform obj)
+    :type       ',(tstruct-slot-type obj)
+    :read-only  ',(tstruct-slot-read-only obj)
+    :transactional ',(tstruct-slot-transactional obj)
+    :other-options ',(tstruct-slot-other-options obj)))
+
+                       
+(defun make-load-form/tstruct-def (obj)
+  (declare (type tstruct-def obj))
+
+  `(make-tstruct-def
+    :name     ',(tstruct-def-name obj)
+    :copier   ',(tstruct-def-copier obj)
+    :conc-name ',(tstruct-def-conc-name obj)
+    :constructors ',(tstruct-def-constructors obj)
+    :other-options ',(tstruct-def-other-options obj)
+    :superclass    ',(tstruct-def-superclass obj)
+    :tx-conc-name  ',(tstruct-def-conc-name obj)
+    :tx-constructor ',(tstruct-def-tx-constructor obj)
+    :tx-copier      ',(tstruct-def-tx-copier obj)
+    :tx-slots       (list ,@(loop for tx-slot in (tstruct-def-tx-slots obj)
+                               collect  (make-load-form/tstruct-slot tx-slot)))))
+
+
+(defun tstruct-def->defun-constructor (struct-def constructor-name-and-arglist)
+  "Define a single constructor function"
+  (declare (type tstruct-def struct-def)
+           (type (or symbol cons) constructor-name-and-arglist))
+
+  (when (consp constructor-name-and-arglist)
+    (error "CONSTRUCTOR-ARGLIST option not yet implemented
+in (TRANSACTIONAL (DEFSTRUCT (~A (:CONSTRUCTOR ...))))" (tstruct-def-name struct-def)))
+
+  (let ((slots (tstruct-def-all-slots struct-def))
+        (constructor-name constructor-name-and-arglist))
+    
+    `(defun ,constructor-name (&key ,@(loop for slot in slots
+                                         collect (list (tstruct-slot-name slot)
+                                                       (tstruct-slot-initform slot))))
+       (declare ,@(loop for slot in slots
+                     collect `(type ,(tstruct-slot-type slot) ,(tstruct-slot-name slot))))
+
+       (,(tstruct-def-tx-constructor struct-def)
+         ,@(loop for slot in slots
+              collect (intern (symbol-name (tstruct-slot-name slot)) :keyword)
+
+              collect (let1 arg-name (tstruct-slot-name slot)
+                        (if (tstruct-slot-transactional slot)
+                            `(tvar ,arg-name)
+                            arg-name)))))))
+
+
+
+(defun tstruct-def->defun-constructors (struct-def)
+  "Define constructor functions"
+  (declare (type tstruct-def struct-def))
+  (loop for constructor in (tstruct-def-constructors struct-def)
+     collect (tstruct-def->defun-constructor struct-def constructor)))
+
+
+(defun tstruct-def->defun-accessors (struct-def)
+  "Define accessor functions"
+  (declare (type tstruct-def struct-def))
+
+  (let ((defuns nil)
+        (name (tstruct-def-name struct-def)))
+    
+    (with-gensyms (instance value)
+      (dolist (struct (cons struct-def (tstruct-defs (tstruct-def-superclass struct-def))))
+        (dolist (slot (tstruct-def-tx-slots struct))
+
+          (let ((accessor    (tstruct-slot-accessor slot struct))
+                (tx-accessor (tstruct-slot-tx-accessor slot struct))
+                (transactional (tstruct-slot-transactional slot))
+                (type        (tstruct-slot-type slot)))
+            
+            (unless transactional
+              (push `(declaim (inline ,accessor))
+                    defuns))
+
+            (push `(defun ,accessor (,instance)
+                     (declare (type ,name ,instance))
+                     (the (values ,type &optional)
+                       ,(if transactional
+                            `($ (,tx-accessor ,instance))
+                            `(,tx-accessor ,instance))))
+                  defuns)
+
+            (unless (tstruct-slot-read-only slot)
+
+              (unless transactional
+                (push `(declaim (inline (setf ,accessor)))
+                      defuns))
+
+              (push `(defun (setf ,accessor) (,value ,instance)
+                       (declare (type ,name ,instance)
+                                (type ,type ,value))
+                       (the (values ,type &optional)
+                         ,(if transactional
+                              `(setf ($ (,tx-accessor ,instance)) ,value)
+                              `(setf (,tx-accessor ,instance) ,value))))
+                    defuns))))))
+    (nreverse defuns)))
+
+
+
+(defun tstruct-def->defun-copier (struct-def)
   "Define copier function"
-  (declare (type transactional-struct-def struct-def))
+  (declare (type tstruct-def struct-def))
            
-  (when-bind copier (transactional-struct-def-copier struct-def)
-    (let ((name      (transactional-struct-def-name    struct-def))
-          (tx-copier (transactional-struct-def-tx-copier struct-def)))
+  (when-bind copier (tstruct-def-copier struct-def)
+    (let ((name      (tstruct-def-name    struct-def))
+          (tx-copier (tstruct-def-tx-copier struct-def)))
+      (declare (ignorable name))
+
       (with-gensyms (old-instance new-instance)
         `(defun ,copier (,old-instance)
            (declare (type ,name ,old-instance))
            (let ((,new-instance (,tx-copier ,old-instance)))
 
              ,@(let1 setf-args nil
-                  (loop for struct = struct-def then (transactional-struct-def-superclass struct)
-                     while struct do
-                       (loop for slot in (transactional-struct-def-tx-slots struct)
-                          when (transactional-struct-slot-transactional slot)
-                          do
-                            (let1 tx-accessor (transactional-struct-slot-tx-accessor slot struct)
-                              ;; we will reverse setf-args later
-                              (push `(,tx-accessor ,new-instance) setf-args)
-                              (push `(tvar ($ (,tx-accessor ,old-instance))) setf-args))))
-                  (if setf-args
-                      `((setf ,@(nreverse setf-args))
-                        ,new-instance)
-                      `(,new-instance)))))))))
+                 (dolist (struct (cons struct-def (tstruct-defs
+                                                   (tstruct-def-superclass struct-def))))
+                   (dolist (slot (tstruct-def-tx-slots struct))
+                     (when (tstruct-slot-transactional slot)
+                       (let1 tx-accessor (tstruct-slot-tx-accessor slot struct)
+                         ;; we will reverse setf-args later
+                         (push `(,tx-accessor ,new-instance) setf-args)
+                         (push `(tvar ($ (,tx-accessor ,old-instance))) setf-args)))))
+                 (cond
+                   ((third setf-args) `((atomic (setf ,@(nreverse setf-args)))
+                                        ,new-instance))
+                   ((second setf-args) `((setf ,@(nreverse setf-args))
+                                         ,new-instance))
+                   (t                  `(,new-instance))))))))))
 
 
-(defun transactional-struct-def->functions (struct-def slot-objs)
+           
+  
+(defun tstruct-def->functions (struct-def slot-objs)
   "Define constructors, copier and accessors functions"
-  (declare (type transactional-struct-def struct-def)
+  (declare (type tstruct-def struct-def)
            (type list slot-objs))
 
-  (let* ((name   (transactional-struct-def-name   struct-def))
-         ;;(pkg    (symbol-package name))
-         (accessors (loop for slot in slot-objs
-                       unless (stringp slot)
-                       when (transactional-struct-slot-transactional slot)
-                       collect
-                         (cons (transactional-struct-slot-accessor slot struct-def)
-                               (transactional-struct-slot-tx-accessor slot struct-def)))))
+  (let ((name   (tstruct-def-name   struct-def)))
 
-    (setf (transactional-struct-def-tx-slots struct-def) (remove-if #'stringp slot-objs))
+    (setf (tstruct-def-tx-slots struct-def) (remove-if #'stringp slot-objs))
+    
+    (with-gensym struct-defs-var
+      (delete
+       nil
+       `((eval-always
+           (let ((,struct-defs-var (cons ,(make-load-form/tstruct-def struct-def)
+                                         (tstruct-defs
+                                          ',(tstruct-def-superclass struct-def)))))
+             (defmethod tstruct-defs ((type (eql ',name)))
+               ,struct-defs-var)))
+           
+         ,@(tstruct-def->defun-constructors struct-def)
+         
+         ,(tstruct-def->defun-copier struct-def)
+         
+         ,@(tstruct-def->defun-accessors struct-def))))))
+     
 
-    (delete
-     nil
-     `((eval-always
-         (defmethod transactional-struct-defs ((type (eql ',name)))
-           (cons ,struct-def (call-next-method))))
-
-       ,(transactional-struct-def->defun-copier struct-def)
-       
-       ,@(with-gensyms (instance value)
-            (loop for (accessor . tx-accessor) in accessors
-               collect
-                 `(defun ,accessor (,instance)
-                    (declare (type ,name ,instance))
-                    ($ (,tx-accessor ,instance)))
-               collect
-                 `(defun (setf ,accessor) (,value ,instance)
-                    (declare (type ,name ,instance))
-                    (setf ($ (,tx-accessor ,instance)) ,value))))))))
 
              
 
@@ -273,14 +409,14 @@ Use this macro to wrap a normal DEFSTRUCT as follows:
 The effect is the same as DEFSTRUCT, plus:
 - by default, direct slots are transactional memory (implemented by TVARs)"
 
-  (let ((struct-def (parse-transactional-struct-def name-and-options))
-        (slot-objs (parse-transactional-struct-slots slot-descriptions)))
+  (let ((struct-def (parse-tstruct-def name-and-options))
+        (slot-objs (parse-tstruct-slots slot-descriptions)))
 
     `(progn
-       (,defstruct ,(transactional-struct-def->form struct-def)
+       (,defstruct ,(tstruct-def->form struct-def)
          ,@(loop for slot-obj in slot-objs
-              collect (transactional-struct-slot->form slot-obj)))
+              collect (tstruct-slot->form slot-obj)))
 
-       ,@(transactional-struct-def->functions struct-def slot-objs))))
+       ,@(tstruct-def->functions struct-def slot-objs))))
 
 

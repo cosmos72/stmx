@@ -139,17 +139,20 @@ of STRUCT-TYPE"))
   (other-options  nil :type list))
                   
 
-(defun tstruct-slot->form (slot-obj)
-  (declare (type (or string tstruct-slot) slot-obj))
+(defun tstruct-slot->form (slot)
+  (declare (type (or string tstruct-slot) slot))
 
-  (let ((name           (tstruct-slot-name slot-obj))
-        (initform       (tstruct-slot-initform      slot-obj))
-        (transactional? (tstruct-slot-transactional slot-obj)))
-    `(,name
-      ,(if transactional? `(tvar ,initform) initform)
-      :type ,(if transactional? 'tvar (tstruct-slot-type slot-obj))
-      :read-only ,(tstruct-slot-read-only slot-obj)
-      ,@(tstruct-slot-other-options slot-obj))))
+  (if (stringp slot)
+      slot
+     
+      (let ((name           (tstruct-slot-name slot))
+            (initform       (tstruct-slot-initform      slot))
+            (transactional? (tstruct-slot-transactional slot)))
+        `(,name
+            ,(if transactional? `(tvar ,initform) initform)
+            :type ,(if transactional? 'tvar (tstruct-slot-type slot))
+            :read-only ,(tstruct-slot-read-only slot)
+            ,@(tstruct-slot-other-options slot)))))
      
 
 (defun tstruct-slot-accessor (slot struct-def)
@@ -263,7 +266,7 @@ read-only slots cannot be transactional" read-only transactional))
 
   (when (consp constructor-name-and-arglist)
     (error "CONSTRUCTOR-ARGLIST option not yet implemented
-in (TRANSACTIONAL (DEFSTRUCT (~A (:CONSTRUCTOR ...))))" (tstruct-def-name struct-def)))
+in (TRANSACTIONAL-STRUCT (DEFSTRUCT (~A (:CONSTRUCTOR ...))))" (tstruct-def-name struct-def)))
 
   (let ((slots (tstruct-def-all-slots struct-def))
         (constructor-name constructor-name-and-arglist))
@@ -371,14 +374,14 @@ in (TRANSACTIONAL (DEFSTRUCT (~A (:CONSTRUCTOR ...))))" (tstruct-def-name struct
 
            
   
-(defun tstruct-def->functions (struct-def slot-objs)
+(defun tstruct-def->functions (struct-def slots)
   "Define constructors, copier and accessors functions"
   (declare (type tstruct-def struct-def)
-           (type list slot-objs))
+           (type list slots))
 
   (let ((name   (tstruct-def-name   struct-def)))
 
-    (setf (tstruct-def-tx-slots struct-def) (remove-if #'stringp slot-objs))
+    (setf (tstruct-def-tx-slots struct-def) (remove-if #'stringp slots))
     
     (with-gensym struct-defs-var
       (delete
@@ -410,13 +413,12 @@ The effect is the same as DEFSTRUCT, plus:
 - by default, direct slots are transactional memory (implemented by TVARs)"
 
   (let ((struct-def (parse-tstruct-def name-and-options))
-        (slot-objs (parse-tstruct-slots slot-descriptions)))
+        (slots (parse-tstruct-slots slot-descriptions)))
 
     `(progn
        (,defstruct ,(tstruct-def->form struct-def)
-         ,@(loop for slot-obj in slot-objs
-              collect (tstruct-slot->form slot-obj)))
+         ,@(mapcar #'tstruct-slot->form slots))
 
-       ,@(tstruct-def->functions struct-def slot-objs))))
+       ,@(tstruct-def->functions struct-def slots))))
 
 

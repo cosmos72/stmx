@@ -28,7 +28,7 @@
 
 ;; standard bordeaux-threads lock. for this simple example,
 ;; they are up to 3 times faster than STMX transactions
-#+never
+#-(and)
 (eval-always
  (deftype lock () 't)
 
@@ -44,7 +44,7 @@
 
 ;; fast locks using atomic compare-and-swap if available.
 ;; for this simple example, they are up to 10 times faster than STMX transactions
-#-always
+#+(and)
 (eval-always
  (deftype lock () 'stmx::mutex)
 
@@ -110,7 +110,7 @@
   (loop until (zerop (philosopher-eats fork1 fork2 plate))))
 
 
-(defun dining-philosophers (philosophers-count &optional (philosophers-initial-hunger 10000000))
+(defun dining-philosophers (philosophers-count &optional (philosophers-initial-hunger 20000000))
   "Prepare the table, sit the philosophers, let them eat.
 Note: the default initial hunger is 10 millions,
       i.e. ten times more than the STMX version."

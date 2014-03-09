@@ -25,7 +25,7 @@ and aim at resolving the tension between granularity and concurrency.
 
 Since version 1.9.0, STMX supports hardware memory transactions in addition to
 classic software ones. It uses Transactional Synchronization
-Extensions (TSX) available on the following Intel x86_64 processors:
+Extensions (Intel TSX) available on the following Intel x86_64 processors:
 - Intel Core i7 4771
 - Intel Core i7 4770, 4770S, 4770T, 4770TE
 - Intel Core i7 4765T
@@ -81,7 +81,7 @@ Supported systems
 -----------------
 STMX is currently tested on the following Common Lisp implementations:
 
-* SBCL  version 1.1.14       (x86_64)   on Debian GNU/Linux 7.0  (x86_64)
+* SBCL  version 1.1.15       (x86_64)   on Debian GNU/Linux 7.0  (x86_64)
 * SBCL  version 1.0.55.0     (x86)      on Ubuntu Linux 12.04LTS (x86)
 * SBCL  version 1.1.14       (powerpc)  on Debian GNU/Linux 7.3  (powerpc) inside Qemu
 * ABCL  version 1.1.1 with OpenJDK 6b27-1.12.5-2 (x86_64) on Debian GNU/Linux 7.0 (x86_64)
@@ -129,11 +129,8 @@ If all goes well, this will automatically download and install the
 - `bordeaux-threads`
 - `trivial-garbage`
 
-Note: as of August 2013, Quicklisp contains STMX version 1.3.3, which does
-**not** yet contain support for hardware memory transactions - to get them,
-download the latest version from GitHub (see below). Quicklisp will probably
-include STMX 1.9.0, which supports hardware transactions, in the next
-update.
+Note: as of December 2013, Quicklisp contains STMX version 1.9.0, which 
+also supports hardware transactional memory (Intel TSX)
 
 Since STMX was added to QuickLisp quite recently (15 June 2013), it
 may happen that your Quicklisp installation can't find it. In such

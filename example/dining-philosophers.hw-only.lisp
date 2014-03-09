@@ -87,6 +87,7 @@
    ;; without this yield, the % of aborted transactions is huge
    (when (= -1 hunger)
      (bt:thread-yield)
+     ;; (sb-thread:thread-yield) -- MUCH slower!
      (go start))
    
    (return hunger)))
@@ -112,7 +113,7 @@
   (loop until (zerop (philosopher-eats fork1 fork2 plate))))
 
 
-(defun dining-philosophers (philosophers-count &optional (philosophers-initial-hunger 10000000))
+(defun dining-philosophers (philosophers-count &optional (philosophers-initial-hunger 20000000))
   "Prepare the table, sit the philosophers, let them eat.
 Note: the default initial hunger is 10 millions,
       i.e. ten times more than the STMX version."

@@ -20,7 +20,7 @@
 
 
 
-(test new-ghash-table
+(def-test new-ghash-table (:compile-at :definition-time)
   (let1 h (new 'ghash-table :test '= :hash 'identity)
     (is (= 0 (ghash-table-count h)))
     (do-ghash (key value) h
@@ -104,7 +104,7 @@
 
       
 
-(test ghash-table
+(def-test ghash-table (:compile-at :definition-time)
   (test-new-ghash-table #'fixnum<))
 
 

@@ -28,10 +28,10 @@
     (is-true (= (take c) 2))
     (is-true (empty? c))))
 
-(test cell
+(def-test cell (:compile-at :definition-time)
   (cell-test))
 
-(test cell-atomic
+(def-test cell-atomic (:compile-at :definition-time)
   (atomic (cell-test)))
 
 
@@ -109,5 +109,5 @@
           (is-true (= expected (+ c1 c2))))))))
 
 
-(test retry-thread4
+(def-test retry-thread4 (:compile-at :definition-time)
   (retry-thread4-test 10000))

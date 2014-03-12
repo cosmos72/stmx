@@ -82,10 +82,10 @@
                                (eq value unique)
                                (empty? place))))))))
       
-(test orelse
+(def-test orelse (:compile-at :definition-time)
   (orelse-test))
 
-(test orelse-atomic
+(def-test orelse-atomic (:compile-at :definition-time)
   (atomic
    (orelse-test)))
 
@@ -227,5 +227,5 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
     (let1 total (apply #'+ cells)
       (is-true (= total (+ 1.5 (* 4 iterations)))))))
 
-(test orelse-thread4
+(def-test orelse-thread4 (:compile-at :definition-time)
   (orelse-thread4-test 10000))

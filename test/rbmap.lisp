@@ -84,7 +84,7 @@ bmap-count must be the actual nodes count, root must be black."
     nil))
 
 
-(test new-rbmap
+(def-test new-rbmap (:compile-at :definition-time)
   (let1 m (new 'rbmap :pred 'fixnum<)
     (is-true (gmap-empty? m))
     (is (= 0 (gmap-count m)))
@@ -172,6 +172,6 @@ bmap-count must be the actual nodes count, root must be black."
            (fsck-rbmap m1 m2)
            (rem-gmap m2 key)))))
 
-(test rbmap
+(def-test rbmap (:compile-at :definition-time)
   (test-rbmap-class 'rbmap))
 

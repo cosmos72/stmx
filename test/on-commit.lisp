@@ -18,7 +18,7 @@
 (def-suite on-commit-suite :in suite)
 (in-suite on-commit-suite)
 
-(test on-commit
+(def-test on-commit (:compile-at :definition-time)
   (let (x)
     (atomic
      (before-commit
@@ -30,7 +30,7 @@
     (is (eq 'after x))))
 
 
-(test before-commit-fails
+(def-test before-commit-fails (:compile-at :definition-time)
   (let ((var (tvar 'original)))
 
     (signals test-error
@@ -53,7 +53,7 @@
     (is (eq 'original (raw-value-of var)))))
 
 
-(test after-commit-fails
+(def-test after-commit-fails (:compile-at :definition-time)
   (let ((var (tvar 'original)))
 
     (signals test-error

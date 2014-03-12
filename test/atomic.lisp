@@ -18,10 +18,10 @@
 (def-suite atomic-suite :in suite)
 (in-suite atomic-suite)
 
-(test rerun
+(def-test rerun (:compile-at :definition-time)
   (signals rerun-error (stmx::rerun)))
 
-(test tx-read-of
+(def-test tx-read-of (:compile-at :definition-time)
   (let ((log (make-tlog))
         (var (tvar 1)))
     (is (= 1 (raw-value-of var)))
@@ -44,7 +44,7 @@
     (set-tvar-value-and-version var 1 +invalid-version+)
     (is-true (valid? log))))
 
-(test valid?
+(def-test valid? (:compile-at :definition-time)
   (valid?-test))
 
 (defun commit-test ()
@@ -55,7 +55,7 @@
     (is-true (commit log))
     (is (= 2 (raw-value-of var)))))
 
-(test commit
+(def-test commit (:compile-at :definition-time)
   (commit-test))
 
 (defun $-test ()
@@ -72,7 +72,7 @@
       (is (= 2 (raw-value-of var))))
     (is (= 2 ($ var)))))
 
-(test $
+(def-test $ (:compile-at :definition-time)
   ($-test))
 
 (defun atomic-test ()
@@ -89,7 +89,7 @@
 
     (is (= 1 ($ var)))))
 
-(test atomic
+(def-test atomic (:compile-at :definition-time)
   (atomic-test))
 
 
@@ -97,7 +97,7 @@
 (define-condition test-error (simple-error)
   ())
 
-(test rollback
+(def-test rollback (:compile-at :definition-time)
   (let1 var (tvar 1)
     
     (signals test-error
@@ -121,7 +121,7 @@
      
      
 
-(test transaction-return-from
+(def-test transaction-return-from (:compile-at :definition-time)
   (let1 var (tvar 1)
     
     (transaction-return-from-setf var 2 :return-from? nil)

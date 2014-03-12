@@ -42,12 +42,12 @@
     t))
 
       
-(test tmap-rollback
+(def-test tmap-rollback (:compile-at :definition-time)
   (test-tmap-rollback))
 
-(test tmap
+(def-test tmap (:compile-at :definition-time)
   (test-rbmap-class 'tmap))
 
-(test tmap-atomic
+(def-test tmap-atomic (:compile-at :definition-time)
   (atomic (test-rbmap-class 'tmap)))
 

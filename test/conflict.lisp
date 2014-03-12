@@ -39,7 +39,7 @@
           
     (is (= 11 ($ var))))) ;; 10 for "(setf (raw-value-of var) 10)" plus 1 for "(incf ($ var))"
 
-(test conflict
+(def-test conflict (:compile-at :definition-time)
   (conflict-test))
 
 (defun conflict-test-1 ()
@@ -74,7 +74,7 @@
 
     (is (= 2 ($ var)))))
 
-(test conflict-1
+(def-test conflict-1 (:compile-at :definition-time)
   (conflict-test-1))
 
 (defun conflict-test-2 ()
@@ -106,7 +106,7 @@
     (is (= 3 ($ b)))))
 
 
-(test conflict-2
+(def-test conflict-2 (:compile-at :definition-time)
   (conflict-test-2))
 
 (defstruct ipc
@@ -242,5 +242,5 @@
 
 ;; CMUCL currently does not have native threads
 #-cmucl
-(test conflict-locked
+(def-test conflict-locked (:compile-at :definition-time)
   (conflict-locked-test))

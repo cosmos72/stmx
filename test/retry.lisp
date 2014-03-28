@@ -40,7 +40,7 @@
            (type tcell c1 c2))
 
   (flet ((f1 ()
-           (let1 x 0.0
+           (let1 x 0.0f0
              (declare (type single-float x))
              (dotimes (i n)
                (log:trace "         <= R")
@@ -52,7 +52,7 @@
              x))
       
          (f2 ()
-           (let1 x 0.0
+           (let1 x 0.0f0
              (declare (type single-float x))
              (dotimes (i n)
                (log:trace "L =>")
@@ -81,8 +81,8 @@
                       (start-thread f2 :name "Y"))
         (atomic
          (when two-tokens
-           (put c1 0.0))
-         (put c2 0.5))
+           (put c1 0.0f0))
+         (put c2 0.5f0))
 
         (let1 xs (loop for th in ths
                     collect (wait4-thread th))
@@ -91,7 +91,7 @@
 
 
 (defun retry-thread4-test (iterations)
-  (let ((expected (+ 0.5 (* 2 iterations))))
+  (let ((expected (+ 0.5f0 (* 2 iterations))))
 
     (multiple-value-bind (xs cs) (retry-thread4 :two-tokens nil :iterations iterations)
       (destructuring-bind (x1 x2 x3 x4) xs

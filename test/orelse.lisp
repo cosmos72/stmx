@@ -94,7 +94,7 @@
   (declare (type fixnum iterations)
            (type simple-vector cells names))
 
-  (let ((x 0.0)
+  (let ((x 0.0f0)
         (name nil))
     (declare (type single-float x))
     (dotimes (i iterations)
@@ -192,14 +192,14 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
                       (start-thread #'f2 :name "C")
                       (start-thread #'f2 :name "D"))
 
-        (sleep 0.01)
+        (sleep 1f-2)
 
         (log:debug "setting the four cell values...")
         (atomic
          (dotimes (i 4)
-           (put (svref cells1 i) (* i 0.25))
+           (put (svref cells1 i) (* i 0.25f0))
            (log:debug "put ~A in cell ~A (may retry)"
-                      (* i 0.25) (svref names1 i))))
+                      (* i 0.25f0) (svref names1 i))))
         (log:debug "...cells values set")
 
         (values
@@ -222,10 +222,10 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
               (is-true (numberp e))))
 
     (let1 remainders (sort (loop for v in cells collect (mod v 1)) #'<)
-      (is-true (equalp '(0.0 0.25 0.5 0.75) remainders)))
+      (is-true (equalp '(0.0f0 0.25f0 0.5f0 0.75f0) remainders)))
 
     (let1 total (apply #'+ cells)
-      (is-true (= total (+ 1.5 (* 4 iterations)))))))
+      (is-true (= total (+ 1.5f0 (* 4 iterations)))))))
 
 (def-test orelse-thread4 (:compile-at :definition-time)
   (orelse-thread4-test 10000))

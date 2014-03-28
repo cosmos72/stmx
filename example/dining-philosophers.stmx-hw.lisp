@@ -238,7 +238,7 @@
 
       (let* ((end (get-internal-real-time))
              (elapsed-secs (/ (- end start) (float internal-time-units-per-second)))
-             (elapsed-secs (max elapsed-secs 0.000000001))
+             (elapsed-secs (max elapsed-secs 1f-9))
              (tx-count (/ (* n philosophers-initial-hunger) elapsed-secs))
 	     (tx-unit ""))
 

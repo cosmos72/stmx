@@ -113,7 +113,8 @@ transactional memory it read has changed."
   (prog ((log (new-tlog))
          (aborted nil))
 
-   (declare (type boolean aborted))
+   (declare (type tlog log)
+            (type boolean aborted))
 
    run
    (setf (tlog-read-version log)

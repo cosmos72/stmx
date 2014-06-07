@@ -79,19 +79,19 @@ i.e. (typep initial-element element-type) must return true."
 (defmacro fast-vector-pop-macro (fast-vector &optional default)
   "If FAST-VECTOR is not empty, remove its last element and return it and t as multiple values.
 Otherwise evaluate DEFAULT and return (values DEFAULT NIL)."
-  (with-gensyms (fvec vec pos element)
+  (with-gensyms (fvec vec len element)
     `(let1 ,fvec ,fast-vector
        (declare (type fast-vector ,fvec))
        (let ((,vec (fast-vector-vec ,fvec))
-             (,pos (fast-vector-len ,fvec)))
+             (,len (fast-vector-len ,fvec)))
          (declare (type simple-vector ,vec)
-                  (type fixnum ,pos))
-         (if (plusp ,pos)
+                  (type fixnum ,len))
+         (if (zerop ,len)
+             (values ,default nil)
              (let1 ,element (fast-vector-initial-element ,fvec)
-               (setf (fast-vector-len ,fvec) (the fixnum (decf ,pos)))
-               (rotatef ,element (svref ,vec ,pos))
-               (values ,element t))
-             (values ,default nil))))))
+               (setf (fast-vector-len ,fvec) (the fixnum (decf ,len)))
+               (rotatef ,element (svref ,vec ,len))
+               (values ,element t)))))))
 
 
 (declaim (ftype (function (fast-vector &optional t) (values t boolean &optional)) fast-vector-pop)
@@ -114,15 +114,15 @@ the index of the pushed element.
 Otherwise return NIL."
   (declare (type fast-vector fast-vector))
   (let ((vec (fast-vector-vec fast-vector))
-        (pos (fast-vector-len fast-vector)))
+        (len (fast-vector-len fast-vector)))
     (declare (type simple-vector vec)
-             (type fixnum pos))
+             (type fixnum len))
 
     (the (or null fixnum)
-      (when (< pos (length vec))
-          (setf (svref vec pos) new-element
-                (fast-vector-len fast-vector) (the fixnum (1+ pos)))
-          pos))))
+      (when (< len (length vec))
+          (setf (svref vec len) new-element
+                (fast-vector-len fast-vector) (the fixnum (1+ len)))
+          len))))
 
 
 
@@ -134,23 +134,23 @@ the index of the pushed element."
   (declare (type fast-vector fast-vector))
 
   (let ((vec (fast-vector-vec fast-vector))
-        (pos (fast-vector-len fast-vector)))
+        (len (fast-vector-len fast-vector)))
     (declare (type simple-vector vec)
-             (type fixnum pos))
+             (type fixnum len))
 
-    (when (= pos (length vec))
-      (let* ((new-vec (fast-vector-make-array (max 8 (ash pos 1))
+    (when (= len (length vec))
+      (let* ((new-vec (fast-vector-make-array (max 8 (ash len 1))
                                               (array-element-type vec)
                                               (fast-vector-initial-element fast-vector))))
-        (dotimes (i pos)
+        (dotimes (i len)
           (setf (svref new-vec i) (svref vec i)))
         
         (setf (fast-vector-vec fast-vector) new-vec
               vec new-vec)))
     
-    (setf (svref vec pos) new-element
-          (fast-vector-len fast-vector) (the fixnum (1+ pos)))
-    (the fixnum pos)))
+    (setf (svref vec len) new-element
+          (fast-vector-len fast-vector) (the fixnum (1+ len)))
+    (the fixnum len)))
 
 
 (declaim (ftype (function (fast-vector) (values fast-vector &optional)) fast-vector-clear))

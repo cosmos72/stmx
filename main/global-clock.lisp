@@ -70,7 +70,7 @@ is reserved as \"prevent HW transactions\"")
 
 
 (declaim (type lv156 *lv*))
-(defvar *lv* (make-lv156))
+(defparameter *lv* (make-lv156))
 (eval-always
  (ensure-thread-initial-binding '*lv* '(make-lv156)))
 

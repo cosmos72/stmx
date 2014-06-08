@@ -51,10 +51,10 @@
 ;;;; * the return value of functions executed in threads
 
 (declaim (type t *current-thread*))
-(defvar *current-thread* (current-thread))
+(defparameter *current-thread* (current-thread))
 
 (eval-always
-  (ensure-thread-initial-bindings '(*current-thread* . (current-thread)))
+  (ensure-thread-initial-binding '*current-thread* '(current-thread))
 
   (defun start-multithreading ()
     ;; on CMUCL, (bt:start-multiprocessing) is blocking!

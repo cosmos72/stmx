@@ -24,10 +24,39 @@
 (defun make-tlog-pool (&optional (n 10))
   (make-fast-vector n :element-type '(or null tlog) :initial-element nil))
 
-(defvar *tlog-pool* (make-tlog-pool))
+(defparameter *tlog-pool* (make-tlog-pool))
 
-(eval-when (:load-toplevel :execute)
-  (ensure-thread-initial-bindings '(*tlog-pool* . (make-tlog-pool))))
+(eval-always
+  (ensure-thread-initial-binding '*tlog-pool* '(make-tlog-pool)))
+
+(defun stmx-internal-error/suggest-bordeaux-threads (datum &rest arguments)
+  (apply #'stmx-internal-error (concatenate 'string datum "
+  Typical causes (and fixes) are:
+  1) new threads were created with implementation-specific functions,
+     as for example (sb-thread:make-thread).
+     Solution: use (bordeaux-threads:make-thread) instead.
+  2) ") arguments))
+
+
+(defun %validate-tlog-pool (&optional (pool *tlog-pool*))
+  (declare (type fast-vector pool))
+
+  (let ((i 0))
+    (do-fast-vector (element) pool
+      (unless element
+        (stmx-internal-error/suggest-bordeaux-threads
+         "inconsistent TLOG-POOL ~S: TLOG at index ~S is NIL." pool i))
+      (incf (the fixnum i)))))
+
+(defmacro validate-tlog-pool ()
+  #+stmx-debug
+  `(%validate-tlog-pool))
+
+
+(defun validate-current-thread ()
+  (unless (eq *current-thread* (bt:current-thread))
+    (stmx-internal-error/suggest-bordeaux-threads
+     "stmx:*current-thread* contains a stale value.")))
 
   
 ;;;; ** Creating, copying and clearing tlogs
@@ -54,10 +83,10 @@ return LOG itself."
 (declaim (inline new-tlog))
 (defun new-tlog ()
   "Get a TLOG from pool or create one, and return it."
-  (let1 log (or (fast-vector-pop *tlog-pool*)
-                (make-tlog))
-    (declare (type tlog log))
-    (setf (tlog-read-version log) +invalid-version+)
+  (let1 log (fast-vector-pop-macro *tlog-pool*
+                                   (progn (validate-current-thread) (make-tlog)))
+    (validate-tlog-pool)
+    (setf (tlog-read-version (the tlog log)) +invalid-version+)
     log))
 
 
@@ -72,7 +101,8 @@ return LOG itself."
          (<= (txhash-table-count (tlog-reads log)) 127)
          (<= (txhash-table-count (tlog-writes log)) 127))
     (when (fast-vector-push log *tlog-pool*)
-      (clear-tlog log)))
+      (clear-tlog log))
+    (validate-tlog-pool))
   nil)
     
 

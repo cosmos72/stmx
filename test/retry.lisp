@@ -110,4 +110,4 @@
 
 
 (def-test retry-thread4 (:compile-at :definition-time)
-  (retry-thread4-test 10000))
+  (retry-thread4-test 20000))

@@ -228,4 +228,4 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
       (is-true (= total (+ 1.5f0 (* 4 iterations)))))))
 
 (def-test orelse-thread4 (:compile-at :definition-time)
-  (orelse-thread4-test 10000))
+  (orelse-thread4-test 20000))

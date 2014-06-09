@@ -24,14 +24,14 @@ and aim at resolving the tension between granularity and concurrency.
 ### Latest news, 20th May 2014
 
 STMX was presented at
-[European Lisp Symposium 2014](http://www.european-lisp-symposium.org/)
+[European Lisp Symposium (ELS) 2014](http://www.european-lisp-symposium.org/)
 in a technical paper titled
 [High performance concurrency in Common Lisp - hybrid transactional memory with STMX](doc/stmx-ELS-2014.pdf).
 
 [Slides](http://www.european-lisp-symposium.org/ghilardi.pdf)
 and [video](http://medias.ircam.fr/xcc8494) 
 of STMX presentation are available from
-[ELS 2014 website](http://www.european-lisp-symposium.org/content-programme-full.html).
+[ELS website](http://www.european-lisp-symposium.org/content-programme-full.html).
 
 Thanks everybody for the event!
 

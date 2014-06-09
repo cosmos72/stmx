@@ -30,12 +30,16 @@
   (ensure-thread-initial-binding '*tlog-pool* '(make-tlog-pool)))
 
 (defun stmx-internal-error/suggest-bordeaux-threads (datum &rest arguments)
-  (apply #'stmx-internal-error (concatenate 'string datum "
-  Typical causes (and fixes) are:
-  1) new threads were created with implementation-specific functions,
-     as for example (sb-thread:make-thread).
-     Solution: use (bordeaux-threads:make-thread) instead.
-  2) ") arguments))
+  (stmx-internal-error
+   "~A~&~A"
+   (apply #'format nil datum arguments)
+"Typical cause is:
+   new threads were created with implementation-specific functions,
+   as for example (sb-thread:make-thread) or (mp:process-run-function),
+   that do not apply thread-local bindings stored in
+   bordeaux-threads:*default-special-bindings*
+Solution:
+   use (bordeaux-threads:make-thread) instead."))
 
 
 (defun %validate-tlog-pool (&optional (pool *tlog-pool*))
@@ -53,10 +57,15 @@
   `(%validate-tlog-pool))
 
 
+(declaim (inline validate-current-thread))
+
 (defun validate-current-thread ()
-  (unless (eq *current-thread* (bt:current-thread))
-    (stmx-internal-error/suggest-bordeaux-threads
-     "stmx:*current-thread* contains a stale value.")))
+  (let ((actual   *current-thread*)
+        (expected (bt:current-thread)))
+    (unless (eq actual expected)
+      (stmx-internal-error/suggest-bordeaux-threads
+       "stmx:*current-thread* contains a stale value:~&   found ~S~&   expecting ~S"
+       actual expected))))
 
   
 ;;;; ** Creating, copying and clearing tlogs
@@ -147,7 +156,7 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   (let1 reads (tlog-reads log)
 
     (when (zerop (txhash-table-count reads))
-      (error "BUG! Transaction ~A called (retry), but no TVARs to wait for changes.
+      (stmx-internal-error "Transaction ~A called (retry), but no TVARs to wait for changes.
   This is a bug either in the STMX library or in the application code.
   Possible reason: some code analogous to (atomic (retry)) was executed.
   Such code is not allowed, because at least one TVAR or one TOBJ slot

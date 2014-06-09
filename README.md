@@ -26,7 +26,7 @@ and aim at resolving the tension between granularity and concurrency.
 STMX was presented at
 [European Lisp Symposium 2014](http://www.european-lisp-symposium.org/)
 in a technical paper titled
-[High performance concurrency in Common Lisp - hybrid transactional memory with STMX](doc/stmx-paper-at-ELS-2014.pdf).
+[High performance concurrency in Common Lisp - hybrid transactional memory with STMX](doc/stmx-ELS-2014.pdf).
 
 [Slides](http://www.european-lisp-symposium.org/ghilardi.pdf)
 and [video](http://medias.ircam.fr/xcc8494) 

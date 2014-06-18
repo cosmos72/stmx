@@ -109,10 +109,11 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
     (check-type hash-sym symbol)
 
     (unless hash-sym
-      ;; provide default hash-fun when test-fun is one of: 'eq 'eql or 'equal
+      ;; provide default hash-fun when test-fun is one of: 'eq 'eql 'equal or 'equalp
       (if (or (eq test-sym 'eq)
               (eq test-sym 'eql)
               (eq test-sym 'equal))
+              (eq test-sym 'equalp))
           (setf hash-sym 'sxhash)
           (error "missing ~S argument, cannot instantiate ~S with custom ~S ~S"
                  :hash (type-of hash) :test test-sym)))

@@ -811,7 +811,7 @@ use `(describe 'some-symbol)` at REPL:
 
   One difference from standard Common Lisp HASH-TABLE:
   - a hash function can be specified explicitly with `:hash 'some-hash-function`
-  For the usual test functions, i.e. `'eq` `'eql` and `'equal` the hash function
+  For the usual test functions, i.e. `'eq` `'eql` `'equal` and `'equalp` the hash function
   can be omitted and a safe default (usually `'sxhash`) will be used.
   For other test functions, the hash function becomes mandatory.
 

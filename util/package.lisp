@@ -61,6 +61,7 @@
            #:ghash-table ;; generic hash table - can be used directly, see thash-table for a transactional implementation
            #:thash-table ;; transactional hash table (extends ghash-table)
 
+           #:ghash-table-test #:ghash-table-hash
            #:ghash-table-count #:ghash-table-empty? #:clear-ghash
            #:get-ghash #:set-ghash #:rem-ghash   ;; also (setf (get-ghash ... ) ... )
            #:map-ghash #:do-ghash  ;; iterate on ghash-table or thash-table

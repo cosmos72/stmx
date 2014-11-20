@@ -314,6 +314,10 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   input/output. More details in the paragraph INPUT/OUTPUT DURING TRANSACTIONS
   below.
 
+  Note: new threads **must** be created with `(bordeaux-threads:start-thread)`
+  in order to establish thread-local bindings needed by STMX. A safety check
+  that detects missing thread-local bindings has been recently added to STMX.
+  
   Note: STMX allows using transactional data both inside and outside atomic
   blocks, but be aware that accessing transactional data from outside
   atomic transactions is only intended for **debugging** purposes at the REPL:

@@ -17,7 +17,7 @@
 
 ;;;; ** Transactional cell, it can be empty or hold a single value
 
-(define-global +empty-tcell+ (gensym "EMPTY"))
+(define-global +empty-tcell+ (gensym "EMPTY-TCELL-"))
 
 (transactional
  (defclass tcell ()
@@ -106,4 +106,11 @@ Linux amd64) than the unspecialized (try-put place) which calls
   (let1 value (_ obj value)
     (if (eq value +empty-tcell+)
         (format t "empty")
-        (format t "[~A]" value))))
+        (format t "[~S]" value))))
+
+#-(and)
+(defmethod print-object ((obj tcell) stream)
+  (let1 value (_ obj value)
+    (if (eq value +empty-tcell+)
+        (format stream "#@(~S)" 'tcell)
+        (format stream "#@(~S ~S ~S)" 'tcell :value value))))

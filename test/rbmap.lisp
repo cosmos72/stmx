@@ -80,7 +80,7 @@ bmap-count must be the actual nodes count, root must be black."
       (fail-at m ref "rbmap ~A root node ~A is red" m (_ root key)))
     (unless (eql nodes count)
       (fail-at m ref "rbmap ~A node count is ~A, but actually has ~A nodes"
-               m ref count nodes))
+               m count nodes))
     nil))
 
 

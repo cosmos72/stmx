@@ -100,7 +100,7 @@
    (if where
        ;; emit 32-bit, signed relative offset for where
        (emit-dword-displacement-backpatch segment where)
-       ;; no where to jump: simply jump to the next instruction
+       ;; nowhere to jump: simply jump to the next instruction
        (sb-vm::emit-skip segment 4 0))))
 
 

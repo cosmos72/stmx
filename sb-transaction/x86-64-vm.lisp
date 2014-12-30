@@ -22,11 +22,11 @@
 
 (sb-c:define-vop (%cpuid)
   (:policy :fast-safe)
-  (:args (eax-val :scs (sb-vm::unsigned-reg) :target eax)
-         (ecx-val :scs (sb-vm::unsigned-reg) :target ecx))
-  (:arg-types sb-vm::positive-fixnum sb-vm::positive-fixnum)
   (:translate %cpuid)
 
+  (:args (eax-val :scs (sb-vm::unsigned-reg) :target eax)
+         (ecx-val :scs (sb-vm::unsigned-reg) :target ecx))
+  (:arg-types sb-vm::unsigned-num sb-vm::unsigned-num)
   (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::eax-offset :target r1 :from (:argument 0)) eax)
   (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::ebx-offset :target r2) ebx)
   (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::ecx-offset :target r3 :from (:argument 1)) ecx)
@@ -36,14 +36,12 @@
    (r2 :scs (sb-vm::unsigned-reg))
    (r3 :scs (sb-vm::unsigned-reg))
    (r4 :scs (sb-vm::unsigned-reg)))
-  (:result-types sb-vm::positive-fixnum sb-vm::positive-fixnum
-                 sb-vm::positive-fixnum sb-vm::positive-fixnum)
+  (:result-types sb-vm::unsigned-num sb-vm::unsigned-num
+                 sb-vm::unsigned-num sb-vm::unsigned-num)
   (:generator 8
    (sb-c:move eax eax-val)
    (sb-c:move ecx ecx-val)
-
    (sb-assem:inst cpuid)
-
    (sb-c:move r1 eax)
    (sb-c:move r2 ebx)
    (sb-c:move r3 ecx)
@@ -71,11 +69,12 @@ abort error codes.")
 
   (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::eax-offset :target r1) eax)
   (:results   (r1 :scs (sb-vm::unsigned-reg)))
-  (:result-types sb-vm::positive-fixnum)
+  (:result-types sb-vm::unsigned-num)
   (:generator 0
    (sb-vm::move-immediate eax +transaction-started+)
    (sb-assem:inst xbegin)
-   (sb-c:move r1 eax)))
+   (unless (sb-vm::location= r1 eax)
+     (sb-c:move r1 eax))))
 
 
 (sb-c:define-vop (%xend)

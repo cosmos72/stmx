@@ -77,7 +77,6 @@
                              (:file "orelse"         :depends-on ("atomic")))
                 :depends-on (:lang))
 
-
                (:module :util
                 :components ((:file "package")
                              (:file "misc"           :depends-on ("package"))
@@ -85,6 +84,7 @@
 
                              (:file "container"      :depends-on ("misc"))
                              (:file "tcons"          :depends-on ("misc"))
+                             (:file "tlist"          :depends-on ("tcons"))
                              (:file "tvar"           :depends-on ("container"))
                              (:file "tcell"          :depends-on ("container"))
                              (:file "tstack"         :depends-on ("container"))

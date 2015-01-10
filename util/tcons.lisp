@@ -15,6 +15,8 @@
 
 (in-package :stmx.util)
 
+(enable-#?-syntax)
+
 ;;;; ** Transactional cell holding two values. It is the STM equivalent of CONS cells.
 
 #|

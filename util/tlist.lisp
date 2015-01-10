@@ -11,6 +11,8 @@
 
 (in-package :stmx.util)
 
+(enable-#?-syntax)
+
 (defmacro %tlist-ops (tlist op &rest next-ops)
   (let ((op (case op
               ((a car first) 'tcons-first)
@@ -68,6 +70,7 @@ This function should always be executed inside an STMX atomic block."
   "Return all but the 1st two objects of a TLIST."
   (declare (type tlist list))
   (%tlist-ops list d d))
+
 
 (defun tcaaar (list)
   "Return the 1st object in the caar of a TLIST."

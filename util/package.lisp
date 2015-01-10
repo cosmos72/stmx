@@ -30,6 +30,9 @@
                           #:typep
                           #:subtypep)
 
+  (:import-from #:alexandria
+                #:symbolicate)
+
   (:import-from #:stmx
                 #:+dummy-tvar+ #:peek-$ #:try-take-$ #:try-put-$)
 

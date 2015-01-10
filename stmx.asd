@@ -22,7 +22,8 @@
   :author "Massimiliano Ghilardi"
   :description "Composable Transactional Memory"
 
-  :depends-on (:log4cl
+  :depends-on (:alexandria
+               :log4cl
                :closer-mop
                :bordeaux-threads
                :trivial-garbage)

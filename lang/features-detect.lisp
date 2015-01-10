@@ -72,6 +72,14 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
 
 (eval-always
 
+  (flet ((list-args (&rest list) list))
+    (let* ((x '(1 2 3 4))
+           (y (apply #'list-args x)))
+      (if (eq x y)
+          (rem-feature '&rest-is-fresh-list)
+          (set-feature '&rest-is-fresh-list))))
+          
+    
   (default-feature 'bt/with-lock :fast)
 
   (default-feature 'define-constant-once)

@@ -137,6 +137,12 @@ for debugging purposes. please use ($-slot var) instead."
    - for example because the version changed while reading."
   (declare (type tvar var))
 
+  #?+(eql tvar-lock :single-thread)
+  ;; no concurrent modifications to protect against
+  (multiple-value-bind (version value) (%tvar-version-and-value var)
+    (values value version 0))
+  
+  
   #?+(eql tvar-lock :bit)
   ;; lock is lowest bit of tvar-version. extract and check it.
   ;; we must get version, value and version again EXACTLY in this order.
@@ -242,6 +248,10 @@ also set it (which may unlock VAR!). Return VALUE."
   "Try to lock VAR. Return T if locked successfully, otherwise return NIL."
   (declare (ignorable var))
 
+  #?+(eql tvar-lock :single-thread)
+  ;; no lock to take
+  t
+  
   #?+(eql tvar-lock :bit)
   (let1 version (progn (mem-read-barrier) (the version-type (tvar-version var)))
     (declare (type atomic-counter-num version))
@@ -258,6 +268,10 @@ also set it (which may unlock VAR!). Return VALUE."
 (defun unlock-tvar (var)
   "Unlock VAR. always return NIL."
   (declare (ignorable var))
+
+  #?+(eql tvar-lock :single-thread)
+  ;; no lock to release
+  nil
 
   #?+(eql tvar-lock :bit)
   (let1 version-unlocked (logand (the version-type (tvar-version var)) (lognot 1))

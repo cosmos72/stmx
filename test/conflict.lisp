@@ -15,6 +15,8 @@
 
 (in-package :stmx.test)
 
+(enable-#?-syntax)
+
 (def-suite conflict-suite :in suite)
 (in-suite conflict-suite)
 
@@ -242,5 +244,6 @@
 
 ;; CMUCL currently does not have native threads
 #-cmucl
-(def-test conflict-locked (:compile-at :definition-time)
+(def-test conflict-multithread (:compile-at :definition-time)
+  #?+bt/make-thread
   (conflict-locked-test))

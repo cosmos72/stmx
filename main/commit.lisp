@@ -46,6 +46,7 @@ by **other** threads."
   (declare (type tlog log))
 
   (log.trace "Tlog ~A valid-and-own-or-unlocked?.." (~ log))
+
   (do-txhash (var val) (tlog-reads log)
     (if (tvar-valid-and-own-or-unlocked? var val log)
 
@@ -54,6 +55,7 @@ by **other** threads."
         (progn
           (log.debug "Tlog ~A tvar ~A conflict or locked: not valid" (~ log) (~ var))
           (return-from valid-and-own-or-unlocked? nil))))
+
 
   (log.trace "Tlog ~A ..is valid and own-or-unlocked" (~ log))
   t)
@@ -173,6 +175,8 @@ After return, LOCKED will contain all TXPAIR entries of locked VARS."
   "Release vars in LOCKED in same order of acquisition."
   (declare (type txfifo locked))
 
+  ;; trivial optimization... nothing to unlock in single-thread mode
+  #?-(eql tvar-lock :single-thread)
   (do-txfifo (var) locked
     (unlock-tvar var)))
 
@@ -490,6 +494,7 @@ Note: internally invokes GLOBAL-CLOCK/{HW,SW}/STAT-{COMMITTED,ABORTED}"
 
        (log.debug "Tlog ~A ...committed (and released locks)" (~ log))
 
+       ;; #?-(eql tvar-lock :single-thread)
        (do-txfifo (var) locked
          (log.trace "Tlog ~A notifying threads waiting on tvar ~A"
                     (~ log) (~ var))

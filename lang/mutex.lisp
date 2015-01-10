@@ -26,12 +26,16 @@
   (with-gensym lock-var
     `(let ((,lock-var ,lock))
        (unwind-protect
-            (progn
+	    (progn
               (bt:acquire-lock ,lock-var)
               ,@body)
          (bt:release-lock ,lock-var))))
 
-  #?-(eql bt/with-lock :fast)
+  #?+(eql bt/with-lock :single-thread)
+  `(progn
+     ,@body)
+
+  #?-(or (eql bt/with-lock :fast) (eql bt/with-lock :single-thread))
   `(bt:with-lock-held (,lock)
      ,@body))
 
@@ -44,6 +48,21 @@
 ;;;;    Tries very hard to also define (mutex-owner) and related functions.
 
 
+#?+(eql fast-mutex :single-thread)
+(progn
+  (deftype mutex () 'null)
+
+  (declaim (inline mutex-owner mutex-lock))
+
+  (defun mutex-owner (mutex)
+   "Return the thread that locked a mutex, or NIL if mutex is free."
+   (declare (type mutex mutex)
+	    (ignore mutex))
+   nil))
+
+	   
+
+#?-(eql fast-mutex :single-thread)
 (defstruct (mutex (:constructor %make-mutex) (:conc-name))
   #?+fast-mutex
   (mutex-owner nil :type atomic-t)
@@ -59,6 +78,9 @@
 
 (defun make-mutex ()
   "Create and return a MUTEX."
+  #?+(eql fast-mutex :single-thread)
+  nil
+  #?-(eql fast-mutex :single-thread)
   (the mutex (%make-mutex)))
     
 
@@ -73,10 +95,9 @@
 
 
 
-   
 
 
-;; ABCL needs its own magic... special case it
+;; ABCL needs its own magic... defined later
 #?+(and (eql mutex-owner :bt/lock-owner) (not (eql bt/lock-owner :abcl)))
 (eval-always
 
@@ -92,7 +113,7 @@
 
 
 
-;; ABCL needs its own magic... special case it
+;; ABCL needs its own magic... defined later
 #?+(and mutex-owner (not (eql bt/lock-owner :abcl))) 
 (eval-always
 

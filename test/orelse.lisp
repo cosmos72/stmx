@@ -15,6 +15,8 @@
 
 (in-package :stmx.test)
 
+(enable-#?-syntax)
+
 (def-suite orelse-suite :in suite)
 (in-suite orelse-suite)
 
@@ -227,5 +229,7 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
     (let1 total (apply #'+ cells)
       (is-true (= total (+ 1.5f0 (* 4 iterations)))))))
 
+
+#?+bt/make-thread
 (def-test orelse-thread4 (:compile-at :definition-time)
   (orelse-thread4-test 20000))

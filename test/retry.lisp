@@ -15,6 +15,8 @@
 
 (in-package :stmx.test)
 
+(enable-#?-syntax)
+
 (def-suite retry-suite :in suite)
 (in-suite retry-suite)
 
@@ -109,5 +111,6 @@
           (is-true (= expected (+ c1 c2))))))))
 
 
+#?+bt/make-thread
 (def-test retry-thread4 (:compile-at :definition-time)
   (retry-thread4-test 20000))

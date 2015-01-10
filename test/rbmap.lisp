@@ -81,7 +81,8 @@ bmap-count must be the actual nodes count, root must be black."
     (unless (eql nodes count)
       (fail-at m ref "rbmap ~A node count is ~A, but actually has ~A nodes"
                m count nodes))
-    nil))
+    #-(and) (format t "~S " count))
+  nil)
 
 
 (def-test new-rbmap (:compile-at :definition-time)
@@ -148,6 +149,7 @@ bmap-count must be the actual nodes count, root must be black."
          (m2    (copy-gmap m1))
          (hash  (make-hash-table :test 'eql)))
     (dotimes (i count)
+      ;; (format t "~&pass 1/3, step ~S/~S " i count)
       (let* ((key (random count))
              (value (- key)))
         (set-gmap m1 key value)
@@ -157,6 +159,7 @@ bmap-count must be the actual nodes count, root must be black."
         (set-gmap m2 key value)))
         
     (dotimes (i (* 2 count))
+      ;; (format t "~&pass 2/3, step ~S/~S " i (* 2 count))
       (let1 key (random count)
         (is (eql (hash-table-count hash) (gmap-count m1)))
         (is-equal-gmap-and-hash-table m1 hash)
@@ -164,8 +167,11 @@ bmap-count must be the actual nodes count, root must be black."
         (fsck-rbmap m1 m2)
         (rem-gmap m2 key)))
 
-    (let1 keys (hash-table-keys hash)
+    (let ((keys (hash-table-keys hash))
+          (n-keys (hash-table-count hash))
+          (i -1))
       (loop for key in keys do
+           ;; (format t "~&pass 3/3, step ~S/~S " (incf i) n-keys)
            (is-true (rem-gmap m1 key))
            (is-true (rem-hash hash key))
            (is-equal-gmap-and-hash-table m1 hash)

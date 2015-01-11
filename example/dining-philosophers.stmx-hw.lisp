@@ -50,7 +50,7 @@
 (defun eat-from-plate/swtx (plate)
   "Decrease by one TVAR in plate."
   (declare (type cons plate))
-  (decf (the fixnum ($-tx (car plate)))))
+  (decf (the fixnum ($-swtx (car plate)))))
 
 
 (declaim (ftype (function (tvar tvar cons) fixnum) philosopher-eats
@@ -142,13 +142,13 @@
         (free t)
         (busy +unbound-tvar+))
 
-    (when (eq free ($-tx fork1))
-      (setf ($-tx fork1) busy)
-      (when (eq free ($-tx fork2))
-        (setf ($-tx fork2) busy
+    (when (eq free ($-swtx fork1))
+      (setf ($-swtx fork1) busy)
+      (when (eq free ($-swtx fork2))
+        (setf ($-swtx fork2) busy
               hunger (eat-from-plate/swtx plate)
-              ($-tx fork2) free))
-      (setf ($-tx fork1) free))
+              ($-swtx fork2) free))
+      (setf ($-swtx fork1) free))
 
     hunger))
 

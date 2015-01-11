@@ -65,8 +65,8 @@
 
            ;; low-level API to use TVARs directly
            #:tvar #:+unbound-tvar+
-           #:$-slot #:$ #:$-tx #:$-hwtx #:$-notx
-	   ;; also (setf $-slot) (setf $) (setf $-tx)
+           #:$-slot #:$ #:$-swtx #:$-hwtx #:$-notx
+	   ;; also (setf $-slot) (setf $) (setf $-swtx)
 	   ;; (setf $-hwtx) and (setf $-notx)
 
            #:bound-$? #:unbind-$

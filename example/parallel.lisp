@@ -42,7 +42,7 @@
           (stmx::hw-atomic2 (helper :test-for-running-tx? nil)
            (decf (the fixnum (stmx::$-hwtx var helper)))
            (stmx::sw-atomic
-            (decf (the fixnum (stmx::$-tx var)))))))))
+            (decf (the fixnum (stmx::$-swtx var)))))))))
 
 
 (defun run-one-thread/hw-only (var)
@@ -144,7 +144,7 @@
 
   (:cpu 'intel-core-i7-4770 :cores 4 :hyper-threading t
         :global-clock :gv6
-        :algorithm '(hw-atomic2 $-hwtx $-tx)
+        :algorithm '(hw-atomic2 $-hwtx $-swtx)
    (:n-threads   1 :tx-speed  44.2f6 :tx-speed/thread 44.19f6) ;;2.263 secs
    (:n-threads   2 :tx-speed  87.7f6 :tx-speed/thread 43.84f6) ;;2.284 secs
    (:n-threads   3 :tx-speed 131.1f6 :tx-speed/thread 43.71f6) ;;2.288 secs
@@ -170,7 +170,7 @@
 
   (:cpu 'intel-core-i7-4770 :cores 4 :hyper-threading t
         :global-clock :gv5
-        :algorithm '(hw-atomic2 $-hwtx $-tx)
+        :algorithm '(hw-atomic2 $-hwtx $-swtx)
    (:n-threads   1 :tx-speed  45.0f6 :tx-speed/thread 45.00f6) ;;2.222 secs
    (:n-threads   2 :tx-speed  89.9f6 :tx-speed/thread 44.96f6) ;;2.226 secs
    (:n-threads   3 :tx-speed 134.6f6 :tx-speed/thread 44.86f6) ;;2.229 secs

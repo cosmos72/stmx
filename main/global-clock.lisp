@@ -193,7 +193,8 @@ Return the current +gv+ value."
 
 ;; define stub macros (GV5/STAT-COMMITTED) (GV5/STAT-ABORTED)
 ;; (GV1/GET-NOHW-COUNTER) (GV1/INCF-NOHW-COUNTER) and (GV1/DECF-NOHW-COUNTER) 
-(gvx-add-missing gv1)
+(eval-always
+  (gvx-add-missing gv1))
 
 
 
@@ -274,7 +275,8 @@ Decrement by DELTA the slot NOHW-COUNTER of +gv+ and return its new value."
 
 ;; define stub macros (GV5/{HW,SW}/STAT-COMMITTED)
 ;; and (GV5/{HW,SW}/STAT-ABORTED)
-(gvx-add-missing gv5)
+(eval-always
+  (gvx-add-missing gv5))
 
 
 

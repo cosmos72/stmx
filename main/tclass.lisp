@@ -341,8 +341,6 @@ The effect is the same as DEFCLASS, plus:
 
 (defmethod slot-value-using-class ((class transactional-class) instance
                                    (slot transactional-effective-slot))
-  (declare (ignore class instance))
-  
   ;; Get the slot value - it may be a TVAR.
   (let1 obj (call-next-method)
 

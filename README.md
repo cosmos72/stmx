@@ -96,14 +96,19 @@ Supported systems
 -----------------
 STMX is currently tested on the following Common Lisp implementations:
 
+* SBCL  version 1.2.6        (x86_64)   on Debian GNU/Linux 7.0  (x86_64)
 * SBCL  version 1.1.15       (x86_64)   on Debian GNU/Linux 7.0  (x86_64)
 * SBCL  version 1.0.55.0     (x86)      on Ubuntu Linux 12.04LTS (x86)
 * SBCL  version 1.1.14       (powerpc)  on Debian GNU/Linux 7.3  (powerpc) inside Qemu
-* ABCL  version 1.1.1 with OpenJDK 6b27-1.12.5-2 (x86_64) on Debian GNU/Linux 7.0 (x86_64)
-* CCL   version 1.9-r15769   (x86_64)   on Debian GNU/Linux 7.0  (x86_64)
-* CCL   version 1.9-r15769M  (x86)      on Debian GNU/Linux 7.0  (x86_64)
+* SBCL  version 1.2.1        (armhf)    on Raspbian GNU/Linux (armhf) Raspberry Pi
+
+* ABCL  version 1.3.1 with OpenJDK 7u71 (x86_64) on Debian GNU/Linux 7.0 (x86_64)
+
+* CCL   version 1.10         (x86_64)   on Debian GNU/Linux 7.0  (x86_64)
+* CCL   version 1.10         (x86)      on Debian GNU/Linux 7.0  (x86_64)
 * CCL   version 1.9-dev-r15475M-trunk (LinuxARM32) on Raspbian GNU/Linux (armhf) Raspberry Pi
 * CCL   version 1.9-r15761   (linuxppc) on Debian GNU/Linux 7.3  (powerpc) inside Qemu
+
 * CMUCL version 20d Unicode  (x86)      on Debian GNU/Linux 7.0  (x86_64)
 * CMUCL version 20c Unicode  (x86)      on Debian GNU/Linux 7.0  (x86)
 

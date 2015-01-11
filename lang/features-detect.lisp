@@ -150,6 +150,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
   ;; 2) memory barriers (even trivial ones will do)
   ;; 3) mutex-owner
   ;;
+  (default-feature 'hw-transactions nil)
   (when (all-features? 'mem-rw-barriers 'mutex-owner)
     ;; do we also have the sb-transaction package exposing CPU hardware transactions?
     #?+(symbol sb-transaction transaction-supported-p)

@@ -74,7 +74,7 @@
 
            ;; transactional simple-vector
            #:simple-tvector #:simple-tvector-length
-           #:tsvref #:tsvref-tx #:tsvref-notx #:do-simple-tvector))
+           #:tsvref #:do-simple-tvector))
 
 
 

@@ -248,34 +248,6 @@ but must NOT invoke (decf (_ m count))."))
 ;;;; ** Base implementation
 
 
-;;(deftype comp-result () '(member :< :> :=))
-
-#+(and)
-(eval-always
-  (defconstant k< -1)
-  (defconstant k=  0)
-  (defconstant k> +1))
-
-#-(and)
-(eval-always
-  (defconstant k< :<)
-  (defconstant k= :=)
-  (defconstant k> :>))
-
-(deftype comp-result () `(member ,k< ,k= ,k>))
-
-(declaim (inline compare-keys))
-(defun gmap-compare-keys (pred key1 key2)
-  "Compare KEY1 agains KEY2 using the comparison function PRED.
-Return K< if KEY1 compares as lesser than KEY2,
-return K> if KEY1 compares as greater than KEY2,
-return K= if KEY1 and KEY2 compare as equal."
-  (declare (type function pred))
-  (the comp-result
-    (cond
-      ((funcall pred key1 key2) k<)
-      ((funcall pred key2 key1) k>)
-      (t k=))))
 
 
 
@@ -287,7 +259,7 @@ If M does not contain KEY, return (values DEFAULT NIL)."
         (pred (_ m pred-func)))
     (loop while node 
        for xkey = (_ node key) do
-         (case (gmap-compare-keys pred key xkey)
+         (case (compare-keys pred key xkey)
            (#.k< (setf node (_ node left)))
            (#.k> (setf node (_ node right)))
            (t    (return-from get-gmap (values (_ node value) t)))))

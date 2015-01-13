@@ -279,7 +279,7 @@ as multiple values"
      (loop while node
         for xkey = (_ node key) do
           (push^ node stack)
-          (case (setf comp (gmap-compare-keys pred key xkey))
+          (case (setf comp (compare-keys pred key xkey))
             (#.k< (setf node (_ node left)))
             (#.k> (setf node (_ node right)))
             (t    (return))))

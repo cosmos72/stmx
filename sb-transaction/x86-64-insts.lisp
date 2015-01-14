@@ -15,6 +15,7 @@
 
 (in-package :sb-transaction)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
 
 ;; utilities copy-pasted from sbcl/src/compiler/x86-64/insts.lisp:
 ;; DISPLACEMENT, TWO-BYTES, THREE-BYTES
@@ -34,7 +35,6 @@
 
 (sb-disassem:define-instruction-format (three-bytes 24 :default-printer '(:name))
   (op :fields (list (byte 8 0) (byte 8 8) (byte 8 16))))
-
 
 
 
@@ -129,3 +129,5 @@
    (sb-vm::emit-byte segment #x01)
    (sb-vm::emit-byte segment #xd6)))
 
+
+) ; EVAL-WHEN

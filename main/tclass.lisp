@@ -142,7 +142,7 @@ to the same value. Problematic classes containing slot ~A: ~{~A ~}"
 
 
 
-;;;; ** Transactional objects definition
+;;;; ** Transactional objects definition, and their slots
 
 (defclass transactional-object ()
   ()
@@ -202,6 +202,7 @@ Otherwise return NIL."
         (otherwise nil))))
    t))
 
+
 (defun adjust-transactional-slot-definition (slot-definition
                                              class-name class-precedence-list)
   "Adjust a single slot definition for a transactional class: unless the slot
@@ -219,7 +220,7 @@ is defined as :transactional NIL, wrap its :initform with a TVAR and alter its
     ;; transactional, collect the slot type from the superslots
 
     
-    ;; STMX v2.0.1 optimization:
+    ;; STMX v2.0.0 optimization:
     ;; treat initargs and initforms uniformly, i.e. put a TVAR in each transactional slot
     ;; in INITIALIZE-INSTANCE :before method, and let SLOT-VALUE-USING-CLASS
     ;; store initargs and initforms into the tvars during normal inizialization.
@@ -345,6 +346,20 @@ and alter its :type to also accept TVARs"
       (remove-method #'initialize-instance method)
       t)))
   
+
+;; live migration from STMX v1.9.0:
+;; we must remove the method INITIALIZE-INSTANCE specialized for TRANSACTIONAL-OBJECT
+(eval-always
+  (defun remove-method-initialize-instance (class-name)
+    "Remove the method INITIALIZE-INSTANCE specialized for CLASS-NAME"
+    (let ((method (find-method #'initialize-instance nil `(,class-name) nil)))
+      (when method
+        (remove-method #'initialize-instance method)
+        t)))
+
+  (remove-method-initialize-instance 'transactional-object))
+
+
 (defmacro define-method-initialize-instance-before (class-name)
   (let ((slots (list-class-transactional-direct-slots (find-class class-name))))
     (block nil

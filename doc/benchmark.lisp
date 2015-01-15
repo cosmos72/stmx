@@ -163,58 +163,32 @@
 ;; CLOS is slower...
 
 ;; 0.251 seconds - v2.0.1 initialize-instance
-;; 0.567 seconds - v2.0.0 initialize-instance
+;; 0.847 seconds - v2.0.0 initialize-instance
 (run1m (tcell))
 
 ;; 0.258 seconds - v2.0.1 initialize-instance
-;;       seconds - v2.0.0 initialize-instance
+;; 0.547 seconds - v2.0.0 initialize-instance
 (run1m (tstack))
 
 ;; 0.393 seconds - v2.0.1 initialize-instance
-;;       seconds - v2.0.0 initialize-instance
-(run1m (tfifo))
+;; 0.943 seconds - v2.0.0 initialize-instance
+(run1m (new 'tfifo))
 
 ;; 0.141 seconds - v2.0.1 initialize-instance
-;;       seconds - v2.0.0 initialize-instance
+;; 0.127 seconds - v2.0.0 initialize-instance
 (run1m (new 'rbmap :pred 'fixnum<))
 
 ;; 0.644 seconds - v2.0.1 initialize-instance
-;;       seconds - v2.0.0 initialize-instance
+;; 1.318 seconds - v2.0.0 initialize-instance
 (run1m (new 'tmap  :pred 'fixnum<))
 
 ;; 0.245 seconds - v2.0.1 initialize-instance
-;;       seconds - v2.0.0 initialize-instance
+;; 0.234 seconds - v2.0.0 initialize-instance
 (run1m (new 'ghash-table :test 'fixnum= :hash 'identity))
 
 ;; 1.124 seconds - v2.0.1 initialize-instance
-;;       seconds - v2.0.0 initialize-instance
+;; 2.363 seconds - v2.0.0 initialize-instance
 (run1m (new 'thash-table :test 'fixnum= :hash 'identity)) 
-
-
-
-
-
-;;               - v2.0.1 initialize-instance
-;; 0.657 seconds - v2.0.0 initialize-instance
-(run1m (tlist 1 2 3 4 5 6 7 8 9 10))
-
-;; 0.027 seconds
-(let ((n 0))
-  (declare (type fixnum n))
-  (run1m
-   (let* ((list (list 1 2 3 4 5 6 7 8 9 10))
-          (pos (position 2 list)))
-     (when pos
-       (incf n pos))))
-  n)
-
-
-(run1m (tcell (tcell (tcell (tcell (tcell (tcell (tcell (tcell (tcell (tcell 1)))))))))))
-
-
-
-; 2.383 seconds
-(run1m (new 'thash-table :test 'fixnum= :hash 'identity))
 
 ;; 0.298 seconds
 (let ((n 0))
@@ -223,5 +197,10 @@
    (let ((h (make-hash-table)))
      (incf n (hash-table-count h))))
   n)
+
+;;       seconds - v2.0.1 initialize-instance
+;; 8.564 seconds - v2.0.0 initialize-instance
+(run1m (tcell (tcell (tcell (tcell (tcell (tcell (tcell (tcell (tcell (tcell 1)))))))))))
+
 
 

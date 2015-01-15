@@ -183,6 +183,7 @@ UNLESS explicitly defined with the option :transactional nil."
     (or (null transactional-opt)
         (not (null (second transactional-opt))))))
 
+
 (defun typespec-allows? (type typespec)
   "Return T if TYPESPEC is compatible with TYPE, i.e. if:
 * TYPESPEC is equal to TYPE
@@ -215,62 +216,78 @@ is defined as :transactional NIL, wrap its :initform with a TVAR and alter its
       ;; not transactional, keep the slot definition intact
       (return-from adjust-transactional-slot-definition slot-definition))
 
-    ;; transactional, collect the slot type and initform from the superslots
-    (let* ((plist (rest slot-definition))
+    ;; transactional, collect the slot type from the superslots
 
-           (initform-tx? nil) ;; slot initform is already TVAR-aware?
-           (initform? (member :initform plist))
-           (initform (second initform?))
+    
+    ;; STMX v2.0.1 optimization:
+    ;; treat initargs and initforms uniformly, i.e. put a TVAR in each transactional slot
+    ;; in INITIALIZE-INSTANCE :before method, and let SLOT-VALUE-USING-CLASS
+    ;; store initargs and initforms into the tvars during normal inizialization.
+    ;;
+    ;; In this way, we no longer need to patch the slots
+    ;; *PARTIALLY* by wrapping initforms with (tvar ,initform) at class declaration time,
+    ;; and *PARTIALLY* by reflectively modifying initargs at runtime
+    ;; inside INITIALIZE-INSTANCE main method
+    ;;
+    ;; This has two benefits:
+    ;; 1) performance: overriding INITIALIZE-INSTANCE main method is slow.
+    ;; 2) uniformity and bug freedom: now a programmer can declare :initform (tvar ...)
+    ;;    and it will work as expected.
+      
+    (let* ((plist (rest slot-definition))
 
            (type? (member :type plist))
            (type (second type?))
-
+           
            (super-type-tx? nil) ;; super-slot type is already TVAR-aware?
            (super-type? nil)
            (super-type nil)
 
            (super-slots (list-direct-slot-in-superclasses slot-name class-precedence-list)))
 
-      ;; find the most specific :initform and :type
-      (loop until (and super-type? initform?)
+      ;; CLOS allows to add type restrictions to a derived slot type,
+      ;; but forbids adding alternatives... we cannot add TVARs as allowed :type,
+      ;; the only hope is for them to be already allowed
+      
+      ;; find the most restrictive :type
+      (loop until super-type?
          for slot in super-slots
          for tx? = (and (typep slot 'transactional-direct-slot) (transactional-slot? slot))
          do
-           (when (and (not initform?) (slot-definition-initfunction slot))
-             (setf initform-tx? tx?
-                   initform? t
-                   initform (slot-definition-initform slot)))
-           
            (unless super-type?
              (setf super-type-tx? tx?
                    super-type? (slot-definition-type slot)
                    super-type super-type?)))
-
-      ;; if super-slot :initform and/or :type are already TVAR-aware,
-      ;; keep things simple and don't repeat them
-
-      (unless initform-tx?
-        (setf (getf plist :initform) (if initform? `(tvar ,initform) '(tvar))))
-
-      ;; CLOS allows to add type restrictions to a derived slot type,
-      ;; but forbids adding alternatives... we cannot add TVARs as allowed :type,
-      ;; the only hope is for them to be already allowed
       
       (unless (or super-type-tx? (member super-type '(t nil))
                   (typespec-allows? 'tvar super-type))
         (warn "transactional class ~A defines transactional slot ~A to override
 a non-transactional superclass slot with the same name,
-but the superslot already contains a type definition ~A.
+but the superslot already contains the definition :type ~S.
 STMX cannot add a type exception to also store TVARs in slot ~A,
 expect type errors when instantiating ~A!
 
 Solution: remove the type definition from superslot, or at least explicitly
-add TVARs as one of the slot allowed types.
+add TVAR as one of the slot allowed types, as for example:
+:type (or ~S tvar)
 "
-              class-name slot-name super-type slot-name class-name))
+              class-name slot-name super-type slot-name class-name super-type))
 
       (when type?
-        (setf (getf plist :type) (if (or (eq nil type) (eq t type)) t `(or ,type tvar))))
+        ;; if :type is already TVAR-aware, keep things simple and don't repeat TVAR
+        (setf (getf plist :type) (if (member type '(t nil)) t `(or ,type tvar))))
+
+
+      ;; transactional slots do not (yet) support :allocation :class
+      (let ((allocation (getf plist :allocation)))
+        (loop until allocation
+           for slot in super-slots
+           do
+             (setf allocation (slot-definition-allocation slot)))
+        (when (eq :class allocation)
+          (error "transactional slots do not (yet) support :allocation :class
+Maybe use :allocation :instance in slot ~S ?" slot-name)))
+
       
       (cons slot-name plist))))
     
@@ -295,6 +312,57 @@ and alter its :type to also accept TVARs"
                                                      class-name class-precedence-list))))
 
 
+(defmacro do-class-transactional-effective-slots ((slot class) &body body)
+  "Execute BODY on every transactional slot (direct or inherited) of CLASS."
+  `(dolist (,slot (class-slots ,class))
+     ;; Only loop on those where `transactional-slot?' is true.
+     (when (and (typep ,slot 'transactional-effective-slot)
+                (transactional-slot? ,slot))
+       ,@body)))
+
+
+(defmacro do-class-transactional-direct-slots ((slot class) &body body)
+  "Execute BODY on every transactional direct slot (not inherited) of CLASS."
+  `(dolist (,slot (class-direct-slots ,class))
+     ;; Only loop on those where `transactional-slot?' is true.
+     (when (and (typep ,slot 'transactional-direct-slot)
+                (transactional-slot? ,slot))
+       ,@body)))
+
+
+
+(defun list-class-transactional-direct-slots (class)
+  (let ((slots))
+    (do-class-transactional-direct-slots (slot class)
+      (push slot slots))
+    (nreverse slots)))
+
+
+(defun remove-method-initialize-instance-before (class-name)
+  "Remove the method INITIALIZE-INSTANCE :before specialized for CLASS-NAME"
+  (let ((method (find-method #'initialize-instance '(:before) `(,class-name) nil)))
+    (when method
+      (remove-method #'initialize-instance method)
+      t)))
+  
+(defmacro define-method-initialize-instance-before (class-name)
+  (let ((slots (list-class-transactional-direct-slots (find-class class-name))))
+    (block nil
+      (unless slots
+        (return `(remove-method-initialize-instance-before ',class-name)))
+
+      (with-gensym obj
+        `(defmethod initialize-instance :before ((,obj ,class-name) &key &allow-other-keys)
+           ,(format nil "Put a TVAR into every transactional direct slot of ~S
+*before* the normal slots initialization." class-name)
+           (stmx::without-recording-with-show-tvars
+             ,@(let ((forms))
+                 (dolist (slot slots)
+                   (push `(setf (slot-value ,obj ',(slot-definition-name slot)) (tvar))
+                         forms))
+                 (nreverse forms))))))))
+        
+
 
 (defmacro transactional ((defclass class-name direct-superclasses direct-slots &rest class-options))
   "Define CLASS-NAME as a new transactional class.
@@ -304,12 +372,16 @@ Use this macro to wrap a normal DEFCLASS as follows:
 The effect is the same as DEFCLASS, plus:
 - by default, slots are transactional memory (implemented by TVARs)
 - it inherits also from TRANSACTIONAL-OBJECT
-- the metaclass is TRANSACTIONAL-CLASS"
-  `(,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
-     ,(adjust-transactional-slots-definitions direct-slots class-name direct-superclasses)
-     ,@class-options
-     ,@(stmx.lang::get-feature 'tclass-options)
-     (:metaclass transactional-class)))
+- the metaclass is TRANSACTIONAL-CLASS
+- it internally defines a method INITIALIZE-INSTANCE :before, do NOT redefine it"
+  `(progn
+     (eval-always
+       (,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
+         ,(adjust-transactional-slots-definitions direct-slots class-name direct-superclasses)
+         ,@class-options
+         ,@(stmx.lang::get-feature 'tclass-options)
+         (:metaclass transactional-class)))
+     (define-method-initialize-instance-before ,class-name)))
 
 
 
@@ -358,11 +430,10 @@ The effect is the same as DEFCLASS, plus:
         obj)))
 
 
-(declaim (inline slot-raw-tvar))
-(defun slot-raw-tvar (class instance slot)
+(defmacro slot-raw-tvar (class instance slot)
   "Return the raw tvar stored in a transactional slot."
-  (without-recording-with-show-tvars
-    (slot-value-using-class class instance slot)))
+  `(without-recording-with-show-tvars
+     (slot-value-using-class ,class ,instance ,slot)))
 
 (defmethod (setf slot-value-using-class) (value    (class transactional-class)
                                           instance (slot transactional-effective-slot))
@@ -418,33 +489,20 @@ The effect is the same as DEFCLASS, plus:
   ;;(log.trace "transactional-object ~A, initargs = ~{~A~^ ~}" instance initargs)
 
   (let1 initargs (copy-list initargs)
-    (dolist (slot (class-slots (class-of instance)))
-      ;; Only check those where `transactional-slot?' is true.
-      (when (and (typep slot 'transactional-effective-slot)
-                 (transactional-slot? slot))
-        (dolist (initarg-name (slot-definition-initargs slot))
-          (let1 fragment (rest (member initarg-name initargs))
-            (when fragment
-              (setf (first fragment) (tvar (first fragment)))
-              ;; wrap each initarg only once
-              (return))))))
+    (do-class-transactional-effective-slots (slot (class-of instance))
+      (dolist (initarg-name (slot-definition-initargs slot))
+        (declare (type symbol initarg-name))
+        (let1 fragment (rest (member initarg-name initargs))
+          (when fragment
+            (setf (first fragment) (tvar (first fragment)))
+            ;; wrap each initarg only once
+            (return)))))
 
     ;;(log.trace "updated initargs = ~{~A~^ ~}" initargs)
     initargs))
 
 
-
-(defmethod initialize-instance ((instance transactional-object)
-                                &rest initargs &key &allow-other-keys)
-  "For every transactional slot, wrap its initarg into a tvar."
-
-  (let1 initargs (wrap-transactional-slots instance initargs)
-
-    ;; Disable recording so that slots initialization is NOT recorded to the log.
-    ;; Show-tvars so that (setf slot-value) will set the tvar, not its contents
-    (without-recording-with-show-tvars
-      (apply #'call-next-method instance initargs))))
-
+;; TODO: rewrite like initialize-instance :before
 (defmethod reinitialize-instance ((instance transactional-object)
                                   &rest initargs &key &allow-other-keys)
   "For every transactional slot, wrap its initarg into a tvar."

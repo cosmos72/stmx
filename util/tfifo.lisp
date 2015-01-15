@@ -23,6 +23,9 @@
     (back  :type tcons :accessor back-of))))
 
 
+(defun tfifo ()
+  (new 'tfifo))
+
 (defmethod initialize-instance :after ((f tfifo) &key &allow-other-keys)
   "Initialize tfifo F."
   (let1 cell (tcons nil nil)

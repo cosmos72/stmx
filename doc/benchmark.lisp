@@ -1,4 +1,4 @@
-(declaim (optimize (compilation-speed 0) (space 0) (debug 0) (safety 0) (speed 3)))
+(declaim (optimize (compilation-speed 0) (space 0) (debug 1) (safety 0) (speed 3)))
 (ql:quickload "stmx")
 (ql:quickload "stmx.test")
 (fiveam:run! 'stmx.test:suite)
@@ -18,6 +18,7 @@
   `(time (dotimes (i 10000000000)
            ,@body)))
 (defvar v (tvar 0))
+(defvar c (tcell 0))
 (defvar m  (new 'rbmap :pred 'fixnum<)) 
 (defvar tm (new 'tmap  :pred 'fixnum<)) 
 (defvar h  (new 'ghash-table :test 'fixnum= :hash 'identity)) 
@@ -45,6 +46,7 @@
 
 (defmacro run1m (&rest body)
   `(let ((v v)
+         (c c)
          (m m)
          (tm tm)
          (h h)
@@ -53,6 +55,7 @@
 
 (defmacro run10m (&rest body)
   `(let ((v v)
+         (c c)
          (m m)
          (tm tm)
          (h h)
@@ -61,6 +64,7 @@
 
 (defmacro run1g (&rest body)
   `(let ((v v)
+         (c c)
          (m m)
          (tm tm)
          (h h)
@@ -133,3 +137,91 @@
                   (set-gmap tm i t)))
 (run1m (atomic    (when (zerop (mod i  100)) (clear-gmap tm))
                   (set-gmap tm i t)))
+
+
+
+
+
+
+
+
+;; 0.028 seconds
+(run1m (slot-value c 'value))
+
+;; 0.057 seconds
+(run1m (setf (slot-value c 'value) 0))
+
+;; 0.025 seconds
+(run1m (tvar))
+
+;; 0.056 seconds
+(run1m (tcons 0 0))
+
+;; 0.644 seconds
+(run1m (tlist 1 2 3 4 5 6 7 8 9 10))
+
+;; CLOS is slower...
+
+;; 0.251 seconds - v2.0.1 initialize-instance
+;; 0.567 seconds - v2.0.0 initialize-instance
+(run1m (tcell))
+
+;; 0.258 seconds - v2.0.1 initialize-instance
+;;       seconds - v2.0.0 initialize-instance
+(run1m (tstack))
+
+;; 0.393 seconds - v2.0.1 initialize-instance
+;;       seconds - v2.0.0 initialize-instance
+(run1m (tfifo))
+
+;; 0.141 seconds - v2.0.1 initialize-instance
+;;       seconds - v2.0.0 initialize-instance
+(run1m (new 'rbmap :pred 'fixnum<))
+
+;; 0.644 seconds - v2.0.1 initialize-instance
+;;       seconds - v2.0.0 initialize-instance
+(run1m (new 'tmap  :pred 'fixnum<))
+
+;; 0.245 seconds - v2.0.1 initialize-instance
+;;       seconds - v2.0.0 initialize-instance
+(run1m (new 'ghash-table :test 'fixnum= :hash 'identity))
+
+;; 1.124 seconds - v2.0.1 initialize-instance
+;;       seconds - v2.0.0 initialize-instance
+(run1m (new 'thash-table :test 'fixnum= :hash 'identity)) 
+
+
+
+
+
+;;               - v2.0.1 initialize-instance
+;; 0.657 seconds - v2.0.0 initialize-instance
+(run1m (tlist 1 2 3 4 5 6 7 8 9 10))
+
+;; 0.027 seconds
+(let ((n 0))
+  (declare (type fixnum n))
+  (run1m
+   (let* ((list (list 1 2 3 4 5 6 7 8 9 10))
+          (pos (position 2 list)))
+     (when pos
+       (incf n pos))))
+  n)
+
+
+(run1m (tcell (tcell (tcell (tcell (tcell (tcell (tcell (tcell (tcell (tcell 1)))))))))))
+
+
+
+; 2.383 seconds
+(run1m (new 'thash-table :test 'fixnum= :hash 'identity))
+
+;; 0.298 seconds
+(let ((n 0))
+  (declare (type fixnum n))
+  (run1m
+   (let ((h (make-hash-table)))
+     (incf n (hash-table-count h))))
+  n)
+
+

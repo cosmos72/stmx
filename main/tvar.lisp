@@ -465,5 +465,5 @@ if VAR changes."
                 version (tlog-read-version log)))))
 
     (if (eq value +unbound-tvar+)
-        (format t "~A v~A unbound" id version)
-        (format t "~A v~A [~A]" id version value))))
+        (format t "unbound v:~A id:~A" version id)
+        (format t "[~A] v:~A id:~A" value version id))))

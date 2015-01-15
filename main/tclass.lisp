@@ -339,43 +339,57 @@ and alter its :type to also accept TVARs"
     (nreverse slots)))
 
 
-(defun remove-method-initialize-instance-before (class-name)
-  "Remove the method INITIALIZE-INSTANCE :before specialized for CLASS-NAME"
-  (let ((method (find-method #'initialize-instance '(:before) `(,class-name) nil)))
+(defun undefine-method-before (generic-func-name class-name)
+  "Remove from GENERIC-FUNC-NAME the method qualified :BEFORE and specialized for CLASS-NAME"
+  (let* ((generic-func (fdefinition generic-func-name))
+         (method (find-method generic-func '(:before) `(,class-name) nil)))
     (when method
-      (remove-method #'initialize-instance method)
+      (remove-method generic-func method)
       t)))
   
 
-;; live migration from STMX v1.9.0:
-;; we must remove the method INITIALIZE-INSTANCE specialized for TRANSACTIONAL-OBJECT
-(eval-always
-  (defun remove-method-initialize-instance (class-name)
-    "Remove the method INITIALIZE-INSTANCE specialized for CLASS-NAME"
-    (let ((method (find-method #'initialize-instance nil `(,class-name) nil)))
-      (when method
-        (remove-method #'initialize-instance method)
-        t)))
-
-  (remove-method-initialize-instance 'transactional-object))
+(defun undefine-method (generic-func-name class-name)
+  "Remove from GENERIC-FUNC-NAME the method specialized for CLASS-NAME"
+  (let* ((generic-func (fdefinition generic-func-name))
+         (method (find-method generic-func nil `(,class-name) nil)))
+    (when method
+      (remove-method generic-func method)
+      t)))
 
 
-(defmacro define-method-initialize-instance-before (class-name)
-  (let ((slots (list-class-transactional-direct-slots (find-class class-name))))
-    (block nil
-      (unless slots
-        (return `(remove-method-initialize-instance-before ',class-name)))
 
-      (with-gensym obj
-        `(defmethod initialize-instance :before ((,obj ,class-name) &key &allow-other-keys)
-           ,(format nil "Put a TVAR into every transactional direct slot of ~S
+(defmacro define-method-initialize-instance-before (class-name direct-slots)
+  (flet ((%extract-slot-name (slot)
+           (if (symbolp slot)
+               slot
+               (first slot)))
+         (%is-slot-tx (slot)
+           ;; a slot is transactional *unless* defined :transactional nil
+           (if (symbolp slot)
+               t
+               (let* ((tx-and-rest (member :transactional slot))
+                      (tx-opt (second tx-and-rest)))
+                 (or tx-opt (not tx-and-rest))))))
+
+    (let ((transactional-direct-slots
+           (loop for slot in direct-slots  
+              when (%is-slot-tx slot)
+              collect slot)))
+
+      (block nil
+        (unless transactional-direct-slots
+          (return
+            `(eval-when (:execute)
+               (undefine-method-before 'initialize-instance ',class-name))))
+
+        (with-gensym obj
+          `(defmethod initialize-instance :before ((,obj ,class-name) &key &allow-other-keys)
+             ,(format nil "Put a TVAR into every transactional direct slot of ~S
 *before* the normal slots initialization." class-name)
-           (stmx::without-recording-with-show-tvars
-             ,@(let ((forms))
-                 (dolist (slot slots)
-                   (push `(setf (slot-value ,obj ',(slot-definition-name slot)) (tvar))
-                         forms))
-                 (nreverse forms))))))))
+             (stmx::without-recording-with-show-tvars
+               ,@(loop for slot in transactional-direct-slots  
+                    collect `(setf (slot-value ,obj ',(%extract-slot-name slot)) (tvar))))))))))
+
         
 
 
@@ -390,13 +404,12 @@ The effect is the same as DEFCLASS, plus:
 - the metaclass is TRANSACTIONAL-CLASS
 - it internally defines a method INITIALIZE-INSTANCE :before, do NOT redefine it"
   `(progn
-     (eval-always
-       (,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
-         ,(adjust-transactional-slots-definitions direct-slots class-name direct-superclasses)
-         ,@class-options
-         ,@(stmx.lang::get-feature 'tclass-options)
-         (:metaclass transactional-class)))
-     (define-method-initialize-instance-before ,class-name)))
+     (,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
+       ,(adjust-transactional-slots-definitions direct-slots class-name direct-superclasses)
+       ,@class-options
+       ,@(stmx.lang::get-feature 'tclass-options)
+       (:metaclass transactional-class))
+     (define-method-initialize-instance-before ,class-name ,direct-slots)))
 
 
 
@@ -517,14 +530,9 @@ The effect is the same as DEFCLASS, plus:
     initargs))
 
 
-;; TODO: rewrite like initialize-instance :before
-(defmethod reinitialize-instance ((instance transactional-object)
-                                  &rest initargs &key &allow-other-keys)
-  "For every transactional slot, wrap its initarg into a tvar."
-
-  (let1 initargs (wrap-transactional-slots instance initargs)
-
-    ;; Disable recording so that slots initialization is NOT recorded to the log.
-    ;; Show-tvars so that (setf slot-value) will set the tvar, not its contents
-    (without-recording-with-show-tvars
-      (apply #'call-next-method instance initargs))))
+;; live migration from STMX v1.9.0:
+;; we must remove the methods INITIALIZE-INSTANCE
+;; and REINITIALIZE-INSTANCE specialized for TRANSACTIONAL-OBJECT
+(eval-when (:execute)
+  (undefine-method 'initialize-instance   'transactional-object)
+  (undefine-method 'reinitialize-instance 'transactional-object))

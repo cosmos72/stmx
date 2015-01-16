@@ -73,12 +73,11 @@ Return nil if all tx are valid and want to retry."
     
     (loop for i from 1 to (1- (length txs))
        for itx    = (svref txs i)
-       for ifunc  = (orelse-tx-func  itx)
        for ilog   = (orelse-tx-log   itx)
        do
          (unless (merge-tlog-reads log ilog)
            (log.debug me "Tlog ~A {~A} is incompatible with previous ones, rerunning ORELSE"
-                      (~ ilog) (~ ifunc))
+                      (~ ilog) (~ (orelse-tx-func  itx)))
            (return-from merge-tlog-reads-tx nil)))
     log))
         

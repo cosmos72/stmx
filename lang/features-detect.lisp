@@ -42,7 +42,8 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
  #+ccl
  (set-features '(bt/lock-owner ccl::%%lock-owner)
                #+x86 '(mem-rw-barriers nil) ;; causes "bogus object" errors.
-               '(define-constant-once nil)) ;; causes deadlocks
+               '(define-constant-once nil) ;; causes deadlocks
+               'initialize-instance-calls-slot-value-using-class)
                
  #+cmucl
  (set-features '(bt/lock-owner mp::lock-process))
@@ -62,7 +63,10 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
                ;; its own mutex-owner, without resorting to bt/lock-owner
                '(bt/lock-owner sb-thread::mutex-owner)
 
-               #?+(symbol sb-ext defglobal) '(define-global sb-ext:defglobal)))
+               #?+(symbol sb-ext defglobal) '(define-global sb-ext:defglobal)
+
+               'initialize-instance-calls-slot-value-using-class))
+
 
 
 

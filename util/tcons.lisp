@@ -28,7 +28,10 @@
 To use TCONS cells, see the functions TCONS, TLIST, TFIRST and TREST.")))
 |#
 
-(declaim (inline %make-tcons %copy-tcons %tcons-first %tcons-rest))
+(declaim (inline %make-tcons %copy-tcons))
+#-cmucl
+(declaim (inline %tcons-first (setf %tcons-first)
+                 %tcons-rest  (setf %tcons-rest)))
 
 (defstruct
     (tcons (:conc-name %tcons-) (:constructor %make-tcons)

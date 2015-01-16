@@ -48,7 +48,7 @@ bad style; I prefer to be notified early if I try to do something plainly wrong.
     (error "Cannot instantiate abstract class ~A" class)))
 
 
-(defmethod initialize-instance :after ((m gmap) &key)
+(defmethod initialize-instance :after ((m gmap) &key &allow-other-keys)
   (with-ro-slots (pred-sym) m
     (unless pred-sym
       (error "missing ~S argument instantiating ~A" :pred (type-of m)))

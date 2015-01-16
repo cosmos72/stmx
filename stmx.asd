@@ -70,6 +70,7 @@
                              (:file "tlog"           :depends-on ("txhash"))
                              (:file "tvar"           :depends-on ("tlog"))
                              (:file "tclass"         :depends-on ("tvar"))
+                             (:file "tslot"          :depends-on ("tclass"))
                              (:file "hw-atomic"      :depends-on ("classes"))
                              (:file "commit"         :depends-on ("tvar" "hw-atomic"))
                              (:file "sw-atomic"      :depends-on ("commit"))

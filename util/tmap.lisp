@@ -38,7 +38,8 @@
    ((root :type (or null tnode))
     ;; inherited slot PRED is immutable -> no need to make it transactional
     ;; -> no need to override it
-    (count))
+    (count)
+    (foo))
    (:documentation "Transactional sorted map, implemented with red-black tree")))
 
 

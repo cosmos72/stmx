@@ -24,7 +24,7 @@ and aim at resolving the tension between granularity and concurrency.
 
 News
 ----
-See the file [NEWS](NEWS.md)
+See the file [NEWS.md](NEWS.md)
 
 
 General documentation

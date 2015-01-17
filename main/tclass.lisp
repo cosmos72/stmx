@@ -139,11 +139,12 @@ otherwise signal an error."
          while slot2 do
            (unless (eq (transactional-slot? slot1)
                        (transactional-slot? slot2))
-             (error "Transactional slot ~S in class ~S is inherited multiple times,
-some with :transactional T and some with :transactional NIL.
-This is not allowed, please set all the relevant :transactional flags
+             (error "Error compiling TRANSACTIONAL-CLASS ~S
+Slot ~S in class ~S is inherited multiple times,
+some with :TRANSACTIONAL T and some with :TRANSACTIONAL NIL.
+This is not allowed, please set all the relevant :TRANSACTIONAL flags
 to the same value. Problematic classes containing slot ~S: ~{~S ~}"
-                    slot-name (class-name class) slot-name
+                    (class-name class) slot-name (class-name class) slot-name
                     (list-classes-containing-direct-slots direct-slots class))))
         
       (let* ((direct-slot (first direct-slots))
@@ -242,12 +243,23 @@ Direct slots defined in transactional classes are by default transactional,
 UNLESS explicitly defined with the option :transactional nil."
 
   (declare (type (or symbol list) slot-form))
-  (if (symbolp slot-form)
-      t
-      (let ((transactional-opt (member :transactional slot-form)))
-        ;; return T unless we find :transactional nil
-        (or (null transactional-opt)
-            (not (null (second transactional-opt)))))))
+  (block nil
+    (when (symbolp slot-form)
+      (return t))
+      
+    (let ((tx-opt-and-rest (member :transactional slot-form)))
+      ;; return T unless we find :transactional nil
+      (unless tx-opt-and-rest
+        (return t))
+      
+      (let ((tx-opt (second tx-opt-and-rest)))
+        (when (member tx-opt '(nil t))
+          (return tx-opt))
+
+        (error "Error compiling TRANSACTIONAL-CLASS slot ~S:
+Unsupported :TRANSACTIONAL flag ~S, expecting either T or NIL"
+               (first slot-form) tx-opt)))))
+                    
 
 
 (defun slot-form-name (slot-form)
@@ -317,33 +329,78 @@ Otherwise return NIL."
 ;;;; ** functions to manipulate the slot forms inside (defclass ...)
 
 
-(defun check-class-slot-transactional-flip (class-name slot-name was-tx is-tx)
-  (declare (type symbol class-name slot-name)
-           (type boolean was-tx is-tx))
-  (unless (eq was-tx is-tx)
-    (error "STMX error!
-Tried to redefine class ~S slot ~S from ~Atransactional to ~Atransactional.
-This is currently NOT supported. Possible workarounds:
-  1) if the slot is not inherited from a superclass,
-     you can remove the slot then re-add it
-  2) if the slot is inherited from non-transactional superclasses,
-     you can remove the slot then re-add it
-  3) if the slot is inherited from some transactional superclass,
-     you are out of luck: the only way is discarding the whole class
-     and recursing the workaround on all superclasses"
-           
-           class-name slot-name (if was-tx "" "non-") (if is-tx "" "non-"))))
 
+(defun error-tclass-slot-name (class-name slot-name)
+  (declare (type symbol class-name slot-name))
+  (error "Error compiling TRANSACTIONAL-CLASS ~S.
+Unsupported slot name ~S" class-name slot-name)) 
+
+
+(defun cerror-tclass-slot-change (class-name slot-name option old-value new-value)
+  (declare (type symbol class-name slot-name))
   
+  (unless (eq old-value new-value)
+    (cerror "Continue anyway."
+            "Error compiling TRANSACTIONAL-CLASS ~S.
+Unsupported redefinition of class ~S slot ~S from ~S ~S to ~S ~S.
+Possible solutions:
+1) Continue anyway. Existing istances of class ~S and its subclasses
+   will no longer work properly and should be discarded.
+   You can also avoid this error by uninterning ~S before redefining it.
+2) Abort and use a workaround to preserve existing instances.
+   Possible workarounds include:
+   a) if the slot is not inherited from a superclass,
+      you can remove the slot then re-add it.
+   b) if the slot is inherited from non-transactional superclasses,
+      you can remove the slot then re-add it.
+   c) if the slot is inherited from some transactional superclass,
+      you are out of luck: the only way is discarding the whole class
+      and recursively applying one of these workarounds on all superclasses."
+           
+            class-name class-name slot-name option old-value option new-value
+            class-name class-name)))
+
+
+
+(defun set-assoc (key datum alist)
+  "implementation of (SETF ASSOC)"
+  (let ((cons (assoc key alist)))
+    (if cons
+        (setf (rest cons) datum)
+        (setf alist (acons key datum alist))))
+  alist)
+
+(defun set-assoc* (key datum alist-cons)
+  (setf (first alist-cons)
+        (set-assoc key datum (first alist-cons)))
+  alist-cons)
+
+(defun check-tclass-slot-name (class-name slot-name errors)
+  (unless slot-name
+    (set-assoc* (gensym)
+                (list 'error-tclass-slot-name class-name slot-name)
+                errors)))
+
+(defun check-tclass-slot-change (class-name slot-name option old-value new-value errors)
+  (unless (equal old-value new-value)
+    (set-assoc* slot-name
+                (list 'cerror-tclass-slot-change class-name slot-name
+                      option old-value new-value)
+                errors)))
+
+
+
+
 (defun adjust-transactional-slot-form (class-name class-precedence-list
-                                       slot-form old-effective-slot)
+                                       slot-form old-effective-slot errors)
   "Adjust a single slot definition for a transactional class.
 Unless the slot is defined as :transactional NIL,
 wrap its :initform with a TVAR and alter its :type to also accept TVARs"
   (declare (type symbol class-name)
            (type list class-precedence-list)
            (type (or symbol list) slot-form)
-           (type (or null transactional-effective-slot) old-effective-slot))
+           (type (or null transactional-effective-slot) old-effective-slot)
+           (type cons errors))
             
   (let* ((slot-name (slot-form-name slot-form))
          (is-tx (slot-form-transactional? slot-form))
@@ -351,8 +408,9 @@ wrap its :initform with a TVAR and alter its :type to also accept TVARs"
                       (transactional-slot? old-effective-slot)
                       is-tx)))
 
-    (check-class-slot-transactional-flip class-name slot-name was-tx is-tx)
-
+    (check-tclass-slot-name class-name slot-name errors)
+    (check-tclass-slot-change class-name slot-name :transactional was-tx is-tx errors)
+    
     (unless is-tx
       ;; not transactional, just return
       (return-from adjust-transactional-slot-form slot-form))
@@ -418,12 +476,13 @@ Maybe use :allocation :instance in slot ~S ?" slot-name)))
     
 
 (defun adjust-transactional-slot-forms (class-name direct-superclasses-names
-                                        slot-forms)
+                                        slot-forms errors)
   "Adjust each slot definition for a transactional class:
 unless a slot is defined as :transactional NIL, wrap its :initform with a TVAR
 and alter its :type to also accept TVARs"
   (declare (type list direct-superclasses-names slot-forms)
-           (type symbol class-name))
+           (type symbol class-name)
+           (type cons errors))
 
   (let* ((class-precedence-list
           (clos-compute-class-precedence-list class-name
@@ -464,14 +523,15 @@ and alter its :type to also accept TVARs"
                             (loop for superclass in class-precedence-list
                                thereis
                                  (some #'transactional-slot? (class-direct-slots superclass))))))
-                
-            (check-class-slot-transactional-flip class-name slot-name was-tx is-tx)))))
-            
+
+            (check-tclass-slot-change class-name slot-name
+                                      :transactional was-tx is-tx errors)))))
+    
     (loop for slot-form in slot-forms
        for slot-name = (slot-form-name slot-form)
        for old-effective-slot = (find-slot-by-name slot-name old-effective-slots)
        collect (adjust-transactional-slot-form class-name class-precedence-list
-                                               slot-form old-effective-slot))))
+                                               slot-form old-effective-slot errors))))
                                                
 
 
@@ -601,15 +661,19 @@ The effect is the same as DEFCLASS, plus:
 - it inherits also from TRANSACTIONAL-OBJECT
 - the metaclass is TRANSACTIONAL-CLASS
 - it internally defines a method INITIALIZE-INSTANCE :before, do NOT redefine it"
-  `(progn
-     (,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
-       ,(adjust-transactional-slot-forms class-name direct-superclasses direct-slots)
-       ,@class-options
-       ,@(stmx.lang::get-feature 'tclass-options)
-       (:metaclass transactional-class))
-     (define-method-initialize-instance ,class-name ,direct-slots)
-     (eval-when (:execute)
-       (find-class ',class-name nil))))
+  (let* ((errors (cons nil nil))
+         (direct-slots
+          (adjust-transactional-slot-forms class-name direct-superclasses direct-slots errors)))
+    `(progn
+       ,@(mapcar #'rest (first errors))
+       (,defclass ,class-name ,(ensure-transactional-object-among-superclasses direct-superclasses)
+         ,direct-slots
+         ,@class-options
+         ,@(stmx.lang::get-feature 'tclass-options)
+         (:metaclass transactional-class))
+       (define-method-initialize-instance ,class-name ,direct-slots)
+       (eval-when (:execute)
+         (find-class ',class-name nil)))))
 
 
 
@@ -629,5 +693,3 @@ Or to wrap a normal DEFCLASS as follows:
     (defstruct
         `(transactional-struct
            (defstruct ,class-or-struct-name ,@direct-superclasses-slots-and-options)))))
-
-  

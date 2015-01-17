@@ -22,7 +22,8 @@
 
 (declaim (notinline tcons-first (setf tcons-first)
                     tcons-rest  (setf tcons-rest)
-                    tconsp))
+                    tconsp)
+         (inline    make-tcons))
 
 
 ;; transactional objects are a little slow...
@@ -46,17 +47,17 @@ To use TCONS cells, prepend T to the name of most list-manipulating functions. E
  (LIST ...) -> (TLIST ...)
  (FIRST c)  -> (TFIRST c)
  (REST  c)  -> (TREST  c) and so on"
-   (first (error "missing TCONS argument TFIRST"))
-   (rest  (error "missing TCONS argument TREST"))))
+   (first nil)
+   (rest  nil)))
 
 
 (deftype tlist () '(or tcons null))
 
 (declaim (ftype (function (t t) (values tcons &optional)) tcons)
          (ftype (function (#-ecl tlist #+ecl t) t) tfirst trest)
-         (inline tcons
-                 tfirst (setf tfirst)
-                 trest  (setf trest)))
+         (notinline tcons)
+         (inline    tfirst (setf tfirst)
+                    trest  (setf trest)))
 
 
 (defun tcons (first rest)

@@ -15,7 +15,7 @@
   `(time (dotimes (i 10000000)
            ,@body)))
 (defmacro 1g (&rest body)
-  `(time (dotimes (i 10000000000)
+  `(time (dotimes (i 1000000000)
            ,@body)))
 (defvar v (tvar 0))
 (defvar c (tcell 0))
@@ -145,11 +145,26 @@
 
 
 
-;; 0.028 seconds
-(run1m (slot-value c 'value))
+;; 0.455 seconds
+(run1g ($-notx v))
 
-;; 0.057 seconds
-(run1m (setf (slot-value c 'value) 0))
+;; 1.554 seconds
+(run1g ($ v))
+
+;; 31.311 seconds
+(run1g (slot-value c 'value))
+
+;; 6.728 seconds
+(run1g (setf ($-notx v) 1))
+
+;; 9.066 seconds
+(run1g (setf ($ v) 1))
+
+;; ~60 seconds
+(run1g (setf (slot-value c 'value) 0))
+
+
+
 
 ;; 0.025 seconds
 (run1m (tvar))

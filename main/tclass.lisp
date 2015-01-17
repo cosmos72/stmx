@@ -558,26 +558,34 @@ and alter its :type to also accept TVARs"
       
       #?+initialize-instance-calls-slot-value-using-class
       (with-gensym obj
-        `(defmethod initialize-instance :before ((,obj ,class-name) &key &allow-other-keys)
-           ,(format nil "Put a TVAR into every transactional direct slot of ~S
+        `(progn
+           (eval-when (:execute)
+             (undefine-method 'initialize-instance ',class-name))
+           
+           (defmethod initialize-instance :before ((,obj ,class-name) &key &allow-other-keys)
+             ,(format nil "Put a TVAR into every transactional direct slot of ~S
 *before* the normal slots initialization." class-name)
-           (stmx::without-recording-with-show-tvars
-             ,@(loop for slot-form in tx-slot-forms
-                  for slot-name = (slot-form-name slot-form)
-                  collect `(setf (slot-value ,obj ',slot-name) (tvar))))))
+             (stmx::without-recording-with-show-tvars
+               ,@(loop for slot-form in tx-slot-forms
+                    for slot-name = (slot-form-name slot-form)
+                    collect `(setf (slot-value ,obj ',slot-name) (tvar)))))))
 
 
       #?-initialize-instance-calls-slot-value-using-class
       (with-gensym obj
-        `(defmethod initialize-instance ((,obj ,class-name) &key &allow-other-keys)
-           ,(format nil "Put a TVAR into every transactional direct slot of ~S
+        `(progn
+           (eval-when (:execute)
+             (undefine-method-before 'initialize-instance ',class-name))
+
+           (defmethod initialize-instance ((,obj ,class-name) &key &allow-other-keys)
+             ,(format nil "Put a TVAR into every transactional direct slot of ~S
 *after* the normal slots initialization." class-name)
 
-           (stmx::without-recording-with-show-tvars
-             (call-next-method)
-             ,@(loop for slot-form in tx-slot-forms
-                  for slot-name = (slot-form-name slot-form)
-                  collect `(tvar-wrap-slot-macro ,obj ',slot-name))))))))
+             (stmx::without-recording-with-show-tvars
+               (call-next-method)
+               ,@(loop for slot-form in tx-slot-forms
+                    for slot-name = (slot-form-name slot-form)
+                    collect `(tvar-wrap-slot-macro ,obj ',slot-name)))))))))
 
         
 
@@ -599,7 +607,9 @@ The effect is the same as DEFCLASS, plus:
        ,@class-options
        ,@(stmx.lang::get-feature 'tclass-options)
        (:metaclass transactional-class))
-     (define-method-initialize-instance ,class-name ,direct-slots)))
+     (define-method-initialize-instance ,class-name ,direct-slots)
+     (eval-when (:execute)
+       (find-class ',class-name nil))))
 
 
 

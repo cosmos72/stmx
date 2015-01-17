@@ -17,53 +17,53 @@
 
 (enable-#?-syntax)
 
-;;;; ** Transactional cell holding two values. It is the STM equivalent of CONS cells.
+;;;; ** TCONS: a transactional cell holding two values. It is the STM equivalent of CONS cells.
 
-#|
+
+(declaim (notinline tcons-first (setf tcons-first)
+                    tcons-rest  (setf tcons-rest)
+                    tconsp))
+
+
+;; transactional objects are a little slow...
+;; use a transactional struct instead
+
+#-(and)
 (transactional
  (defclass tcons ()
    ((first :initarg :first :accessor first-of)
     (rest  :initarg :rest  :accessor rest-of))
    (:documentation "Transactional cell holding two values. It is the STM equivalent of CONS cells.
 To use TCONS cells, see the functions TCONS, TLIST, TFIRST and TREST.")))
-|#
 
-(declaim (inline %make-tcons %copy-tcons))
-#-cmucl
-(declaim (inline %tcons-first (setf %tcons-first)
-                 %tcons-rest  (setf %tcons-rest)))
 
-(defstruct
-    (tcons (:conc-name %tcons-) (:constructor %make-tcons)
-           (:copier %copy-tcons))
-  (first (error "missing ~S argument ~S" 'tcons 'first) :type tvar)
-  (rest (error "missing ~S argument ~S" 'tcons 'rest) :type tvar))
+#+(and)
+(transactional
+ (defstruct (tcons (:predicate tconsp) (:copier nil))
+   "Transactional cell holding two values. It is the STM equivalent of CONS cells.
+To use TCONS cells, prepend T to the name of most list-manipulating functions. Examples:
+ (CONS a b) -> (TCONS a b)
+ (LIST ...) -> (TLIST ...)
+ (FIRST c)  -> (TFIRST c)
+ (REST  c)  -> (TREST  c) and so on"
+   (first (error "missing TCONS argument TFIRST"))
+   (rest  (error "missing TCONS argument TREST"))))
+
 
 (deftype tlist () '(or tcons null))
 
 (declaim (ftype (function (t t) (values tcons &optional)) tcons)
          (ftype (function (#-ecl tlist #+ecl t) t) tfirst trest)
-         (inline    tfirst trest)
-         (notinline tcons
-                    tcons-first (setf tfirst)
-                    tcons-rest (setf trest)))
+         (inline tcons
+                 tfirst (setf tfirst)
+                 trest  (setf trest)))
+
 
 (defun tcons (first rest)
   "Create and return a new TCONS."
-  (%make-tcons :first (tvar first) :rest (tvar rest)))
+  (make-tcons :first first :rest rest))
 
           
-(defun tcons-first (cons)
-  (declare (type tcons cons))
-  (the (values t &optional) ($ (%tcons-first cons))))
-
-
-(defun tcons-rest (cons)
-  (declare (type tcons cons))
-  (the (values t &optional) ($ (%tcons-rest cons))))
-
-
-
 (defun tfirst (tlist)
   "Return the first element in a TCONS or TLIST."
   (when tlist (tcons-first tlist)))
@@ -78,7 +78,7 @@ To use TCONS cells, see the functions TCONS, TLIST, TFIRST and TREST.")))
 This function should always be executed inside an STMX atomic block."
   (declare (type tcons cons))
   (the (values t &optional)
-       (setf ($ (%tcons-first cons)) value)))
+       (setf (tcons-first cons) value)))
 
 (defun (setf trest) (value cons)
    "Set VALUE as the rest element in a TCONS or non-null TLIST.
@@ -86,24 +86,28 @@ This function should always be executed inside an STMX atomic block."
 This function should always be executed inside an STMX atomic block."
    (declare (type tcons cons))
    (the (values t &optional)
-        (setf ($ (%tcons-rest cons)) value)))
+        (setf (tcons-rest cons) value)))
 
 
-(declaim (notinline tconsp)
-         (inline tatom))
-
-(defun tconsp (object)
-  "Return true if OBJECT is a TCONS, and NIL otherwise."
-  (typep object 'tcons))
-
-(defun tatom (object)
-  "Return false if OBJECT is a TCONS, and T otherwise."
-  (not (tconsp object)))
-
-
+;; defined automatically by (defstruct tcons ...) above
+#-(and)
 (defun copy-tcons (cons)
   (declare (type tcons cons))
   (tcons (tcons-first cons) (tcons-rest cons)))
+
+
+;; defined automatically by (defstruct tcons ...) above
+#-(and)
+(defun tconsp (object)
+  "Return T if OBJECT is a TCONS, and NIL otherwise."
+  (not (tconsp object)))
+
+(declaim (inline tatom))
+
+(defun tatom (object)
+  "Return NIL if OBJECT is a TCONS, and T otherwise."
+  (not (tconsp object)))
+
 
 
   

@@ -21,7 +21,18 @@ threads until it commits.
 Memory transactions gives freedom from deadlocks, automatic roll-back on failure,
 and aim at resolving the tension between granularity and concurrency.
 
-### Latest news, 20th May 2014
+### Latest news, 16th January 2015
+
+Version 2.0.1 released.
+It adds support for transactional structs in addition to transactional CLOS objects,
+and a faster, struct-based implementation of transactional CONS cells and lists,
+including several list-manipulating functions - see stmx/util/tcons.lisp and stmx/util/tlist.lisp
+
+Unluckily, the hardware bug that prompted Intel to disable hardware transactional memory (TSX)
+in August 2014 is still there, and *very* few new models are available without the bug.
+So for the moment STMX will be software-only on many CPUs.
+
+### News, 20th May 2014
 
 STMX was presented at
 [7th European Lisp Symposium (ELS 2014)](http://www.european-lisp-symposium.org/)
@@ -96,21 +107,19 @@ Supported systems
 -----------------
 STMX is currently tested on the following Common Lisp implementations:
 
-* SBCL  version 1.2.6        (x86_64)   on Debian GNU/Linux 7.0  (x86_64)
-* SBCL  version 1.1.15       (x86_64)   on Debian GNU/Linux 7.0  (x86_64)
+* SBCL  version 1.2.6        (x86_64)   on Debian GNU/Linux 8.0  (x86_64)
+* SBCL  version 1.1.14       (x86_64)   on Debian GNU/Linux 8.0  (x86_64)
 * SBCL  version 1.0.55.0     (x86)      on Ubuntu Linux 12.04LTS (x86)
-* SBCL  version 1.1.14       (powerpc)  on Debian GNU/Linux 7.3  (powerpc) inside Qemu
+* SBCL  version 1.1.15       (powerpc)  on Debian GNU/Linux 7.3  (powerpc) inside Qemu
 * SBCL  version 1.2.1        (armhf)    on Raspbian GNU/Linux (armhf) Raspberry Pi
 
-* ABCL  version 1.3.1 with OpenJDK 7u71 (x86_64) on Debian GNU/Linux 7.0 (x86_64)
+* ABCL  version 1.3.1 with OpenJDK 7u71 (x86_64) on Debian GNU/Linux 8.0 (x86_64)
 
-* CCL   version 1.10         (x86_64)   on Debian GNU/Linux 7.0  (x86_64)
-* CCL   version 1.10         (x86)      on Debian GNU/Linux 7.0  (x86_64)
-* CCL   version 1.9-dev-r15475M-trunk (LinuxARM32) on Raspbian GNU/Linux (armhf) Raspberry Pi
+* CCL   version 1.10         (x86_64)   on Debian GNU/Linux 8.0  (x86_64)
+* CCL   version 1.10         (x86)      on Debian GNU/Linux 8.0  (x86_64)
 * CCL   version 1.9-r15761   (linuxppc) on Debian GNU/Linux 7.3  (powerpc) inside Qemu
 
-* CMUCL version 20d Unicode  (x86)      on Debian GNU/Linux 7.0  (x86_64)
-* CMUCL version 20c Unicode  (x86)      on Debian GNU/Linux 7.0  (x86)
+* CMUCL version 20d Unicode  (x86)      on Debian GNU/Linux 8.0  (x86_64)
 
 CMUCL needs a small workaround to run STMX reliably, see
 [doc/supported-systems.md](doc/supported-systems.md).
@@ -251,16 +260,29 @@ Basic usage
 STMX offers the following Lisp macros and functions, also heavily documented
 in the sources - remember `(describe 'some-symbol)` at REPL.
 
-- `TRANSACTIONAL` declares that a class is transactional, i.e. that its
-  slots contain transactional data. Use it to wrap a class definition:
+- `TRANSACTIONAL` declares that a class or struct is transactional, i.e. that its
+  slots contain transactional data. Use it to wrap a class or a struct definition:
   
         (transactional
           (defclass foo ()
             ((value1 :type integer :initarg :value1 :initform 0)
              (value2 :type string  :initarg :value2 :initform ""))))
 
+        (transactional
+          (defstruct bar ()
+            (value1 0  :type integer)
+            (value2 "" :type string)))
+
+  If you want to declare a slot as non-transactional, for example because it is
+  immutable, add the option `:transactional nil`:
+
+        (transactional
+          (defclass tred-black-tree ()
+            ((root           :type t)
+             (key-comparator :type function :transactional nil))))
+
   Note: on some Common Lisp implementations (ABCL and possibly others)
-  slot accessors are known to ignore by default the transactional machinery
+  CLOS slot accessors are known to ignore by default the transactional machinery
   (implemented with MOP slot-value-using-class, if you wonder) causing all
   kind of errors on transactional classes.
   Even though usually this problem can be usually at least *partially* fixed
@@ -268,6 +290,10 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   instead of slot accessors to read and write the slots of transactional
   classes or, even better, a macro that can be defined to use either
   `slot-value` or slot accessors.
+
+  Support for `(TRANSACTIONAL (DEFSTRUCT ...))` was added in STMX version 2.0.1
+  on January 2015. Previously, only `(TRANSACTIONAL (DEFCLASS ...))` was supported.
+
 
 - `ATOMIC` is the main macro: it wraps Lisp forms into an atomic
    memory transaction then executes them. For example, defining
@@ -746,14 +772,16 @@ use `(describe 'some-symbol)` at REPL:
 - `TCONS` is a transactional cons cell. It is created with
   `(tcons first-value second-value)`.
 
-  Methods: `TFIRST` `(SETF TFIRST)` `TREST` `(SETF TREST)`.
+  Functions: `TFIRST` `(SETF TFIRST)` `TREST` `(SETF TREST)`.
 
   Seldom used directly.
 
-- `TLIST` is a transactional list. It is created with
+- `TLIST` is a transactional list, composed of `TCONS` cells. It is created with
   `(tlist [values ...])`.
 
-  Methods: `TFIRST` `(SETF TFIRST)` `TREST` `(SETF TREST)` `TPUSH` `TPOP`.
+  Functions: `TFIRST` `(SETF TFIRST)` `TREST` `(SETF TREST)` `TPUSH` `TPOP`
+  `TSECOND` `TTHIRD` `TFOURTH` `TNTH` `TLAST` `TLIST-LENGTH` `TLIST*` and many others.
+  See stmx/util/tlist.lisp for details.
 
   Normal lists are perfectly suitable for transactional use as long as
   they are not destructively modified, so TLIST is often unnecessary:

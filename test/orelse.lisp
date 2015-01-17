@@ -145,13 +145,13 @@
 (defun to-vector (seq)
   (coerce seq 'simple-vector))
 
-(defun orelse-thread4 (&optional (iterations 1))
+(defun orelse-thread6 (&optional (iterations 1))
   "This test runs a pass-the-ball algorithm with 4 threads
 that take turns consuming (take) and producing (put) values in 4 cells.
 
-Two threads consume values from cells 1 or 2, increase the value by one,
+Three threads consume values from cells 1 or 2, increase the value by one,
 and produce into cells 3 or 4.
-Two other threads consume values from cells 3 or 4, increase the value by one,
+Three other threads consume values from cells 3 or 4, increase the value by one,
 and produce into cells 1 or 2.
 
 Consuming a value \"from cells x or y\" means (atomic (orelse (take cell-x) (take cell-y))),
@@ -191,8 +191,10 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
 
       (let1 ths (list (start-thread #'f1 :name "A")
                       (start-thread #'f1 :name "B")
-                      (start-thread #'f2 :name "C")
-                      (start-thread #'f2 :name "D"))
+                      (start-thread #'f1 :name "C")
+                      (start-thread #'f2 :name "D")
+                      (start-thread #'f2 :name "E")
+                      (start-thread #'f2 :name "F"))
 
         (sleep 1f-2)
 
@@ -215,9 +217,9 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
              collect (take cell))))))))
 
 
-(defun orelse-thread4-test (&optional (iterations 1))
+(defun orelse-thread6-test (&optional (iterations 1))
   (multiple-value-bind (values cells)
-      (orelse-thread4 iterations)
+      (orelse-thread6 iterations)
 
     (loop for list in (list values cells) do
          (loop for e in list do
@@ -227,9 +229,9 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
       (is-true (equalp '(0.0f0 0.25f0 0.5f0 0.75f0) remainders)))
 
     (let1 total (apply #'+ cells)
-      (is-true (= total (+ 1.5f0 (* 4 iterations)))))))
+      (is-true (= total (+ 1.5f0 (* 6 iterations)))))))
 
 
 #?+bt/make-thread
-(def-test orelse-thread4 (:compile-at :definition-time)
-  (orelse-thread4-test 20000))
+(def-test orelse-thread6 (:compile-at :definition-time)
+  (orelse-thread6-test 15000))

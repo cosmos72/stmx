@@ -30,7 +30,7 @@
 
            #:enable-#?-syntax
            #:set-feature  #:set-features #:default-feature #:default-features
-           #:get-feature  #:all-features?
+           #:get-feature  #:all-features #:assoc-feature
            
            #:log.trace    #:log.debug    #:log.make-logger
 

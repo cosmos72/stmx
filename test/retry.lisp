@@ -67,7 +67,7 @@
              x)))
     (values #'f1 #'f2)))
 
-(defun retry-thread4 (&key (two-tokens nil) (iterations 1))
+(defun retry-thread8 (&key (two-tokens nil) (iterations 1))
   (declare (type fixnum iterations))
 
   (start-multithreading)
@@ -79,8 +79,12 @@
 
       (let1 ths (list (start-thread f1 :name "A")
                       (start-thread f1 :name "B")
+                      (start-thread f1 :name "C")
+                      (start-thread f1 :name "D")
                       (start-thread f2 :name "X")
-                      (start-thread f2 :name "Y"))
+                      (start-thread f2 :name "Y")
+                      (start-thread f2 :name "Z")
+                      (start-thread f2 :name "W"))
         (atomic
          (when two-tokens
            (put c1 0.0f0))
@@ -92,25 +96,23 @@
           (values xs (atomic (list (peek c1) (peek c2)))))))))
 
 
-(defun retry-thread4-test (iterations)
-  (let ((expected (+ 0.5f0 (* 2 iterations))))
+(defun retry-thread8-test (iterations)
+  (let ((expected (+ 0.5f0 (* 4 iterations))))
 
-    (multiple-value-bind (xs cs) (retry-thread4 :two-tokens nil :iterations iterations)
-      (destructuring-bind (x1 x2 x3 x4) xs
-        (destructuring-bind (c1 c2) cs
-          (is-true (= expected (max x1 x2 x3 x4)))
-          (is-true (null c1))
-          (is-true (= expected c2)))))
+    (multiple-value-bind (xs cs) (retry-thread8 :two-tokens nil :iterations iterations)
+      (destructuring-bind (c1 c2) cs
+        (is-true (null c1))
+        (is-true (= expected c2))
+        (is-true (= expected (apply #'max xs)))))
 
-    (multiple-value-bind (xs cs) (retry-thread4 :two-tokens t :iterations iterations)
-      (destructuring-bind (x1 x2 x3 x4) xs
-        (destructuring-bind (c1 c2) cs
-          (is-true (= (max c1 c2) (max x1 x2 x3 x4)))
-          (is-true (not (null c1)))
-          (is-true (not (null c2)))
-          (is-true (= expected (+ c1 c2))))))))
+    (multiple-value-bind (xs cs) (retry-thread8 :two-tokens t :iterations iterations)
+      (destructuring-bind (c1 c2) cs
+        (is-true (not (null c1)))
+        (is-true (not (null c2)))
+        (is-true (= expected (+ c1 c2)))
+        (is-true (= (max c1 c2) (apply #'max xs)))))))
 
 
 #?+bt/make-thread
-(def-test retry-thread4 (:compile-at :definition-time)
-  (retry-thread4-test 20000))
+(def-test retry-thread8 (:compile-at :definition-time)
+  (retry-thread8-test 10000))

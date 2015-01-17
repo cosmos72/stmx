@@ -36,9 +36,7 @@
   (:import-from #:stmx
                 #:+dummy-tvar+ #:peek-$ #:try-take-$ #:try-put-$)
 
-  (:export #:tcons #:tlist #:tfirst #:trest #:tpush #:tpop ;; transactional CONS cell and list
-
-           #:tcell #:tfifo #:tstack #:tchannel #:tport  ;; transactional containers
+  (:export #:tcell #:tfifo #:tstack #:tchannel #:tport  ;; transactional containers
            
            #:full? #:empty? #:empty! ;; methods for transactional containers
            #:peek   #:take   #:put
@@ -74,7 +72,21 @@
 
            ;; transactional simple-vector
            #:simple-tvector #:simple-tvector-length
-           #:tsvref #:do-simple-tvector))
+           #:tsvref #:do-simple-tvector
+
+           ;; transactional CONS cell and list
+           #:tcons  #:tfirst #:trest  #:tconsp #:tatom  #:tpush  #:tpop
+           #:tlist  #:tcar   #:tcdr   #:tcaar  #:tcadr  #:tcdar  #:tcddr
+           #:tcaaar #:tcaadr #:tcadar #:tcaddr #:tcdaar #:tcdadr #:tcddar #:tcdddr
+
+           #:tcaaaar #:tcaaadr #:tcaadar #:tcaaddr #:tcadaar #:tcadadr #:tcaddar #:tacdddr
+           #:tcdaaar #:tcdaadr #:tcdadar #:tcdaddr #:tcddaar #:tcddadr #:tcdddar #:taddddr
+
+           #:tendp   #:tlist-length #:tnthcdr #:tnth
+           #:tsecond #:tthird #:tfourth #:tfifth #:tsixth #:tseventh #:teighth #:tninth #:ttenth
+           #:ttree-equal #:ttree-equal-test #:ttree-equal-test-not
+           #:tlast   #:tlist* #:make-tlist))
+           
 
 
 

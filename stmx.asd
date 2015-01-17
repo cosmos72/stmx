@@ -17,7 +17,7 @@
 
 (asdf:defsystem :stmx
   :name "STMX"
-  :version "2.0.0"
+  :version "2.0.1"
   :license "LLGPL"
   :author "Massimiliano Ghilardi"
   :description "Composable Transactional Memory"
@@ -69,7 +69,8 @@
                              (:file "txhash"         :depends-on ("classes"))
                              (:file "tlog"           :depends-on ("txhash"))
                              (:file "tvar"           :depends-on ("tlog"))
-                             (:file "tclass"         :depends-on ("tvar"))
+                             (:file "tstruct"        :depends-on ("tvar"))
+                             (:file "tclass"         :depends-on ("tvar" "tstruct"))
                              (:file "tslot"          :depends-on ("tclass"))
                              (:file "hw-atomic"      :depends-on ("classes"))
                              (:file "commit"         :depends-on ("tvar" "hw-atomic"))
@@ -108,7 +109,7 @@
 
 (asdf:defsystem :stmx.test
   :name "STMX.TEST"
-  :version "2.0.0"
+  :version "2.0.1"
   :author "Massimiliano Ghilardi"
   :license "LLGPL"
   :description "test suite for STMX"

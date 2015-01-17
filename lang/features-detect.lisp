@@ -89,7 +89,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
 
   ;; both the above two features
   (set-feature 'fixnum-is-large-powerof2
-               (all-features? 'fixnum-is-large 'fixnum-is-powerof2)))
+               (all-features 'fixnum-is-large 'fixnum-is-powerof2)))
 
 
               
@@ -136,7 +136,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
   ;; FAST-MUTEX requires atomic compare-and-swap plus *real* memory barriers.
   ;; Also, fast-mutex provides the preferred implementation of mutex-owner,
   ;;   which does not use bt/lock-owner
-  (when (all-features? 'atomic-ops 'mem-rw-barriers)
+  (when (all-features 'atomic-ops 'mem-rw-barriers)
     (unless (eql (get-feature 'mem-rw-barriers) :trivial)
       (default-features 'fast-mutex
                         '(mutex-owner :fast-mutex))))
@@ -144,7 +144,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
 
   ;; if mem-rw-barriers (even trivial ones) are available, bt/lock-owner
   ;; can be used as concurrency-safe mutex-owner even without atomic-ops
-  (when (all-features? 'mem-rw-barriers 'bt/lock-owner)
+  (when (all-features 'mem-rw-barriers 'bt/lock-owner)
     (default-feature 'mutex-owner :bt/lock-owner))
 
 
@@ -155,7 +155,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
   ;; 3) mutex-owner
   ;;
   (default-feature 'hw-transactions nil)
-  (when (all-features? 'mem-rw-barriers 'mutex-owner)
+  (when (all-features 'mem-rw-barriers 'mutex-owner)
     ;; do we also have the sb-transaction package exposing CPU hardware transactions?
     #?+(symbol sb-transaction transaction-supported-p)
     ;; good, and does the current CPU actually support hardware transactions?
@@ -173,7 +173,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
   ;;
   ;; The second and much slower choice is to use mutexes; in such case
   ;; define the feature TVAR-LOCK to :MUTEX
-  (if (all-features? 'fast-mutex 'fixnum-is-powerof2)
+  (if (all-features 'fast-mutex 'fixnum-is-powerof2)
       (default-feature 'tvar-lock :bit)
       (default-feature 'tvar-lock :mutex))
   
@@ -183,7 +183,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
   ;; atomic counters use them and do not need locking.
   ;; otherwise, atomic counters will need locking (using mutexes)
   (set-feature 'fast-atomic-counter
-               (all-features? 'atomic-ops 'mem-rw-barriers 'fixnum-is-large-powerof2))
+               (all-features 'atomic-ops 'mem-rw-barriers 'fixnum-is-large-powerof2))
 
 
 

@@ -76,6 +76,11 @@ the scenes the slots will be stored in transactional memory implemented by tvars
   (waiting-lock (make-lock "TVAR-WAITING") :read-only t));; tvar-waiting-lock
 
 
+(deftype transactional (type)
+  "Transactional memory containing TYPE"
+  (declare (ignore type))
+  'tvar)
+
 
 ;;;; ** Reading and writing
 

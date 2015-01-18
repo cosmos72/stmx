@@ -51,8 +51,10 @@
 	   #:hw-transaction-supported-and-running?
 
            ;; defining classes, structs, functions and methods
-           #:transactional-struct #:transactional-class #:transactional
-           #:transaction          #:transaction?
+           #:transactional      #:transaction          #:transaction?
+           #:transactional-class
+           
+           #:transactional-struct #:non-transactional-struct #:analyze-struct
 
            ;; utilities
            #:nonblocking

@@ -46,7 +46,9 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
                'initialize-instance-calls-slot-value-using-class)
                
  #+cmucl
- (set-features '(bt/lock-owner mp::lock-process))
+ (set-features '(bt/lock-owner mp::lock-process)
+               'closer-mop/works-on-structs)
+
 
  #+ecl
  (set-features '(bt/lock-owner mp::lock-owner)
@@ -65,8 +67,8 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
 
                #?+(symbol sb-ext defglobal) '(define-global sb-ext:defglobal)
 
-               'initialize-instance-calls-slot-value-using-class))
-
+               'initialize-instance-calls-slot-value-using-class
+               'closer-mop/works-on-structs))
 
 
 

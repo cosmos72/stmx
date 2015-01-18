@@ -42,7 +42,6 @@ options can be passed to component slots:
 - If not specified, the default is to make a transactional slot."))
 
 
-
 (defclass transactional-effective-slot (standard-effective-slot-definition)
   ((transactional :type boolean :initform nil
                   ;; if a transactional class inherits a slot
@@ -88,8 +87,6 @@ Exactly analogous to TRANSACTIONAL-DIRECT-SLOT."))
                                               &rest initargs)
     (declare (ignore initargs))
     transactional-effective-slot-class))
-
-
 
 ;; guard against recursive calls
 (defvar *recursive-call-list-classes-containing-direct-slots* nil)
@@ -139,7 +136,8 @@ otherwise signal an error."
          while slot2 do
            (unless (eq (transactional-slot? slot1)
                        (transactional-slot? slot2))
-             (error "Error compiling TRANSACTIONAL-CLASS ~S
+
+             (compile-error "Error compiling TRANSACTIONAL-CLASS ~S
 Slot ~S in class ~S is inherited multiple times,
 some with :TRANSACTIONAL T and some with :TRANSACTIONAL NIL.
 This is not allowed, please set all the relevant :TRANSACTIONAL flags
@@ -256,9 +254,9 @@ UNLESS explicitly defined with the option :transactional nil."
         (when (member tx-opt '(nil t))
           (return tx-opt))
 
-        (error "Error compiling TRANSACTIONAL-CLASS slot ~S:
+        (compile-error "Error compiling TRANSACTIONAL-CLASS slot ~S:
 Unsupported :TRANSACTIONAL flag ~S, expecting either T or NIL"
-               (first slot-form) tx-opt)))))
+                       (first slot-form) tx-opt)))))
                     
 
 
@@ -332,7 +330,7 @@ Otherwise return NIL."
 
 (defun error-tclass-slot-name (class-name slot-name)
   (declare (type symbol class-name slot-name))
-  (error "Error compiling TRANSACTIONAL-CLASS ~S.
+  (compile-error "Error compiling TRANSACTIONAL-CLASS ~S.
 Unsupported slot name ~S" class-name slot-name)) 
 
 
@@ -340,8 +338,9 @@ Unsupported slot name ~S" class-name slot-name))
   (declare (type symbol class-name slot-name))
   
   (unless (eq old-value new-value)
-    (cerror "Continue anyway."
-            "Error compiling TRANSACTIONAL-CLASS ~S.
+    (compile-cerror
+     "Continue anyway."
+     "Error compiling TRANSACTIONAL-CLASS ~S.
 Unsupported redefinition of class ~S slot ~S from ~S ~S to ~S ~S.
 Possible solutions:
 1) Continue anyway. Existing istances of class ~S and its subclasses
@@ -469,7 +468,8 @@ add TVAR as one of the slot allowed types, as for example:
            do
              (setf allocation (slot-definition-allocation slot)))
         (when (eq :class allocation)
-          (error "transactional slots do not (yet) support :allocation :class
+          (error 'stmx.compile-error
+                 "transactional slots do not (yet) support :allocation :class
 Maybe use :allocation :instance in slot ~S ?" slot-name)))
 
       (cons slot-name plist))))

@@ -15,10 +15,11 @@ back if it signals an error (and the error is propagated to the caller).
 
 Finally, memory transactions can safely run in parallel in different threads,
 are re-executed from the beginning in case of conflicts or if consistent reads
-cannot be guaranteed, and effects of a memory transaction are not visible from other
-threads until it commits.
+cannot be guaranteed, and their effects are not visible from other threads
+until they commit.
 
-Memory transactions gives freedom from deadlocks, automatic roll-back on failure,
+Memory transactions give freedom from deadlocks, are immune to thread-safety
+bugs and race conditions, provide automatic roll-back on failure,
 and aim at resolving the tension between granularity and concurrency.
 
 

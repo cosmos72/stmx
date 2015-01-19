@@ -174,8 +174,11 @@ After return, LOCKED will contain all TXPAIR entries of locked VARS."
 (defun unlock-tvars (locked)
   "Release vars in LOCKED in same order of acquisition."
   (declare (type txfifo locked))
-
+  
   ;; trivial optimization... nothing to unlock in single-thread mode
+  #?+(eql tvar-lock :single-thread)
+  (declare (ignore locked))
+
   #?-(eql tvar-lock :single-thread)
   (do-txfifo (var) locked
     (unlock-tvar var)))

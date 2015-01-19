@@ -119,30 +119,33 @@
 
 (defmethod update-instance-for-redefined-class
 
-    #?+initialize-instance-calls-slot-value-using-class :before
+    #?+use-initialize-instance-before :before
     
     ((instance transactional-object) added-slots discarded-slots
      property-list #-(and) &rest #-(and) initargs &key &allow-other-keys)
   
   "Put TVARs into all newly-added transactional slots of INSTANCE"
 
-  #?-initialize-instance-calls-slot-value-using-class
-  (call-next-method)
+  (declare (ignore discarded-slots property-list))
+  
+  (stmx::without-recording-with-show-tvars
 
-  (when added-slots
-    (without-recording-with-show-tvars
+    #?-use-initialize-instance-before
+    (call-next-method)
+
+    (when added-slots
       (let ((effective-slots (class-slots (class-of instance))))
         (dolist (slot-name added-slots)
           (declare (type symbol slot-name))
           (let ((slot (find-slot-by-name slot-name effective-slots)))
             (when (transactional-slot? slot)
 
-              #?+initialize-instance-calls-slot-value-using-class 
+              #?+use-initialize-instance-before 
               ;; added a transactional slot. put a TVAR into it
               ;; before its contents is initialized
               (setf (slot-value instance slot-name) (tvar))
 
-              #?-initialize-instance-calls-slot-value-using-class 
+              #?-use-initialize-instance-before 
               ;; the new transactional slot is already initialized.
               ;; wrap the slot value with a TVAR.
               (tvar-wrap-slot instance slot-name))))))))

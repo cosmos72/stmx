@@ -257,13 +257,14 @@ If M does not contain KEY, return (values DEFAULT NIL)."
   (declare (type gmap m))
   (let ((node (_ m root))
         (pred (_ m pred-func)))
-    (loop while node 
-       for xkey = (_ node key) do
-         (case (compare-keys pred key xkey)
-           (#.k< (setf node (_ node left)))
-           (#.k> (setf node (_ node right)))
-           (t    (return-from get-gmap (values (_ node value) t)))))
-    (values default nil)))
+    (loop while node
+       do
+         (let ((xkey (_ node key)))
+           (case (compare-keys pred key xkey)
+             (#.k< (setf node (_ node left)))
+             (#.k> (setf node (_ node right)))
+             (t    (return-from get-gmap (values (_ node value) t)))))))
+  (values default nil))
 
 
 
@@ -277,12 +278,13 @@ as multiple values"
          (pred (the function (_ m pred-func)))
          (comp nil))
      (loop while node
-        for xkey = (_ node key) do
-          (push^ node stack)
-          (case (setf comp (compare-keys pred key xkey))
-            (#.k< (setf node (_ node left)))
-            (#.k> (setf node (_ node right)))
-            (t    (return))))
+        do
+          (let ((xkey (_ node key)))
+            (push^ node stack)
+            (case (setf comp (compare-keys pred key xkey))
+              (#.k< (setf node (_ node left)))
+              (#.k> (setf node (_ node right)))
+              (t    (return)))))
      (values (the list stack)
              (the (or null comp-result) comp))))
      
@@ -366,9 +368,10 @@ add or replace each of them into M. Return M."
   (declare (type gmap m)
            (type list keys-and-values))
   (loop while keys-and-values
-     for key = (pop keys-and-values)
-     for value = (pop keys-and-values) do
-       (set-gmap m key value))
+     do
+       (let* ((key   (pop keys-and-values))
+              (value (pop keys-and-values)))
+         (set-gmap m key value)))
   m)
 
 

@@ -164,9 +164,10 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
            (return))
          (loop named ,loop-name
             for ,pair = (funcall ,aref-fun ,vec ,i) then ,next
+            with ,next = nil
             while ,pair
-            for ,next = (_ ,pair next)
             do
+              (setf ,next (_ ,pair next))
               (decf ,left)
               (locally ,@body))))))
                 
@@ -325,9 +326,10 @@ Return T if KEY was present in HASH, otherwise return NIL."
 
     (loop for prev = nil then pair
        for pair = head then next
+       with next = nil
        while pair
-       for next = (_ pair next)
        do
+         (setf next (_ pair next))
          (when (funcall test-fun key (_ pair key))
            (if prev
                (setf (_ prev next) next)

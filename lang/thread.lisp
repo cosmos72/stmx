@@ -106,7 +106,10 @@
 (defun start-thread (function &key name (initial-bindings bt:*default-special-bindings*))
 
   #?-bt/make-thread
-  (error "STMX compiled without multi-threading support, cannot start a new thread")
+  (error "STMX compiled without multi-threading support, cannot start a new thread with
+function = ~S
+name = ~S
+initial-bindings = ~S" function name initial-bindings)
 
   #?+bt/make-thread
   (progn
@@ -127,7 +130,7 @@
 (defun wait4-thread (th)
 
   #?-bt/make-thread
-  (error "STMX compiled without multi-threading support, cannot wait for a thread")
+  (error "STMX compiled without multi-threading support, cannot wait for thread ~S" th)
 
   #?+bt/make-thread
   (progn

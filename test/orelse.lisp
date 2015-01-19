@@ -60,9 +60,10 @@
        (loop for takef in (list #'take1 #'take2 #'take3) do
             (loop for putf in (list #'put1 #'put2 #'put3)
                for unique = (gensym) do
-                 (locally
+                 (let ((takef takef)
+                       (putf  putf))
 
-                     (declare (type function takef putf))
+                   (declare (type function takef putf))
                    
                    (multiple-value-bind (took? value) (funcall takef place)
                      (are-true (not took?)
@@ -176,7 +177,7 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
   (start-multithreading)
 
   (let* ((names '("A" "B" "C" "D"))
-         (cells (loop for n in names collect (tcell)))
+         (cells (loop repeat (length names) collect (tcell)))
          
          (cells1 (to-vector cells))
          (names1 (to-vector names))

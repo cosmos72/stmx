@@ -326,6 +326,9 @@ Works only inside software transactions."
 ;;;; ** Accessors
 
 
+(defgeneric value-of (place))
+(defgeneric (setf value-of) (value place))
+
 (defmethod value-of ((var tvar))
   "Return the value inside a TVAR. Works both outside and inside transactions.
 Equivalent to ($-slot var)"

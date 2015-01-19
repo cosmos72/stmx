@@ -21,6 +21,7 @@
 
 ;;;; ** Metaclasses
 
+
 (defclass transactional-class (standard-class)
   ()
   (:documentation "The metaclass for transactional classes.
@@ -28,6 +29,8 @@
 Classes defined with this metaclass have extra slot options,
 see the class TRANSACTIONAL-DIRECT-SLOT for details."))
 
+
+(defgeneric transactional-slot? (slot))
 
 (defclass transactional-direct-slot (standard-direct-slot-definition)
   ((transactional :type boolean :initform t
@@ -40,7 +43,6 @@ options can be passed to component slots:
 :transactional [ T | NIL ] - Specify whether this slot is transactional.
 - If true, all reads and writes will be transactional.
 - If not specified, the default is to make a transactional slot."))
-
 
 (defclass transactional-effective-slot (standard-effective-slot-definition)
   ((transactional :type boolean :initform nil
@@ -284,15 +286,15 @@ Return modified SLOT-FORM."
   (let ((temp (list (pop slot-form)))
         (replaced nil))
     (loop while slot-form
-       for k = (pop slot-form)
-       for v = (pop slot-form)
        do
-         (push k temp)
-         (if (eq k key)
-             (progn
-               (setf replaced t)
-               (push value temp))
-             (push v temp)))
+         (let* ((k (pop slot-form))
+                (v (pop slot-form)))
+           (push k temp)
+           (if (eq k key)
+               (progn
+                 (setf replaced t)
+                 (push value temp))
+               (push v temp))))
 
     (unless replaced
       (push key temp)
@@ -433,8 +435,8 @@ wrap its :initform with a TVAR and alter its :type to also accept TVARs"
       ;; the only hope is for them to be already allowed
       
       ;; find the most restrictive :type
-      (loop until super-type?
-         for slot in super-slots
+      (loop for slot in super-slots
+         until super-type?
          do
            (unless super-type?
              (setf super-tx?   (transactional-slot? slot)
@@ -463,8 +465,8 @@ add TVAR as one of the slot allowed types, as for example:
 
       ;; transactional slots do not (yet) support :allocation :class
       (let ((allocation (getf plist :allocation)))
-        (loop until allocation
-           for slot in super-slots
+        (loop for slot in super-slots
+           until allocation
            do
              (setf allocation (slot-definition-allocation slot)))
         (when (eq :class allocation)
@@ -563,22 +565,26 @@ and alter its :type to also accept TVARs"
 
 (defun undefine-method-before (generic-func-name class-name)
   "Remove from GENERIC-FUNC-NAME the method qualified :BEFORE and specialized for CLASS-NAME"
-  (when (find-class-or-nil class-name)
-    (let* ((generic-func (fdefinition generic-func-name))
-           (method (find-method generic-func '(:before) `(,class-name) nil)))
-      (when method
-        (remove-method generic-func method)
-        t))))
+  (let ((class (find-class-or-nil class-name)))
+    (when class
+      (let* ((generic-func (fdefinition generic-func-name))
+             (method (or (find-method generic-func '(:before) `(,class-name) nil)
+                         (find-method generic-func '(:before) `(,class) nil))))
+        (when method
+          (remove-method generic-func method)
+          t)))))
   
 
 (defun undefine-method (generic-func-name class-name)
   "Remove from GENERIC-FUNC-NAME the method specialized for CLASS-NAME"
-  (when (find-class-or-nil class-name)
-    (let* ((generic-func (fdefinition generic-func-name))
-           (method (find-method generic-func nil `(,class-name) nil)))
-      (when method
-        (remove-method generic-func method)
-        t))))
+  (let ((class (find-class-or-nil class-name)))
+    (when class
+      (let* ((generic-func (fdefinition generic-func-name))
+             (method (or (find-method generic-func nil `(,class-name) nil)
+                         (find-method generic-func nil `(,class) nil))))
+        (when method
+          (remove-method generic-func method)
+          t)))))
 
 
 
@@ -611,15 +617,15 @@ and alter its :type to also accept TVARs"
     (block nil
       (unless tx-slot-forms
         (return
-          `(eval-when (:execute)
+          `(eval-always
              (undefine-method-before 'initialize-instance ',class-name)
              (undefine-method        'initialize-instance ',class-name))))
 
       
-      #?+initialize-instance-calls-slot-value-using-class
+      #?+use-initialize-instance-before
       (with-gensym obj
         `(progn
-           (eval-when (:execute)
+           (eval-always
              (undefine-method 'initialize-instance ',class-name))
            
            (defmethod initialize-instance :before ((,obj ,class-name) &key &allow-other-keys)
@@ -631,10 +637,10 @@ and alter its :type to also accept TVARs"
                     collect `(setf (slot-value ,obj ',slot-name) (tvar)))))))
 
 
-      #?-initialize-instance-calls-slot-value-using-class
+      #?-use-initialize-instance-before
       (with-gensym obj
         `(progn
-           (eval-when (:execute)
+           (eval-always
              (undefine-method-before 'initialize-instance ',class-name))
 
            (defmethod initialize-instance ((,obj ,class-name) &key &allow-other-keys)

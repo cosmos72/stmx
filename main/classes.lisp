@@ -242,6 +242,11 @@ to TLOGs while executing BODY."
           :format-control ,format
           :format-arguments (list ,@args)))
 
+(defmacro compile-cerror (cont-string format &rest args)
+  `(cerror ,cont-string 'stmx.compile-error
+           :format-control ,format
+           :format-arguments (list ,@args)))
+
 
 (define-condition stmx.control-error (control-error)
   ()

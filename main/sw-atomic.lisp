@@ -30,23 +30,30 @@ or
 
 The effect is the same as DEFUN - or DEFMETHOD - plus:
 - the BODY is wrapped inside (atomic ...)"
-  `(,defun-or-defmethod ,func-name ,args
-     ;; move docstring here
-     ,@(when (and (stringp (first body)) (rest body))
-             (list (pop body)))
-     ;; also copy all declarations
-     ,@(loop for form in body
-          while (and (listp form) (eq 'declare (first form)))
-          collect form)
+
+  (let* ((docstring (when (and (stringp (first body)) (rest body))
+                     (pop body)))
+         declarations)
+
+     (loop for form = (first body)
+        while (and (consp form) (eq 'declare (first form)))
+        do
+          (push (pop body) declarations))
+     (setf declarations (nreverse declarations))
      
-     (atomic
-      ,(if (symbolp func-name)
-	   ;; support (return-from ,func-name ...)
-	   `(block ,func-name
-	      (locally ;; support (declare ...)
-                  ,@body))
-	   `(locally ;; support (declare ...)
-		,@body)))))
+     `(,defun-or-defmethod ,func-name ,args
+        ;; move docstring here
+        ,@(when docstring (list docstring))
+        ;; also move all declarations
+        ,@declarations
+     
+        (atomic
+         ,(if (symbolp func-name)
+              ;; support (return-from ,func-name ...)
+              `(block ,func-name
+                 ,@body)
+              `(progn
+                 ,@body))))))
 
 
 

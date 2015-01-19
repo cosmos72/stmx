@@ -168,8 +168,8 @@ bmap-count must be the actual nodes count, root must be black."
         (rem-gmap m2 key)))
 
     (let ((keys (hash-table-keys hash))
-          (n-keys (hash-table-count hash))
-          (i -1))
+          #-(and) (n-keys (hash-table-count hash))
+          #-(and) (i -1))
       (loop for key in keys do
            ;; (format t "~&pass 3/3, step ~S/~S " (incf i) n-keys)
            (is-true (rem-gmap m1 key))

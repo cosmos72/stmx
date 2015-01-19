@@ -153,11 +153,10 @@ Cannot generate functions in package NIL" symbol))
 (defmacro do-loop-tstruct-defs ((struct-def-var struct-def) &body body)
   "Execute BODY inside a loop, iterating on tstruct-def STRUCT-DEF
 and all its superclasses"
-  (with-gensym superclass-name
-    `(loop for ,struct-def-var = ,struct-def then (tstruct-def ,superclass-name)
-        while ,struct-def-var
-        for ,superclass-name = (tstruct-def-superclass ,struct-def-var)
-          ,@body)))
+  `(loop for ,struct-def-var = ,struct-def
+      then (tstruct-def (tstruct-def-superclass ,struct-def-var))
+      while ,struct-def-var
+        ,@body))
 
 (defmacro do-tstruct-defs ((struct-def-var struct-def) &body body)
   "Execute BODY on tstruct-def STRUCT-DEF and all its superclasses"
@@ -602,11 +601,11 @@ in order to declaim them inline"
             ,@(let ((args nil))
                 (do-tstruct-defs (superstruct struct-def)
                   (dolist (slot (tstruct-def-slots superstruct))
-                    (let ((accessor    (tstruct-slot-accessor slot struct-def))
-                          (arg-keyword (tstruct-slot-keyword slot struct-def)))
+                    (let ((reader      (tstruct-slot-effective-reader slot struct-def))
+                          (arg-keyword (tstruct-slot-keyword          slot struct-def)))
                       ;; we will reverse args later
                       (push arg-keyword args)
-                      (push `(,accessor ,old-instance) args))))
+                      (push `(,reader ,old-instance) args))))
                 (nreverse args))))))))
          
 

@@ -24,6 +24,21 @@ and aim at resolving the tension between granularity and concurrency.
 
 News
 ----
+
+### Latest news, 16th January 2015
+
+Version 2.0.1 released.
+It adds support for transactional structs in addition to transactional CLOS objects,
+and a faster, struct-based implementation of transactional CONS cells and lists,
+including several list-manipulating functions - see [util/tcons.lisp](util/tcons.lisp)
+and [util/tlist.lisp](util/tlist.lisp)
+
+Unluckily, the hardware bug that prompted Intel to disable hardware transactional memory (TSX)
+in August 2014 is still there, and *very* few new models are available without the bug.
+So for the moment STMX will be software-only on many CPUs.
+
+### Older news
+
 See the file [NEWS.md](NEWS.md)
 
 
@@ -52,6 +67,7 @@ STMX is currently tested on the following Common Lisp implementations:
 * CCL   version 1.10         (x86_64)   on Debian GNU/Linux 8.0  (x86_64)
 * CCL   version 1.10         (x86)      on Debian GNU/Linux 8.0  (x86_64)
 * CCL   version 1.9-r15761   (linuxppc) on Debian GNU/Linux 7.3  (powerpc) inside Qemu
+* CLISP version 2.49         (x86_64)   on Debian GNU/Linux 8.0  (x86_64)
 * CMUCL version 20d Unicode  (x86)      on Debian GNU/Linux 8.0  (x86_64)
 
 CMUCL needs a small workaround to run STMX reliably, see

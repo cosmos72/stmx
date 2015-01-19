@@ -39,9 +39,11 @@
   "Return to TLOG pool all logs contained in TXS"
   (loop for tx across txs
      while tx
-     for log = (orelse-tx-log tx)
-     while log do
-       (free-tlog log)))
+     do
+       (let ((log (orelse-tx-log tx)))
+         (unless log
+           (return))
+         (free-tlog log))))
 
 
 (defun find-first-rerun-tx (txs me)
@@ -138,7 +140,9 @@ Can only be used inside an ATOMIC block."
 
     (declare (type boolean rerunning)
              (type fixnum index)
-             (type simple-vector txs))
+             (type simple-vector txs)
+             ;; rerunning is needed only by #?+global-clock/spurious-failures-in-single-thread
+             (ignorable rerunning))
 
     (labels ((ensure-tx ()
                (unless (setf tx (svref txs index))

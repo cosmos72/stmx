@@ -86,7 +86,11 @@
 
                              (:file "container"      :depends-on ("misc"))
                              (:file "tcons"          :depends-on ("misc"))
-                             (:file "tlist"          :depends-on ("tcons"))
+                             (:file "tcons-list"     :depends-on ("tcons"))
+                             (:file "tcons-alist"    :depends-on ("tcons"))
+                             (:file "tcons-set"      :depends-on ("tcons"))
+                             (:file "tcons-tree"     :depends-on ("tcons"))
+                             (:file "tcons-higher"   :depends-on ("tcons-alist"))
                              (:file "tvar"           :depends-on ("container"))
                              (:file "tcell"          :depends-on ("container"))
                              (:file "tstack"         :depends-on ("container"))

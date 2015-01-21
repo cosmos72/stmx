@@ -13,6 +13,91 @@
 
 (enable-#?-syntax)
 
+
+(declaim (inline tlistp))
+
+(defun tlistp (object)
+  "Return true if OBJECT is a TLIST, and NIL otherwise."
+  (or (null object) (tconsp object)))
+
+       
+(declaim (ftype (function (&rest t) (values tlist &optional)) tlist))
+
+(defun tlist (&rest list)
+  "Create and return a new TLIST, whose cells are TCONS."
+  (when list
+    (let* ((list #?+&rest-is-fresh-list (nreverse list)
+                 #?-&rest-is-fresh-list (reverse list))
+           (result nil))
+      (dolist (e list result)
+        (setf result (tcons e result))))))
+               
+
+(define-compiler-macro tlist (&whole form &rest list)
+  (cond
+    ((null list)               nil)
+    ((null (rest list))        `(tcons ,(first list) nil))
+    ((null (rest (rest list))) `(tcons ,(first list) (tcons ,(second list) nil)))
+    (t form)))
+
+
+
+
+(defun tlist* (arg0 &rest args)
+  "Return a TLIST of the arguments with last TCONS a dotted pair."
+  ;; We know the &REST is a proper list.
+  (cond ((null args) arg0)
+        ((atom (rest args)) (tcons arg0 (first args)))
+        (t (let* ((args #?+&rest-is-fresh-list (nreverse args)
+                        #?-&rest-is-fresh-list (reverse args))
+                  (argn (pop args))
+                  (list (tcons (pop args) argn)))
+             (dolist (argx args)
+               (setf list (tcons argx list)))
+             (tcons arg0 list)))))
+
+
+(define-compiler-macro tlist* (&whole form arg0 &rest args)
+  (cond
+    ((null args)               arg0)
+    ((null (rest args))        `(tcons ,arg0 ,(first args)))
+    ((null (rest (rest args))) `(tcons ,arg0 (tcons ,(first args) ,(second args))))
+    (t form)))
+
+
+(defun make-tlist (size &key initial-element)
+  "Constructs a tlist with SIZE elements each set to INITIAL-ELEMENT"
+  (declare (type fixnum size))
+  (do ((count size (1- count))
+       (result nil (tcons initial-element result)))
+      ((<= count 0) result)
+    (declare (type fixnum count))))
+
+
+(defmacro do-tlist ((var tlist &optional result) &body body)
+  "Analogous to DOLIST, iterates on transactional list TLIST.
+On each iteration, sets VAR to the element and executes BODY inside a tagbody.
+Returns RESULT. Note: when RESULT is executed, VAR is set to NIL.
+
+An implicit block named NIL surrounds DO-TLIST, so RETURN can be used
+to terminate immediately the iterations and return zero or more values."
+  (with-gensyms (tlist-var start)
+    `(block nil
+       (let ((,tlist-var ,tlist))
+         (tagbody
+            ,start
+            (unless (tendp ,tlist-var)
+              (let ((,var (tfirst ,tlist-var)))
+                (setf ,tlist-var (trest ,tlist-var))
+                (tagbody
+                   ,@body))
+              (go ,start))))
+       (let ((,var nil))
+         (declare (ignorable ,var))
+         ,result))))
+
+
+
 (defmacro %tlist-ops (tlist op &rest next-ops)
   (let ((op (case op
               ((a car first) 'tcons-first)
@@ -128,15 +213,15 @@ This function should always be executed inside an STMX atomic block."
   "This is the recommended way to test for the end of a proper TLIST. It
    returns true if OBJECT is NIL, false if OBJECT is a TCONS, and an error
    for any other type of OBJECT."
-  (check-type object (or null tcons))
+  (check-type object tlist)
   (null object))
 
 
-(defun tlist-length (list)
+(defun tlist-length (tlist)
   "Return the length of the given TLIST, or NIL if the TLIST is circular."
   (do ((n 0 (+ n 2))
-       (y list (tcddr y))
-       (z list (tcdr z)))
+       (y tlist (tcddr y))
+       (z tlist (tcdr z)))
       (())
     (declare (type fixnum n)
              (type tlist y z))
@@ -145,22 +230,35 @@ This function should always be executed inside an STMX atomic block."
     (when (and (eq y z) (> n 0)) (return nil))))
 
 
-(declaim (inline tnthcdr)
-         (notinline tnth))
+(declaim (notinline tnthcdr)
+         (inline tnth))
 
-(defun tnthcdr (n list)
-  "Performs the cdr function N times on a TLIST."
-  (declare (type fixnum n)
-           (type tlist list))
-  (loop for i = n then (the fixnum (1- i))
-     for result = list then (tcdr result)
+(defun tnthcdr (n tlist)
+  "Performs the TCDR function N times on a TLIST."
+  (declare (type (and fixnum (integer 0)) n)
+           (type tlist tlist))
+  (loop for i fixnum = n then (1- i)
+     for result = tlist then (tcons-rest result)
      while (and result (plusp i))
      finally (return result)))
 
-(defun tnth (n list)
-  "Return the Nth object in a TLIST where the car is the zero-th element."
-  (declare (type tlist list))
-  (tcar (tnthcdr n list)))
+
+(defun tnth (n tlist)
+  "Return the Nth object in a TLIST where the TCAR is the zero-th element."
+  (declare (type (and fixnum (integer 0)))
+           (type tlist tlist))
+  (tcar (tnthcdr n tlist)))
+
+
+(defun (setf tnth) (newval n tlist)
+  "Set the Nth element of TLIST to NEWVAL."
+  (declare (type (and fixnum (integer 0)) n)
+           (type tcons tlist))
+  (let ((cons (tnthcdr n tlist)))
+    (when (tendp cons)
+      (error "~S is too large an index for SETF of TNTH." n))
+    (setf (tfirst cons) newval)))
+
 
 
 (declaim (inline tsecond tthird tfourth tfifth tsixth tseventh teighth tninth ttenth))
@@ -310,109 +408,147 @@ This function should always be executed inside an STMX atomic block."
       form))
 
 
-(defun tlist* (arg0 &rest args)
-  "Return a TLIST of the arguments with last TCONS a dotted pair."
-  ;; We know the &REST is a proper list.
-  (cond ((null args) arg0)
-        ((atom (rest args)) (tcons arg0 (first args)))
-        (t (let* ((args #?+&rest-is-fresh-list (nreverse args)
-                        #?-&rest-is-fresh-list (reverse args))
-                  (argn (pop args))
-                  (list (tcons (pop args) argn)))
-             (dolist (argx args)
-               (setf list (tcons argx list)))
-             (tcons arg0 list)))))
+            
+
+(defmacro %tappend-consing (lists &key (do-outer-list 'dolist) (do-inner-list 'dolist))
+  ;; cons an intermediate list rather than using SETF on newly created TVARS.
+  ;; preferred inside software transactions, where SETF on TVARS is expensive
+  (with-gensyms (rev-lists list obj tlist)
+    `(let ((,rev-lists))
+        (,do-outer-list (,list ,lists)
+          (,do-inner-list (,obj ,list)
+            (push ,obj ,rev-lists)))
+        
+        (let ((,tlist nil))
+          (dolist (,obj ,rev-lists)
+            (setf ,tlist (tcons ,obj ,tlist)))
+          ,tlist))))
 
 
-(defun make-tlist (size &key initial-element)
-  "Constructs a TLIST with SIZE elements each set to INITIAL-ELEMENT"
-  (declare (type fixnum size))
-  (do ((count size (1- count))
-       (result nil (tcons initial-element result)))
-      ((<= count 0) result)
-    (declare (type fixnum count))))
+(defmacro %tappend-setf-tvar (lists &key (do-outer-list 'dolist) (do-inner-list 'dolist))
+  ;; use SETF on newly created TVARS rather than consing an intermediate list.
+  ;; preferred outside transactions, where SETF on TVARS is cheap
+  (with-gensyms (prev next top list obj)
+    `(let* ((,prev (tcons nil nil))
+            (,top  ,prev))
+       (,do-outer-list (,list ,lists)
+         (,do-inner-list (,obj ,list)
+           (let ((,next (tcons ,obj nil)))
+             (setf (tcons-rest ,prev) ,next
+                   ,prev ,next))))
+       (tcons-rest ,top))))
+    
+
+(defun tappend (&rest tlists)
+  "Construct a new tlist by concatenating the TLIST arguments"
+  (declare (dynamic-extent tlists)
+           (type list tlists)
+           (optimize speed))
+
+  (if (stmx::use-$-swtx?)
+      (%tappend-consing tlists :do-inner-list do-tlist)
+      (%tappend-setf-tvar tlists :do-inner-list do-tlist)))
+        
+
+(defun tappend-lists (&rest lists)
+  "Construct a new tlist by concatenating the LIST arguments"
+  (declare (dynamic-extent lists)
+           (type list lists)
+           (optimize speed))
+
+  (if (stmx::use-$-swtx?)
+      (%tappend-consing lists)
+      (%tappend-setf-tvar lists)))
+      
+
+    
+(defmacro %copy-tlist-consing (list-or-tlist &key (car 'car) (cdr 'cdr) (consp 'consp))
+  ;; cons an intermediate list rather than using SETF on newly created TVARS.
+  ;; preferred inside software transactions, where SETF on TVARS is expensive
+  (with-gensyms (list obj rest copy tcopy)
+    `(loop
+        with ,list = ,list-or-tlist
+        with ,copy = nil
+        for ,obj = (,car ,list) then (,car ,rest)
+        for ,rest = (,cdr ,list) then (,cdr ,rest)
+        while (,consp ,rest)
+        do
+          (setf ,copy (cons ,obj ,copy))
+        finally
+          (let ((,tcopy (tcons ,obj ,rest)))
+            (dolist (,obj ,copy)
+              (setf ,tcopy (tcons ,obj ,tcopy)))
+            (return ,tcopy)))))
+
+
+
+(defmacro %copy-tlist-setf-tvar (list-or-tlist &key (car 'car) (cdr 'cdr) (consp 'consp))
+  ;; use SETF on newly created TVARS rather than consing an intermediate list.
+  ;; preferred outside transactions, where SETF on TVARS is cheap
+  (with-gensyms (list copy splice orig next)
+    `(loop
+        with ,list = ,list-or-tlist
+        with ,copy = (tlist (,car ,list))
+        with ,splice = ,copy
+        for ,orig = (,cdr ,list) then (,cdr ,orig)
+        while (,consp ,orig)
+        do
+          (let ((,next (tcons (,car ,orig) nil)))
+            (setf (trest ,splice) ,next
+                  ,splice ,next))
+        finally
+          (unless (null ,orig)
+            (setf (trest ,splice) ,orig))
+          (return ,copy))))
+  
+
+
+(defun copy-tlist (tlist)
+  "Return a new tlist which has the same elements as TLIST. TLIST may be improper."
+  (declare (type tlist tlist))
+
+  (unless tlist
+    (return-from copy-tlist nil))
+
+  (if (stmx::use-$-swtx?)
+      (%copy-tlist-consing tlist :car tcons-first :cdr tcons-rest :consp tconsp)
+      (%copy-tlist-setf-tvar tlist :car tcons-first :cdr tcons-rest :consp tconsp)))
+
+
+(defun list-to-tlist (list)
+  "Return a new tlist which has the same elements as LIST. LIST may be improper."
+  (declare (type list list))
+
+  (unless list
+    (return-from list-to-tlist nil))
+
+  (if (stmx::use-$-swtx?)
+      (%copy-tlist-consing list)
+      (%copy-tlist-setf-tvar list)))
+
+
+
+(defun copy-tlist-tree (object)
+  "Recursively copy trees of TCONSes."
+  (if (tconsp object)
+      (let ((result (tlist (let ((car (tcons-first object)))
+                             (if (tconsp car)
+                                 (copy-tlist-tree car)
+                                 car)))))
+        (loop
+           for last-cons = result then new-cons
+           for cdr = (tcons-rest object) then (tcons-rest cdr)
+           for car = (if (tconsp cdr)
+                         (tcons-first cdr)
+                         (return (setf (trest last-cons) cdr)))
+           for new-cons = (tlist (if (tconsp car)
+                                     (copy-tlist-tree car)
+                                     car))
+           do (setf (trest last-cons) new-cons))
+        result)
+      object))
 
 #|
-(defun append (&rest lists)
-  "Construct a new list by concatenating the list arguments"
-  (declare (truly-dynamic-extent lists) (optimize speed))
-  (labels ((fail (object)
-             (error 'type-error
-                    :datum object
-                    :expected-type 'list))
-           (append-into (last-cons current rest)
-             ;; Set (CDR LAST-CONS) to (APPLY #'APPEND CURRENT REST).
-             (declare (cons last-cons rest))
-             (if (listp current)
-                 (if (consp current)
-                     ;; normal case, cdr down the list
-                     (append-into (setf (cdr last-cons) (list (car current)))
-                                  (cdr current)
-                                  rest)
-                     ;; empty list
-                     (let ((more (cdr rest)))
-                       (if (null more)
-                           (setf (cdr last-cons) (car rest))
-                           (append-into last-cons (car rest) more))))
-                 (fail current)))
-           (append1 (lists)
-             (let ((current (car lists))
-                   (rest (cdr lists)))
-               (cond ((null rest)
-                      current)
-                     ((consp current)
-                      (let ((result (truly-the cons (list (car current)))))
-                        (append-into result
-                                     (cdr current)
-                                     rest)
-                        result))
-                     ((null current)
-                      (append1 rest))
-                     (t
-                      (fail current))))))
-    (append1 lists)))
-
-(defun append2 (x y)
-  (declare (optimize speed (sb!c::verify-arg-count 0)))
-  (if (null x)
-      y
-      (let ((result (list (car x))))
-        (do ((more (cdr x) (cdr more))
-             (tail result (cdr tail)))
-            ((null more)
-             (rplacd tail y)
-             result)
-          (rplacd tail (list (car more)))))))
-
-(define-compiler-macro append (&whole form &rest lists)
-  (case (length lists)
-    (0 nil)
-    (1 (car lists))
-    (2 `(append2 ,@lists))
-    (t form)))
-
-;;;; list copying functions
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (sb!xc:defmacro !copy-list-macro (list &key check-proper-list)
-    ;; Unless CHECK-PROPER-LIST is true, the list is copied correctly
-    ;; even if the list is not terminated by NIL. The new list is built
-    ;; by CDR'ing SPLICE which is always at the tail of the new list.
-    `(when ,list
-       (let ((copy (list (car ,list))))
-         (do ((orig (cdr ,list) (cdr orig))
-              (splice copy (cdr (rplacd splice (cons (car orig) nil)))))
-             (,@(if check-proper-list
-                    '((endp orig))
-                    '((atom orig)
-                      (unless (null orig)
-                        (rplacd splice orig))))
-              copy))))))
-
-(defun copy-list (l)
-  "Return a new list which is EQUAL to LIST. LIST may be improper."
-  (!copy-list-macro l))
-
 (defun copy-alist (alist)
   "Return a new association list which is EQUAL to ALIST."
   (if (endp alist)
@@ -433,23 +569,7 @@ This function should always be executed inside an STMX atomic block."
             ((endp x)))
         result)))
 
-(defun copy-tree (object)
-  "Recursively copy trees of conses."
-  (if (consp object)
-      (let ((result (list (if (consp (car object))
-                              (copy-tree (car object))
-                              (car object)))))
-        (loop for last-cons = result then new-cons
-              for cdr = (cdr object) then (cdr cdr)
-              for car = (if (consp cdr)
-                            (car cdr)
-                            (return (setf (cdr last-cons) cdr)))
-              for new-cons = (list (if (consp car)
-                                       (copy-tree car)
-                                       car))
-              do (setf (cdr last-cons) new-cons))
-        result)
-      object))
+
 
 
 ;;;; more commonly-used list functions
@@ -559,40 +679,6 @@ This function should always be executed inside an STMX atomic block."
     (if (eql list object)
         (return (cdr result))
         (setq splice (cdr (rplacd splice (list (car l))))))))
-
-;;;; functions to alter list structure
-
-(defun rplaca (cons x)
-  "Change the CAR of CONS to X and return the CONS."
-  (rplaca cons x))
-
-(defun rplacd (cons x)
-  "Change the CDR of CONS to X and return the CONS."
-  (rplacd cons x))
-
-;;; The following are for use by SETF.
-
-(defun %rplaca (x val) (rplaca x val) val)
-
-(defun %rplacd (x val) (rplacd x val) val)
-
-;;; Set the Nth element of LIST to NEWVAL.
-(defun %setnth (n list newval)
-  (typecase n
-    (fixnum
-     (do ((count n (1- count))
-          (list list (cdr l)))
-         ((endp l)
-          (error "~S is too large an index for SETF of NTH." n))
-       (declare (type fixnum count))
-       (when (<= count 0)
-         (rplaca list newval)
-         (return newval))))
-    (t (let ((cons (nthcdr n l)))
-         (when (endp cons)
-           (error "~S is too large an index for SETF of NTH." n))
-         (rplaca cons newval)
-         newval))))
 
 ;;;; :KEY arg optimization to save funcall of IDENTITY
 

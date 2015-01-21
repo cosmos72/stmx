@@ -143,17 +143,21 @@ Removes and returns the first element in PLACE."
          (tfirst ,var)))))
       
 
-(declaim (ftype (function (&rest t) (values tlist &optional)) tlist))
 
-(defun tlist (&rest list)
-  "Create and return a new TLIST, whose cells are TCONS."
-  (when list
-    (let* ((list #?+&rest-is-fresh-list (nreverse list)
-                 #?-&rest-is-fresh-list (reverse list))
-           (result nil))
-      (dolist (e list result)
-        (setf result (tcons e result))))))
-               
+(defun trplaca (tcons x)
+  "Change the TCAR of TCONS to X and return the TCONS."
+  (declare (type tcons tcons))
+  (setf (tcons-first tcons) x)
+  tcons)
+           
+
+(defun trplacd (tcons x)
+  "Change the TCDR of TCONS to X and return the TCONS."
+  (declare (type tcons tcons))
+  (setf (tcons-rest tcons) x)
+  tcons)
+           
+
 
 (defprint-object (obj tcons :type nil :identity nil)
   (write-string "(")
@@ -168,4 +172,3 @@ Removes and returns the first element in PLACE."
        (write-string " ")
        (setf obj rest))
   (write-string ")"))
-

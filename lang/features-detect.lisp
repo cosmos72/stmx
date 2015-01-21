@@ -57,8 +57,11 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
 (eval-always
   
  #+lispworks ;; incomplete porting
- (set-features '(tclass-options ((:optimize-slot-access nil))))
-
+ (set-features '(tclass-options ((:optimize-slot-access nil)))
+               '(bt/lock-owner mp:lock-owner)
+               #+(or x86 x8664 x86-64 x86_64)
+               '(mem-rw-barriers :trivial))
+ 
  #+abcl
  (set-features '(bt/lock-owner :abcl)
                ;; (closer-mop:class-slots <struct>) returns a list of simple-vectors,
@@ -74,8 +77,7 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
 
  #+clisp
  ;; as of CLISP 2.49, threads are experimental an disabled by default,
- ;; thus STMX compiles in single-thread mode
- ;; and does not use bt/with-lock and mem-rw-barriers.
+ ;; thus STMX compiles in single-thread mode, without using bt/with-lock and mem-rw-barriers.
  ;; On the other hand, define-constant-once and use-initialize-instance-before work.
  (set-features '(bt/with-lock nil)
                '(mem-rw-barriers nil)

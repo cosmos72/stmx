@@ -98,20 +98,6 @@ to terminate immediately the iterations and return zero or more values."
 
 
 
-(defmacro %tlist-ops (tlist op &rest next-ops)
-  (let ((op (case op
-              ((a car first) 'tcons-first)
-              ((d cdr rest) 'tcons-rest)
-              (otherwise op))))
-    `(when ,tlist
-       ,(if next-ops
-            (with-gensym tlist-
-              `(let ((,tlist- (,op ,tlist)))
-                 (%tlist-ops ,tlist- ,@next-ops)))
-            `(,op ,tlist)))))
-
-
-
 (declaim (inline tcar tcdr (setf tcar) (setf tcdr)))
 
 ;;; These functions perform basic tlist operations.
@@ -124,88 +110,143 @@ to terminate immediately the iterations and return zero or more values."
   (declare (type tlist list))
   (trest list))
 
+
 (defun (setf tcar) (value cons)
   "Set VALUE as the first element in a TCONS or non-null TLIST.
 
 This function should always be executed inside an STMX atomic block."
   (declare (type tcons cons))
-  (setf (tfirst cons) value))
+  (setf (tcons-first cons) value))
 
 (defun (setf tcdr) (value cons)
    "Set VALUE as the rest element in a TCONS or non-null TLIST.
 
 This function should always be executed inside an STMX atomic block."
   (declare (type tcons cons))
-  (setf (trest cons) value))
+  (setf (tcons-rest cons) value))
 
 
-(defun tcaar (list)
-  "Return the car of the 1st sublist."
-  (declare (type tlist list))
-  (%tlist-ops list a a))
-(defun tcadr (list)
-  "Return the 2nd object in a TLIST."
-  (declare (type tlist list))
-  (%tlist-ops list d a))
-(defun tcdar (list)
-  "Return the cdr of the 1st sublist."
-  (declare (type tlist list))
-  (%tlist-ops list a d))
-(defun tcddr (list)
-  "Return all but the 1st two objects of a TLIST."
-  (declare (type tlist list))
-  (%tlist-ops list d d))
 
 
-(defun tcaaar (list)
-  "Return the 1st object in the caar of a TLIST."
-  (declare (type tlist list))
-  (%tlist-ops list a a a))
-(defun tcaadr (list)
-  "Return the 1st object in the cadr of a TLIST."
-  (declare (type tlist list))
-  (%tlist-ops list d a a))
-(defun tcadar (list)
-  "Return the 1st object in the cdar of a TLIST."
-  (declare (type tlist list))
-  (%tlist-ops list a d a))
-(defun tcaddr (list)
-  "Return the 1st object in the cddr of a TLIST."
-  (declare (type tlist list))
-  (%tlist-ops list d d a))
-(defun tcdaar (list)
-  "Return the cdr of the caar of a TLIST."
-  (declare (type tlist list))
-  (%tlist-ops list a a d))
-(defun tcdadr (list)
-  "Return the cdr of the cadr of a TLIST."
-  (declare (type tlist list))
-  (%tlist-ops list d a d))
-(defun tcddar (list)
-  "Return the cdr of the cdar of a TLIST."
-  (declare (type tlist list))
-  (%tlist-ops list a d d))
-(defun tcdddr (list)
-  "Return the cdr of the cddr of a TLIST."
-  (declare (type tlist list))
-  (%tlist-ops list d d d))
+(defmacro %tlist-get (tlist op &rest next-ops)
+  (let ((op (case op
+              ((a car first) 'tcons-first)
+              ((d cdr rest) 'tcons-rest)
+              (otherwise op))))
+    `(when ,tlist
+       ,(if next-ops
+            (with-gensym tlist-
+              `(let ((,tlist- (,op ,tlist)))
+                 (%tlist-get ,tlist- ,@next-ops)))
+            `(,op ,tlist)))))
 
-(macrolet
-    ((def-tcxxxxr ()
-       (let ((forms))
-         (dolist (a0 '(a d))
-           (dolist (a1 '(a d))
-             (dolist (a2 '(a d))
-               (dolist (a3 '(a d))
-                 (push
-                  `(defun ,(symbolicate 'tc a0 a1 a2 a3 'r) (list)
-                     (declare (type tlist list))
-                     ,(format nil "Return the ~a~a~a of the ~a~a~a~a~a of a TLIST."
-                              'c a0 'r 'c a1 a2 a3 'r)
-                     (%tlist-ops list ,a3 ,a2 ,a1 ,a0))
-                  forms)))))
-         `(progn ,@(nreverse forms)))))
-  (def-tcxxxxr))
+
+
+(defun %%tlist-set (value tcons op next-ops)
+  (let ((op (case op
+              ((a car first) 'tcons-first)
+              ((d cdr rest) 'tcons-rest)
+              (otherwise op))))
+    ;; the slow, exact test is: (unless (tconsp ,tcons) ...)
+    ;; instead we only check for nil,
+    ;; relying on compiler's safety level for other non-TCONS
+    `((unless ,tcons 
+        (go type-error))
+      ,@(if next-ops
+            `((setf ,tcons (,op ,tcons))
+              ,@(%%tlist-set value tcons (first next-ops) (rest next-ops)))
+            `((setf (,op ,tcons) ,value))))))
+
+
+(defmacro %tlist-set (value tcons op &rest next-ops)
+  `(block nil
+     (tagbody
+        ,@(%%tlist-set value tcons op next-ops)
+        (return ,value)
+      type-error
+        (error 'type-error :datum ,tcons :expected-type 'tcons))))
+
+
+
+(eval-when (:compile-toplevel)
+
+  ;; defun tcaar tcadr tcdar tcddr and their setf
+  (defmacro %def-tcxxr ()
+    (let ((forms))
+      (dolist (a0 '(a d))
+        (dolist (a1 '(a d))
+          (setf
+           forms
+           (list*
+            `(defun (setf ,(symbolicate 'tc a0 a1 'r)) (value tlist)
+               ,(format nil "Set the ~a~a~a of the ~a~a~a of a TLIST.
+This function should always be executed inside an STMX atomic block."
+                        'c a0 'r 'c a1 'r)
+               (declare (type tlist tlist))
+               (%tlist-set value tlist ,a1 ,a0))
+            `(defun ,(symbolicate 'tc a0 a1 'r) (tlist)
+               ,(format nil "Return the ~a~a~a of the ~a~a~a of a TLIST."
+                        'c a0 'r 'c a1 'r)
+               (declare (type tlist tlist))
+               (%tlist-get tlist ,a1 ,a0))
+            forms))))
+      `(progn ,@(nreverse forms))))
+
+
+  ;; defun tcaaar tcaadr tcadar tcaddr tcdaar tcdadr tcddar tcdddr and their setf
+  (defmacro %def-tcxxxr ()
+    (let ((forms))
+      (dolist (a0 '(a d))
+        (dolist (a1 '(a d))
+          (dolist (a2 '(a d))
+            (setf
+             forms
+             (list*
+              `(defun (setf ,(symbolicate 'tc a0 a1 a2 'r)) (value tlist)
+                 ,(format nil "Set the ~a~a~a of the ~a~a~a~a of a TLIST.
+This function should always be executed inside an STMX atomic block."
+                          'c a0 'r 'c a1 a2 'r)
+                 (declare (type tlist tlist))
+                 (%tlist-set value tlist ,a2 ,a1 ,a0))
+              `(defun ,(symbolicate 'tc a0 a1 a2 'r) (tlist)
+                 ,(format nil "Return the ~a~a~a of the ~a~a~a~a of a TLIST."
+                          'c a0 'r 'c a1 a2 'r)
+                 (declare (type tlist tlist))
+                 (%tlist-get tlist ,a2 ,a1 ,a0))
+              forms)))))
+      `(progn ,@(nreverse forms))))
+
+
+  ;; defun tcaaaar tcaaadr tcaadar tcaaddr ... tcdddar tcddddr and their setf
+  (defmacro %def-tcxxxxr ()
+    (let ((forms))
+      (dolist (a0 '(a d))
+        (dolist (a1 '(a d))
+          (dolist (a2 '(a d))
+            (dolist (a3 '(a d))
+              (setf
+               forms
+               (list*
+                `(defun (setf ,(symbolicate 'tc a0 a1 a2 a3 'r)) (value tlist)
+                   ,(format nil "Set the ~a~a~a of the ~a~a~a~a~a of a TLIST.
+This function should always be executed inside an STMX atomic block."
+                            'c a0 'r 'c a1 a2 a3 'r)
+                   (declare (type tlist tlist))
+                   (%tlist-set value tlist ,a3 ,a2 ,a1 ,a0))
+                `(defun ,(symbolicate 'tc a0 a1 a2 a3 'r) (tlist)
+                   ,(format nil "Return the ~a~a~a of the ~a~a~a~a~a of a TLIST."
+                            'c a0 'r 'c a1 a2 a3 'r)
+                   (declare (type tlist tlist))
+                   (%tlist-get tlist ,a3 ,a2 ,a1 ,a0))
+                forms))))))
+      `(progn ,@(nreverse forms)))))
+
+(%def-tcxxr)
+(%def-tcxxxr)
+(%def-tcxxxxr)
+
+
+
 
 
 
@@ -263,42 +304,85 @@ This function should always be executed inside an STMX atomic block."
 
 (declaim (inline tsecond tthird tfourth tfifth tsixth tseventh teighth tninth ttenth))
 
-(defun tsecond (list)
+(defun tsecond (tlist)
   "Return the 2nd object in a TLIST or NIL if there is no 2nd object."
-  (declare (type tlist list))
-  (tcadr list))
-(defun tthird (list)
+  (declare (type tlist tlist))
+  (tcadr tlist))
+(defun tthird (tlist)
   "Return the 3rd object in a TLIST or NIL if there is no 3rd object."
-  (declare (type tlist list))
-  (tcaddr list))
-(defun tfourth (list)
+  (declare (type tlist tlist))
+  (tcaddr tlist))
+(defun tfourth (tlist)
   "Return the 4th object in a TLIST or NIL if there is no 4th object."
-  (declare (type tlist list))
-  (tcadddr list))
-(defun tfifth (list)
+  (declare (type tlist tlist))
+  (tcadddr tlist))
+(defun tfifth (tlist)
   "Return the 5th object in a TLIST or NIL if there is no 5th object."
-  (declare (type tlist list))
-  (tnth 4 list))
-(defun tsixth (list)
+  (declare (type tlist tlist))
+  (tnth 4 tlist))
+(defun tsixth (tlist)
   "Return the 6th object in a TLIST or NIL if there is no 6th object."
-  (declare (type tlist list))
-  (tnth 5 list))
-(defun tseventh (list)
+  (declare (type tlist tlist))
+  (tnth 5 tlist))
+(defun tseventh (tlist)
   "Return the 7th object in a TLIST or NIL if there is no 7th object."
-  (declare (type tlist list))
-  (tnth 6 list))
-(defun teighth (list)
+  (declare (type tlist tlist))
+  (tnth 6 tlist))
+(defun teighth (tlist)
   "Return the 8th object in a TLIST or NIL if there is no 8th object."
-  (declare (type tlist list))
-  (tnth 7 list))
-(defun tninth (list)
+  (declare (type tlist tlist))
+  (tnth 7 tlist))
+(defun tninth (tlist)
   "Return the 9th object in a TLIST or NIL if there is no 9th object."
-  (declare (type tlist list))
-  (tnth 8 list))
-(defun ttenth (list)
+  (declare (type tlist tlist))
+  (tnth 8 tlist))
+(defun ttenth (tlist)
   "Return the 10th object in a TLIST or NIL if there is no 10th object."
-  (declare (type tlist list))
-  (tnth 9 list))
+  (declare (type tlist tlist))
+  (tnth 9 tlist))
+
+
+(declaim (inline (setf tsecond) (setf tthird) (setf tfourth) (setf tfifth)
+                 (setf tsixth) (setf tseventh) (setf teighth) (setf tninth) (setf ttenth)))
+
+(defun (setf tsecond) (value tlist)
+  "Set the 2nd object in a TLIST."
+  (declare (type tlist tlist))
+  (setf (tcadr tlist) value))
+(defun (setf tthird) (value tlist)
+  "Set the 3rd object in a TLIST."
+  (declare (type tlist tlist))
+  (setf (tcaddr tlist) value))
+(defun (setf tfourth) (value tlist)
+  "Set the 4th object in a TLIST."
+  (declare (type tlist tlist))
+  (setf (tcadddr tlist) value))
+(defun (setf tfifth) (value tlist)
+  "Set the 5th object in a TLIST."
+  (declare (type tlist tlist))
+  (setf (tnth 4 tlist) value))
+(defun (setf tsixth) (value tlist)
+  "Set the 6th object in a TLIST."
+  (declare (type tlist tlist))
+  (setf (tnth 5 tlist) value))
+(defun (setf tseventh) (value tlist)
+  "Set the 7th object in a TLIST."
+  (declare (type tlist tlist))
+  (setf (tnth 6 tlist) value))
+(defun (setf teighth) (value tlist)
+  "Set the 8th object in a TLIST."
+  (declare (type tlist tlist))
+  (setf (tnth 7 tlist) value))
+(defun (setf tninth) (value tlist)
+  "Set the 9th object in a TLIST."
+  (declare (type tlist tlist))
+  (setf (tnth 8 tlist) value))
+(defun (setf ttenth) (value tlist)
+  "Set the 10th object in a TLIST."
+  (declare (type tlist tlist))
+  (setf (tnth 9 tlist) value))
+
+
 
 
 

@@ -1,4 +1,4 @@
-;;;; functions to implement lists
+;;;; functions to implement lists-based sets
 
 ;;;; This software is derived from the SBCL system.
 ;;;; See the README.SBCL file for more information.

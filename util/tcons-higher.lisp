@@ -1,4 +1,4 @@
-;;;; functions to implement lists
+;;;; functions to implement list-based higher order functions
 
 ;;;; This software is derived from the SBCL system.
 ;;;; See the README.SBCL file for more information.

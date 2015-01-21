@@ -48,12 +48,11 @@ The effect is the same as DEFUN - or DEFMETHOD - plus:
         ,@declarations
      
         (atomic
-         ,(if (symbolp func-name)
-              ;; support (return-from ,func-name ...)
-              `(block ,func-name
-                 ,@body)
-              `(progn
-                 ,@body))))))
+         ;; support (return-from ,func-name ...)
+         (block ,(if (consp func-name)
+                     (second func-name)
+                     func-name)
+           ,@body)))))
 
 
 

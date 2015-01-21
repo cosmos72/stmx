@@ -141,21 +141,21 @@ This function should always be executed inside an STMX atomic block."
             `(,op ,tlist)))))
 
 
-
-(defun %%tlist-set (value tcons op next-ops)
-  (let ((op (case op
-              ((a car first) 'tcons-first)
-              ((d cdr rest) 'tcons-rest)
-              (otherwise op))))
-    ;; the slow, exact test is: (unless (tconsp ,tcons) ...)
-    ;; instead we only check for nil,
-    ;; relying on compiler's safety level for other non-TCONS
-    `((unless ,tcons 
-        (go type-error))
-      ,@(if next-ops
-            `((setf ,tcons (,op ,tcons))
-              ,@(%%tlist-set value tcons (first next-ops) (rest next-ops)))
-            `((setf (,op ,tcons) ,value))))))
+(eval-when (:compile-toplevel)
+  (defun %%tlist-set (value tcons op next-ops)
+    (let ((op (case op
+                ((a car first) 'tcons-first)
+                ((d cdr rest) 'tcons-rest)
+                (otherwise op))))
+      ;; the slow, exact test is: (unless (tconsp ,tcons) ...)
+      ;; instead we only check for nil,
+      ;; relying on compiler's safety level for other non-TCONS
+      `((unless ,tcons 
+          (go type-error))
+        ,@(if next-ops
+              `((setf ,tcons (,op ,tcons))
+                ,@(%%tlist-set value tcons (first next-ops) (rest next-ops)))
+              `((setf (,op ,tcons) ,value)))))))
 
 
 (defmacro %tlist-set (value tcons op &rest next-ops)
@@ -169,7 +169,6 @@ This function should always be executed inside an STMX atomic block."
 
 
 (eval-when (:compile-toplevel)
-
   ;; defun tcaar tcadr tcdar tcddr and their setf
   (defmacro %def-tcxxr ()
     (let ((forms))
@@ -612,27 +611,27 @@ This function should always be executed inside an STMX atomic block."
 
 
 
-(defun copy-tlist-tree (object)
+(defun copy-ttree (tree)
   "Recursively copy trees of TCONSes."
-  (if (tconsp object)
-      (let ((result (tlist (let ((car (tcons-first object)))
+  (if (tconsp tree)
+      (let ((result (tlist (let ((car (tcons-first tree)))
                              (if (tconsp car)
-                                 (copy-tlist-tree car)
+                                 (copy-ttree car)
                                  car)))))
         (loop
            for last-cons = result then new-cons
-           for cdr = (tcons-rest object) then (tcons-rest cdr)
+           for cdr = (tcons-rest tree) then (tcons-rest cdr)
            for car = (if (tconsp cdr)
                          (tcons-first cdr)
                          (return (setf (trest last-cons) cdr)))
            for new-cons = (tlist (if (tconsp car)
-                                     (copy-tlist-tree car)
+                                     (copy-ttree car)
                                      car))
            do (setf (trest last-cons) new-cons))
         result)
-      object))
+      tree))
 
-#|
+#-(and) ;; TODO
 (defun copy-alist (alist)
   "Return a new association list which is EQUAL to ALIST."
   (if (endp alist)
@@ -655,14 +654,71 @@ This function should always be executed inside an STMX atomic block."
 
 
 
-
-;;;; more commonly-used list functions
+;;;; sequence functions
 
-(defun revappend (x y)
-  "Return (append (reverse x) y)."
-  (do ((top x (cdr top))
-       (result y (cons (car top) result)))
-      ((endp top) result)))
+
+(defgeneric treverse (x)
+  (:documentation
+   "Return a new transactional sequence containing the same elements but in reverse order."))
+
+(defmethod treverse ((x (eql nil)))
+  nil)
+
+(defmethod treverse ((x tcons))
+  (declare (type tcons x))
+  (let ((copy))
+    (do-tlist (obj x)
+      (tpush obj copy))
+    copy))
+
+
+
+(defgeneric tnreverse (x)
+  (:documentation
+   "Return a transactional sequence of the same elements in reverse order;
+  the argument is destroyed."))
+
+(defmethod tnreverse ((x (eql nil)))
+  nil)
+
+(defmethod tnreverse ((x tcons))
+  #-(and)
+  (loop 
+     for top = x then curr
+     for curr = (prog1 (tcons-rest x)
+                  (setf (tcons-rest x) nil)) then next
+     with next
+     until (tendp curr)
+     do
+       (setf next (tcons-rest curr)
+             (tcons-rest curr) top)
+     finally (return top))
+
+  ;; equivalent to loop above, shorter compiled code on SBCL
+  #+(and)
+  (do ((top x curr)
+       (curr (prog1 (tcons-rest x) (setf (tcons-rest x) nil))
+             next)
+       (next))
+      ((tendp curr) top)
+    
+    (setf next (tcons-rest curr)
+          (tcons-rest curr) top)))
+
+             
+         
+  
+;;;; list functions
+
+
+(defun trevappend (x y)
+  "Return (tappend (treverse x) y)."
+  (declare (type tlist x y))
+  (do ((top x (tcdr top))
+       (result y (tcons (tcar top) result)))
+      ((tendp top) result)))
+
+#| TODO
 
 ;;; NCONC finds the first non-null list, so it can make splice point
 ;;; to a cons. After finding the first cons element, it holds it in a
@@ -705,15 +761,17 @@ This function should always be executed inside an STMX atomic block."
             (if (cdr top)
                 (fail top-of-top)
                 (return top-of-top))))))))
+|#
 
-(defun nreconc (x y)
-  "Return (NCONC (NREVERSE X) Y)."
-  (do ((1st (cdr x) (if (endp 1st) 1st (cdr 1st)))
+(defun tnreconc (x y)
+  "Return (TNCONC (TNREVERSE X) Y)."
+  (do ((1st (tcdr x) (if (tendp 1st) 1st (tcdr 1st)))
        (2nd x 1st)              ;2nd follows first down the list.
        (3rd y 2nd))             ;3rd follows 2nd down the list.
-      ((atom 2nd) 3rd)
-    (rplacd 2nd 3rd)))
-
+      ((tatom 2nd) 3rd)
+    (trplacd 2nd 3rd)))
+
+#|
 (defun butlast (list &optional (n 1))
   (cond ((zerop n)
          (copy-list l))
@@ -748,22 +806,24 @@ This function should always be executed inside an STMX atomic block."
                     ((atom (cdr head))
                      (setf (cdr trail) nil)
                      l)))))))
+|#
 
-(defun ldiff (list object)
-  "Return a new list, whose elements are those of LIST that appear before
-   OBJECT. If OBJECT is not a tail of LIST, a copy of LIST is returned.
-   LIST must be a proper list or a dotted list."
-  (do* ((list list (cdr l))
-        (result (list ()))
+(defun tldiff (tlist object)
+  "Return a new tlist, whose elements are those of TLIST that appear before
+   OBJECT. If OBJECT is not a tail of TLIST, a copy of TLIST is returned.
+   TLIST must be a proper tlist or a dotted tlist."
+  (do* ((tlist tlist (tcdr tlist))
+        (result (tlist ()))
         (splice result))
-       ((atom l)
-        (if (eql list object)
-            (cdr result)
-            (progn (rplacd splice l) (cdr result))))
-    (if (eql list object)
-        (return (cdr result))
-        (setq splice (cdr (rplacd splice (list (car l))))))))
-
+       ((tatom tlist)
+        (if (eql tlist object)
+            (tcdr result)
+            (progn (trplacd splice tlist) (tcdr result))))
+    (if (eql tlist object)
+        (return (tcdr result))
+        (setf splice (tcdr (trplacd splice (tlist (tcar tlist))))))))
+
+#|
 ;;;; :KEY arg optimization to save funcall of IDENTITY
 
 ;;; APPLY-KEY saves us a function call sometimes.
@@ -773,7 +833,7 @@ This function should always be executed inside an STMX atomic block."
   `(if ,key
        (funcall ,key ,element)
        ,element))
-
+
 ;;;; macros for (&KEY (KEY #'IDENTITY) (TEST #'EQL TESTP) (TEST-NOT NIL NOTP))
 
 ;;; Use these with the following &KEY args:
@@ -788,7 +848,7 @@ This function should always be executed inside an STMX atomic block."
       (cond (testp (funcall test ,item ,key-tmp))
             (notp (not (funcall test-not ,item ,key-tmp)))
             (t (funcall test ,item ,key-tmp))))))
-
+
 ;;;; substitution of expressions
 
 (defun subst (new old tree &key key (test #'eql testp) (test-not #'eql notp))
@@ -897,7 +957,7 @@ This function should always be executed inside an STMX atomic block."
                               (setf (car subtree) (s (car subtree)))))
                         subtree))))
       (s tree))))
-
+
 (defun sublis (alist tree &key key (test #'eql testp) (test-not #'eql notp))
   "Substitute from ALIST into TREE nondestructively."
   (when (and testp notp)
@@ -954,7 +1014,7 @@ This function should always be executed inside an STMX atomic block."
                                 (setf (car subtree) (s (car subtree)))))
                           subtree))))
         (s tree)))))
-
+
 ;;;; functions for using lists as sets
 
 (defun member (item list &key key (test nil testp) (test-not nil notp))
@@ -1268,22 +1328,26 @@ This function should always be executed inside an STMX atomic block."
       (unless (with-set-keys (member (apply-key key elt) list2))
         (return-from subsetp nil)))
     t))
-
+|#
+
 ;;;; functions that operate on association lists
 
-(defun acons (key datum alist)
-  "Construct a new alist by adding the pair (KEY . DATUM) to ALIST."
-  (cons (cons key datum) alist))
+(defun tacons (key datum talist)
+  "Construct a new talist by adding the pair (KEY . DATUM) to TALIST."
+  (declare (type tlist talist))
+  (tcons (tcons key datum) talist))
 
-(defun pairlis (keys data &optional (alist '()))
-  "Construct an association list from KEYS and DATA (adding to ALIST)."
-  (do ((x keys (cdr x))
-       (y data (cdr y)))
-      ((and (endp x) (endp y)) alist)
-    (if (or (endp x) (endp y))
+(defun tpairlis (keys data &optional talist)
+  "Construct an association list from KEYS and DATA (adding to TALIST)."
+  (declare (type tlist talist))
+  (do ((x keys (tcdr x))
+       (y data (tcdr y)))
+      ((and (tendp x) (tendp y)) talist)
+    (if (or (tendp x) (tendp y))
         (error "The lists of keys and data are of unequal length."))
-    (setq alist (acons (car x) (car y) alist))))
+    (setf talist (tacons (tcar x) (tcar y) talist))))
 
+#|
 (defun assoc (item alist &key key (test nil testp) (test-not nil notp))
   "Return the cons in ALIST whose car is equal (by a given test or EQL) to
    the ITEM."
@@ -1362,7 +1426,8 @@ This function should always be executed inside an STMX atomic block."
     (if key
         (%rassoc-if-not-key predicate alist key)
         (%rassoc-if-not predicate alist))))
-
+|#
+
 ;;;; mapping functions
 
 ;;; a helper function for implementation of MAPC, MAPCAR, MAPCAN,
@@ -1372,53 +1437,54 @@ This function should always be executed inside an STMX atomic block."
 ;;; way. It is done when any of the arglists runs out. Until then, it
 ;;; CDRs down the arglists calling the function and accumulating
 ;;; results as desired.
-(defun map1 (fun-designator original-arglists accumulate take-car)
-  (let ((fun (%coerce-callable-to-fun fun-designator)))
-    (let* ((arglists (copy-list original-arglists))
-           (ret-list (list nil))
+(defun %tmap1 (fun-designator original-arglists accumulate take-car)
+  (let ((fun (fdefinition fun-designator)))
+    (let* ((arglists (copy-tlist original-arglists))
+           (ret-list (tlist nil))
            (temp ret-list))
       (do ((res nil)
-           (args '() '()))
+           (args nil nil))
           ((dolist (x arglists nil) (if (null x) (return t)))
            (if accumulate
-               (cdr ret-list)
-               (car original-arglists)))
-        (do ((l arglists (cdr l)))
+               (tcdr ret-list)
+               (tcar original-arglists)))
+        (do ((l arglists (tcdr l)))
             ((null l))
-          (push (if take-car (caar l) (car l)) args)
-          (setf (car l) (cdar l)))
-        (setq res (apply fun (nreverse args)))
+          (tpush (if take-car (tcaar l) (tcar l)) args)
+          (setf (tcar l) (tcdar l)))
+        (setq res (apply fun (tnreverse args)))
         (case accumulate
-          (:nconc (setq temp (last (nconc temp res))))
-          (:list (rplacd temp (list res))
-                 (setq temp (cdr temp))))))))
+          (:nconc (setf temp (tlast (tnconc temp res))))
+          (:list (trplacd temp (tlist res))
+                 (setf temp (tcdr temp))))))))
 
-(defun mapc (function list &rest more-lists)
+(defun tmapc (function list &rest more-lists)
   "Apply FUNCTION to successive elements of lists. Return the second argument."
-  (map1 function (cons list more-lists) nil t))
+  (%tmap1 function (cons list more-lists) nil t))
 
-(defun mapcar (function list &rest more-lists)
+(defun tmapcar (function list &rest more-lists)
   "Apply FUNCTION to successive elements of LIST. Return list of FUNCTION
    return values."
-  (map1 function (cons list more-lists) :list t))
+  (%tmap1 function (cons list more-lists) :list t))
 
-(defun mapcan (function list &rest more-lists)
+(defun tmapcan (function list &rest more-lists)
   "Apply FUNCTION to successive elements of LIST. Return NCONC of FUNCTION
    results."
-  (map1 function (cons list more-lists) :nconc t))
+  (%tmap1 function (cons list more-lists) :nconc t))
 
-(defun mapl (function list &rest more-lists)
+(defun tmapl (function list &rest more-lists)
   "Apply FUNCTION to successive CDRs of list. Return NIL."
-  (map1 function (cons list more-lists) nil nil))
+  (%tmap1 function (cons list more-lists) nil nil))
 
-(defun maplist (function list &rest more-lists)
+(defun tmaplist (function list &rest more-lists)
   "Apply FUNCTION to successive CDRs of list. Return list of results."
-  (map1 function (cons list more-lists) :list nil))
+  (%tmap1 function (cons list more-lists) :list nil))
 
-(defun mapcon (function list &rest more-lists)
+(defun tmapcon (function list &rest more-lists)
   "Apply FUNCTION to successive CDRs of lists. Return NCONC of results."
-  (map1 function (cons list more-lists) :nconc nil))
+  (%tmap1 function (cons list more-lists) :nconc nil))
 
+#|
 ;;;; Specialized versions
 
 ;;; %ADJOIN-*, %ASSOC-*, %MEMBER-*, and %RASSOC-* functions. Deftransforms

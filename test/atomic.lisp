@@ -111,24 +111,44 @@
     (is (= ($ var) 1))))
 
 
+;; test (return-from function-name) used inside (transaction (defun ...))
+
 (transaction
- (defun transaction-return-from-setf (var value &key return-from?)
+ (defun transaction-return-from (var value &key return-from?)
    (declare (type tvar var)
+            (type fixnum value)
             (type boolean return-from?))
    (when return-from?
-     (return-from transaction-return-from-setf (setf ($ var) value)))
-   (setf ($ var) value)))
-     
-     
+     (return-from transaction-return-from (setf ($ var) value)))
+   (setf ($ var) (- value))))
 
+
+(transaction
+ (defun (setf transaction-return-from) (value var &key return-from?)
+   (declare (type tvar var)
+            (type fixnum value)
+            (type boolean return-from?))
+   (when return-from?
+     (return-from transaction-return-from (setf ($ var) value)))
+   (setf ($ var) (- value))))
+
+     
 (def-test transaction-return-from (:compile-at :definition-time)
   (let1 var (tvar 1)
     
-    (transaction-return-from-setf var 2 :return-from? nil)
-    (is (= 2 ($ var)))
+    (transaction-return-from var 2 :return-from? nil)
+    (is (= -2 ($ var)))
 
-    (transaction-return-from-setf var 3 :return-from? t)
-    (is (= 3 ($ var)))))
+    (transaction-return-from var 3 :return-from? t)
+    (is (= 3 ($ var)))
+
+    (setf (transaction-return-from var :return-from? nil) 4)
+    (is (= -4 ($ var)))
+
+    (setf (transaction-return-from var :return-from? t) 5)
+    (is (= 5 ($ var)))))
+
+    
 
     
   

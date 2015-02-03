@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -20,7 +20,7 @@
 
 
 
-(test new-txhash
+(def-test new-txhash (:compile-at :definition-time)
   (let1 h (make-txhash-table)
     (is (= 0 (txhash-table-count h)))
     (do-txhash (key value) h
@@ -96,7 +96,7 @@
         (is-equal-txhash-and-hash-table txh hash pred)))))
            
 
-(test txhash
+(def-test txhash (:compile-at :definition-time)
   (test-txhash #'tvar>))
 
 

@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -42,7 +42,8 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
  #+ccl
  (set-features '(bt/lock-owner ccl::%%lock-owner)
                #+x86 '(mem-rw-barriers nil) ;; causes "bogus object" errors.
-               '(define-constant-once nil)) ;; causes deadlocks
+               '(define-constant-once nil) ;; causes deadlocks
+               'initialize-instance-calls-slot-value-using-class)
                
  #+cmucl
  (set-features '(bt/lock-owner mp::lock-process))
@@ -62,19 +63,53 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
                ;; its own mutex-owner, without resorting to bt/lock-owner
                '(bt/lock-owner sb-thread::mutex-owner)
 
-               #?+(symbol sb-ext defglobal) '(define-global sb-ext:defglobal)))
+               #?+(symbol sb-ext defglobal) '(define-global sb-ext:defglobal)
 
-
-
+               'initialize-instance-calls-slot-value-using-class))
 
 
 
 
 (eval-always
-
-  (default-feature 'bt/with-lock :fast)
-
   (default-feature 'define-constant-once)
+
+  (flet ((list-args (&rest list) list))
+    (let* ((x '(1 2 3 4))
+           (y (apply #'list-args x)))
+      (set-feature '&rest-is-fresh-list (not (eq x y)))))
+
+  ;; (1+ most-positive-fixnum) is a power of two?
+  (set-feature 'fixnum-is-powerof2
+               (zerop (logand most-positive-fixnum (1+ most-positive-fixnum))))
+
+  ;; fixnum is large enough to count 20 million transactions
+  ;; per second for at least 50 years?
+  (set-feature 'fixnum-is-large
+               (>= most-positive-fixnum #x7fffffffffffff))
+
+  ;; both the above two features
+  (set-feature 'fixnum-is-large-powerof2
+               (all-features 'fixnum-is-large 'fixnum-is-powerof2)))
+
+
+              
+
+;; fix features if no thread support
+#?-bt/make-thread
+(eval-always
+  (set-features '(mem-rw-barriers :trivial)
+		'(atomic-ops      nil)
+		'(bt/with-lock    :single-thread)
+		'(bt/lock-owner   :single-thread)
+		'(mutex-owner     :single-thread)
+		'(fast-mutex      :single-thread)
+		'(tvar-lock       :single-thread)))
+
+
+
+;; detect and compose features
+(eval-always
+  (default-feature 'bt/with-lock :fast)
 
   ;; on x86 and x86_64, memory read-after-read and write-after-write barriers
   ;; are NOP (well, technically except for SSE)
@@ -101,7 +136,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
   ;; FAST-MUTEX requires atomic compare-and-swap plus *real* memory barriers.
   ;; Also, fast-mutex provides the preferred implementation of mutex-owner,
   ;;   which does not use bt/lock-owner
-  (when (all-features? 'atomic-ops 'mem-rw-barriers)
+  (when (all-features 'atomic-ops 'mem-rw-barriers)
     (unless (eql (get-feature 'mem-rw-barriers) :trivial)
       (default-features 'fast-mutex
                         '(mutex-owner :fast-mutex))))
@@ -109,7 +144,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
 
   ;; if mem-rw-barriers (even trivial ones) are available, bt/lock-owner
   ;; can be used as concurrency-safe mutex-owner even without atomic-ops
-  (when (all-features? 'mem-rw-barriers 'bt/lock-owner)
+  (when (all-features 'mem-rw-barriers 'bt/lock-owner)
     (default-feature 'mutex-owner :bt/lock-owner))
 
 
@@ -119,7 +154,8 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
   ;; 2) memory barriers (even trivial ones will do)
   ;; 3) mutex-owner
   ;;
-  (when (all-features? 'mem-rw-barriers 'mutex-owner)
+  (default-feature 'hw-transactions nil)
+  (when (all-features 'mem-rw-barriers 'mutex-owner)
     ;; do we also have the sb-transaction package exposing CPU hardware transactions?
     #?+(symbol sb-transaction transaction-supported-p)
     ;; good, and does the current CPU actually support hardware transactions?
@@ -127,19 +163,6 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
       ;; yes. start the turbines.
       (set-feature 'hw-transactions :sb-transaction)))
 
-
-  ;; (1+ most-positive-fixnum) is a power of two?
-  (set-feature 'fixnum-is-powerof2
-               (zerop (logand most-positive-fixnum (1+ most-positive-fixnum))))
-
-  ;; fixnum is large enough to count 20 million transactions
-  ;; per second for at least 50 years?
-  (set-feature 'fixnum-is-large
-               (>= most-positive-fixnum #x7fffffffffffff))
-
-  ;; both the above two features
-  (set-feature 'fixnum-is-large-powerof2
-               (all-features? 'fixnum-is-large 'fixnum-is-powerof2))
 
 
   ;; which kind of locking shall we use for TVARs?
@@ -150,9 +173,9 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
   ;;
   ;; The second and much slower choice is to use mutexes; in such case
   ;; define the feature TVAR-LOCK to :MUTEX
-  (if (all-features? 'fast-mutex 'fixnum-is-powerof2)
-      (set-feature 'tvar-lock :bit)
-      (set-feature 'tvar-lock :mutex))
+  (if (all-features 'fast-mutex 'fixnum-is-powerof2)
+      (default-feature 'tvar-lock :bit)
+      (default-feature 'tvar-lock :mutex))
   
 
   ;; atomic counters are (almost) 64 bit.
@@ -160,7 +183,7 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
   ;; atomic counters use them and do not need locking.
   ;; otherwise, atomic counters will need locking (using mutexes)
   (set-feature 'fast-atomic-counter
-               (all-features? 'atomic-ops 'mem-rw-barriers 'fixnum-is-large-powerof2))
+               (all-features 'atomic-ops 'mem-rw-barriers 'fixnum-is-large-powerof2))
 
 
 

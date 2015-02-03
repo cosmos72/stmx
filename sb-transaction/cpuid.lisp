@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of SB-TRANSACTION.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -86,7 +86,13 @@ Intel Core i7 4770K, do **NOT** support RTM."
 
 #|
 (defmacro word->extract-byte (word offset)
-  `(ldb (byte 8 (ash ,offset 3)) (the (unsigned-byte 32) ,word)))
+  `(ldb (byte 8 (ash (the (integer 0 3) ,offset) 3))
+	(the (unsigned-byte 32) ,word)))
+
+(defmacro word->extract-byte (word offset)
+  `(logand #xff
+	   (ash (the (unsigned-byte 32) ,word)
+		(* -8 (the (integer 0 3) ,offset)))))
 
 (defun cpuid-vendor ()
   (multiple-value-bind (eax ebx ecx edx) (cpuid 0)

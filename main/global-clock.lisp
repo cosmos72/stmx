@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; this file is part of stmx.
-;; copyright (c) 2013 massimiliano ghilardi
+;; copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; this library is free software: you can redistribute it and/or
 ;; modify it under the terms of the lisp lesser general public license
@@ -70,7 +70,7 @@ is reserved as \"prevent HW transactions\"")
 
 
 (declaim (type lv156 *lv*))
-(defvar *lv* (make-lv156))
+(defparameter *lv* (make-lv156))
 (eval-always
  (ensure-thread-initial-binding '*lv* '(make-lv156)))
 
@@ -193,7 +193,8 @@ Return the current +gv+ value."
 
 ;; define stub macros (GV5/STAT-COMMITTED) (GV5/STAT-ABORTED)
 ;; (GV1/GET-NOHW-COUNTER) (GV1/INCF-NOHW-COUNTER) and (GV1/DECF-NOHW-COUNTER) 
-(gvx-add-missing gv1)
+(eval-always
+  (gvx-add-missing gv1))
 
 
 
@@ -274,7 +275,8 @@ Decrement by DELTA the slot NOHW-COUNTER of +gv+ and return its new value."
 
 ;; define stub macros (GV5/{HW,SW}/STAT-COMMITTED)
 ;; and (GV5/{HW,SW}/STAT-ABORTED)
-(gvx-add-missing gv5)
+(eval-always
+  (gvx-add-missing gv5))
 
 
 

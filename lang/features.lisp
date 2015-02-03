@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -28,29 +28,28 @@
        f
        (the keyword (intern (symbol-name f) :keyword))))
 
+ (defun assoc-feature (f)
+   "Return (list F VALUE) if F is present in *FEATURE-LIST*"
+   (declare (type symbol f))
+   (assoc (intern-feature f) *feature-list*))
+
  (defun get-feature (f &optional default)
    "Return value of F in *FEATURE-LIST* and T, or (values DEFAULT NIL) if not present
 or has NIL value."
    (declare (type symbol f))
-   (let ((value (second (assoc (intern-feature f) *feature-list*))))
+   (let ((value (second (assoc-feature f))))
      (if value
          (values value   t)
          (values default nil))))
 
- (defun feature? (f)
-   "Return T if F is present in *FEATURE-LIST*"
-   (declare (type symbol f))
-   (when (assoc (intern-feature f) *feature-list*)
-     t))
-
- (defun all-features? (&rest list)
+ (defun all-features (&rest list)
    "Return T if all features from LIST are present in *FEATURE-LIST*
 and have non-NIL value."
    (declare (type list list))
    (loop for f in list
       always (get-feature f)))
 
- (defun any-feature? (&rest list)
+ (defun some-features (&rest list)
    "Return T if at least one feature from LIST is present in *FEATURE-LIST*
 and have non-NIL value."
    (declare (type list list))
@@ -61,7 +60,7 @@ and have non-NIL value."
    "Remove feature F from *FEATURE-LIST*.
 Return T if F was present *FEATURE-LIST*, otherwise return NIL."
    (declare (type symbol f))
-   (when (feature? f)
+   (when (assoc-feature f)
      (let1 f (intern-feature f)
        (setf *feature-list*
              (delete-if (lambda (pair) (eql f (first pair)))
@@ -77,11 +76,12 @@ Return T if F was present *FEATURE-LIST*, otherwise return NIL."
 Return (values T VALUE) if F was actually inserted in *FEATURE-LIST*,
 otherwise return NIL and the value already present in *FEATURE-LIST*."
    (declare (type symbol f))
-   (if (feature? f)
-       (values nil (get-feature f))
-       (progn
-         (push (list (intern-feature f) value) *feature-list*)
-         (values t value))))
+   (let ((v (assoc-feature f)))
+     (if v
+         (values nil (rest v))
+         (progn
+           (push (list (intern-feature f) value) *feature-list*)
+           (values t value)))))
 
  (defun default-features (&rest alist)
    "Set the value of each feature in ALIST, unless the feature is already

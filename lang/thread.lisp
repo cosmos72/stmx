@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -51,10 +51,10 @@
 ;;;; * the return value of functions executed in threads
 
 (declaim (type t *current-thread*))
-(defvar *current-thread* (current-thread))
+(defparameter *current-thread* (current-thread))
 
 (eval-always
-  (ensure-thread-initial-bindings '(*current-thread* . (current-thread)))
+  (ensure-thread-initial-binding '*current-thread* '(current-thread))
 
   (defun start-multithreading ()
     ;; on CMUCL, (bt:start-multiprocessing) is blocking!
@@ -62,16 +62,37 @@
 
   (start-multithreading)
 
-  (defvar *bt/join-thread/tested* nil)
+  ;; testing (get-feature 'bt/join-thread) signals an error on CMUCL :(
+  (defvar *bt/threads/tested* nil)
 
-  ;; testing (feature? 'bt/join-thread) signals an error on CMUCL :(
-  (unless *bt/join-thread/tested*
-    (setf *bt/join-thread/tested* t)
-    (set-feature 'bt/join-thread
-                 (let ((x (gensym)))
-                   (if (eq x (bt:join-thread (bt:make-thread (lambda () x))))
-                       :sane
-                       :broken)))))
+  ;; test for multi-threading support:
+  ;; BT:*SUPPORTS-THREADS-P* must be non-NIL,
+  ;; and (BT:MAKE-THREAD) and (BT:JOIN-THREAD) must work
+  (unless *bt/threads/tested*
+    (setf *bt/threads/tested* t)
+
+    (if #+stmx/disable-threads nil
+        #-stmx/disable-threads bt:*supports-threads-p*
+
+        (progn
+          (set-feature 'bt/make-thread t)
+          (set-feature 'bt/join-thread
+                       (if (let ((x (gensym)))
+                             (eq x (bt:join-thread (bt:make-thread (lambda () x)))))
+                           :sane
+                           :broken)))
+        (progn
+          #+stmx/disable-threads
+          (log:warn "Warning: compiling STMX without multi-threading support.
+    reason: feature :STMX/DISABLE-THREADS found in CL:*FEATURES*")
+
+          #-stmx/disable-threads
+          (log:warn "Warning: compiling STMX without multi-threading support.
+    reason: BORDEAUX-THREADS:*SUPPORTS-THREADS-P* is NIL")
+(set-feature 'bt/make-thread nil)
+          ;; if no thread support, no need to wrap threads to collect their exit value
+          (set-feature 'bt/join-thread :sane)))))
+
 
 
 
@@ -84,26 +105,37 @@
 
 (defun start-thread (function &key name (initial-bindings bt:*default-special-bindings*))
 
-  #?+(eql bt/join-thread :sane)
-  (make-thread function :name name :initial-bindings initial-bindings)
+  #?-bt/make-thread
+  (error "STMX compiled without multi-threading support, cannot start a new thread")
 
-  #?-(eql bt/join-thread :sane)
-  (let1 th (make-wrapped-thread)
-        (setf (wrapped-thread-thread th)
-              (make-thread (lambda ()
-                             (setf (wrapped-thread-result th)
-                                   (funcall function)))
-                           :name name
-                           :initial-bindings initial-bindings))
-        th))
+  #?+bt/make-thread
+  (progn
+    
+    #?+(eql bt/join-thread :sane)
+    (make-thread function :name name :initial-bindings initial-bindings)
+
+    #?-(eql bt/join-thread :sane)
+    (let ((th (make-wrapped-thread)))
+      (setf (wrapped-thread-thread th)
+            (make-thread (lambda ()
+                           (setf (wrapped-thread-result th)
+                                 (funcall function)))
+                         :name name
+                         :initial-bindings initial-bindings))
+      th)))
 
 (defun wait4-thread (th)
 
-  #?+(eql bt/join-thread :sane)
-  (join-thread th)
+  #?-bt/make-thread
+  (error "STMX compiled without multi-threading support, cannot wait for a thread")
 
-  #?-(eql bt/join-thread :sane)
+  #?+bt/make-thread
   (progn
-    (join-thread (wrapped-thread-thread th))
-    (wrapped-thread-result th)))
+    #?+(eql bt/join-thread :sane)
+    (join-thread th)
+
+    #?-(eql bt/join-thread :sane)
+    (progn
+      (join-thread (wrapped-thread-thread th))
+      (wrapped-thread-result th))))
 

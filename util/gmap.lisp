@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -30,33 +30,41 @@
 
 (defclass gmap ()
   ;; allow ROOT to also be a TVAR, otherwise subclass TMAP cannot work
-  ((root  :initform nil  :type (or null gmap-node tvar) :accessor root-of)
-   (pred  :initarg :pred :type function             :accessor pred-of
-          :initform (error "missing :pred argument instantiating ~A or a subclass" 'gmap))
+  ((root     :initform nil :type (or null gmap-node tvar))
+   (pred-func              :type function                 :reader pred-function-of)
    ;; allow COUNT to also be a TVAR, otherwise subclass TMAP cannot work
-   (count :initform 0    :type (or fixnum tvar)     :accessor count-of))
+   (count    :initform 0   :type (or fixnum tvar)         :reader count-of)
+   (pred-sym :initform nil :type symbol   :initarg :pred  :reader pred-of))
   (:documentation "Generic binary tree"))
 
 
 
 (let1 gmap-class (find-class 'gmap)
   (defmethod make-instance ((class (eql gmap-class)) &rest initargs &key &allow-other-keys)
-    "GMAP is not supposed to be instantiated directly. For this reason,
+    "Only GMAP subclasses can be instantiated, GMAP cannot. For this reason,
 \(make-instance 'gmap ...) will signal an error. Many Lispers may consider this
 bad style; I prefer to be notified early if I try to do something plainly wrong."
     (declare (ignore initargs))
     (error "Cannot instantiate abstract class ~A" class)))
 
 
+(defmethod initialize-instance :after ((m gmap) &key &allow-other-keys)
+  (with-ro-slots (pred-sym) m
+    (unless pred-sym
+      (error "missing ~S argument instantiating ~A" :pred (type-of m)))
+    (check-type pred-sym symbol)
+    (setf (_ m pred-func) (fdefinition pred-sym))))
+
+  
 
 
 ;;;; ** Public API
 
 
 (defun gmap-pred (m)
-  "Return predicate used by binary tree M to sort keys."
+  "Return the predicate symbol used by binary tree M to sort keys."
   (declare (type gmap m))
-  (the function (_ m pred)))
+  (the symbol (_ m pred-sym)))
 
 
 (defun gmap-count (m)
@@ -73,69 +81,69 @@ bad style; I prefer to be notified early if I try to do something plainly wrong.
 
 
 
-(defgeneric rem-gmap (m key)
-  (:documentation "Find and remove KEY and its associated value from binary tree M.
-Return t if KEY was removed, nil if not found."))
-
-
-(defgeneric clear-gmap (m)
-  (:documentation "Remove all keys and values from M. Return M."))
-
-
-(defgeneric add-to-gmap (m &rest keys-and-values)
-  (:documentation "N-ary version of SET-GMAP and (SETF (GET-GMAP ...) ...):
-Given a list of alternating keys and values,
-add or replace each of them into M. Return M."))
-
-
-(defgeneric remove-from-gmap (m &rest keys)
-  (:documentation "N-ary version of REM-GMAP:
-remove a list of keys from M. Return M."))
 
 
 
-(defgeneric min-gmap (m)
-  (:documentation "Return the smallest key in binary tree M, its value, and t as multiple values,
-or (values nil nil nil) if M is empty."))
 
-(defgeneric max-gmap (m)
-  (:documentation "Return the largest key in binary tree M, its value, and t as multiple values,
-or (values nil nil nil) if M is empty."))
+
+
+
+
+(defun fwd-traverse-gmap-at (m node func)
+  (declare (type gmap m)
+           (type (or null gmap-node) node)
+           (type function func))
+  (unless node
+    (return-from fwd-traverse-gmap-at nil))
   
+  (fwd-traverse-gmap-at m (_ node left) func)
+  (funcall func (_ node key) (_ node value))
+  (fwd-traverse-gmap-at m (_ node right) func))
 
 
-(defgeneric copy-gmap (m)
-  (:documentation "Create and return a copy of binary tree M.
-Keys and values in M are shallow copied."))
+(defun rev-traverse-gmap-at (m node func)
+  (declare (type gmap m)
+           (type (or null gmap-node) node)
+           (type function func))
+  (unless node
+    (return-from rev-traverse-gmap-at nil))
+
+  (rev-traverse-gmap-at m (_ node right) func)
+  (funcall func (_ node key) (_ node value))
+  (rev-traverse-gmap-at m (_ node left) func))
 
 
-(defgeneric copy-gmap-into (mcopy m)
-  (:documentation "Fill MCOPY with a copy of gmap M and return MCOPY.
-Copies all keys and values from M into MCOPY
-and removes any other key/value already present in MCOPY."))
 
-
-
-(defgeneric map-gmap (m func)
-  (:documentation "Invoke FUNC in order on each key/value pair contained in M:
+(defun map-gmap (m func)
+  "Invoke FUNC in order on each key/value pair contained in M:
 first invoke it on the smallest key, then the second smallest...
 finally invoke FUNC on the largest key. Return nil.
 
 FUNC must be a function accepting two arguments: key and value.
 
 Adding or removing keys from M during this call (even from other threads)
-has undefined consequences. Not even the current key can be removed."))
+has undefined consequences. Not even the current key can be removed."
+  (declare (type gmap m)
+           (type function func))
+  (fwd-traverse-gmap-at m (_ m root) func))
 
 
-(defgeneric map-gmap-from-end (m func)
-  (:documentation "Invoke FUNC in reverse order on each key/value pair contained in M:
+(defun map-gmap-from-end (m func)
+  "Invoke FUNC in reverse order on each key/value pair contained in M:
 first invoke it on the largest key, then the second largest...
 finally invoke FUNC on the smallest key. Return nil.
 
 FUNC must be a function accepting two arguments: key and value.
 
 Adding or removing keys from M during this call (even from other threads)
-has undefined consequences. Not even the current key can be removed."))
+has undefined consequences. Not even the current key can be removed."
+  (declare (type gmap m)
+           (type function func))
+  (rev-traverse-gmap-at m (_ m root) func))
+
+
+
+
 
 
 
@@ -159,19 +167,6 @@ has undefined consequences. Not even the current key can be removed."
         `(map-gmap          ,m ,func-body))))
 
 
-(defgeneric gmap-keys (m &optional to-list)
-  (:documentation "Return an ordered list of all keys contained in M."))
-
-
-(defgeneric gmap-values (m &optional to-list)
-  (:documentation "Return a list of all values contained in M.
-The values are returned in the order given by their keys:
-first the value associated to the smallest key, and so on."))
-
-
-(defgeneric gmap-pairs (m &optional to-alist)
-  (:documentation "Return an ordered list of pairs (key . value) containing
-all entries in M."))
 
 
 
@@ -253,20 +248,6 @@ but must NOT invoke (decf (_ m count))."))
 ;;;; ** Base implementation
 
 
-(deftype comp-keyword () '(member :< :> :=))
-
-(declaim (inline compare-keys))
-(defun gmap-compare-keys (pred key1 key2)
-  "Compare KEY1 agains KEY2 using the comparison function PRED.
-Return :< if KEY1 compares as lesser than KEY2,
-return :> if KEY1 compares as greater than KEY2,
-return := if KEY1 and KEY2 compare as equal."
-  (declare (type function pred))
-  (the comp-keyword
-    (cond
-      ((funcall pred key1 key2) :<)
-      ((funcall pred key2 key1) :>)
-      (t :=))))
 
 
 
@@ -275,13 +256,13 @@ return := if KEY1 and KEY2 compare as equal."
 If M does not contain KEY, return (values DEFAULT NIL)."
   (declare (type gmap m))
   (let ((node (_ m root))
-        (pred (_ m pred)))
+        (pred (_ m pred-func)))
     (loop while node 
        for xkey = (_ node key) do
-         (case (gmap-compare-keys pred key xkey)
-           (:< (setf node (_ node left)))
-           (:> (setf node (_ node right)))
-           (t (return-from get-gmap (values (_ node value) t)))))
+         (case (compare-keys pred key xkey)
+           (#.k< (setf node (_ node left)))
+           (#.k> (setf node (_ node right)))
+           (t    (return-from get-gmap (values (_ node value) t)))))
     (values default nil)))
 
 
@@ -293,17 +274,17 @@ and comparison between the KEY to insert and last visited node's key,
 as multiple values"
    (declare (type gmap m))
    (let ((node (_ m root))
-         (pred (the function (_ m pred)))
+         (pred (the function (_ m pred-func)))
          (comp nil))
      (loop while node
         for xkey = (_ node key) do
           (push^ node stack)
-          (case (setf comp (gmap-compare-keys pred key xkey))
-            (:< (setf node (_ node left)))
-            (:> (setf node (_ node right)))
-            (t (return))))
+          (case (setf comp (compare-keys pred key xkey))
+            (#.k< (setf node (_ node left)))
+            (#.k> (setf node (_ node right)))
+            (t    (return))))
      (values (the list stack)
-             (the (or null comp-keyword) comp))))
+             (the (or null comp-result) comp))))
      
 
 (defun set-gmap (m key value)
@@ -311,9 +292,11 @@ as multiple values"
 Return VALUE."
   (declare (type gmap m))
   (multiple-value-bind (stack comp) (find-key-and-stack m key)
+    (declare (type list stack)
+             (type (or null comp-result) comp))
     (let1 node (first stack)
        
-      (if (eq := comp)
+      (if (eql k= comp)
           ;; key already present
           (setf (_ node value) value)
 
@@ -321,7 +304,7 @@ Return VALUE."
           (let1 child (gmap/new-node m key value)
             (incf (the fixnum (_ m count)))
             (if node
-                (if (eq :< comp)
+                (if (eql k< comp)
                     (setf (_ node left) child)
                     (setf (_ node right) child))
                 ;; gmap is empty
@@ -344,15 +327,17 @@ Return VALUE."
 
 
 
-(defmethod rem-gmap ((m gmap) key)
+(defun rem-gmap (m key)
   "Find and remove KEY and its associated value from binary tree M.
 Return t if KEY was removed, nil if not found."
+  (declare (type gmap m))
   (with-rw-slots (root) m
     (unless root
       (return-from rem-gmap nil))
 
     (multiple-value-bind (stack comp) (find-key-and-stack m key)
-      (let1 found? (eq := comp)
+      (declare (type (or null comp-result) comp))
+      (let1 found? (eql k= comp)
         (when found?
           (gmap/remove-at m stack)
           (decf (the fixnum (_ m count))))
@@ -365,15 +350,16 @@ Return t if KEY was removed, nil if not found."
 
 
 
-(defmethod clear-gmap ((m gmap))
+(defun clear-gmap (m)
   "Remove all keys and values from M. Return M."
-  (setf (_ m root) nil)
-  (setf (_ m count) 0)
-  (the gmap m))
+  (declare (type gmap m))
+  (setf (_ m root) nil
+        (_ m count) 0)
+  m)
 
 
 
-(defmethod add-to-gmap ((m gmap) &rest keys-and-values)
+(defun add-to-gmap (m &rest keys-and-values)
   "N-ary version of SET-GMAP and (SETF (GET-GMAP ...) ...):
 Given a list of alternating keys and values,
 add or replace each of them into M. Return M."
@@ -386,18 +372,19 @@ add or replace each of them into M. Return M."
   m)
 
 
-(defmethod remove-from-gmap ((m gmap) &rest keys)
+(defun remove-from-gmap (m &rest keys)
   "N-ary version of REM-GMAP:
 remove a list of keys from M. Return M."
-  (declare (type list keys))
-  (loop for key in keys do
-       (rem-gmap m key))
-  m)
+  (declare (type gmap m)
+           (list keys))
+  (dolist (key keys m)
+    (rem-gmap m key)))
 
 
-(defmethod min-gmap ((m gmap))
+(defun min-gmap (m)
   "Return the smallest key in M, its value, and t as multiple values,
 or (values nil nil nil) if M is empty."
+  (declare (type gmap m))
   (with-ro-slots (root) m
     (if root
         (loop for node = root then child
@@ -407,7 +394,7 @@ or (values nil nil nil) if M is empty."
         (values nil nil nil))))
            
 
-(defmethod max-gmap ((m gmap))
+(defun max-gmap (m)
   "Return the largest key in M, its value, and t as multiple values,
 or (values nil nil nil) if M is empty"
   (declare (type gmap m))
@@ -421,18 +408,11 @@ or (values nil nil nil) if M is empty"
            
 
 
-(defmethod copy-gmap ((m gmap))
-  "Create and return a copy of binary tree M.
-Keys and values in M are shallow copied."
-  (declare (type gmap m))
-  (let1 mcopy (new (class-of m) :pred (_ m pred))
-    (copy-gmap-into mcopy m)))
-
-
-(defmethod copy-gmap-into ((mcopy gmap) (m gmap))
+(defun copy-gmap-into (mcopy m)
   "Fill MCOPY with a copy of gmap M and return MCOPY.
 Copies all keys and values from M into MCOPY
 and removes any other key/value already present in MCOPY."
+  (declare (type gmap mcopy m))
   (labels ((copy-nodes (node)
              (declare (type (or null gmap-node) node))
              (unless node
@@ -446,64 +426,46 @@ and removes any other key/value already present in MCOPY."
     mcopy))
 
 
-(defun fwd-traverse-gmap-at (m node func)
-  (declare (type gmap m)
-           (type (or null gmap-node) node)
-           (type function func))
-  (when node
-    (fwd-traverse-gmap-at m (_ node left) func)
-    (funcall func (_ node key) (_ node value))
-    (fwd-traverse-gmap-at m (_ node right) func))
-  nil)
-
-
-(defun rev-traverse-gmap-at (m node func)
-  (declare (type gmap m)
-           (type (or null gmap-node) node)
-           (type function func))
-  (when node
-    (rev-traverse-gmap-at m (_ node right) func)
-    (funcall func (_ node key) (_ node value))
-    (rev-traverse-gmap-at m (_ node left) func))
-  nil)
-
-
-(defmethod map-gmap ((m gmap) func)
-  (declare (type function func))
-  (fwd-traverse-gmap-at m (_ m root) func))
-
-
-(defmethod map-gmap-from-end ((m gmap) func)
-  (declare (type function func))
-  (rev-traverse-gmap-at m (_ m root) func))
+(defun copy-gmap (m)
+  "Create and return a copy of binary tree M.
+Keys and values in M are shallow copied."
+  (declare (type gmap m))
+  (let1 mcopy (new (class-of m) :pred (gmap-pred m))
+    (copy-gmap-into mcopy m)))
 
 
 
 
-(defmethod gmap-keys ((m gmap) &optional to-list)
+
+
+
+(defun gmap-keys (m &optional to-list)
   "Return an ordered list of all keys contained in M."
-  (declare (type list to-list))
+  (declare (type gmap m)
+           (type list to-list))
   (do-gmap (key value :from-end t) m
     (declare (ignore value))
     (push^ key to-list))
   to-list)
 
 
-(defmethod gmap-values ((m gmap) &optional to-list)
+(defun gmap-values (m &optional to-list)
   "Return a list of all values contained in M.
 The values are returned in the order given by their keys:
 first the value associated to the smallest key, and so on."
-  (declare (type list to-list))
+  (declare (type gmap m)
+           (type list to-list))
   (do-gmap (key value :from-end t) m
     (declare (ignore key))
     (push^ value to-list))
   to-list)
 
 
-(defmethod gmap-pairs ((m gmap) &optional to-alist)
+(defun gmap-pairs (m &optional to-alist)
   "Return an ordered list of pairs (key . value) containing
 all entries in M."
-  (declare (type list to-alist))
+  (declare (type gmap m)
+           (type list to-alist))
   (do-gmap (key value :from-end t) m
     (push^ (cons^ key value) to-alist))
   to-alist)
@@ -576,5 +538,6 @@ Return t if left child was replaced, nil if right child was replaced"
           (setf (_ parent right) new-node))
       left-child?)))
 
+
 (defprint-object (obj gmap)
-  (format t "~S ~S ~S ~S" :count (_ obj count) :pred (_ obj pred)))
+  (format t "~S ~S ~S ~S" :count (gmap-count obj) :pred (gmap-pred obj)))

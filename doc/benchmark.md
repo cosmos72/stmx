@@ -22,22 +22,28 @@ Setup and optimization flags:
         (declaim (optimize (compilation-speed 0) (space 0) (debug 0) (safety 0) (speed 3)))
         (ql:quickload "stmx")
         (in-package :stmx.util)
+        (defvar *v* (tvar 0))
+        (defvar *m*  (new 'rbmap :pred 'fixnum<)) 
+        (defvar *tm* (new 'tmap  :pred 'fixnum<)) 
+        (defvar *h*  (new 'ghash-table :test 'fixnum= :hash 'identity)) 
+        (defvar *th* (new 'thash-table :test 'fixnum= :hash 'identity)) 
+        ;; some initial values
+        (setf (get-gmap *m* 1) 0)
+        (setf (get-gmap *tm* 1) 0)
+        (setf (get-ghash *h* 1) 0)
+        (setf (get-ghash *th* 1) 0)
         (defmacro x3 (&rest body)
-          `(dotimes (,(gensym) 3)
-             ,@body))
+          `(let ((v *v*)
+                 (m *m*)
+                 (tm *tm*)
+                 (h *h*)
+                 (th *th*))
+             (declare (ignorable v m tm h th))
+             (dotimes (,(gensym) 3)
+               ,@body)))
         (defmacro 1m (&rest body)
           `(time (dotimes (i 1000000)
              ,@body)))
-        (defvar v (tvar 0))
-        (defvar m  (new 'rbmap :pred #'fixnum<)) 
-        (defvar tm (new 'tmap  :pred #'fixnum<)) 
-        (defvar h  (new 'ghash-table :test #'fixnum= :hash #'identity)) 
-        (defvar th (new 'thash-table :test #'fixnum= :hash #'identity)) 
-        ;; some initial values
-        (setf (get-gmap m 1) 0)
-        (setf (get-gmap tm 1) 0)
-        (setf (get-ghash h 1) 0)
-        (setf (get-ghash th 1) 0)
 
 3. to warm-up STMX and the common-lisp process before starting the benchmarks,
    it is also recommended to run first the test suite with:
@@ -67,9 +73,9 @@ claim to be exact, absolute or reproducible: your mileage may vary.
 
 Date: 27 July 2013
 
-Hardware: Intel Core-i7 4770 @3.5 GHz (quad-core w/ hyper-threading), 16GB RAM
+Hardware: Intel Core-i7 4770 @3.4 GHz (quad-core w/ hyper-threading), 16GB RAM
 
-Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.9 (x86_64), STMX 1.3.3
+Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.15 (x86_64), STMX 1.3.3
 
 
 <table>
@@ -89,34 +95,34 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.9 (x86_64), STMX 1.3.3
 
 
  <tr><td>nil       </td><td><code>nil</code></td>
-     <td>0.069</td><td>0.022</td><td>0.012</td></tr>
+     <td>0.070</td><td>0.022</td><td>0.012</td></tr>
      <!-- laptop 0.153; gv6 0.159 -->
 
  <tr><td>read-1    </td><td><code>($ v)</code></td>
-     <td>0.082</td><td>0.022</td>0.021<td></td></tr>
+     <td>0.087</td><td>0.022</td>0.021<td></td></tr>
      <!-- laptop 0.187; gv6 0.195 -->
 
  <tr><td>write-1   </td><td><code>(setf ($ v) 1)</code></td>
-     <td>0.108</td><td>0.025</td><td>0.022</td></tr>
+     <td>0.108</td><td>0.027</td><td>0.022</td></tr>
      <!-- laptop 0.277; gv6 0.257 -->
 
  <tr><td>read-write-1</td><td><code>(incf (the fixnum ($ v)))</code></td>
-     <td>0.135</td><td>0.026</td><td>0.022</td></tr>
+     <td>0.148</td><td>0.027</td><td>0.022</td></tr>
      <!-- laptop 0.339; gv6 0.596 -->
 
  <tr><td>read-write-10</td>
      <td><code>(dotimes (j 10) (incf (the fixnum ($ v))))</code></td>
-     <td>0.239</td><td>0.056</td><td>0.036</td></tr>
+     <td>0.272</td><td>0.059</td><td>0.036</td></tr>
      <!-- laptop 0.686; gv6 0.971 -->
 
  <tr><td>read-write-100</td>
      <td><code>(dotimes (j 100) (incf (the fixnum ($ v))))</code></td>
-     <td>1.118</td><td>0.384</td><td>0.196</td></tr>
+     <td>1.399</td><td>0.409</td><td>0.196</td></tr>
      <!-- laptop 3.703; gv6 4.160 -->
 
  <tr><td>read-write-1000</td>
      <td><code>(dotimes (j 1000) (incf (the fixnum ($ v))))</code></td>
-     <td>9.922</td><td>3.609</td><td>1.656</td></tr>
+     <td>9.922</td><td>3.852</td><td>1.656</td></tr>
      <!-- laptop 33.070; gv6 34.607 -->
 
  <tr><td>read-write-N</td><td>best fit of the 3 runs above</td>
@@ -143,11 +149,11 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.9 (x86_64), STMX 1.3.3
 
  <tr><td>tmap read-1</td>
      <td><code>(get-gmap tm 1)</code></td>
-     <td>0.236</td><td>0.169</td></tr>
+     <td>0.236</td><td>0.175</td></tr>
 
  <tr><td>tmap read-write-1</td>
      <td><code>(incf (get-gmap tm 1))</code></td>
-     <td>0.531</td><td>0.372</td></tr>
+     <td>0.531</td><td>0.419</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
      <td><code>(when (zerop (mod i   10)) (clear-gmap tm))<br>
@@ -166,7 +172,7 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.9 (x86_64), STMX 1.3.3
 
  <tr><td>thash read-write-1</td>
      <td><code>(incf (get-ghash th 1))</code></td>
-     <td>0.674</td><td>0.501</td></tr>
+     <td>0.674</td><td>0.525</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 10)</td>
      <td><code>(when (zerop (mod i   10)) (clear-ghash th))<br>
@@ -188,18 +194,18 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.9 (x86_64), STMX 1.3.3
 
  <table>
  
- <tr><th colspan="7">
+ <tr><th colspan="8">
        Concurrent benchmarks on a 4-core CPU. They already iterate
        ten million times, do not wrap them in <code>(1m ...)</code>.
      </th></tr>
 
- <tr><th colspan="7">
+ <tr><th colspan="8">
        Dining philosophers, load with<br>
-       <code>(load "stmx/example/dining-philosophers-stmx.lisp")</code><br>
-       <code>(load "stmx/example/dining-philosophers-stmx-hw.lisp")</code><br>
-       <code>(load "stmx/example/dining-philosophers-hw-only.lisp")</code><br>
-       <code>(load "stmx/example/dining-philosophers-lock.lisp")</code><br>
-       <code>(in-package :stmx.example{1|2|3})</code>
+       <code>(load "stmx/example/dining-philosophers.stmx.lisp")</code><br>
+       <code>(load "stmx/example/dining-philosophers.stmx-hw.lisp")</code><br>
+       <code>(load "stmx/example/dining-philosophers.hw-only.lisp")</code><br>
+       <code>(load "stmx/example/dining-philosophers.lock.lisp")</code><br>
+       <code>(in-package :stmx.example.dining-philosophers.[...])</code>
      </th></tr>
 
  <tr><th rowspan="2"><b>number of threads</b></th>
@@ -215,82 +221,92 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.9 (x86_64), STMX 1.3.3
 
  <tr><td>1 thread</td>
      <td><code>(dining-philosophers 1)</code></td>
-     <td>4.78</td><td></td><td>34.60</td>
-     <td>50.00</td><td>71.43</td><td>15.67</td></tr>
+     <td>4.27</td><td>24.45</td><td>34.97</td>
+     <td>50.00</td><td>68.97</td><td>14.64</td></tr>
 
  <tr><td>2 threads</td>
      <td><code>(dining-philosophers 2)</code></td>
-     <td>8.39</td><td></td><td>9.26</td>
-     <td>39.18</td><td>60.42</td><td>11.80</td></tr>
+     <td>7.77</td><td>9.46</td><td>11.48</td>
+     <td>26.44</td><td>56.92</td><td>11.43</td></tr>
 
  <tr><td>3 threads</td>
      <td><code>(dining-philosophers 3)</code></td>
-     <td>12.10</td><td></td><td>9.93</td>
-     <td>31.51</td><td>49.02</td><td>10.25</td></tr>
+     <td>11.37</td><td>9.67</td><td>10.40</td>
+     <td>30.33</td><td>51.62</td><td>9.48</td></tr>
 
  <tr><td>4 threads</td>
      <td><code>(dining-philosophers 4)</code></td>
-     <td>16.15</td><td></td><td>13.60</td>
-     <td>32.73</td><td>48.60</td><td>15.17</td></tr>
+     <td>14.87</td><td>11.83</td><td>13.84</td>
+     <td>32.05</td><td>44.98</td><td>14.24</td></tr>
 
  <tr><td>5 threads</td>
      <td><code>(dining-philosophers 5)</code></td>
-     <td>14.55</td><td></td><td>14.74</td>
-     <td>39.06</td><td>61.35</td><td>18.01</td></tr>
+     <td>14.64</td><td>13.05</td><td>15.16</td>
+     <td>32.38</td><td>63.13</td><td>18.59</td></tr>
 
  <tr><td>6 threads</td>
      <td><code>(dining-philosophers 6)</code></td>
-     <td>16.43</td><td></td><td>16.12</td>
-     <td>45.91</td><td>75.66</td><td>21.03</td></tr>
+     <td>14.79</td><td>13.94</td><td>14.86</td>
+     <td>37.48</td><td>72.46</td><td>19.14</td></tr>
 
  <tr><td>7 threads</td>
      <td><code>(dining-philosophers 7)</code></td>
-     <td>16.85</td><td></td><td>13.64</td>
-     <td>55.56</td><td>90.09</td><td>24.30</td></tr>
+     <td>15.00</td><td>14.39</td><td>13.25</td>
+     <td>43.48</td><td>86.63</td><td>20.92</td></tr>
 
  <tr><td>8 threads</td>
      <td><code>(dining-philosophers 8)</code></td>
-     <td>17.79</td><td></td><td>12.36</td>
-     <td>72.86</td><td>102.70</td><td>25.56</td></tr>
+     <td>15.43</td><td>13.59</td><td>14.15</td>
+     <td>47.90</td><td>102.11</td><td>23.55</td></tr>
 
  <tr><td>10 threads</td>
      <td><code>(dining-philosophers 10)</code></td>
-     <td>17.26</td><td></td><td>15.43</td>
-     <td>76.75</td><td>121.51</td><td>32.39</td></tr>
+     <td>15.24</td><td>13.96</td><td>16.59</td>
+     <td>56.18</td><td>117.10</td><td>30.24</td></tr>
 
  <tr><td>15 threads</td>
      <td><code>(dining-philosophers 15)</code></td>
-     <td>17.28</td><td></td><td>20.56</td>
-     <td>135.75</td><td>164.84</td><td>51.62</td></tr>
+     <td>15.43</td><td>16.28</td><td>21.54</td>
+     <td>88.94</td><td>165.20</td><td>49.68</td></tr>
 
  <tr><td>20 threads</td>
      <td><code>(dining-philosophers 20)</code></td>
-     <td>17.69</td><td></td><td>44.99</td>
-     <td>205.55</td><td>205.55</td><td>57.95</td></tr>
+     <td>15.55</td><td>18.59</td><td>21.12</td>
+     <td>142.20</td><td>203.77</td><td>53.89</td></tr>
+
+ <tr><td>25 threads</td>
+     <td><code>(dining-philosophers 25)</code></td>
+     <td></td><td></td><td></td>
+     <td>188.54</td><td></td><td></td></tr>
 
  <tr><td>30 threads</td>
      <td><code>(dining-philosophers 30)</code></td>
-     <td>17.57</td><td></td><td>21.48</td>
-     <td>249.58</td><td>240.38</td><td>59.48</td></tr>
+     <td>15.51</td><td>15.84</td><td>16.01</td>
+     <td>211.86</td><td>235.94</td><td>57.64</td></tr>
+
+ <tr><td>35 threads</td>
+     <td><code>(dining-philosophers 35)</code></td>
+     <td></td><td></td><td></td>
+     <td>260.61</td><td></td><td></td></tr>
 
  <tr><td>40 threads</td>
      <td><code>(dining-philosophers 40)</code></td>
-     <td>17.63</td><td></td><td>19.08</td>
-     <td>242.72</td><td>250.78</td><td>57.97</td></tr>
+     <td>15.50</td><td>20.16</td><td>15.20</td>
+     <td>278.75</td><td>254.62</td><td>58.34</td></tr>
 
  <tr><td>50 threads</td>
      <td><code>(dining-philosophers 50)</code></td>
-     <td>17.59</td><td></td><td>19.27</td>
-     <td>262.33</td><td>244.38</td><td>55.43</td></tr>
+     <td>15.42</td><td>16.34</td><td>19.27</td>
+     <td>272.33</td><td>262.67</td><td>58.98</td></tr>
 
  <tr><td>100 threads</td>
      <td><code>(dining-philosophers 100)</code></td>
-     <td>17.65</td><td></td><td>21.79</td>
-     <td>269.91</td><td>234.25</td><td>50.12</td></tr>
+     <td>15.51</td><td></td><td></td>
+     <td>275.22</td><td>274.80</td><td></td></tr>
 
  <tr><td>200 threads</td>
      <td><code>(dining-philosophers 200)</code></td>
-     <td>17.67</td><td></td><td>21.32</td>
-     <td>278.20</td><td>254.58</td><td>51.68</td></tr>
+     <td>15.53</td><td></td><td></td>
+     <td>284.21</td><td>277.47</td><td></td></tr>
 
 </table>

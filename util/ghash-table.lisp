@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -68,16 +68,19 @@ initialize all its elements to NIL and return it."))
 
 (defclass ghash-table ()
   ((vec          :type (or ghash-vector tvar))
-   (test-fun     :type ghash-test-fun  :initarg :test  :initform #'eql)
-   (hash-fun     :type ghash-hash-fun  :initarg :hash)
+   (test-fun     :type ghash-test-fun)
+   (hash-fun     :type ghash-hash-fun)
    (aref-fun     :type ghash-aref-fun     :initform #'svref)
    (set-aref-fun :type ghash-set-aref-fun :initform #+(or sbcl cmucl) #'(setf svref)
                                                     #-(or sbcl cmucl) #'%setf-svref)
-   (count        :type (or fixnum tvar)   :initform 0))
+   (count        :type (or fixnum tvar)   :initform 0)
+
+   (test-sym     :type symbol             :initarg :test  :initform 'eql)
+   (hash-sym     :type symbol             :initarg :hash  :initform nil))
 
   (:documentation
-   "Generic hash-table. Allows custom :test argument at creation - default is #'eql.
-If :test is not one of #'eq #'eql or #'equal, also requires explicit :hash
+   "Generic hash-table. Allows custom :test argument at creation - default is 'eql.
+If :test is not one of 'eq 'eql or 'equal, also requires explicit :hash
 argument at creation.
 
 Not so useful by itself (standard CL:HASH-TABLE is usually faster),
@@ -89,28 +92,53 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
                                        (initial-capacity +ghash-default-capacity+))
 
   (declare (ignore other-keys)
-           (type (integer #.+ghash-default-capacity+ #.+ghash-max-capacity+) initial-capacity))
+           (type (and fixnum (integer 0)) initial-capacity))
 
-  (unless (zerop (logand (1- initial-capacity) initial-capacity))
-    ;; initial-capacity is not a power of 2: round up to nearset power of 2
-    (setf initial-capacity (ash 1 (integer-length initial-capacity))))
+  (cond
+    ((< initial-capacity +ghash-default-capacity+)
+     (setf initial-capacity +ghash-default-capacity+))
+    ((> initial-capacity +ghash-max-capacity+)
+     (setf initial-capacity +ghash-max-capacity+))
+    (t
+     (unless (zerop (logand (1- initial-capacity) initial-capacity))
+       ;; initial-capacity is not a power of 2: round up to nearest power of 2
+       (setf initial-capacity (ash 1 (integer-length initial-capacity))))))
 
-  (unless (slot-boundp hash 'hash-fun)
-    ;; provide default hash-fun when test-fun is #'eq #'eql or #'equal
-    (let1 test-fun (_ hash test-fun)
-      (if (or (eq test-fun #'eq)
-              (eq test-fun #'eql)
-              (eq test-fun #'equal))
-          (setf (_ hash hash-fun) #'sxhash)
-          (error "missing ~S argument, cannot instantiate ~S with custom ~S"
-                 :hash (type-of hash) :test))))
+  (with-rw-slots (test-sym hash-sym) hash
+    (check-type test-sym symbol)
+    (check-type hash-sym symbol)
 
-  (setf (_ hash vec) (ghash/new-vec hash initial-capacity)))
+    (unless hash-sym
+      ;; provide default hash-fun when test-fun is one of: 'eq 'eql 'equal or 'equalp
+      (if (or (eq test-sym 'eq)
+              (eq test-sym 'eql)
+              (eq test-sym 'equal)
+              (eq test-sym 'equalp))
+          (setf hash-sym 'sxhash)
+          (error "missing ~S argument, cannot instantiate ~S with custom ~S ~S"
+                 :hash (type-of hash) :test test-sym)))
+    
+    ;; convert :test and :hash from symbols to actual functions
+    (setf (_ hash test-fun) (fdefinition test-sym)
+          (_ hash hash-fun) (fdefinition hash-sym)
+          ;; allocate internal vector
+          (_ hash vec) (ghash/new-vec hash initial-capacity))))
         
+
+(defun ghash-table-test (hash)
+  "Return the symbol used by ghash-table HASH to compare keys."
+  (declare (type ghash-table hash))
+  (the symbol (_ hash test-sym)))
+
+
+(defun ghash-table-hash (hash)
+  "Return the symbol used by ghash-table HASH to hash keys."
+  (declare (type ghash-table hash))
+  (the symbol (_ hash hash-sym)))
 
 
 (defun ghash-table-count (hash)
-  "Return the number of KEY/VALUE entries in GHASH-TABLE hash."
+  "Return the number of KEY/VALUE entries in ghash-table HASH."
   (declare (type ghash-table hash))
   (the (integer 0 #.most-positive-fixnum) (_ hash count)))
 
@@ -330,7 +358,7 @@ Return T if KEY was present in HASH, otherwise return NIL."
   "Return a copy of ghash-table HASH.
 The copy will have the same class, test and hash functions, and elements."
   (declare (type ghash-table hash))
-  (let1 copy (new (class-of hash) :test (_ hash test-fun) :hash (_ hash hash-fun))
+  (let1 copy (new (class-of hash) :test (_ hash test-sym) :hash (_ hash hash-sym))
     (do-ghash (key value) hash
       (set-ghash copy key value))
     copy))
@@ -369,6 +397,10 @@ TO-ALIST contents is not destructively modified."
     (push (cons key value) to-alist))
   to-alist)
   
+
+(defprint-object (obj ghash-table)
+  (format t "~S ~S ~S ~S ~S ~S" :count (ghash-table-count obj)
+          :test (ghash-table-test obj) :hash (ghash-table-hash obj)))
 
 
 (defprint-object (obj ghash-pair :type t :identity nil)

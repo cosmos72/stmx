@@ -5,16 +5,20 @@ Summary
 -------
 SB-TRANSACTION is a SBCL plugin for the x86-64 family of CPUs.
 
-It defines the 'RTM' assembler instructions introduced in 2012 by Intel,
-a set of CPU instructions that implement [hardware transactional
-memory](http://en.wikipedia.org/wiki/Transactional_Synchronization_Extensions)
+It defines regular, easy to use Common Lisp functions to start, commit, abort
+and test hardware memory transactions, exploiting a set of new CPU instructions
+introduced in 2012 by Intel and known as [Intel TSX hardware transactional memory]
+(http://en.wikipedia.org/wiki/Transactional_Synchronization_Extensions)
 
-It also defines regular, easy to use Common Lisp functions to start, commit, abort
-and query hardware memory transactions.
+Note that Intel TSX comprises two different CPU instructions sets
+to use hardware memory transactions:
+* Restricted Transactional Memory (RTM) - a new set of instructions providing
+  direct control to hardware memory transactions: XBEGIN, XEND (i.e commit), XABORT and XTEST.
+* Hardware Lock Elision (HLE) - designed for backward compatibility
+  with locking code that already uses atomic compare-and-swap
+  instructions LOCK CMPXCHG and LOCK CMPXCHG8B.
 
-Note that the current SB-TRANSACTION only knowns about Restricted Transactional
-Memory (RTM) while knowing nothing about Hardware Lock Elision (HLE),
-an alternative CPU interface to hardware transactional memory.
+The current implementation of SB-TRANSACTION only knowns about RTM.
 
 
 Supported systems
@@ -23,18 +27,24 @@ Due to its nature, SB-TRANSACTION is highly dependent on specific hardware and s
 
 - It can be **compiled** only with SBCL on a x86-64 CPU.
 
-- It can be **used** only with SBCL on a x86-64 CPU that actually supports RTM.
-  As of June 2013, the only x86-64 CPUs supporting RTM are:
-    * Intel Core i5 4570
-    * Intel Core i5 4670
-    * Intel Core i7 4770
+- It can be **used** only with SBCL on a x86-64 CPU that actually supports Intel TSX.
+  As of February 2014, the CPUs supporting Intel TSX are:
+    * Intel Core i7 4771
+    * Intel Core i7 4770, 4770S, 4770T, 4770TE
+    * Intel Core i7 4765T
+    * Intel Core i5 4670, 4670S, 4670T 
+    * Intel Core i5 4570, 4570S, 4570T, 4570TE
+    
+  Note: all the current Intel Core K and R models, as for example Core i7 4770K and Core i5 4670K,
+  do **not** support Intel TSX.
 
 Tested systems:
-* SBCL  version 1.0.57.0.debian  (x86-64) on Debian GNU/Linux 7.0 (x86-64) on Intel Core i7 4770
+* SBCL  version 1.1.14           (x86-64) on Debian GNU/Linux 7.0 (x86-64) on Intel Core i7 4770
 * SBCL  version 1.1.8            (x86-64) on Debian GNU/Linux 7.0 (x86-64) on Intel Core i7 4770
 * SBCL  version 1.1.8.60-77641d6 (x86-64) on Debian GNU/Linux 7.0 (x86-64) on Intel Core i7 4770
+* SBCL  version 1.0.57.0.debian  (x86-64) on Debian GNU/Linux 7.0 (x86-64) on Intel Core i7 4770
 
-A 32-bit version, targeting the same x86-64 CPUs running in 32-bit legacy mode,
+A 32-bit version - targeting the same x86-64 CPUs running in 32-bit legacy mode -
 is technically possibile but this version currently supports only native 64-bit mode.
 
 

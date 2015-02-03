@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -49,6 +49,7 @@
                 #:get-txhash #:set-txhash #:do-txhash)
 
   (:import-from #:stmx.util
+                #:_
                 #:print-object-contents
                 #:print-gmap
                 #:gmap-node #:rbnode #:tnode #:color-of

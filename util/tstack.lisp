@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -19,8 +19,13 @@
 
 (transactional
  (defclass tstack ()
-   ((top  :type list :initform nil :accessor top-of))))
+   ((top  :type list :initarg top :initform nil :accessor top-of))))
 
+(declaim (ftype (function () (values tstack &optional)) tstack))
+
+(defun tstack ()
+  "Create and return a new TSTACK."
+  (new 'tstack))
 
 (defmethod empty? ((s tstack))
   (null (_ s top)))
@@ -35,14 +40,13 @@
   nil)
                   
 
-(transaction
- (defmethod peek ((s tstack) &optional default)
-   "Return the first value in tstack S without removing it, and t as multiple values.
+(defmethod peek ((s tstack) &optional default)
+  "Return the first value in tstack S without removing it, and t as multiple values.
 Return (values DEFAULT nil) if S contains no values."
-   (with-ro-slots (top) s
-     (if (null top)
-         (values default nil)
-         (values (first top) t)))))
+  (with-ro-slots (top) s
+    (if (null top)
+        (values default nil)
+        (values (first top) t))))
 
 
 (transaction
@@ -85,6 +89,6 @@ Since fifo can contain unlimited values, this method never fails."
 (defprint-object (obj tstack :identity nil)
   (with-ro-slots (top) obj
     (if top
-        (format t "~A" (reverse top))
+        (format t "~S" (reverse top))
         (write-string "()"))))
 

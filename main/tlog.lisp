@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -24,10 +24,48 @@
 (defun make-tlog-pool (&optional (n 10))
   (make-fast-vector n :element-type '(or null tlog) :initial-element nil))
 
-(defvar *tlog-pool* (make-tlog-pool))
+(defparameter *tlog-pool* (make-tlog-pool))
 
-(eval-when (:load-toplevel :execute)
-  (ensure-thread-initial-bindings '(*tlog-pool* . (make-tlog-pool))))
+(eval-always
+  (ensure-thread-initial-binding '*tlog-pool* '(make-tlog-pool)))
+
+(defun stmx-internal-error/suggest-bordeaux-threads (datum &rest arguments)
+  (stmx-internal-error
+   "~A~&~A"
+   (apply #'format nil datum arguments)
+"Typical cause is:
+   new threads were created with implementation-specific functions,
+   as for example (sb-thread:make-thread) or (mp:process-run-function),
+   that do not apply thread-local bindings stored in
+   bordeaux-threads:*default-special-bindings*
+Solution:
+   use (bordeaux-threads:make-thread) instead."))
+
+
+(defun %validate-tlog-pool (&optional (pool *tlog-pool*))
+  (declare (type fast-vector pool))
+
+  (let ((i 0))
+    (do-fast-vector (element) pool
+      (unless element
+        (stmx-internal-error/suggest-bordeaux-threads
+         "inconsistent TLOG-POOL ~S: TLOG at index ~S is NIL." pool i))
+      (incf (the fixnum i)))))
+
+(defmacro validate-tlog-pool ()
+  #+stmx-debug
+  `(%validate-tlog-pool))
+
+
+(declaim (inline validate-current-thread))
+
+(defun validate-current-thread ()
+  (let ((actual   *current-thread*)
+        (expected (bt:current-thread)))
+    (unless (eq actual expected)
+      (stmx-internal-error/suggest-bordeaux-threads
+       "stmx:*current-thread* contains a stale value:~&   found ~S~&   expecting ~S"
+       actual expected))))
 
   
 ;;;; ** Creating, copying and clearing tlogs
@@ -54,8 +92,10 @@ return LOG itself."
 (declaim (inline new-tlog))
 (defun new-tlog ()
   "Get a TLOG from pool or create one, and return it."
-  (let1 log (the tlog (nth-value 0 (fast-vector-pop-macro *tlog-pool* (make-tlog))))
-    (setf (tlog-read-version log) +invalid-version+)
+  (let1 log (fast-vector-pop-macro *tlog-pool*
+                                   (progn (validate-current-thread) (make-tlog)))
+    (validate-tlog-pool)
+    (setf (tlog-read-version (the tlog log)) +invalid-version+)
     log))
 
 
@@ -70,7 +110,8 @@ return LOG itself."
          (<= (txhash-table-count (tlog-reads log)) 127)
          (<= (txhash-table-count (tlog-writes log)) 127))
     (when (fast-vector-push log *tlog-pool*)
-      (clear-tlog log)))
+      (clear-tlog log))
+    (validate-tlog-pool))
   nil)
     
 
@@ -115,7 +156,7 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   (let1 reads (tlog-reads log)
 
     (when (zerop (txhash-table-count reads))
-      (error "BUG! Transaction ~A called (retry), but no TVARs to wait for changes.
+      (stmx-internal-error "Transaction ~A called (retry), but no TVARs to wait for changes.
   This is a bug either in the STMX library or in the application code.
   Possible reason: some code analogous to (atomic (retry)) was executed.
   Such code is not allowed, because at least one TVAR or one TOBJ slot

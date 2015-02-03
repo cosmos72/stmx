@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of SB-TRANSACTION.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -15,6 +15,7 @@
 
 (in-package :sb-transaction)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
 
 ;; utilities copy-pasted from sbcl/src/compiler/x86-64/insts.lisp:
 ;; DISPLACEMENT, TWO-BYTES, THREE-BYTES
@@ -34,7 +35,6 @@
 
 (sb-disassem:define-instruction-format (three-bytes 24 :default-printer '(:name))
   (op :fields (list (byte 8 0) (byte 8 8) (byte 8 16))))
-
 
 
 
@@ -100,7 +100,7 @@
    (if where
        ;; emit 32-bit, signed relative offset for where
        (emit-dword-displacement-backpatch segment where)
-       ;; no where to jump: simply jump to the next instruction
+       ;; nowhere to jump: simply jump to the next instruction
        (sb-vm::emit-skip segment 4 0))))
 
 
@@ -129,3 +129,5 @@
    (sb-vm::emit-byte segment #x01)
    (sb-vm::emit-byte segment #xd6)))
 
+
+) ; EVAL-WHEN

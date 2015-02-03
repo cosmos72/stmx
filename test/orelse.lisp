@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -14,6 +14,8 @@
 
 
 (in-package :stmx.test)
+
+(enable-#?-syntax)
 
 (def-suite orelse-suite :in suite)
 (in-suite orelse-suite)
@@ -54,7 +56,7 @@
    (try-put c val)))
 
 (defun orelse-test ()
-  (loop for place in (list (new 'tcell) (tvar)) do
+  (loop for place in (list (tcell) (tvar)) do
        (loop for takef in (list #'take1 #'take2 #'take3) do
             (loop for putf in (list #'put1 #'put2 #'put3)
                for unique = (gensym) do
@@ -82,10 +84,10 @@
                                (eq value unique)
                                (empty? place))))))))
       
-(test orelse
+(def-test orelse (:compile-at :definition-time)
   (orelse-test))
 
-(test orelse-atomic
+(def-test orelse-atomic (:compile-at :definition-time)
   (atomic
    (orelse-test)))
 
@@ -94,7 +96,7 @@
   (declare (type fixnum iterations)
            (type simple-vector cells names))
 
-  (let ((x 0.0)
+  (let ((x 0.0f0)
         (name nil))
     (declare (type single-float x))
     (dotimes (i iterations)
@@ -143,13 +145,13 @@
 (defun to-vector (seq)
   (coerce seq 'simple-vector))
 
-(defun orelse-thread4 (&optional (iterations 1))
+(defun orelse-thread6 (&optional (iterations 1))
   "This test runs a pass-the-ball algorithm with 4 threads
 that take turns consuming (take) and producing (put) values in 4 cells.
 
-Two threads consume values from cells 1 or 2, increase the value by one,
+Three threads consume values from cells 1 or 2, increase the value by one,
 and produce into cells 3 or 4.
-Two other threads consume values from cells 3 or 4, increase the value by one,
+Three other threads consume values from cells 3 or 4, increase the value by one,
 and produce into cells 1 or 2.
 
 Consuming a value \"from cells x or y\" means (atomic (orelse (take cell-x) (take cell-y))),
@@ -174,7 +176,7 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
   (start-multithreading)
 
   (let* ((names '("A" "B" "C" "D"))
-         (cells (loop for n in names collect (new 'tcell)))
+         (cells (loop for n in names collect (tcell)))
          
          (cells1 (to-vector cells))
          (names1 (to-vector names))
@@ -189,17 +191,19 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
 
       (let1 ths (list (start-thread #'f1 :name "A")
                       (start-thread #'f1 :name "B")
-                      (start-thread #'f2 :name "C")
-                      (start-thread #'f2 :name "D"))
+                      (start-thread #'f1 :name "C")
+                      (start-thread #'f2 :name "D")
+                      (start-thread #'f2 :name "E")
+                      (start-thread #'f2 :name "F"))
 
-        (sleep 0.01)
+        (sleep 1f-2)
 
         (log:debug "setting the four cell values...")
         (atomic
          (dotimes (i 4)
-           (put (svref cells1 i) (* i 0.25))
+           (put (svref cells1 i) (* i 0.25f0))
            (log:debug "put ~A in cell ~A (may retry)"
-                      (* i 0.25) (svref names1 i))))
+                      (* i 0.25f0) (svref names1 i))))
         (log:debug "...cells values set")
 
         (values
@@ -213,19 +217,21 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
              collect (take cell))))))))
 
 
-(defun orelse-thread4-test (&optional (iterations 1))
+(defun orelse-thread6-test (&optional (iterations 1))
   (multiple-value-bind (values cells)
-      (orelse-thread4 iterations)
+      (orelse-thread6 iterations)
 
     (loop for list in (list values cells) do
          (loop for e in list do
               (is-true (numberp e))))
 
     (let1 remainders (sort (loop for v in cells collect (mod v 1)) #'<)
-      (is-true (equalp '(0.0 0.25 0.5 0.75) remainders)))
+      (is-true (equalp '(0.0f0 0.25f0 0.5f0 0.75f0) remainders)))
 
     (let1 total (apply #'+ cells)
-      (is-true (= total (+ 1.5 (* 4 iterations)))))))
+      (is-true (= total (+ 1.5f0 (* 6 iterations)))))))
 
-(test orelse-thread4
-  (orelse-thread4-test 10000))
+
+#?+bt/make-thread
+(def-test orelse-thread6 (:compile-at :definition-time)
+  (orelse-thread6-test 15000))

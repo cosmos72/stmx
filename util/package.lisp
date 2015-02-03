@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -30,12 +30,13 @@
                           #:typep
                           #:subtypep)
 
+  (:import-from #:alexandria
+                #:symbolicate)
+
   (:import-from #:stmx
                 #:+dummy-tvar+ #:peek-$ #:try-take-$ #:try-put-$)
 
-  (:export #:tcons #:tlist #:tfirst #:trest #:tpush #:tpop ;; transactional CONS cell and list
-
-           #:tcell #:tfifo #:tstack #:tchannel #:tport  ;; transactional containers
+  (:export #:tcell #:tfifo #:tstack #:tchannel #:tport  ;; transactional containers
            
            #:full? #:empty? #:empty! ;; methods for transactional containers
            #:peek   #:take   #:put
@@ -61,6 +62,7 @@
            #:ghash-table ;; generic hash table - can be used directly, see thash-table for a transactional implementation
            #:thash-table ;; transactional hash table (extends ghash-table)
 
+           #:ghash-table-test #:ghash-table-hash
            #:ghash-table-count #:ghash-table-empty? #:clear-ghash
            #:get-ghash #:set-ghash #:rem-ghash   ;; also (setf (get-ghash ... ) ... )
            #:map-ghash #:do-ghash  ;; iterate on ghash-table or thash-table
@@ -70,7 +72,21 @@
 
            ;; transactional simple-vector
            #:simple-tvector #:simple-tvector-length
-           #:tsvref #:tsvref-tx #:tsvref-notx #:do-simple-tvector))
+           #:tsvref #:do-simple-tvector
+
+           ;; transactional CONS cell and list
+           #:tcons  #:tfirst #:trest  #:tconsp #:tatom  #:tpush  #:tpop
+           #:tlist  #:tcar   #:tcdr   #:tcaar  #:tcadr  #:tcdar  #:tcddr
+           #:tcaaar #:tcaadr #:tcadar #:tcaddr #:tcdaar #:tcdadr #:tcddar #:tcdddr
+
+           #:tcaaaar #:tcaaadr #:tcaadar #:tcaaddr #:tcadaar #:tcadadr #:tcaddar #:tacdddr
+           #:tcdaaar #:tcdaadr #:tcdadar #:tcdaddr #:tcddaar #:tcddadr #:tcdddar #:taddddr
+
+           #:tendp   #:tlist-length #:tnthcdr #:tnth
+           #:tsecond #:tthird #:tfourth #:tfifth #:tsixth #:tseventh #:teighth #:tninth #:ttenth
+           #:ttree-equal #:ttree-equal-test #:ttree-equal-test-not
+           #:tlast   #:tlist* #:make-tlist))
+           
 
 
 

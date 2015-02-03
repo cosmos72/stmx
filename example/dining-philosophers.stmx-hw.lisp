@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -15,7 +15,7 @@
 
 (in-package :cl-user)
 
-(defpackage #:stmx.example2
+(defpackage #:stmx.example.dining-philosophers.stmx-hw
   (:use #:cl
         #:bordeaux-threads
         #:stmx.lang
@@ -26,7 +26,7 @@
                 #:new #:try-take-$ #:try-put-$))
 
 
-(in-package :stmx.example2)
+(in-package :stmx.example.dining-philosophers.stmx-hw)
 
 (enable-#?-syntax)  
 
@@ -50,7 +50,7 @@
 (defun eat-from-plate/swtx (plate)
   "Decrease by one TVAR in plate."
   (declare (type cons plate))
-  (decf (the fixnum ($-tx (car plate)))))
+  (decf (the fixnum ($-swtx (car plate)))))
 
 
 (declaim (ftype (function (tvar tvar cons) fixnum) philosopher-eats
@@ -142,13 +142,13 @@
         (free t)
         (busy +unbound-tvar+))
 
-    (when (eq free ($-tx fork1))
-      (setf ($-tx fork1) busy)
-      (when (eq free ($-tx fork2))
-        (setf ($-tx fork2) busy
+    (when (eq free ($-swtx fork1))
+      (setf ($-swtx fork1) busy)
+      (when (eq free ($-swtx fork2))
+        (setf ($-swtx fork2) busy
               hunger (eat-from-plate/swtx plate)
-              ($-tx fork2) free))
-      (setf ($-tx fork1) free))
+              ($-swtx fork2) free))
+      (setf ($-swtx fork1) free))
 
     hunger))
 
@@ -238,7 +238,7 @@
 
       (let* ((end (get-internal-real-time))
              (elapsed-secs (/ (- end start) (float internal-time-units-per-second)))
-             (elapsed-secs (max elapsed-secs 0.000000001))
+             (elapsed-secs (max elapsed-secs 1f-9))
              (tx-count (/ (* n philosophers-initial-hunger) elapsed-secs))
 	     (tx-unit ""))
 

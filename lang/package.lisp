@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -24,13 +24,15 @@
   (:export #:define-global    #:define-constant-once
 
            #:with-gensym  #:with-gensyms
-           #:eval-always  #:new     #:let1
+           #:eval-always  #:new          #:let1
            #:when-bind    #:awhen
            #:if-bind      #:aif
 
            #:enable-#?-syntax
-
-           #:log.trace    #:log.debug   #:log.make-logger
+           #:set-feature  #:set-features #:default-feature #:default-features
+           #:get-feature  #:all-features #:assoc-feature
+           
+           #:log.trace    #:log.debug    #:log.make-logger
 
            ;; bordeaux-threads helpers
            #:start-multithreading

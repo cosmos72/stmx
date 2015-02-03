@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -17,12 +17,13 @@
 
 (asdf:defsystem :stmx
   :name "STMX"
-  :version "1.3.3"
+  :version "2.0.1"
   :license "LLGPL"
   :author "Massimiliano Ghilardi"
-  :description "Composable Software Transactional Memory"
+  :description "Composable Transactional Memory"
 
-  :depends-on (:log4cl
+  :depends-on (:alexandria
+               :log4cl
                :closer-mop
                :bordeaux-threads
                :trivial-garbage)
@@ -46,8 +47,8 @@
                              (:file "macro"           :depends-on ("package"))
                              (:file "features"        :depends-on ("macro"))
                              (:file "features-reader" :depends-on ("features"))
-                             (:file "features-detect" :depends-on ("features-reader"))
-                             (:file "thread"          :depends-on ("features-detect"))
+                             (:file "thread"          :depends-on ("features-reader"))
+                             (:file "features-detect" :depends-on ("thread"))
                              (:file "hw-transactions" :depends-on ("features-detect"))
                              (:file "atomic-ops"      :depends-on ("features-detect"))
                              (:file "mutex"           :depends-on ("atomic-ops"))
@@ -59,22 +60,24 @@
                              (:file "class-precedence-list" :depends-on ("macro")))
                 :depends-on (:sb-transaction))
 
-               (:module :src
+               (:module :main
                 :components ((:file "package")
+                             (:file "version"        :depends-on ("package"))
                              (:file "global-clock"   :depends-on ("package"))
                              (:file "tvar-fwd"       :depends-on ("global-clock"))
                              (:file "classes"        :depends-on ("tvar-fwd"))
                              (:file "txhash"         :depends-on ("classes"))
                              (:file "tlog"           :depends-on ("txhash"))
                              (:file "tvar"           :depends-on ("tlog"))
-                             (:file "tclass"         :depends-on ("tvar"))
+                             (:file "tstruct"        :depends-on ("tvar"))
+                             (:file "tclass"         :depends-on ("tvar" "tstruct"))
+                             (:file "tslot"          :depends-on ("tclass"))
                              (:file "hw-atomic"      :depends-on ("classes"))
                              (:file "commit"         :depends-on ("tvar" "hw-atomic"))
                              (:file "sw-atomic"      :depends-on ("commit"))
                              (:file "atomic"         :depends-on ("hw-atomic" "sw-atomic"))
                              (:file "orelse"         :depends-on ("atomic")))
                 :depends-on (:lang))
-
 
                (:module :util
                 :components ((:file "package")
@@ -83,6 +86,7 @@
 
                              (:file "container"      :depends-on ("misc"))
                              (:file "tcons"          :depends-on ("misc"))
+                             (:file "tlist"          :depends-on ("tcons"))
                              (:file "tvar"           :depends-on ("container"))
                              (:file "tcell"          :depends-on ("container"))
                              (:file "tstack"         :depends-on ("container"))
@@ -99,13 +103,13 @@
 
                              (:file "ghash-table"    :depends-on ("print"))
                              (:file "thash-table"    :depends-on ("ghash-table" "simple-tvector")))
-                :depends-on (:lang :src))))
+                :depends-on (:lang :main))))
 
 
 
 (asdf:defsystem :stmx.test
   :name "STMX.TEST"
-  :version "1.3.3"
+  :version "2.0.1"
   :author "Massimiliano Ghilardi"
   :license "LLGPL"
   :description "test suite for STMX"
@@ -117,8 +121,7 @@
 
   :components ((:module :test
                 :components ((:file "package")
-                             (:file "misc"           :depends-on ("package"))
-			     (:file "hash-table"     :depends-on ("misc"))
+			     (:file "hash-table"     :depends-on ("package"))
                              (:file "txhash"         :depends-on ("hash-table"))
                              (:file "ghash-table"    :depends-on ("hash-table"))
                              (:file "thash-table"    :depends-on ("hash-table"))
@@ -134,4 +137,7 @@
 (defmethod asdf:perform ((op asdf:test-op) (system (eql (asdf:find-system :stmx))))
   (asdf:load-system :stmx.test)
   (eval (read-from-string "(fiveam:run! 'stmx.test:suite)")))
+
+
+
 

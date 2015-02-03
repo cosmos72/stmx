@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -113,7 +113,8 @@ transactional memory it read has changed."
   (prog ((log (new-tlog))
          (aborted nil))
 
-   (declare (type boolean aborted))
+   (declare (type tlog log)
+            (type boolean aborted))
 
    run
    (setf (tlog-read-version log)

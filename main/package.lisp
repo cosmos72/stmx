@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -39,7 +39,9 @@
                           #:typep
                           #:subtypep)
 
-  (:export #:atomic    #:run-atomic
+  (:export #:*stmx-version*
+
+           #:atomic    #:run-atomic
            #:retry
            #:orelse    #:run-orelse
 
@@ -48,9 +50,9 @@
 	   #:hw-transaction-supported?
 	   #:hw-transaction-supported-and-running?
 
-           #:transactional
-           #:transaction
-           #:transaction?
+           ;; defining classes, structs, functions and methods
+           #:transactional-struct #:transactional-class #:transactional
+           #:transaction          #:transaction?
 
            ;; utilities
            #:nonblocking
@@ -63,8 +65,8 @@
 
            ;; low-level API to use TVARs directly
            #:tvar #:+unbound-tvar+
-           #:$-slot #:$ #:$-tx #:$-hwtx #:$-notx
-	   ;; also (setf $-slot) (setf $) (setf $-tx)
+           #:$-slot #:$ #:$-swtx #:$-hwtx #:$-notx
+	   ;; also (setf $-slot) (setf $) (setf $-swtx)
 	   ;; (setf $-hwtx) and (setf $-notx)
 
            #:bound-$? #:unbind-$

@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -22,7 +22,7 @@
   ())
 
 (defun test-tmap-rollback ()
-  (let* ((m1 (new 'tmap :pred #'fixnum<))
+  (let* ((m1 (new 'tmap :pred 'fixnum<))
          (m2 (copy-gmap m1)))
 
     (add-to-gmap m1 1 "x" 2 "y")
@@ -42,12 +42,12 @@
     t))
 
       
-(test tmap-rollback
+(def-test tmap-rollback (:compile-at :definition-time)
   (test-tmap-rollback))
 
-(test tmap
+(def-test tmap (:compile-at :definition-time)
   (test-rbmap-class 'tmap))
 
-(test tmap-atomic
+(def-test tmap-atomic (:compile-at :definition-time)
   (atomic (test-rbmap-class 'tmap)))
 

@@ -21,16 +21,42 @@ threads until it commits.
 Memory transactions gives freedom from deadlocks, automatic roll-back on failure,
 and aim at resolving the tension between granularity and concurrency.
 
-### Latest news, 31st August 2013
+### Latest news, 16th January 2015
+
+Version 2.0.1 released.
+It adds support for transactional structs in addition to transactional CLOS objects,
+and a faster, struct-based implementation of transactional CONS cells and lists,
+including several list-manipulating functions - see stmx/util/tcons.lisp and stmx/util/tlist.lisp
+
+Unluckily, the hardware bug that prompted Intel to disable hardware transactional memory (TSX)
+in August 2014 is still there, and *very* few new models are available without the bug.
+So for the moment STMX will be software-only on many CPUs.
+
+### News, 20th May 2014
+
+STMX was presented at
+[7th European Lisp Symposium (ELS 2014)](http://www.european-lisp-symposium.org/)
+in a technical paper titled
+[High performance concurrency in Common Lisp - hybrid transactional memory with STMX](doc/stmx-ELS-2014.pdf).
+
+[Slides](http://www.european-lisp-symposium.org/ghilardi.pdf)
+and [video](http://medias.ircam.fr/xcc8494) 
+of STMX presentation are available from
+[ELS 2014 website](http://www.european-lisp-symposium.org/content-programme-full.html).
+
+Thanks everybody who joined this great event in Paris!
+
+
+### News, 31st August 2013
 
 Since version 1.9.0, STMX supports hardware memory transactions in addition to
 classic software ones. It uses Transactional Synchronization
-Extensions (TSX) available at least on the following Intel x86_64 processors
-released in June 2013:
-
-- Intel Core i5 4570
-- Intel Core i5 4670
-- Intel Core i7 4770
+Extensions (Intel TSX) available on the following Intel x86_64 processors:
+- Intel Core i7 4771
+- Intel Core i7 4770, 4770S, 4770T, 4770TE
+- Intel Core i7 4765T
+- Intel Core i5 4670, 4670S, 4670T 
+- Intel Core i5 4570, 4570S, 4570T, 4570TE
 
 To actually use hardware memory transactions with STMX, you will need:
 
@@ -81,14 +107,19 @@ Supported systems
 -----------------
 STMX is currently tested on the following Common Lisp implementations:
 
-* SBCL  version 1.1.11       (x86_64) on Debian GNU/Linux 7.0  (x86_64)
-* SBCL  version 1.0.55.0     (x86)    on Ubuntu Linux 12.04LTS (x86)
-* ABCL  version 1.1.1 with OpenJDK 6b27-1.12.5-2 (x86_64) on Debian GNU/Linux 7.0 (x86_64)
-* CCL   version 1.9-r15769   (x86_64) on Debian GNU/Linux 7.0  (x86_64)
-* CCL   version 1.9-r15769M  (x86)    on Debian GNU/Linux 7.0  (x86_64)
-* CCL   version 1.9-dev-r15475M-trunk (LinuxARM32) on Raspbian GNU/Linux (armhf) Raspberry Pi
-* CMUCL version 20d Unicode  (x86)    on Debian GNU/Linux 7.0  (x86_64)
-* CMUCL version 20c Unicode  (x86)    on Debian GNU/Linux 7.0  (x86)
+* SBCL  version 1.2.6        (x86_64)   on Debian GNU/Linux 8.0  (x86_64)
+* SBCL  version 1.1.14       (x86_64)   on Debian GNU/Linux 8.0  (x86_64)
+* SBCL  version 1.0.55.0     (x86)      on Ubuntu Linux 12.04LTS (x86)
+* SBCL  version 1.1.15       (powerpc)  on Debian GNU/Linux 7.3  (powerpc) inside Qemu
+* SBCL  version 1.2.1        (armhf)    on Raspbian GNU/Linux (armhf) Raspberry Pi
+
+* ABCL  version 1.3.1 with OpenJDK 7u71 (x86_64) on Debian GNU/Linux 8.0 (x86_64)
+
+* CCL   version 1.10         (x86_64)   on Debian GNU/Linux 8.0  (x86_64)
+* CCL   version 1.10         (x86)      on Debian GNU/Linux 8.0  (x86_64)
+* CCL   version 1.9-r15761   (linuxppc) on Debian GNU/Linux 7.3  (powerpc) inside Qemu
+
+* CMUCL version 20d Unicode  (x86)      on Debian GNU/Linux 8.0  (x86_64)
 
 CMUCL needs a small workaround to run STMX reliably, see
 [doc/supported-systems.md](doc/supported-systems.md).
@@ -127,11 +158,8 @@ If all goes well, this will automatically download and install the
 - `bordeaux-threads`
 - `trivial-garbage`
 
-Note: as of August 2013, Quicklisp contains STMX version 1.3.3, which does
-**not** yet contain support for hardware memory transactions - to get them,
-download the latest version from GitHub (see below). Quicklisp will probably
-include STMX 1.9.0, which supports hardware transactions, in the next
-update.
+Note: as of December 2013, Quicklisp contains STMX version 1.9.0, which 
+also supports hardware transactional memory (Intel TSX)
 
 Since STMX was added to QuickLisp quite recently (15 June 2013), it
 may happen that your Quicklisp installation can't find it. In such
@@ -232,16 +260,29 @@ Basic usage
 STMX offers the following Lisp macros and functions, also heavily documented
 in the sources - remember `(describe 'some-symbol)` at REPL.
 
-- `TRANSACTIONAL` declares that a class is transactional, i.e. that its
-  slots contain transactional data. Use it to wrap a class definition:
+- `TRANSACTIONAL` declares that a class or struct is transactional, i.e. that its
+  slots contain transactional data. Use it to wrap a class or a struct definition:
   
         (transactional
           (defclass foo ()
             ((value1 :type integer :initarg :value1 :initform 0)
              (value2 :type string  :initarg :value2 :initform ""))))
 
+        (transactional
+          (defstruct bar ()
+            (value1 0  :type integer)
+            (value2 "" :type string)))
+
+  If you want to declare a slot as non-transactional, for example because it is
+  immutable, add the option `:transactional nil`:
+
+        (transactional
+          (defclass tred-black-tree ()
+            ((root           :type t)
+             (key-comparator :type function :transactional nil))))
+
   Note: on some Common Lisp implementations (ABCL and possibly others)
-  slot accessors are known to ignore by default the transactional machinery
+  CLOS slot accessors are known to ignore by default the transactional machinery
   (implemented with MOP slot-value-using-class, if you wonder) causing all
   kind of errors on transactional classes.
   Even though usually this problem can be usually at least *partially* fixed
@@ -249,6 +290,10 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   instead of slot accessors to read and write the slots of transactional
   classes or, even better, a macro that can be defined to use either
   `slot-value` or slot accessors.
+
+  Support for `(TRANSACTIONAL (DEFSTRUCT ...))` was added in STMX version 2.0.1
+  on January 2015. Previously, only `(TRANSACTIONAL (DEFCLASS ...))` was supported.
+
 
 - `ATOMIC` is the main macro: it wraps Lisp forms into an atomic
    memory transaction then executes them. For example, defining
@@ -300,6 +345,10 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   input/output. More details in the paragraph INPUT/OUTPUT DURING TRANSACTIONS
   below.
 
+  Note: new threads **must** be created with `(bordeaux-threads:start-thread)`
+  in order to establish thread-local bindings needed by STMX. A safety check
+  that detects missing thread-local bindings has been recently added to STMX.
+  
   Note: STMX allows using transactional data both inside and outside atomic
   blocks, but be aware that accessing transactional data from outside
   atomic transactions is only intended for **debugging** purposes at the REPL:
@@ -707,7 +756,7 @@ related methods and functions, all in the STMX.UTIL package - for more details,
 use `(describe 'some-symbol)` at REPL:
 
 - `TCELL` is the simplest transactional class. It is created with
-  `(make-instance 'tcell [:value initial-value])` and it can be empty or hold a
+  `(tcell [initial-value])` and it can be empty or hold a
   single value.
 
   Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
@@ -723,21 +772,23 @@ use `(describe 'some-symbol)` at REPL:
 - `TCONS` is a transactional cons cell. It is created with
   `(tcons first-value second-value)`.
 
-  Methods: `TFIRST` `(SETF TFIRST)` `TREST` `(SETF TREST)`.
+  Functions: `TFIRST` `(SETF TFIRST)` `TREST` `(SETF TREST)`.
 
   Seldom used directly.
 
-- `TLIST` is a transactional list. It is created with
+- `TLIST` is a transactional list, composed of `TCONS` cells. It is created with
   `(tlist [values ...])`.
 
-  Methods: `TFIRST` `(SETF TFIRST)` `TREST` `(SETF TREST)` `TPUSH` `TPOP`.
+  Functions: `TFIRST` `(SETF TFIRST)` `TREST` `(SETF TREST)` `TPUSH` `TPOP`
+  `TSECOND` `TTHIRD` `TFOURTH` `TNTH` `TLAST` `TLIST-LENGTH` `TLIST*` and many others.
+  See stmx/util/tlist.lisp for details.
 
   Normal lists are perfectly suitable for transactional use as long as
   they are not destructively modified, so TLIST is often unnecessary:
   it becomes needed only to support transactional destructive modifications.
 
 - `TSTACK` is a transactional first-in-last-out buffer. It is created with
-  `(make-instance 'tstack)` and it can be empty or hold unlimited values.
+  `(tstack)` and it can be empty or hold unlimited values.
 
   Methods: `FULL?` `EMPTY?` `EMPTY!` `PEEK` `TAKE` `PUT` `TRY-TAKE` `TRY-PUT`.
 
@@ -793,19 +844,22 @@ use `(describe 'some-symbol)` at REPL:
 
 - `THASH-TABLE` is a transactional hash table.
   It is created with
-  `(make-instance 'thash-table [:test #'some-test-function] [:hash #'some-hash-function])`.
+  `(make-instance 'thash-table [:test 'some-test-function] [:hash 'some-hash-function])`.
 
-  Two differences from standard Common Lisp HASH-TABLE:
-  - `:test` argument must be an actual function, not a symbol. The default is `#'eql`.
-  - a hash function can be specified explicitly with `:hash #'some-hash-function`
-  For the usual test functions, i.e. `#'eq` `#'eql` and `#'equal` the hash function
-  can be omitted and a safe default (usually `#'sxhash`) will be used.
+  One difference from standard Common Lisp HASH-TABLE:
+  - a hash function can be specified explicitly with `:hash 'some-hash-function`
+  For the usual test functions, i.e. `'eq` `'eql` `'equal` and `'equalp` the hash function
+  can be omitted and a safe default (usually `'sxhash`) will be used.
   For other test functions, the hash function becomes mandatory.
 
   Methods: `GHASH-TABLE-COUNT` `GHASH-TABLE-EMPTY?` `CLEAR-GHASH`
            `GET-GHASH` `(SETF GET-GHASH)` `SET-GHASH` `REM-GHASH` 
            `MAP-GHASH` `DO-GHASH` `COPY-GHASH`
-           `GHASH-KEYS` `GHASH-VALUES` `GHASH-PAIRS`.
+           `GHASH-KEYS` `GHASH-VALUES` `GHASH-PAIRS`
+           `GHASH-TEST` `GHASH-HASH`.
+
+  Note: THASH-TABLE test functions and hash functions changed in STMX 2.0.0.
+  They now must be function names (i.e. symbols), previously they were actual functions.
 
   Note: THASH-TABLE has been completely rewritten in STMX 1.3.3 and
   has now much better performance. Previously its methods contained
@@ -813,18 +867,22 @@ use `(describe 'some-symbol)` at REPL:
 
 - `TMAP` is a transactional sorted map, backed by a red-black tree.
   It is created with `(make-instance 'tmap :pred compare-function)`
-  where COMPARE-FUNCTION must be a function accepting two arguments, KEY1 and
-  KEY2, and returning t if KEY1 is smaller that KEY2. For numeric keys, typical
-  COMPARE-FUNCTIONs are `#'<` or `#'>` and the faster `#'fixnum<` or `#'fixnum>`.
-  For string keys, typical COMPARE-FUNCTIONs are `#'string<` and `#'string>`.
+  where COMPARE-FUNCTION must be the name of a function accepting two arguments,
+  KEY1 and KEY2, and returning t if KEY1 is smaller that KEY2.
+  For numeric keys, typical COMPARE-FUNCTIONs are `'<` or `'>` and the faster
+  `'fixnum<` or `'fixnum>`.
+  For string keys, typical COMPARE-FUNCTIONs are `'string<` and `'string>`.
 
   Methods: `GMAP-PRED` `GMAP-COUNT` `GMAP-EMPTY?` `CLEAR-GMAP`
            `GET-GMAP` `(SETF GET-GMAP)` `SET-GMAP` `REM-GMAP` 
            `MIN-GMAP` `MAX-GMAP` `MAP-GMAP` `DO-GMAP`
            `GMAP-KEYS` `GMAP-VALUES` `GMAP-PAIRS`.
 
-  Note: TMAP methods were renamed in STMX 1.3.3, they previously contained
-  `BMAP` instead of `GMAP` in their names.
+  Note: COMPARE-FUNCTIONs changed in STMX 2.0.0. They now must be function names
+  (i.e. symbols), previously they were actual functions.
+
+  Note: TMAP methods changed in STMX 1.3.3. They now contain `GMAP` in their names,
+  previously they contained `BMAP` in the name.
 
 - `GHASH-TABLE` is the non-transactional version of `THASH-TABLE`. Not so
   interesting by itself, as Common Lisp offers a standard (and usually faster)

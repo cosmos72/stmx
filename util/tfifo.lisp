@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -22,6 +22,9 @@
    ((front :type tcons :accessor front-of)
     (back  :type tcons :accessor back-of))))
 
+
+(defun tfifo ()
+  (new 'tfifo))
 
 (defmethod initialize-instance :after ((f tfifo) &key &allow-other-keys)
   "Initialize tfifo F."
@@ -104,8 +107,8 @@ Since tfifo can contain unlimited values, this method never fails."
          for rest = (trest list)
          do
            (when (eq rest end)
-             (format t "~A" value)
+             (format t "~S" value)
              (return))
-           (format t "~A " value)
+           (format t "~S " value)
            (setf list rest))))
   (write-string ")"))

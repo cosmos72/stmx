@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -35,11 +35,6 @@
    (:documentation "Priority queue implemented with a binary min-heap.
 Elements that compare smaller will be the first (top) in the heap."))
 
-
-(defmethod initialize-instance :after ((q bheap) &key &allow-other-keys)
-  "Initialize bheap Q."
-  (setf (length-of q) (length (vector-of q)))
-  (heapify-bheap q))
 
 ;;;; ** bheap private functions
 
@@ -104,7 +99,7 @@ Destructively modifies (vector-of Q)."
 
   (with-ro-slots (length) q
     (loop for start = (the fixnum (1- (floor length 2))) ;; index of last parent
-         #||#        then (the fixnum (1- start)) 
+         #||#    then (the fixnum (1- start)) 
        while (>= start 0) do
          (sift-down-bheap q start (1- length)))
     q))
@@ -126,10 +121,17 @@ priority queue TQUEUE: as long as bheap is concerned,
 
 ;;;; ** bheap public functions
 
+(defmethod initialize-instance :after ((q bheap) &key &allow-other-keys)
+  "Initialize bheap Q."
+  (setf (length-of q) (length (vector-of q)))
+  (heapify-bheap q))
+
+
 (defun empty-bheap? (q)
   (declare (type bheap q))
   "Return t if bheap Q is empty."
   (zerop (length-of q)))
+
 
 (defun clear-bheap (q)
   "Remove all values from bheap Q. Return Q."

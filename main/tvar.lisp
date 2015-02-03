@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -113,8 +113,8 @@ and by writing TOBJs slots."
 
 
 
-(declaim (inline $-tx))
-(defun $-tx (var)
+(declaim (inline $-swtx))
+(defun $-swtx (var)
     "Get the value from the transactional variable VAR and return it.
 Return +unbound-tvar+ if VAR is not bound to a value.
 Works ONLY inside software memory transactions."
@@ -122,8 +122,8 @@ Works ONLY inside software memory transactions."
   (tx-read-of var))
 
 
-(declaim (inline (setf $-tx)))
-(defun (setf $-tx) (value var)
+(declaim (inline (setf $-swtx)))
+(defun (setf $-swtx) (value var)
   "Store VALUE inside transactional variable VAR and return VALUE.
 Works ONLY inside software memory transactions."
   (declare (type tvar var))
@@ -192,8 +192,8 @@ Works ONLY outside memory transactions."
   `nil)
 
 
-(defmacro use-$-tx? ()
-  "Return T if $-tx and (setf $-tx) should be used, otherwise return NIL."
+(defmacro use-$-swtx? ()
+  "Return T if $-swtx and (setf $-swtx) should be used, otherwise return NIL."
   `(recording?))
 
 
@@ -209,7 +209,7 @@ and to check for any value stored in the log."
 
   (cond
     #?+hw-transactions ((use-$-hwtx?) ($-hwtx var))
-    ((use-$-tx?)   ($-tx   var))
+    ((use-$-swtx?)   ($-swtx   var))
     (t             ($-notx var))))
 
                
@@ -240,12 +240,12 @@ During transactions, it uses transaction log to record the value."
   (let ((hw-write-version *hw-tlog-write-version*))
     (cond
       ((/= +invalid-version+ hw-write-version) (setf ($-hwtx var hw-write-version) value))
-      ((use-$-tx?)                             (setf ($-tx   var) value))
+      ((use-$-swtx?)                             (setf ($-swtx   var) value))
       (t                                       (setf ($-notx var) value))))
 
   #?-hw-transactions
   (cond
-    ((use-$-tx?) (setf ($-tx var) value))
+    ((use-$-swtx?) (setf ($-swtx var) value))
     (t           (setf ($-notx var) value))))
 
 
@@ -465,5 +465,5 @@ if VAR changes."
                 version (tlog-read-version log)))))
 
     (if (eq value +unbound-tvar+)
-        (format t "~A v~A unbound" id version)
-        (format t "~A v~A [~A]" id version value))))
+        (format t "unbound v:~A id:~A" version id)
+        (format t "[~A] v:~A id:~A" value version id))))

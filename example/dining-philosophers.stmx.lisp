@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -15,7 +15,7 @@
 
 (in-package :cl-user)
 
-(defpackage #:stmx.example1
+(defpackage #:stmx.example.dining-philosophers.stmx
   (:use #:cl
         #:bordeaux-threads
         #:stmx.lang
@@ -26,7 +26,7 @@
                 #:new #:try-take-$ #:try-put-$))
 
 
-(in-package :stmx.example1)
+(in-package :stmx.example.dining-philosophers.stmx)
 
 (enable-#?-syntax)  
 
@@ -99,7 +99,7 @@
   ;; (loop until (zerop (the fixnum (atomic (philosopher-eats fork1 fork2 plate)))))
 
   (let1 lambda-philosopher-eats
-        (lambda () (fast-philosopher-eats/swtx fork1 fork2 plate))
+        (lambda () (fast-philosopher-eats fork1 fork2 plate))
     (loop until (zerop (the fixnum (run-atomic lambda-philosopher-eats))))))
 
 
@@ -146,7 +146,7 @@
 
       (let* ((end (get-internal-real-time))
              (elapsed-secs (/ (- end start) (float internal-time-units-per-second)))
-             (elapsed-secs (max elapsed-secs 0.000000001))
+             (elapsed-secs (max elapsed-secs 1f-9))
              (tx-count (/ (* n philosophers-initial-hunger) elapsed-secs))
 	     (tx-unit ""))
 

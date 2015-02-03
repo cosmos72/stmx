@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013 Massimiliano Ghilardi
+;; Copyright (c) 2013-2014 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -38,7 +38,8 @@
    ((root :type (or null tnode))
     ;; inherited slot PRED is immutable -> no need to make it transactional
     ;; -> no need to override it
-    (count))
+    (count)
+    (foo))
    (:documentation "Transactional sorted map, implemented with red-black tree")))
 
 

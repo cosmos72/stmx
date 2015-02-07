@@ -66,14 +66,16 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
  (set-features '(bt/lock-owner :abcl)
                ;; (closer-mop:class-slots <struct>) returns a list of simple-vectors,
                ;; not of a list of slot-definitions. We would need to special-case this...
-               #-(and) 'closer-mop/works-on-structs)
- 
+               #-(and) 'closer-mop/works-on-structs
+               '(sxhash-equalp sys:psxhash))
+
  #+ccl
  (set-features '(bt/lock-owner ccl::%%lock-owner)
                #+x86 '(mem-rw-barriers nil) ;; causes "bogus object" errors.
                '(define-constant-once nil) ;; causes deadlocks
                'use-initialize-instance-before
-               'closer-mop/works-on-structs)
+               'closer-mop/works-on-structs
+               '(sxhash-equalp ccl::%%equalphash))
 
  #+clisp
  ;; as of CLISP 2.49, threads are experimental an disabled by default,
@@ -82,19 +84,29 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
  (set-features '(bt/with-lock nil)
                '(mem-rw-barriers nil)
                'use-initialize-instance-before
-               'closer-mop/works-on-structs)
+               'closer-mop/works-on-structs
+               ;; on CLISP, SXHASH can be used for SXHASH-EQUALP,
+               ;; with performance degradation because it hashes
+               ;; 1) all HASH-TABLEs to the same hash
+               ;; 2) all STRUCTURE-OBJECT of the same type to the same hash
+               ;; potentially causing a lot of conflicts in GHASH-TABLE and THASH-TABLE
+               '(sxhash-equalp sxhash))
 
  #+cmucl
  (set-features '(bt/lock-owner mp::lock-process)
-               'closer-mop/works-on-structs)
-
-
+               'closer-mop/works-on-structs
+               '(sxhash-equalp (lisp::internal-equalp-hash * 0)))
+ 
  #+ecl
+ ;; ECL versions up to 13.5.1 have issues with reloading bordeaux-threads from cached FASLs.
+ ;; as of 2015-02-07, latest ECL from git://git.code.sf.net/p/ecls/ecl seems to fix them
  (set-features '(bt/lock-owner mp::lock-owner)
                '(bt/with-lock nil) ;; bugged?
                '(mem-rw-barriers nil) ;; bugged?
                '(define-constant-once nil) ;; bugged?
-               'closer-mop/works-on-structs)
+               'use-initialize-instance-before
+               'closer-mop/works-on-structs
+               '(sxhash-equalp si:hash-equalp))
  
  #+sbcl
  (set-features #+compare-and-swap-vops '(atomic-ops :sbcl)
@@ -108,7 +120,8 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
                #?+(symbol sb-ext defglobal) '(define-global sb-ext:defglobal)
 
                'use-initialize-instance-before
-               'closer-mop/works-on-structs))
+               'closer-mop/works-on-structs
+               '(sxhash-equalp sb-impl::sxhash)))
 
 
 

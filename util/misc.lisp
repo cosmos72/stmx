@@ -60,7 +60,6 @@
 (deftype comp-result () `(member ,k< ,k= ,k>))
 
 (declaim (inline compare-keys))
-
 (defun compare-keys (pred key1 key2)
   "Compare KEY1 agains KEY2 using the comparison function PRED.
 Return K< if KEY1 compares as lesser than KEY2,
@@ -73,6 +72,21 @@ return K= if KEY1 and KEY2 compare as equal."
       ((funcall pred key2 key1) k>)
       (t k=))))
 
+
+(declaim (inline sxhash-equalp))
+(defun sxhash-equalp (x)
+  "Variant of SXHASH designed for EQUALP tests, i.e.
+\(equalp x y) implies (= (sxhash-equalp x) (sxhash-equalp y)).
+A common use is for ghash-tables and thash-tables that use :test 'equalp"
+  #+abcl  (sys:psxhash x)
+  #+ccl   (ccl::%%equalphash x)
+  #+cmucl (lisp::internal-equalp-hash x 0)
+  #+sbcl  (sb-impl::sxhash x)
+  #-(or abcl ccl cmucl sbcl)
+  (progn
+    #.(log:warn "SXHASH-EQUALP not supported on this implementation, falling back on SXHASH.
+  GHASH-TABLE and THASH-TABLE instances using :test 'EQUALP may not work properly")
+    (sxhash x)))
 
 
 ;;;; ** Utility macros

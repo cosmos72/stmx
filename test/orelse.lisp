@@ -146,13 +146,13 @@
 (defun to-vector (seq)
   (coerce seq 'simple-vector))
 
-(defun orelse-thread6 (&optional (iterations 1))
-  "This test runs a pass-the-ball algorithm with 4 threads
+(defun orelse-threads (&key (thread-pairs 2) (iterations 100))
+  "This test runs a pass-the-ball algorithm with N threads
 that take turns consuming (take) and producing (put) values in 4 cells.
 
-Three threads consume values from cells 1 or 2, increase the value by one,
+Half of the threads consume values from cells 1 or 2, increase the value by one,
 and produce into cells 3 or 4.
-Three other threads consume values from cells 3 or 4, increase the value by one,
+The other half consume values from cells 3 or 4, increase the value by one,
 and produce into cells 1 or 2.
 
 Consuming a value \"from cells x or y\" means (atomic (orelse (take cell-x) (take cell-y))),
@@ -172,7 +172,7 @@ The test first creates the threads, then atomically puts the four values
 \(0 0.25 0.5 0.75) in the cells to trigger the pass-the-ball among the threads,
 and finishes after each thread executed ITERATIONS loops, returning the final cell values."
 
-  (declare (type fixnum iterations))
+  (declare (type fixnum thread-pairs iterations))
 
   (start-multithreading)
 
@@ -185,17 +185,14 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
          (cells2 (to-vector (rotate-list cells 2)))
          (names2 (to-vector (rotate-list names 2))))
 
-    (flet ((f1 ()
+    (flet ((orelse-left ()
              (orelse-func iterations cells1 names1))
-           (f2 ()
+           (orelse-right ()
              (orelse-func iterations cells2 names2)))
 
-      (let1 ths (list (start-thread #'f1 :name "A")
-                      (start-thread #'f1 :name "B")
-                      (start-thread #'f1 :name "C")
-                      (start-thread #'f2 :name "D")
-                      (start-thread #'f2 :name "E")
-                      (start-thread #'f2 :name "F"))
+      (let1 ths (loop for i below thread-pairs
+                   collect (start-thread #'orelse-left :name (format nil "orelse-left-~S" i))
+                   collect (start-thread #'orelse-right :name (format nil "orelse-right-~S" i)))
 
         (sleep 1f-2)
 
@@ -218,21 +215,26 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
              collect (take cell))))))))
 
 
-(defun orelse-thread6-test (&optional (iterations 1))
-  (multiple-value-bind (values cells)
-      (orelse-thread6 iterations)
+(defun orelse-threads-test (threads iterations)
+  (declare (type fixnum thread iterations))
 
-    (loop for list in (list values cells) do
-         (loop for e in list do
-              (is-true (numberp e))))
+  (let ((thread-pairs (truncate (1+ threads) 2)))
+    
+    (multiple-value-bind (values cells)
+        (orelse-threads :thread-pairs thread-pairs :iterations iterations)
 
-    (let1 remainders (sort (loop for v in cells collect (mod v 1)) #'<)
-      (is-true (equalp '(0.0f0 0.25f0 0.5f0 0.75f0) remainders)))
+      (loop for list in (list values cells) do
+           (loop for e in list do
+                (is-true (numberp e))))
 
-    (let1 total (apply #'+ cells)
-      (is-true (= total (+ 1.5f0 (* 6 iterations)))))))
+      (let1 remainders (sort (loop for v in cells collect (mod v 1)) #'<)
+        (is-true (equalp '(0.0f0 0.25f0 0.5f0 0.75f0) remainders)))
+
+      (let1 total (apply #'+ cells)
+        (is-true (= total (+ 1.5f0 (* threads iterations))))))))
 
 
 #?+bt/make-thread
-(def-test orelse-thread6 (:compile-at :definition-time)
-  (orelse-thread6-test 15000))
+(def-test orelse-threads (:compile-at :definition-time)
+  #+(and sbcl (or x86 x86-64)) (orelse-threads-test 6 15000)
+  #-(and sbcl (or x86 x86-64)) (orelse-threads-test 4 1000))

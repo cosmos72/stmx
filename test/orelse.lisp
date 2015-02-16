@@ -216,7 +216,7 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
 
 
 (defun orelse-threads-test (threads iterations)
-  (declare (type fixnum thread iterations))
+  (declare (type fixnum threads iterations))
 
   (let ((thread-pairs (truncate (1+ threads) 2)))
     

@@ -121,7 +121,7 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
 
                'use-initialize-instance-before
                'closer-mop/works-on-structs
-               '(sxhash-equalp sb-impl::sxhash)))
+               '(sxhash-equalp sb-impl::psxhash)))
 
 
 

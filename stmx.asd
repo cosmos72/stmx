@@ -135,6 +135,7 @@
                              (:file "on-commit"      :depends-on ("atomic"))
                              (:file "retry"          :depends-on ("package"))
                              (:file "orelse"         :depends-on ("package"))
+                             (:file "accessors"      :depends-on ("atomic"))
                              (:file "tmap"           :depends-on ("rbmap" "orelse"))))))
 
 

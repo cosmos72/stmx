@@ -231,16 +231,16 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
             ((root           :type t)
              (key-comparator :type function :transactional nil))))
 
-  Note: on some Common Lisp implementations (ABCL and possibly others)
-  CLOS slot accessors are known to ignore by default the transactional machinery
-  (implemented with MOP slot-value-using-class, if you wonder) causing all
-  kind of errors on transactional classes.
-  Even though usually this problem can be usually at least *partially* fixed
-  with implementation-specific options, it is recommended to use `slot-value`
-  instead of slot accessors to read and write the slots of transactional
-  classes or, even better, a macro that can be defined to use either
-  `slot-value` or slot accessors.
-
+  Note: on all Common Lisp implementations listed above, CLOS slot accessors
+  have been tested to work correctly, i.e. they honour the transactional machinery
+  (implemented with MOP slot-value-using-class) and return the same values
+  as SLOT-VALUE.
+  
+  In the past, some cases were found - and fixed - where slot accessors would not
+  work correctly on transactional classes. It is *strongly* recommended to run
+  the test suite when using STMX for the first time on a system: it will also check
+  that accessors work on transactional classes.
+  
   Support for `(TRANSACTIONAL (DEFSTRUCT ...))` was added in STMX version 2.0.1
   on January 2015. Previously, only `(TRANSACTIONAL (DEFCLASS ...))` was supported.
 

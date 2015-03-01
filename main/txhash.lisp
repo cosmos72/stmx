@@ -28,12 +28,10 @@
 
 (defmacro do-txfifo-entries ((pair) fifo &body body)
   "Execute BODY on each TXPAIR contained in FIFO. Return NIL."
-  (with-gensym next
-    `(loop for ,pair = (txfifo-front ,fifo) then ,next
-        while ,pair
-        for ,next = (txpair-rest ,pair)
-        do
-          (progn ,@body))))
+  `(loop for ,pair = (txfifo-front ,fifo) then (txpair-rest ,pair)
+      while ,pair do
+        (progn
+          ,@body)))
 
 
 (defmacro do-txfifo ((key &optional value) fifo &body body)
@@ -51,16 +49,16 @@
     `(let1 ,f ,fifo
        (loop for ,prev = nil then ,pair
           for ,pair = (txfifo-front ,f) then ,next
-          while ,pair
-          for ,next = (txpair-rest ,pair)
-          do
+          with ,next = nil
+          while ,pair do
+            (setf ,next (txpair-rest ,pair))
             (flet ((rem-current-txfifo-entry ()
                      (if ,prev
                          (setf (txpair-rest ,prev) ,next)
                          (setf (txfifo-front ,f) ,next))
                      (unless ,next
                        (setf (txfifo-back ,f) ,prev))))
-              (progn ,@body))))))
+              ,@body)))))
 
 
 (defmacro do-filter-txfifo ((key &optional value) fifo &body body)
@@ -98,13 +96,13 @@
        (dotimes (,i ,n)
          (when (zerop ,left)
            (return))
-         (loop named ,loop-name
-            for ,pair = (svref ,vec ,i) then ,next
-            while ,pair
-            for ,next = (txpair-next ,pair)
-            do
-              (decf ,left)
-              ,@body)))))
+           (loop named ,loop-name
+              for ,pair = (svref ,vec ,i) then ,next
+              with ,next = nil
+              while ,pair do
+                (setf ,next (txpair-next ,pair))
+                (decf ,left)
+                ,@body)))))
                 
 
 

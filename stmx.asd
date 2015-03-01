@@ -17,7 +17,7 @@
 
 (asdf:defsystem :stmx
   :name "STMX"
-  :version "2.0.1"
+  :version "2.0.2"
   :license "LLGPL"
   :author "Massimiliano Ghilardi"
   :description "Composable Transactional Memory"
@@ -86,7 +86,11 @@
 
                              (:file "container"      :depends-on ("misc"))
                              (:file "tcons"          :depends-on ("misc"))
-                             (:file "tlist"          :depends-on ("tcons"))
+                             (:file "tcons-list"     :depends-on ("tcons"))
+                             (:file "tcons-alist"    :depends-on ("tcons"))
+                             (:file "tcons-set"      :depends-on ("tcons"))
+                             (:file "tcons-tree"     :depends-on ("tcons"))
+                             (:file "tcons-higher"   :depends-on ("tcons-alist"))
                              (:file "tvar"           :depends-on ("container"))
                              (:file "tcell"          :depends-on ("container"))
                              (:file "tstack"         :depends-on ("container"))
@@ -109,7 +113,7 @@
 
 (asdf:defsystem :stmx.test
   :name "STMX.TEST"
-  :version "2.0.1"
+  :version "2.0.2"
   :author "Massimiliano Ghilardi"
   :license "LLGPL"
   :description "test suite for STMX"
@@ -131,6 +135,7 @@
                              (:file "on-commit"      :depends-on ("atomic"))
                              (:file "retry"          :depends-on ("package"))
                              (:file "orelse"         :depends-on ("package"))
+                             (:file "accessors"      :depends-on ("atomic"))
                              (:file "tmap"           :depends-on ("rbmap" "orelse"))))))
 
 

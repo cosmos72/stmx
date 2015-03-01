@@ -18,7 +18,7 @@
 ;;;; * Hash-table utilities
 
 
-#+never
+#-(and)
 (eval-always
  (defstruct hash-counter
    "(stmx.example1::dining-philosophers 4 1000000) on average
@@ -43,7 +43,7 @@ hash table operations for EACH iteration:
         (sb-ext:atomic-incf (,accessor *hash-counter*))
         nil))))
 
-#-always
+#+(and)
 (defmacro incf-hash-counter (which)
   (declare (ignore which))
   nil)

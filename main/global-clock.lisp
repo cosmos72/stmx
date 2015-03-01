@@ -21,6 +21,7 @@
 ;;;; ** global clock - exact, atomic counter for transaction validation:
 ;;;; used to ensure transactional read consistency.
 
+(eval-always
 
 (defconstant +global-clock-delta+ 2
   "+global-clock+ VERSION is incremented by 2 each time: the lowest bit
@@ -37,25 +38,24 @@ is reserved as \"prevent HW transactions\"")
 
 (deftype gv156/version-type () 'atomic-counter-num)
 
-(eval-always
-  (defstruct (gv156 (:include atomic-counter))
-    (nohw-counter 0 :type atomic-counter-slot-type)
-    (nohw-flag    0 :type bit)
-    ;; padding to put {hw,sw}-{commits,aborts} in a different cache line.
-    ;; Assumes cache line size = 64 bytes, i.e. 8 slots on 64-bit archs
-    (pad1 0) (pad2 0) (pad3 0)
-    (pad4 0) (pad5 0) (pad6 0)
-    (pad7 0)
-    (commits 0 :type fixnum)
-    (aborts  0 :type fixnum))
+(defstruct (gv156 (:include atomic-counter))
+  (nohw-counter 0 :type atomic-counter-slot-type)
+  (nohw-flag    0 :type bit)
+  ;; padding to put {hw,sw}-{commits,aborts} in a different cache line.
+  ;; Assumes cache line size = 64 bytes, i.e. 8 slots on 64-bit archs
+  (pad1 0) (pad2 0) (pad3 0)
+  (pad4 0) (pad5 0) (pad6 0)
+  (pad7 0)
+  (commits 0 :type fixnum)
+  (aborts  0 :type fixnum))
 
-  (defstruct lv156
-    (commits 0 :type fixnum)
-    (aborts  0 :type fixnum))
+(defstruct lv156
+  (commits 0 :type fixnum)
+  (aborts  0 :type fixnum))
 
-  (defmethod make-load-form ((obj gv156) &optional environment)
-    (declare (ignore environment))
-    `(make-gv156)))
+(defmethod make-load-form ((obj gv156) &optional environment)
+  (declare (ignore environment))
+  `(make-gv156))
 
 
 
@@ -650,16 +650,18 @@ to let the latter run, since their current implementations are mutually incompat
 
 
 
-(eval-always
-  (defun global-clock/publish-features ()
-    "Publish (GLOBAL-CLOCK/FEATURES) to stmx.lang::*feature-list*
+(defun global-clock/publish-features ()
+  "Publish (GLOBAL-CLOCK/FEATURES) to stmx.lang::*feature-list*
 so they can be tested with #?+ and #?- reader macros."
-    (loop for pair in (global-clock/features) do
-         (let* ((feature (if (consp pair) (first  pair) pair))
-                (value   (if (consp pair) (second pair) t))
-                (gv-feature (%gvx-expand0-f 'global-clock feature)))
+  (loop for pair in (global-clock/features) do
+        (let* ((feature (if (consp pair) (first  pair) pair))
+               (value   (if (consp pair) (second pair) t))
+               (gv-feature (%gvx-expand0-f 'global-clock feature)))
 
-           (stmx.lang::set-feature gv-feature value))))
+          (stmx.lang::set-feature gv-feature value))))
 
-  (global-clock/publish-features))
-     
+(global-clock/publish-features)
+
+
+) ;; eval-always
+    

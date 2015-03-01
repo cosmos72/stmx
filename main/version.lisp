@@ -18,11 +18,11 @@
 ;;;; ** constants
 
 (declaim (type cons *stmx-version*))
-(defparameter *stmx-version* '(1 9 1))
+(defparameter *stmx-version* '(2 0 2))
 
 
 (defun stmx-internal-error (datum &rest arguments)
-  (error "STMX internal error!~&   ~A" 
+  (error "STMX internal error!~&  ~A" 
          (apply #'format nil datum arguments)))
 
 

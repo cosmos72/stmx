@@ -15,6 +15,8 @@
 
 (in-package :stmx.util)
 
+(enable-#?-syntax)
+
 ;;;; ** Some simple functions optimized for FIXNUMs
 
 
@@ -60,7 +62,6 @@
 (deftype comp-result () `(member ,k< ,k= ,k>))
 
 (declaim (inline compare-keys))
-
 (defun compare-keys (pred key1 key2)
   "Compare KEY1 agains KEY2 using the comparison function PRED.
 Return K< if KEY1 compares as lesser than KEY2,
@@ -74,6 +75,29 @@ return K= if KEY1 and KEY2 compare as equal."
       (t k=))))
 
 
+
+
+#?+sxhash-equalp
+(defmacro %sxhash-equalp (x)
+  (let ((form (get-feature 'sxhash-equalp)))
+    (etypecase form
+      (symbol (list form x))
+      (cons   (substitute x '* form)))))
+
+#?-sxhash-equalp
+(defmacro %sxhash-equalp (x)
+  #.(log:warn "missing SXHASH-EQUALP on this implementation,
+  falling back on SXHASH.
+  GHASH-TABLE and THASH-TABLE instances using :test 'EQUALP may not work properly.")
+  `(sxhash ,x))
+
+
+(declaim (inline sxhash-equalp))
+(defun sxhash-equalp (x)
+  "Variant of SXHASH designed for EQUALP tests, i.e.
+\(equalp x y) implies (= (sxhash-equalp x) (sxhash-equalp y)).
+A common use is for ghash-tables and thash-tables that use :test 'equalp"
+  (%sxhash-equalp x))
 
 ;;;; ** Utility macros
 

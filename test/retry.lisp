@@ -41,34 +41,34 @@
   (declare (type fixnum n)
            (type tcell c1 c2))
 
-  (flet ((f1 ()
+  (flet ((retry-left ()
            (let1 x 0.0f0
              (declare (type single-float x))
              (dotimes (i n)
-               (log:trace "         <= R")
+               (log.trace "         <= R")
                (setf x (take c2))
-               (log:trace "  <= ~A <= R" x)
+               (log.trace "  <= ~A <= R" x)
                (put c1 x)
-               (log:trace "L <= ~A" x))
-             (log:debug "left ~A in L" x)
+               (log.trace "L <= ~A" x))
+             (log.debug "left ~A in L" x)
              x))
       
-         (f2 ()
+         (retry-right ()
            (let1 x 0.0f0
              (declare (type single-float x))
              (dotimes (i n)
-               (log:trace "L =>")
+               (log.trace "L =>")
                (setf x (take c1))
-               (log:trace "L => ~A +>" x)
+               (log.trace "L => ~A +>" x)
                (incf x)
                (put c2 x)
-               (log:trace "     ~A => R" x))
-             (log:debug "left ~A in R" x)
+               (log.trace "     ~A => R" x))
+             (log.debug "left ~A in R" x)
              x)))
-    (values #'f1 #'f2)))
+    (values #'retry-left #'retry-right)))
 
-(defun retry-thread8 (&key (two-tokens nil) (iterations 1))
-  (declare (type fixnum iterations))
+(defun retry-threads (&key (two-tokens nil) (thread-pairs 2) (iterations 100))
+  (declare (type fixnum thread-pairs iterations))
 
   (start-multithreading)
 
@@ -77,14 +77,9 @@
 
     (multiple-value-bind (f1 f2) (retry-funs iterations c1 c2)
 
-      (let1 ths (list (start-thread f1 :name "A")
-                      (start-thread f1 :name "B")
-                      (start-thread f1 :name "C")
-                      (start-thread f1 :name "D")
-                      (start-thread f2 :name "X")
-                      (start-thread f2 :name "Y")
-                      (start-thread f2 :name "Z")
-                      (start-thread f2 :name "W"))
+      (let ((ths (loop for i below thread-pairs
+                    collect (start-thread f1 :name (format nil "retry-left-~S" i))
+                    collect (start-thread f2 :name (format nil "retry-right-~S" i)))))
         (atomic
          (when two-tokens
            (put c1 0.0f0))
@@ -96,16 +91,19 @@
           (values xs (atomic (list (peek c1) (peek c2)))))))))
 
 
-(defun retry-thread8-test (iterations)
-  (let ((expected (+ 0.5f0 (* 4 iterations))))
+(defun retry-threads-test (threads iterations)
+  (let* ((thread-pairs (truncate (1+ threads) 2))
+         (expected (+ 0.5f0 (* thread-pairs iterations))))
 
-    (multiple-value-bind (xs cs) (retry-thread8 :two-tokens nil :iterations iterations)
+    (multiple-value-bind (xs cs)
+        (retry-threads :two-tokens nil :thread-pairs thread-pairs :iterations iterations)
       (destructuring-bind (c1 c2) cs
         (is-true (null c1))
         (is-true (= expected c2))
         (is-true (= expected (apply #'max xs)))))
 
-    (multiple-value-bind (xs cs) (retry-thread8 :two-tokens t :iterations iterations)
+    (multiple-value-bind (xs cs)
+        (retry-threads :two-tokens t :thread-pairs thread-pairs :iterations iterations)
       (destructuring-bind (c1 c2) cs
         (is-true (not (null c1)))
         (is-true (not (null c2)))
@@ -114,5 +112,6 @@
 
 
 #?+bt/make-thread
-(def-test retry-thread8 (:compile-at :definition-time)
-  (retry-thread8-test 10000))
+(def-test retry-threads (:compile-at :definition-time)
+  #+(and sbcl (or x86 x86-64)) (retry-threads-test 8 10000)
+  #-(and sbcl (or x86 x86-64)) (retry-threads-test 4 1000))

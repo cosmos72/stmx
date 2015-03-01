@@ -110,13 +110,16 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
 
     (unless hash-sym
       ;; provide default hash-fun when test-fun is one of: 'eq 'eql 'equal or 'equalp
-      (if (or (eq test-sym 'eq)
-              (eq test-sym 'eql)
-              (eq test-sym 'equal)
-              (eq test-sym 'equalp))
-          (setf hash-sym 'sxhash)
-          (error "missing ~S argument, cannot instantiate ~S with custom ~S ~S"
-                 :hash (type-of hash) :test test-sym)))
+      (cond
+        ((or (eq test-sym 'eq) (eq test-sym 'eql) (eq test-sym 'equal))
+         (setf hash-sym 'sxhash))
+
+        ((eq test-sym 'equalp)
+         (setf hash-sym 'sxhash-equalp))
+
+        (t
+         (error "missing ~S argument, cannot instantiate ~S with custom ~S ~S"
+                :hash (type-of hash) :test test-sym))))
     
     ;; convert :test and :hash from symbols to actual functions
     (setf (_ hash test-fun) (fdefinition test-sym)
@@ -162,11 +165,12 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
        (dotimes (,i ,n)
          (when (zerop ,left)
            (return))
-         (loop named ,loop-name
+         (loop named ,loop-name ;; (return) will exit from (dotimes) above
             for ,pair = (funcall ,aref-fun ,vec ,i) then ,next
+            with ,next = nil
             while ,pair
-            for ,next = (_ ,pair next)
             do
+              (setf ,next (_ ,pair next))
               (decf ,left)
               (locally ,@body))))))
                 
@@ -182,14 +186,13 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
                 
 
          
-(declaim (inline ghash-mask ghash-subscript find-ghash-pair get-ghash))
-
+(declaim (inline ghash-mask))
 (defun ghash-mask (vec-len)
   "Return the bitmask to use for hash indexes."
   (declare (type fixnum vec-len))
   (the fixnum (1- vec-len)))
 
-
+(declaim (inline ghash-subscript))
 (defun ghash-subscript (hash-code vec &optional (vec-len (length vec)))
   "Return the array subscript in HASH corresponding to HASH-CODE."
   (declare (type simple-vector vec)
@@ -223,7 +226,6 @@ Otherwise return NIL."
 
 (declaim (ftype (function (#-ecl ghash-table #+ecl t t &optional t) (values t boolean)) get-ghash)
          (notinline get-ghash))
-
 (defun get-ghash (hash key &optional default)
   "If KEY is associated to VALUE in HASH, return (values VALUE t)
 Otherwise return (values DEFAULT nil)."
@@ -325,9 +327,10 @@ Return T if KEY was present in HASH, otherwise return NIL."
 
     (loop for prev = nil then pair
        for pair = head then next
+       with next = nil
        while pair
-       for next = (_ pair next)
        do
+         (setf next (_ pair next))
          (when (funcall test-fun key (_ pair key))
            (if prev
                (setf (_ prev next) next)

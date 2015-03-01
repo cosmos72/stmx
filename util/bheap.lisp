@@ -82,12 +82,13 @@ Elements that compare smaller will be the first (top) in the heap."))
         (child end))
     (declare (type fixnum child))
     (loop while (< start child)
-       for parent = (the fixnum (floor (1- child) 2)) do
-         (unless (compare-bheap-entries q parent child)
-           (return))
-         (log:debug "vector = ~A, swapping index ~A with ~A" vector parent child)
-         (rotatef (aref vector parent) (aref vector child))
-         (setf child parent))
+       do
+         (let ((parent (the fixnum (floor (1- child) 2))))
+           (unless (compare-bheap-entries q parent child)
+             (return))
+           (log:debug "vector = ~A, swapping index ~A with ~A" vector parent child)
+           (rotatef (aref vector parent) (aref vector child))
+           (setf child parent)))
     (log:debug "vector = ~A, done with start index = ~A" vector start)))
 
 
@@ -115,8 +116,8 @@ priority queue TQUEUE: as long as bheap is concerned,
   (let* ((n (length v))
          (vcopy (make-array (list (* 2 (1+ n)))
                             :element-type (array-element-type v))))
-    (loop for i from 0 to (1- n) do
-         (setf (aref vcopy i) (aref v i)))
+    (dotimes (i n)
+      (setf (aref vcopy i) (aref v i)))
     vcopy))
 
 ;;;; ** bheap public functions

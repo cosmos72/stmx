@@ -15,80 +15,33 @@ back if it signals an error (and the error is propagated to the caller).
 
 Finally, memory transactions can safely run in parallel in different threads,
 are re-executed from the beginning in case of conflicts or if consistent reads
-cannot be guaranteed, and effects of a memory transaction are not visible from other
-threads until it commits.
+cannot be guaranteed, and their effects are not visible from other threads
+until they commit.
 
-Memory transactions gives freedom from deadlocks, automatic roll-back on failure,
+Memory transactions give freedom from deadlocks, are immune to thread-safety
+bugs and race conditions, provide automatic roll-back on failure,
 and aim at resolving the tension between granularity and concurrency.
+
+
+News
+----
 
 ### Latest news, 16th January 2015
 
 Version 2.0.1 released.
 It adds support for transactional structs in addition to transactional CLOS objects,
 and a faster, struct-based implementation of transactional CONS cells and lists,
-including several list-manipulating functions - see stmx/util/tcons.lisp and stmx/util/tlist.lisp
+including several list-manipulating functions - see [util/tcons.lisp](util/tcons.lisp)
+and [util/tlist.lisp](util/tlist.lisp)
 
 Unluckily, the hardware bug that prompted Intel to disable hardware transactional memory (TSX)
 in August 2014 is still there, and *very* few new models are available without the bug.
 So for the moment STMX will be software-only on many CPUs.
 
-### News, 20th May 2014
+### Older news
 
-STMX was presented at
-[7th European Lisp Symposium (ELS 2014)](http://www.european-lisp-symposium.org/)
-in a technical paper titled
-[High performance concurrency in Common Lisp - hybrid transactional memory with STMX](doc/stmx-ELS-2014.pdf).
+See the file [NEWS.md](NEWS.md)
 
-[Slides](http://www.european-lisp-symposium.org/ghilardi.pdf)
-and [video](http://medias.ircam.fr/xcc8494) 
-of STMX presentation are available from
-[ELS 2014 website](http://www.european-lisp-symposium.org/content-programme-full.html).
-
-Thanks everybody who joined this great event in Paris!
-
-
-### News, 31st August 2013
-
-Since version 1.9.0, STMX supports hardware memory transactions in addition to
-classic software ones. It uses Transactional Synchronization
-Extensions (Intel TSX) available on the following Intel x86_64 processors:
-- Intel Core i7 4771
-- Intel Core i7 4770, 4770S, 4770T, 4770TE
-- Intel Core i7 4765T
-- Intel Core i5 4670, 4670S, 4670T 
-- Intel Core i5 4570, 4570S, 4570T, 4570TE
-
-To actually use hardware memory transactions with STMX, you will need:
-
-- a CPU supporting Intel TSX, for example one from the above list
-- a 64-bit OS (currently tested on Debian GNU/Linux x86_64)
-- a 64-bit installation of Steel Bank Common Lisp (SBCL) version 1.0.55 or later
-  Note: x86_64 is often named AMD64 - they are the same thing
-- the latest STMX version - download it from [GitHub](https://github.com/cosmos72/stmx)
-  as described in **Installation and loading** below
-
-The current hardware memory transactions implementation is very fast, yet it
-still has room for optimizations. Currently, it can accelerate short
-transactions up to 4-5 times while seamlessly falling back on software
-transactions when the hardware limits are exceeded. Experiments with
-hand-optimized code (not yet included in STMX) show that the maximum possible
-performance increase is 7-8 times.
-
-### News, 27th July 2013
-
-Since version 1.3.3, STMX also includes [SB-TRANSACTION](sb-transaction), a
-standalone library that does **not** depend on STMX and provides hardware-only
-memory transactions on CPUs that support Intel TSX instructions.
-It is a low-level library providing raw access to the new CPU instructions
-for hardware transactions.
-Its performance reaches the theoretical peak supported by the underlying CPU,
-and it is obviously faster than STMX - it is usually even faster than
-hand-optimized compare-and-swap fine grained locking code (see benchmark
-results in [doc/benchmark.md](doc/benchmark.md)). The reason is that it avoids
-the overhead and the software compatibility requirements of STMX, providing
-only the raw features - and the limitations - of the underlying CPU.
-At the moment, SB-TRANSACTION only works on SBCL running in native 64-bit mode
-on a CPU with hardware transaction support (see the list above).
 
 General documentation
 ---------------------
@@ -102,34 +55,43 @@ how they are used and combined. For the interested reader, it also goes in
 deep detail on how to actually implement them.
 
 
-
 Supported systems
 -----------------
 STMX is currently tested on the following Common Lisp implementations:
 
-* SBCL  version 1.2.6        (x86_64)   on Debian GNU/Linux 8.0  (x86_64)
-* SBCL  version 1.1.14       (x86_64)   on Debian GNU/Linux 8.0  (x86_64)
-* SBCL  version 1.0.55.0     (x86)      on Ubuntu Linux 12.04LTS (x86)
-* SBCL  version 1.1.15       (powerpc)  on Debian GNU/Linux 7.3  (powerpc) inside Qemu
-* SBCL  version 1.2.1        (armhf)    on Raspbian GNU/Linux (armhf) Raspberry Pi
+* [SBCL](http://sbcl.org/)
+  * version 1.2.6       (x86_64)   on Debian GNU/Linux jessie (x86_64)
+  * version 1.1.15      (x86_64)   on Debian GNU/Linux jessie (x86_64)
+  * version 1.1.14      (x86)      on Debian GNU/Linux jessie (x86_64)
+  * version 1.2.8       (armhf)    on Debian GNU/Linux wheezy (armhf) inside Qemu
+  * version 1.1.15      (powerpc)  on Debian GNU/Linux jessie (powerpc) inside Qemu
+  
+* [ABCL](http://www.abcl.org/)
+  * version 1.3.1 with OpenJDK 7u71 (x86_64) on Debian GNU/Linux jessie (x86_64)
+  
+* [CCL](http://ccl.clozure.com/)
+  * version 1.10        (x86_64)   on Debian GNU/Linux jessie (x86_64)
+  * version 1.10        (x86)      on Debian GNU/Linux jessie (x86_64)
+  * version 1.10        (linuxarm) on Debian GNU/Linux wheezy (armhf) inside Qemu
+  * version 1.9-r15761  (linuxppc) on Debian GNU/Linux wheezy (powerpc) inside Qemu
 
-* ABCL  version 1.3.1 with OpenJDK 7u71 (x86_64) on Debian GNU/Linux 8.0 (x86_64)
-
-* CCL   version 1.10         (x86_64)   on Debian GNU/Linux 8.0  (x86_64)
-* CCL   version 1.10         (x86)      on Debian GNU/Linux 8.0  (x86_64)
-* CCL   version 1.9-r15761   (linuxppc) on Debian GNU/Linux 7.3  (powerpc) inside Qemu
-
-* CMUCL version 20d Unicode  (x86)      on Debian GNU/Linux 8.0  (x86_64)
-
-CMUCL needs a small workaround to run STMX reliably, see
-[doc/supported-systems.md](doc/supported-systems.md).
+* [CLISP](http://www.clisp.org/)
+  * version 2.49        (x86_64)   on Debian GNU/Linux jessie (x86_64)
+  
+* [CMUCL](http://www.cons.org/cmucl/)
+  * version 20d Unicode (x86)      on Debian GNU/Linux jessie (x86_64)
+  
+  CMUCL needs a small workaround to run STMX reliably, see
+  [doc/supported-systems.md](doc/supported-systems.md).
 
 ### Partially supported systems
 
-There are known problems running STMX on the following implementations,
-see (doc/supported-systems.md) for details:
+* [ECL](http://ecls.sourceforge.net/)
+  * version 15.2.21     (x86_64)   on Debian GNU/Linux jessie (x86_64)
+  * version 13.5.1      (x86_64)   on Debian GNU/Linux jessie (x86_64)
 
-* ECL   version 13.5.1, on both x86 and x86_64
+  There are known problems running STMX on ECL,
+  see [doc/supported-systems.md](doc/supported-systems.md) for details.
 
 ### Untested systems
 
@@ -281,16 +243,16 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
             ((root           :type t)
              (key-comparator :type function :transactional nil))))
 
-  Note: on some Common Lisp implementations (ABCL and possibly others)
-  CLOS slot accessors are known to ignore by default the transactional machinery
-  (implemented with MOP slot-value-using-class, if you wonder) causing all
-  kind of errors on transactional classes.
-  Even though usually this problem can be usually at least *partially* fixed
-  with implementation-specific options, it is recommended to use `slot-value`
-  instead of slot accessors to read and write the slots of transactional
-  classes or, even better, a macro that can be defined to use either
-  `slot-value` or slot accessors.
-
+  Note: on all Common Lisp implementations listed above, CLOS slot accessors
+  have been tested to work correctly, i.e. they honour the transactional machinery
+  (implemented with MOP slot-value-using-class) and return the same values
+  as SLOT-VALUE.
+  
+  In the past, some cases were found - and fixed - where slot accessors would not
+  work correctly on transactional classes. It is *strongly* recommended to run
+  the test suite when using STMX for the first time on a system: it will also check
+  that accessors work on transactional classes.
+  
   Support for `(TRANSACTIONAL (DEFSTRUCT ...))` was added in STMX version 2.0.1
   on January 2015. Previously, only `(TRANSACTIONAL (DEFCLASS ...))` was supported.
 
@@ -781,7 +743,7 @@ use `(describe 'some-symbol)` at REPL:
 
   Functions: `TFIRST` `(SETF TFIRST)` `TREST` `(SETF TREST)` `TPUSH` `TPOP`
   `TSECOND` `TTHIRD` `TFOURTH` `TNTH` `TLAST` `TLIST-LENGTH` `TLIST*` and many others.
-  See stmx/util/tlist.lisp for details.
+  See [util/tlist.lisp](util/tlist.lisp) for details.
 
   Normal lists are perfectly suitable for transactional use as long as
   they are not destructively modified, so TLIST is often unnecessary:

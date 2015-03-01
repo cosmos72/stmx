@@ -107,13 +107,13 @@ Return VALUE."
      value))
 
 
- (defun set-features (&rest alist)
-   "Set the value of each feature in ALIST, even if the feature is already
-present in *FEATURE-LIST*. Each element in ALIST must be either
+ (defun set-features (&rest plist)
+   "Set the value of each feature in PLIST, even if the feature is already
+present in *FEATURE-LIST*. Each element in PLIST must be either
 a pair (FEATURE VALUE) or a simple atom FEATURE.
 In the latter case, the FEATURE value will default to T."
-   (declare (type list alist))
-   (dolist (pair alist)
+   (declare (type list plist))
+   (dolist (pair plist)
      (let ((feature (if (consp pair) (first pair) pair))
            (value   (if (consp pair) (second  pair) t)))
        (set-feature feature value)))))

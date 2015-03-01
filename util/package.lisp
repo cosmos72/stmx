@@ -45,7 +45,7 @@
            ;; optimized versions of < > = /= useful with sorted maps
            #:fixnum< #:fixnum>
            #:fixnum= #:fixnum/=
-           
+
            #:gmap  ;; abstract, generic sorted binary map - see rbmap and tmap implementations
            #:rbmap ;; sorted map, implemented with red-black trees
            #:tmap  ;; transactional sorted map, implemented with red-black trees
@@ -58,9 +58,11 @@
            #:gmap-keys   #:gmap-values #:gmap-pairs ;; list all keys, values, or pairs
            #:add-to-gmap #:remove-from-gmap ;; add or remove multiple keys
 
-
-           #:ghash-table ;; generic hash table - can be used directly, see thash-table for a transactional implementation
-           #:thash-table ;; transactional hash table (extends ghash-table)
+           ;; generic hash table - can be used directly,
+           ;; see thash-table for a transactional implementation
+           #:ghash-table
+           ;; transactional hash table (extends ghash-table)
+           #:thash-table
 
            #:ghash-table-test #:ghash-table-hash
            #:ghash-table-count #:ghash-table-empty? #:clear-ghash
@@ -68,7 +70,8 @@
            #:map-ghash #:do-ghash  ;; iterate on ghash-table or thash-table
            ;; list all keys, values, or pairs:
            #:ghash-keys #:ghash-values #:ghash-pairs
-           
+           ;; hash function suitable for :test 'equalp
+           #:sxhash-equalp
 
            ;; transactional simple-vector
            #:simple-tvector #:simple-tvector-length

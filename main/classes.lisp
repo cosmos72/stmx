@@ -229,13 +229,28 @@ to TLOGs while executing BODY."
 ;;;; ** Retrying
 
 (defmacro maybe-yield-before-rerun ()
-  #+never nil
-  #-always (thread-yield))
+  #-(and) nil
+  #+(and) (thread-yield))
+
+
+(define-condition stmx.compile-error (simple-error)
+  ()
+  (:documentation "Parent class of all STMX compile errors"))
+
+(defmacro compile-error (format &rest args)
+  `(error 'stmx.compile-error
+          :format-control ,format
+          :format-arguments (list ,@args)))
+
+(defmacro compile-cerror (cont-string format &rest args)
+  `(cerror ,cont-string 'stmx.compile-error
+           :format-control ,format
+           :format-arguments (list ,@args)))
 
 
 (define-condition stmx.control-error (control-error)
   ()
-  (:documentation "Parent class of all STMX errors"))
+  (:documentation "Parent class of all STMX runtime errors"))
 
 
 (define-condition retry-error (stmx.control-error)

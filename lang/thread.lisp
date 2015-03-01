@@ -84,11 +84,11 @@
         (progn
           #+stmx/disable-threads
           (log:warn "Warning: compiling STMX without multi-threading support.
-    reason: feature :STMX/DISABLE-THREADS found in CL:*FEATURES*")
+  reason: feature :STMX/DISABLE-THREADS found in CL:*FEATURES*")
 
           #-stmx/disable-threads
           (log:warn "Warning: compiling STMX without multi-threading support.
-    reason: BORDEAUX-THREADS:*SUPPORTS-THREADS-P* is NIL")
+  reason: BORDEAUX-THREADS:*SUPPORTS-THREADS-P* is NIL")
 (set-feature 'bt/make-thread nil)
           ;; if no thread support, no need to wrap threads to collect their exit value
           (set-feature 'bt/join-thread :sane)))))
@@ -106,7 +106,10 @@
 (defun start-thread (function &key name (initial-bindings bt:*default-special-bindings*))
 
   #?-bt/make-thread
-  (error "STMX compiled without multi-threading support, cannot start a new thread")
+  (error "STMX compiled without multi-threading support, cannot start a new thread with
+function = ~S
+name = ~S
+initial-bindings = ~S" function name initial-bindings)
 
   #?+bt/make-thread
   (progn
@@ -127,7 +130,7 @@
 (defun wait4-thread (th)
 
   #?-bt/make-thread
-  (error "STMX compiled without multi-threading support, cannot wait for a thread")
+  (error "STMX compiled without multi-threading support, cannot wait for thread ~S" th)
 
   #?+bt/make-thread
   (progn

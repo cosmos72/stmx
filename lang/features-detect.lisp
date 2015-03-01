@@ -16,16 +16,39 @@
 (in-package :stmx.lang)
 
 (eval-when (:compile-toplevel)
-  #-(or abcl ccl cmucl ecl sbcl)
+  #-(or abcl ccl clisp cmucl ecl sbcl)
   (progn
     (warn "Untested Common Lisp implementation.
-STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
+STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
 
     ;; unknown system - for safety, disable even features
     ;; enabled by default on known systems
     (set-features '(bt/with-lock nil)
                   '(mem-rw-barriers nil)
-                  '(define-constant-once nil))))
+                  '(define-constant-once nil))
+
+
+    ;; feature 'use-initialize-instance-before
+    ;; is faster on some Lisps, but broken on others:
+    ;;
+    ;; it uses :before methods on INITIALIZE-INSTANCE,
+    ;; UPDATE-INSTANCE-FOR-REDEFINED-CLASS and UPDATE-INSTANCE-FOR-CHANGED-CLASS
+    ;; to put empty TVARs into objects slots, and assumes that the main methods
+    ;; internally call slot-value-using-class to set the values of the TVARs
+    ;; already inside the slots, *not* the slots themselves.
+    ;;
+    ;; If this feature is unset or NIL, a safe default will be used, that works in all cases:
+    ;; main methods will be defined on INITIALIZE-INSTANCE,
+    ;; UPDATE-INSTANCE-FOR-REDEFINED-CLASS and UPDATE-INSTANCE-FOR-CHANGED-CLASS
+    ;; that first invoke (call-next-method) inside (stmx::without-recording-with-show-tvars ...)
+    ;; to set raw slot values, then manually fix the transactional slots by wrapping into TVARs
+    ;; the values already present.
+    ;;
+    ;; So we selectively enable 'use-initialize-instance-before
+    ;; only where known to work *and* to be faster than the safe default.
+    ;;
+    ;; In both cases, :after methods are not created, keeping them available for programmers.
+    ))
 
 
 (enable-#?-syntax)
@@ -34,26 +57,57 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
 (eval-always
   
  #+lispworks ;; incomplete porting
- (set-features '(tclass-options ((:optimize-slot-access nil))))
-
+ (set-features '(tclass-options ((:optimize-slot-access nil)))
+               '(bt/lock-owner mp:lock-owner)
+               #+(or x86 x8664 x86-64 x86_64)
+               '(mem-rw-barriers :trivial))
+ 
  #+abcl
- (set-features '(bt/lock-owner :abcl))
+ (set-features '(bt/lock-owner :abcl)
+               ;; (closer-mop:class-slots <struct>) returns a list of simple-vectors,
+               ;; not of a list of slot-definitions. We would need to special-case this...
+               #-(and) 'closer-mop/works-on-structs
+               '(sxhash-equalp sys:psxhash))
 
  #+ccl
  (set-features '(bt/lock-owner ccl::%%lock-owner)
                #+x86 '(mem-rw-barriers nil) ;; causes "bogus object" errors.
                '(define-constant-once nil) ;; causes deadlocks
-               'initialize-instance-calls-slot-value-using-class)
-               
- #+cmucl
- (set-features '(bt/lock-owner mp::lock-process))
+               'use-initialize-instance-before
+               'closer-mop/works-on-structs
+               '(sxhash-equalp ccl::%%equalphash))
 
+ #+clisp
+ ;; as of CLISP 2.49, threads are experimental an disabled by default,
+ ;; thus STMX compiles in single-thread mode, without using bt/with-lock and mem-rw-barriers.
+ ;; On the other hand, define-constant-once and use-initialize-instance-before work.
+ (set-features '(bt/with-lock nil)
+               '(mem-rw-barriers nil)
+               'use-initialize-instance-before
+               'closer-mop/works-on-structs
+               ;; on CLISP, SXHASH can be used for SXHASH-EQUALP,
+               ;; with performance degradation because it hashes
+               ;; 1) all HASH-TABLEs to the same hash
+               ;; 2) all STRUCTURE-OBJECT of the same type to the same hash
+               ;; potentially causing a lot of conflicts in GHASH-TABLE and THASH-TABLE
+               '(sxhash-equalp sxhash))
+
+ #+cmucl
+ (set-features '(bt/lock-owner mp::lock-process)
+               'closer-mop/works-on-structs
+               '(sxhash-equalp (lisp::internal-equalp-hash * 0)))
+ 
  #+ecl
+ ;; ECL versions up to 13.5.1 have issues with reloading bordeaux-threads from cached FASLs.
+ ;; as of 2015-02-07, latest ECL from git://git.code.sf.net/p/ecls/ecl seems to fix them
  (set-features '(bt/lock-owner mp::lock-owner)
                '(bt/with-lock nil) ;; bugged?
                '(mem-rw-barriers nil) ;; bugged?
-               '(define-constant-once nil)) ;; bugged?
-
+               '(define-constant-once nil) ;; bugged?
+               'use-initialize-instance-before
+               'closer-mop/works-on-structs
+               '(sxhash-equalp si:hash-equalp))
+ 
  #+sbcl
  (set-features #+compare-and-swap-vops '(atomic-ops :sbcl)
                #+memory-barrier-vops   '(mem-rw-barriers :sbcl)
@@ -65,8 +119,9 @@ STMX is currently tested only on ABCL, CCL, CMUCL, ECL and SBCL.")
 
                #?+(symbol sb-ext defglobal) '(define-global sb-ext:defglobal)
 
-               'initialize-instance-calls-slot-value-using-class))
-
+               'use-initialize-instance-before
+               'closer-mop/works-on-structs
+               '(sxhash-equalp sb-impl::psxhash)))
 
 
 

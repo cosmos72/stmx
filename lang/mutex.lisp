@@ -32,6 +32,8 @@
          (bt:release-lock ,lock-var))))
 
   #?+(eql bt/with-lock :single-thread)
+  (declare (ignore lock))
+  #?+(eql bt/with-lock :single-thread)
   `(progn
      ,@body)
 

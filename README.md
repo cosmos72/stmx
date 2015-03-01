@@ -59,27 +59,39 @@ Supported systems
 -----------------
 STMX is currently tested on the following Common Lisp implementations:
 
-* SBCL  version 1.2.6        (x86_64)   on Debian GNU/Linux 8.0  (x86_64)
-* SBCL  version 1.1.14       (x86_64)   on Debian GNU/Linux 8.0  (x86_64)
-* SBCL  version 1.0.55.0     (x86)      on Ubuntu Linux 12.04LTS (x86)
-* SBCL  version 1.1.15       (powerpc)  on Debian GNU/Linux 7.3  (powerpc) inside Qemu
-* SBCL  version 1.2.1        (armhf)    on Raspbian GNU/Linux (armhf) Raspberry Pi
-* ABCL  version 1.3.1 with OpenJDK 7u71 (x86_64) on Debian GNU/Linux 8.0 (x86_64)
-* CCL   version 1.10         (x86_64)   on Debian GNU/Linux 8.0  (x86_64)
-* CCL   version 1.10         (x86)      on Debian GNU/Linux 8.0  (x86_64)
-* CCL   version 1.9-r15761   (linuxppc) on Debian GNU/Linux 7.3  (powerpc) inside Qemu
-* CLISP version 2.49         (x86_64)   on Debian GNU/Linux 8.0  (x86_64)
-* CMUCL version 20d Unicode  (x86)      on Debian GNU/Linux 8.0  (x86_64)
+* [SBCL](http://sbcl.org/)
+  * version 1.2.6       (x86_64)   on Debian GNU/Linux jessie (x86_64)
+  * version 1.1.15      (x86_64)   on Debian GNU/Linux jessie (x86_64)
+  * version 1.1.14      (x86)      on Debian GNU/Linux jessie (x86_64)
+  * version 1.2.8       (armhf)    on Debian GNU/Linux wheezy (armhf) inside Qemu
+  * version 1.1.15      (powerpc)  on Debian GNU/Linux jessie (powerpc) inside Qemu
+  
+* [ABCL](http://www.abcl.org/)
+  * version 1.3.1 with OpenJDK 7u71 (x86_64) on Debian GNU/Linux jessie (x86_64)
+  
+* [CCL](http://ccl.clozure.com/)
+  * version 1.10        (x86_64)   on Debian GNU/Linux jessie (x86_64)
+  * version 1.10        (x86)      on Debian GNU/Linux jessie (x86_64)
+  * version 1.10        (linuxarm) on Debian GNU/Linux wheezy (armhf) inside Qemu
+  * version 1.9-r15761  (linuxppc) on Debian GNU/Linux wheezy (powerpc) inside Qemu
 
-CMUCL needs a small workaround to run STMX reliably, see
-[doc/supported-systems.md](doc/supported-systems.md).
+* [CLISP](http://www.clisp.org/)
+  * version 2.49        (x86_64)   on Debian GNU/Linux jessie (x86_64)
+  
+* [CMUCL](http://www.cons.org/cmucl/)
+  * version 20d Unicode (x86)      on Debian GNU/Linux jessie (x86_64)
+  
+  CMUCL needs a small workaround to run STMX reliably, see
+  [doc/supported-systems.md](doc/supported-systems.md).
 
 ### Partially supported systems
 
-There are known problems running STMX on the following implementations,
-see (doc/supported-systems.md) for details:
+* [ECL](http://ecls.sourceforge.net/)
+  * version 15.2.21     (x86_64)   on Debian GNU/Linux jessie (x86_64)
+  * version 13.5.1      (x86_64)   on Debian GNU/Linux jessie (x86_64)
 
-* ECL   version 13.5.1, on both x86 and x86_64
+  There are known problems running STMX on ECL,
+  see [doc/supported-systems.md](doc/supported-systems.md) for details.
 
 ### Untested systems
 

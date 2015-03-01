@@ -17,7 +17,7 @@
 
 (asdf:defsystem :stmx
   :name "STMX"
-  :version "2.0.1"
+  :version "2.0.2"
   :license "LLGPL"
   :author "Massimiliano Ghilardi"
   :description "Composable Transactional Memory"
@@ -113,7 +113,7 @@
 
 (asdf:defsystem :stmx.test
   :name "STMX.TEST"
-  :version "2.0.1"
+  :version "2.0.2"
   :author "Massimiliano Ghilardi"
   :license "LLGPL"
   :description "test suite for STMX"

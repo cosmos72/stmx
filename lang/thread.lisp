@@ -107,9 +107,7 @@
 
   #?-bt/make-thread
   (error "STMX compiled without multi-threading support, cannot start a new thread with
-function = ~S
-name = ~S
-initial-bindings = ~S" function name initial-bindings)
+  function = ~S~%  name = ~S~%  initial-bindings = ~S" function name initial-bindings)
 
   #?+bt/make-thread
   (progn
@@ -122,7 +120,7 @@ initial-bindings = ~S" function name initial-bindings)
       (setf (wrapped-thread-thread th)
             (make-thread (lambda ()
                            (setf (wrapped-thread-result th)
-                                 (funcall function)))
+                                 (multiple-value-list (funcall function))))
                          :name name
                          :initial-bindings initial-bindings))
       th)))
@@ -140,5 +138,5 @@ initial-bindings = ~S" function name initial-bindings)
     #?-(eql bt/join-thread :sane)
     (progn
       (join-thread (wrapped-thread-thread th))
-      (wrapped-thread-result th))))
+      (values-list (wrapped-thread-result th)))))
 

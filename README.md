@@ -121,16 +121,6 @@ If all goes well, this will automatically download and install the
 - `bordeaux-threads`
 - `trivial-garbage`
 
-Note: as of December 2013, Quicklisp contains STMX version 1.9.0, which 
-also supports hardware transactional memory (Intel TSX)
-
-Since STMX was added to QuickLisp quite recently (15 June 2013), it
-may happen that your Quicklisp installation can't find it. In such
-case, you need to first update your QuickLisp installation as
-described [here](http://www.quicklisp.org/beta) - search for "To get updated
-software" in the page.
-  
-
 ### Latest version - from [GitHub](https://github.com/cosmos72/stmx)
 
 In case you want to use the "latest and greatest" version directly

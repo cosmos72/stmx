@@ -56,43 +56,59 @@
 (eval-always
   (ensure-thread-initial-binding '*current-thread* '(current-thread))
 
+  
   (defun start-multithreading ()
     ;; on CMUCL, (bt:start-multiprocessing) is blocking!
     #-cmucl (bt:start-multiprocessing))
 
   (start-multithreading)
 
-  ;; testing (get-feature 'bt/join-thread) signals an error on CMUCL :(
-  (defvar *bt/threads/tested* nil)
+  (defmacro compile-log-warn (&rest args)
+    `(when *compile-file-truename*
+       (log:warn ,@args)))
+  
+  (defun detect-thread-support()
+    "test for multi-threading support:
+  :STMX/DISABLE-THREADS most not be present CL:*FEATURES*,
+  BORDEAUX-THREADS:*SUPPORTS-THREADS-P* must be non-NIL,
+  and (BT:MAKE-THREAD) and (BT:JOIN-THREAD) must work."
 
-  ;; test for multi-threading support:
-  ;; BT:*SUPPORTS-THREADS-P* must be non-NIL,
-  ;; and (BT:MAKE-THREAD) and (BT:JOIN-THREAD) must work
-  (unless *bt/threads/tested*
-    (setf *bt/threads/tested* t)
-
-    (if #+stmx/disable-threads nil
-        #-stmx/disable-threads bt:*supports-threads-p*
-
-        (progn
-          (set-feature 'bt/make-thread t)
-          (set-feature 'bt/join-thread
-                       (if (let ((x (gensym)))
-                             (eq x (bt:join-thread (bt:make-thread (lambda () x)))))
-                           :sane
-                           :broken)))
-        (progn
-          #+stmx/disable-threads
-          (log:warn "Warning: compiling STMX without multi-threading support.
+    (set-feature
+     'bt/make-thread
+     (block nil
+       #+stmx/disable-threads
+       (progn
+         (compile-log-warn "Warning: compiling STMX without multi-threading support.
   reason: feature :STMX/DISABLE-THREADS found in CL:*FEATURES*")
-
-          #-stmx/disable-threads
-          (log:warn "Warning: compiling STMX without multi-threading support.
+         (return nil))
+       
+       #-stmx/disable-threads
+       (progn
+         (unless bt:*supports-threads-p*
+           (compile-log-warn "Warning: compiling STMX without multi-threading support.
   reason: BORDEAUX-THREADS:*SUPPORTS-THREADS-P* is NIL")
-(set-feature 'bt/make-thread nil)
-          ;; if no thread support, no need to wrap threads to collect their exit value
-          (set-feature 'bt/join-thread :sane)))))
+           (return nil))
 
+         (handler-case
+             (let* ((x (gensym))
+                    (y (bt:join-thread (bt:make-thread (lambda () x)))))
+               (set-feature 'bt/join-thread (if (eq x y) :sane :broken))
+               (return t))
+           
+           (condition (c)
+             (compile-log-warn "Warning: compiling STMX without multi-threading support.
+  reason: (BORDEAUX-THREADS:JOIN-THREAD (BORDEAUX-THREADS:MAKE-THREAD ...))
+  signaled an exception: ~A" c)
+             (return nil))))))
+
+    (if (get-feature 'bt/make-thread)
+        t
+        ;; if no thread support, no need to wrap threads to collect their exit value
+        (progn
+          (set-feature 'bt/join-thread :sane)
+          nil)))
+
+  (detect-thread-support))
 
 
 

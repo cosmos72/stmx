@@ -65,6 +65,7 @@ STMX is currently tested on the following Common Lisp implementations:
   * version 1.1.14      (x86)      on Debian GNU/Linux jessie (x86_64)
   * version 1.2.8       (armhf)    on Debian GNU/Linux wheezy (armhf) inside Qemu
   * version 1.1.15      (powerpc)  on Debian GNU/Linux jessie (powerpc) inside Qemu
+  * version 1.2.7       (x86_64)   on Windows 7               (x86_64)
   
 * [ABCL](http://www.abcl.org/)
   * version 1.3.1 with OpenJDK 7u71 (x86_64) on Debian GNU/Linux jessie (x86_64)

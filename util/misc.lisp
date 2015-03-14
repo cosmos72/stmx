@@ -17,8 +17,9 @@
 
 (enable-#?-syntax)
 
-;;;; ** Some simple functions optimized for FIXNUMs
+(deftype ufixnum () `(integer 0 ,most-positive-fixnum))
 
+;;;; ** Some simple functions optimized for FIXNUMs
 
 (declaim (inline fixnum< fixnum> fixnum= fixnum/=))
 

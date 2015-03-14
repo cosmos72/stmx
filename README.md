@@ -805,18 +805,19 @@ use `(describe 'some-symbol)` at REPL:
   can be omitted and a safe default (usually `'sxhash`) will be used.
   For other test functions, the hash function becomes mandatory.
 
-  Methods: `GHASH-TABLE-COUNT` `GHASH-TABLE-EMPTY?` `CLEAR-GHASH`
+  Methods: `GHASH-TABLE-COUNT` `GHASH-TABLE-COUNT>` `GHASH-TABLE-COUNT<=`
+           `GHASH-TABLE-EMPTY?` `CLEAR-GHASH`
            `GET-GHASH` `(SETF GET-GHASH)` `SET-GHASH` `REM-GHASH` 
            `MAP-GHASH` `DO-GHASH` `COPY-GHASH`
            `GHASH-KEYS` `GHASH-VALUES` `GHASH-PAIRS`
            `GHASH-TEST` `GHASH-HASH`.
 
-  Note: THASH-TABLE test functions and hash functions changed in STMX 2.0.0.
-  They now must be function names (i.e. symbols), previously they were actual functions.
+  Warning: retrieving the number of elements in a transactional container is potentially expensive:
+  to maintain consistency, it inhibits concurrent insertion and removal from other threads.
+  For this reason, use `GHASH-TABLE-COUNT` sparingly.
 
-  Note: THASH-TABLE has been completely rewritten in STMX 1.3.3 and
-  has now much better performance. Previously its methods contained
-  `THASH` instead of `GHASH` in their names.
+  THASH-TABLE constructor arguments `test` and `hash` changed in STMX 2.0.0.
+  They now must be function names (i.e. symbols), previously they were actual functions.
 
 - `TMAP` is a transactional sorted map, backed by a red-black tree.
   It is created with `(make-instance 'tmap :pred compare-function)`
@@ -826,16 +827,17 @@ use `(describe 'some-symbol)` at REPL:
   `'fixnum<` or `'fixnum>`.
   For string keys, typical COMPARE-FUNCTIONs are `'string<` and `'string>`.
 
+  Note: COMPARE-FUNCTIONs changed in STMX 2.0.0. They now must be function names
+  (i.e. symbols), previously they were actual functions.
+
   Methods: `GMAP-PRED` `GMAP-COUNT` `GMAP-EMPTY?` `CLEAR-GMAP`
            `GET-GMAP` `(SETF GET-GMAP)` `SET-GMAP` `REM-GMAP` 
            `MIN-GMAP` `MAX-GMAP` `MAP-GMAP` `DO-GMAP`
            `GMAP-KEYS` `GMAP-VALUES` `GMAP-PAIRS`.
 
-  Note: COMPARE-FUNCTIONs changed in STMX 2.0.0. They now must be function names
-  (i.e. symbols), previously they were actual functions.
-
-  Note: TMAP methods changed in STMX 1.3.3. They now contain `GMAP` in their names,
-  previously they contained `BMAP` in the name.
+  Warning: retrieving the number of elements in a transactional container is potentially expensive:
+  to maintain consistency, it inhibits concurrent insertion and removal from other threads.
+  For this reason, use `GMAP-COUNT` sparingly.
 
 - `GHASH-TABLE` is the non-transactional version of `THASH-TABLE`. Not so
   interesting by itself, as Common Lisp offers a standard (and usually faster)

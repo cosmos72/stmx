@@ -33,7 +33,8 @@
   ((root     :initform nil :type (or null gmap-node tvar))
    (pred-func              :type function                 :reader pred-function-of)
    ;; allow COUNT to also be a TVAR, otherwise subclass TMAP cannot work
-   (count    :initform 0   :type (or fixnum tvar)         :reader count-of)
+   ;; (eq count nil) means unknown count
+   (count    :initform 0   :type (or null fixnum tvar)    :reader count-of)
    (pred-sym :initform nil :type symbol   :initarg :pred  :reader pred-of))
   (:documentation "Generic binary tree"))
 
@@ -67,16 +68,6 @@ bad style; I prefer to be notified early if I try to do something plainly wrong.
   (the symbol (_ m pred-sym)))
 
 
-(defun gmap-count (m)
-  "Return number of elements in binary tree M."
-  (declare (type gmap m))
-  (the fixnum (_ m count)))
-
-
-(defun gmap-empty? (m)
-  "Return t if binary tree M is empty, otherwise return nil."
-  (declare (type gmap m))
-  (zerop (gmap-count m)))
 
 
 
@@ -89,31 +80,36 @@ bad style; I prefer to be notified early if I try to do something plainly wrong.
 
 
 
-(defun fwd-traverse-gmap-at (m node func)
+(defun fwd-traverse-gmap-at (m node index func)
   (declare (type gmap m)
            (type (or null gmap-node) node)
+           (type fixnum index)
            (type function func))
   (unless node
-    (return-from fwd-traverse-gmap-at nil))
+    (return-from fwd-traverse-gmap-at index))
   
-  (fwd-traverse-gmap-at m (_ node left) func)
-  (funcall func (_ node key) (_ node value))
-  (fwd-traverse-gmap-at m (_ node right) func))
+  (let ((index (fwd-traverse-gmap-at m (_ node left) index func)))
+    (funcall func (_ node key) (_ node value) index)
+    (incf (the fixnum index))
+    (fwd-traverse-gmap-at m (_ node right) index func)))
 
 
-(defun rev-traverse-gmap-at (m node func)
+(defun rev-traverse-gmap-at (m node index func)
   (declare (type gmap m)
            (type (or null gmap-node) node)
+           (type fixnum index)
            (type function func))
   (unless node
-    (return-from rev-traverse-gmap-at nil))
+    (return-from rev-traverse-gmap-at index))
 
-  (rev-traverse-gmap-at m (_ node right) func)
-  (funcall func (_ node key) (_ node value))
-  (rev-traverse-gmap-at m (_ node left) func))
+  (let ((index (rev-traverse-gmap-at m (_ node right) index func)))
+    (funcall func (_ node key) (_ node value) index)
+    (incf (the fixnum index))
+    (rev-traverse-gmap-at m (_ node left) index func)))
 
 
 
+(declaim (inline map-gmap))
 (defun map-gmap (m func)
   "Invoke FUNC in order on each key/value pair contained in M:
 first invoke it on the smallest key, then the second smallest...
@@ -125,9 +121,11 @@ Adding or removing keys from M during this call (even from other threads)
 has undefined consequences. Not even the current key can be removed."
   (declare (type gmap m)
            (type function func))
-  (fwd-traverse-gmap-at m (_ m root) func))
+  (setf (_ m count) (fwd-traverse-gmap-at m (_ m root) 0 func))
+  nil)
 
 
+(declaim (inline map-gmap-from-end))
 (defun map-gmap-from-end (m func)
   "Invoke FUNC in reverse order on each key/value pair contained in M:
 first invoke it on the largest key, then the second largest...
@@ -139,12 +137,35 @@ Adding or removing keys from M during this call (even from other threads)
 has undefined consequences. Not even the current key can be removed."
   (declare (type gmap m)
            (type function func))
-  (rev-traverse-gmap-at m (_ m root) func))
+  (setf (_ m count) (rev-traverse-gmap-at m (_ m root) 0 func))
+  nil)
 
 
 
 
+(defmacro do-gmap* ((&key key value index from-end) m &body body)
+  "Execute BODY in order on each key/value pair contained in M:
+first execute it on the smallest key, then the second smallest...
+finally execute BODY on the largest key. Return nil.
 
+If :FROM-END is true, BODY will be executed first on the largest key,
+then on the second largest key... and finally on the smallest key.
+
+Adding or removing keys from M during this call (even from other threads)
+has undefined consequences. Not even the current key can be removed."
+
+  (let* ((vkey   (gensym))
+         (vvalue (gensym))
+         (vindex (gensym))
+         (func-body `(lambda (,(or key vkey) ,(or value vvalue)
+                              ,(or index vindex))
+                       (declare (ignore ,@(unless key   `(,vkey))
+                                        ,@(unless value `(,vvalue))
+                                        ,@(unless index `(,vindex))))
+                       ,@body)))
+    (if from-end
+        `(map-gmap-from-end ,m ,func-body)
+        `(map-gmap          ,m ,func-body))))
 
 
 (defmacro do-gmap ((key &optional value &key from-end) m &body body)
@@ -157,17 +178,48 @@ then on the second largest key... and finally on the smallest key.
 
 Adding or removing keys from M during this call (even from other threads)
 has undefined consequences. Not even the current key can be removed."
-
-  (let* ((dummy (gensym))
-         (func-body `(lambda (,key ,(or value dummy))
-                       ,@(unless value `((declare (ignore ,dummy))))
-                       ,@body)))
-    (if from-end
-        `(map-gmap-from-end ,m ,func-body)
-        `(map-gmap          ,m ,func-body))))
+  `(do-gmap* (:key ,key :value ,value :from-end ,from-end) ,m
+     ,@body))
 
 
 
+(defun gmap-count (m)
+  "Return number of elements in binary tree M."
+  (declare (type gmap m))
+  (when-bind n (_ m count)
+    (return-from gmap-count (the fixnum n)))
+
+  ;; (do-gmap*) computes (_ hash count) unless body exits early
+  (do-gmap* () m)
+  (the fixnum (_ m count)))
+
+
+(defun gmap-count> (m count)
+  "Return T if ghash-table HASH contains more than COUNT key/value entries."
+  (declare (type gmap m)
+           (type fixnum count))
+  (when (< count 0)
+    (return-from gmap-count> t))
+  (when-bind n (_ m count)
+    (return-from gmap-count> (> (the fixnum n) count)))
+  
+  (do-gmap* (:index index) m
+    (when (> index count)
+      (return-from gmap-count> t)))
+  nil)
+
+
+(declaim (inline gmap-count<=))
+(defun gmap-count<= (m count)
+  "Return T if gmap M contains at most COUNT key/value entries."
+  (not (gmap-count> m count)))
+
+
+(declaim (inline gmap-empty?))
+(defun gmap-empty? (m)
+  "Return t if binary tree M is empty, otherwise return nil."
+  (declare (type gmap m))
+  (null (_ m root)))
 
 
 ;;;; ** Abstract methods to be implemented by subclasses
@@ -304,7 +356,7 @@ Return VALUE."
 
           ;; no such key, create node for it
           (let1 child (gmap/new-node m key value)
-            (incf (the fixnum (_ m count)))
+            (setf (_ m count) nil)
             (if node
                 (if (eql k< comp)
                     (setf (_ node left) child)
@@ -342,7 +394,7 @@ Return t if KEY was removed, nil if not found."
       (let1 found? (eql k= comp)
         (when found?
           (gmap/remove-at m stack)
-          (decf (the fixnum (_ m count))))
+          (setf (_ m count) nil))
 
         (free-list^ stack)
         found?))))
@@ -416,17 +468,20 @@ or (values nil nil nil) if M is empty"
 Copies all keys and values from M into MCOPY
 and removes any other key/value already present in MCOPY."
   (declare (type gmap mcopy m))
-  (labels ((copy-nodes (node)
-             (declare (type (or null gmap-node) node))
-             (unless node
-               (return-from copy-nodes nil))
-             (let1 copy (gmap/copy-node m node)
-               (setf (_ copy left)  (copy-nodes (_ node left)))
-               (setf (_ copy right) (copy-nodes (_ node right)))
-               copy)))
-    (setf (_ mcopy root) (copy-nodes (_ m root))
-          (_ mcopy count) (_ m count))
-    mcopy))
+  (let ((count 0))
+    (declare (type fixnum count))
+    (labels ((copy-nodes (node)
+               (declare (type (or null gmap-node) node))
+               (unless node
+                 (return-from copy-nodes nil))
+               (let1 copy (gmap/copy-node m node)
+                 (incf (the fixnum count))
+                 (setf (_ copy left)  (copy-nodes (_ node left)))
+                 (setf (_ copy right) (copy-nodes (_ node right)))
+                 copy)))
+      (setf (_ mcopy root) (copy-nodes (_ m root))
+            (_ mcopy count) count)
+      mcopy)))
 
 
 (defun copy-gmap (m)

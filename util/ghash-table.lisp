@@ -192,9 +192,8 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
   (when-bind n (_ hash count)
     (return-from ghash-table-count (the fixnum n)))
 
-  ;; (do-ghash-pairs) computes (_ hash count) unless exited early
+  ;; (do-ghash-pairs) computes (_ hash count) unless body exits early
   (do-ghash-pairs (pair) hash)
-  
   (the fixnum (_ hash count)))
           
 
@@ -391,9 +390,8 @@ Return T if KEY was present in HASH, otherwise return NIL."
            (if prev
                (setf (_ prev next) next)
                (funcall set-aref-fun next vec subscript))
-           (when (_ hash count)
-             ;; do not update COUNT. just set it to NIL, i.e. "unknown"
-             (setf (_ hash count) nil))
+           ;; do not update COUNT. just set it to NIL, i.e. "unknown"
+           (setf (_ hash count) nil)
            (return t)))))
                
 

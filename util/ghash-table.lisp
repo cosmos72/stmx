@@ -337,7 +337,8 @@ Otherwise return (values DEFAULT nil)."
 
       (funcall set-aref-fun pair vec subscript)
       ;; do not update COUNT, just set to NIL *before* calling other functions
-      (setf (_ hash count) nil)
+      (when (_ hash count)
+        (setf (_ hash count) nil))
 
       (flet ((%need-rehash ()
                (let ((vlen (length vec)))
@@ -391,7 +392,8 @@ Return T if KEY was present in HASH, otherwise return NIL."
                (setf (_ prev next) next)
                (funcall set-aref-fun next vec subscript))
            ;; do not update COUNT. just set it to NIL, i.e. "unknown"
-           (setf (_ hash count) nil)
+           (when (_ hash count)
+             (setf (_ hash count) nil))
            (return t)))))
                
 

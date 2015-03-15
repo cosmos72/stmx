@@ -356,7 +356,8 @@ Return VALUE."
 
           ;; no such key, create node for it
           (let1 child (gmap/new-node m key value)
-            (setf (_ m count) nil)
+            (when (_ m count)
+              (setf (_ m count) nil))
             (if node
                 (if (eql k< comp)
                     (setf (_ node left) child)
@@ -394,7 +395,8 @@ Return t if KEY was removed, nil if not found."
       (let1 found? (eql k= comp)
         (when found?
           (gmap/remove-at m stack)
-          (setf (_ m count) nil))
+          (when (_ m count)
+            (setf (_ m count) nil)))
 
         (free-list^ stack)
         found?))))

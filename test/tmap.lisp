@@ -15,6 +15,8 @@
 
 (in-package :stmx.test)
 
+(enable-#?-syntax)
+
 (def-suite tmap-suite :in suite)
 (in-suite tmap-suite)
 
@@ -41,13 +43,79 @@
     (is-equal-gmap m1 m2)
     t))
 
-      
+
 (def-test tmap-rollback (:compile-at :definition-time)
   (test-tmap-rollback))
+      
 
 (def-test tmap (:compile-at :definition-time)
   (test-rbmap-class 'tmap))
 
 (def-test tmap-atomic (:compile-at :definition-time)
   (atomic (test-rbmap-class 'tmap)))
+
+
+
+#?+bt/make-thread
+(defun tmap-insert-func (m iterations)
+  (declare (type gmap m)
+           (type fixnum iterations))
+  (let ((self (bt:thread-name (bt:current-thread)))
+        (max -1))
+    (dotimes (i iterations max)
+      (let ((result
+             (atomic
+              (multiple-value-bind (key value present) (max-gmap m)
+                (declare (ignore value))
+                (unless present (setf key max))
+                (set-gmap m (incf (the fixnum key)) self)
+                key))))
+        (setf max (max result max))))))
+
+
+#?+bt/make-thread
+(defun tmap-remove-func (m iterations)
+  (declare (type gmap m)
+           (type fixnum iterations))
+  (let ((max -1))
+    (dotimes (i iterations max)
+      (let ((result
+             (atomic
+              (multiple-value-bind (key value present) (min-gmap m)
+                (declare (ignore value))
+                (unless present (retry))
+                (rem-gmap m key)
+                key))))
+        (setf max (max result max))))))
+
+
+  
+#?+bt/make-thread
+(defun test-tmap-threads (&key (thread-pairs 4) (iterations 10000))
+  (declare (type fixnum thread-pairs iterations))
+
+  (start-multithreading)
+
+  (let ((m (new 'tmap :pred 'fixnum<)))
+    
+    (flet ((tmap-insert ()
+             (tmap-insert-func m iterations))
+           (tmap-remove ()
+             (tmap-remove-func m iterations)))
+
+      (let ((threads (loop for i below thread-pairs
+                        collect (start-thread #'tmap-insert :name (format nil "tmap-insert-~S" i))
+                        collect (start-thread #'tmap-remove :name (format nil "tmap-remove-~S" i)))))
+
+        (loop for thread in threads
+           do (let ((x (wait4-thread thread)))
+                (log:debug "thread ~A returned ~A" (thread-name thread) x)
+                x))
+        (when (boundp 'fiveam::current-test)
+          (is (= 0 (gmap-count m))))))))
+
+
+#?+bt/make-thread
+(def-test tmap-threads (:compile-at :definition-time)
+  (test-tmap-threads))
 

@@ -963,7 +963,7 @@ Donate
 STMX is a spare-time project. Donations can help the project by
 recognizing its usefulness and covering expenses.
 
-You can <a href="https://stmx.org/donations">donate with PayPal or credit card</a>.
+You can <a href="http://stmx.org/donations">donate with PayPal or credit card</a>.
 
 Legal
 -----

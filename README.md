@@ -957,6 +957,14 @@ and is considered by the author to be stable.
 STMX is a full rewrite of CL-STM, which has been developed by Hoan Ton-That
 for the Google Summer of Code 2006.
 
+Donate
+------
+
+STMX is a spare-time project. Donations can help the project by
+recognizing its usefulness and covering expenses.
+
+You can <a href="https://stmx.org/donations">donate with PayPal or credit card</a>.
+
 Legal
 -----
 

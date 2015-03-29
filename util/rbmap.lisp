@@ -206,7 +206,6 @@ Return some node in rebalanced tree and its stack as multiple values"
 
     ;; also, callers guarantee that black node X has at most one child.
 
-
     (prog ;; replace black node X but remember his parent X and brother B.
           ((left-node?
             (replace-gmap-node node
@@ -215,6 +214,11 @@ Return some node in rebalanced tree and its stack as multiple values"
            brother)
 
      rule-1
+     (unless parent
+       (break "NIL parent at rule 1 in
+  (%rbmap-remove-black-node-at parent=~S node=~S brother=~S left-node?=~S stack=~S)"
+              parent node brother left-node? stack))
+
      (setf brother (if left-node? (_ parent right) (_ parent left)))
      (log.debug-gmap node parent stack "start" :left-node? left-node? :brother brother)
           
@@ -225,7 +229,7 @@ Return some node in rebalanced tree and its stack as multiple values"
      ;;    (X)  B*   of A and B:  (X)  B
      ;;        / \                    / \
      ;;       C   D                  C   D
-     (when (red? brother)             
+     (when (red? brother)
        (rotatef (_ parent color) (_ brother color))
        ;; 1.2) if X is left child, rotate-left parent otherwise rotate-right parent
        ;;       A*                     B
@@ -245,6 +249,12 @@ Return some node in rebalanced tree and its stack as multiple values"
      ;; 2) if both B's children are black (or nil), make the brother red.
      ;;      this may cause double-red between brother B and parent A
      ;; 2.1) if such double-red occurs, set parent's color to black -> DONE
+
+     (unless brother
+       (break "NIL brother at rule 2 in
+(%rbmap-remove-black-node-at parent=~S node=~S brother=~S left-node?=~S stack=~S)"
+              parent node brother left-node? stack))
+
      (with-ro-slots (left right) brother
        (when (and (black? left) (black? right))
          (setf (_ brother color) +red+)
@@ -281,6 +291,12 @@ Return some node in rebalanced tree and its stack as multiple values"
      (log.debug-gmap node parent stack "rule-3.1" :brother brother)
 
      ;; brother B may have changed, recompute its left and right children
+
+     (unless brother
+       (break "NIL brother at rule 3.1 in
+(%rbmap-remove-black-node-at parent=~S node=~S brother=~S left-node?=~S stack=~S)"
+              parent node brother left-node? stack))
+
      (with-ro-slots (left right) brother
        ;; 3.2) set B's far-child to black, copy parent color into B, set parent to black
        (if left-node?

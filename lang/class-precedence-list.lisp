@@ -40,7 +40,7 @@
         (remaining-constraints (copy-list constraints))
         (result nil))
     (loop
-       (log:trace "~%elements = ~A~%constraints = ~A" elements constraints)
+       (log.trace "~%elements = ~A~%constraints = ~A" elements constraints)
        (let ((minimal-elements
               (remove-if (lambda (class) (member class remaining-constraints :key #'second))
                          remaining-elements)))
@@ -53,7 +53,7 @@
                            (funcall tie-breaker
                                     minimal-elements
                                     result))))
-           (log:trace "choice = ~A" choice)
+           (log.trace "choice = ~A" choice)
            (push choice result)
            (setf remaining-elements (delete choice remaining-elements)
                  remaining-constraints (delete choice
@@ -62,7 +62,7 @@
         
 
 (defun clos-tie-breaker-rule (minimal-elements reverse-precedence-list)
-  (log:trace "~%minimal-elements = ~A~%reverse-pcl = ~A" minimal-elements reverse-precedence-list)
+  (log.trace "~%minimal-elements = ~A~%reverse-pcl = ~A" minimal-elements reverse-precedence-list)
   (dolist (class reverse-precedence-list)
     (let* ((superclasses (closer-mop:class-direct-superclasses class))
            (common (intersection minimal-elements superclasses)))

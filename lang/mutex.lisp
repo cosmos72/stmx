@@ -42,6 +42,16 @@
      ,@body))
 
 
+#?+(and bt/lock-owner (not (eql bt/lock-owner :abcl)))
+(progn
+  (declaim (ftype (function (t) t) lock-owner)
+           (inline lock-owner))
+
+ (defun lock-owner (lock)
+   "Return the thread owning a lock, or NIL if lock is free."
+   (#.(stmx.lang::get-feature 'bt/lock-owner) lock)))
+
+
 
 
 ;;;; ** nowait mutex
@@ -110,7 +120,7 @@
    "Return the thread that locked a mutex, or NIL if mutex is free."
    (declare (type mutex mutex))
    
-   (#.(stmx.lang::get-feature 'bt/lock-owner) (mutex-lock mutex))))
+   (lock-owner (mutex-lock mutex))))
 
 
 
@@ -136,8 +146,7 @@ is currently locked by current thread or some other thread."
     "Return T if MUTEX is locked by current thread."
 
     (mem-read-barrier) ;; remember: MUTEX-OWNER depends on MEM-RW-BARRIERS
-    (let1 owner (mutex-owner mutex)
-      (eq owner *current-thread*)))
+    (eq *current-thread* (mutex-owner mutex)))
 
 
   (defun mutex-is-own-or-free? (mutex)
@@ -218,16 +227,23 @@ by current thread, or NIL if MUTEX was already locked by some other thread."
 
   ;; at least on CMUCL, acquiring twice a lock from the same thread
   ;; simply returns nil instead of raising a signal.
-  ;; So it's better to use (mutex-is-own?) if available
+  ;; So we use (mutex-is-own?) or (lock-owner) when available
+
   #?+mutex-owner
   (if (mutex-is-own? mutex)
       :recursion
       (try-acquire-mutex mutex))
 
   #?-mutex-owner
-  (handler-case
-      (bt:acquire-lock (mutex-lock mutex) nil)
-    (condition () :recursion)))
+  (let ((lock (mutex-lock mutex)))
+
+    #?+(and bt/lock-owner (not (eql bt/lock-owner :abcl)))
+    (when (eq *current-thread* (lock-owner lock))
+      (return-from try-acquire-mutex/catch-recursion :recursion))
+
+    (handler-case
+        (bt:acquire-lock lock nil)
+      (condition () :recursion))))
 
 
 (defun release-mutex (mutex)

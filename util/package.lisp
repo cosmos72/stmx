@@ -88,7 +88,9 @@
            #:tendp   #:tlist-length #:tnthcdr #:tnth
            #:tsecond #:tthird #:tfourth #:tfifth #:tsixth #:tseventh #:teighth #:tninth #:ttenth
            #:ttree-equal #:ttree-equal-test #:ttree-equal-test-not
-           #:tlast   #:tlist* #:make-tlist))
+           #:tlast   #:tlist* #:make-tlist
+
+           #:tacons #:tpairlis #:copy-talist #:tassoc #:trassoc))
            
 
 

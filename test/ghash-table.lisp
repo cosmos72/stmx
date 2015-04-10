@@ -82,11 +82,13 @@
       (let ((key   (random count))
             (value i))
         (set-ghash ghash key value)
+        ;;(log:info "added ~S ~S, count = ~S~%~S" key value (_ ghash count) (_ ghash vec))
         (set-hash  hash key value)
         (sort-and-compare-ghash-and-hash-table ghash hash comp)))
     (dotimes (i count)
       (let ((key i))
         (rem-ghash ghash key)
+        ;;(log:info "removed ~S, count = ~S~%~S" key (_ ghash count) (_ ghash vec))
         (rem-hash  hash  key)
         (sort-and-compare-ghash-and-hash-table ghash hash comp)))))
 
@@ -106,7 +108,7 @@
 
 
 (def-test ghash-table (:compile-at :definition-time)
-  (test-new-ghash-table #'fixnum<))
+  (test-new-ghash-table #'fixnum< :count 16))
 
 
 

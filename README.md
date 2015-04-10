@@ -60,14 +60,15 @@ Supported systems
 STMX is currently tested on the following Common Lisp implementations:
 
 * [SBCL](http://sbcl.org/)
-  * version 1.2.6       (x86_64)   on Debian GNU/Linux jessie (x86_64)
+  * version 1.2.10      (x86_64)   on Debian GNU/Linux jessie (x86_64)
   * version 1.1.15      (x86_64)   on Debian GNU/Linux jessie (x86_64)
   * version 1.1.14      (x86)      on Debian GNU/Linux jessie (x86_64)
   * version 1.2.8       (armhf)    on Debian GNU/Linux wheezy (armhf) inside Qemu
   * version 1.1.15      (powerpc)  on Debian GNU/Linux jessie (powerpc) inside Qemu
+  * version 1.2.7       (x86_64)   on Windows 7               (x86_64)
   
 * [ABCL](http://www.abcl.org/)
-  * version 1.3.1 with OpenJDK 7u71 (x86_64) on Debian GNU/Linux jessie (x86_64)
+  * version 1.3.1 with OpenJDK 7u75 (x86_64) on Debian GNU/Linux jessie (x86_64)
   
 * [CCL](http://ccl.clozure.com/)
   * version 1.10        (x86_64)   on Debian GNU/Linux jessie (x86_64)
@@ -77,12 +78,14 @@ STMX is currently tested on the following Common Lisp implementations:
 
 * [CLISP](http://www.clisp.org/)
   * version 2.49        (x86_64)   on Debian GNU/Linux jessie (x86_64)
+    (lacks multi-threading)
   
 * [CMUCL](http://www.cons.org/cmucl/)
+  * version 20e Unicode (x86)      on Debian GNU/Linux jessie (x86_64)
   * version 20d Unicode (x86)      on Debian GNU/Linux jessie (x86_64)
   
-  CMUCL needs a small workaround to run STMX reliably, see
-  [doc/supported-systems.md](doc/supported-systems.md).
+  CMUCL must be started with the command line options "-fpu" "x87"
+  to run STMX reliably, see [doc/supported-systems.md](doc/supported-systems.md).
 
 ### Partially supported systems
 
@@ -119,16 +122,6 @@ If all goes well, this will automatically download and install the
 - `closer-mop`
 - `bordeaux-threads`
 - `trivial-garbage`
-
-Note: as of December 2013, Quicklisp contains STMX version 1.9.0, which 
-also supports hardware transactional memory (Intel TSX)
-
-Since STMX was added to QuickLisp quite recently (15 June 2013), it
-may happen that your Quicklisp installation can't find it. In such
-case, you need to first update your QuickLisp installation as
-described [here](http://www.quicklisp.org/beta) - search for "To get updated
-software" in the page.
-  
 
 ### Latest version - from [GitHub](https://github.com/cosmos72/stmx)
 
@@ -814,18 +807,19 @@ use `(describe 'some-symbol)` at REPL:
   can be omitted and a safe default (usually `'sxhash`) will be used.
   For other test functions, the hash function becomes mandatory.
 
-  Methods: `GHASH-TABLE-COUNT` `GHASH-TABLE-EMPTY?` `CLEAR-GHASH`
+  Methods: `GHASH-TABLE-COUNT` `GHASH-TABLE-COUNT>` `GHASH-TABLE-COUNT<=`
+           `GHASH-TABLE-EMPTY?` `CLEAR-GHASH`
            `GET-GHASH` `(SETF GET-GHASH)` `SET-GHASH` `REM-GHASH` 
            `MAP-GHASH` `DO-GHASH` `COPY-GHASH`
            `GHASH-KEYS` `GHASH-VALUES` `GHASH-PAIRS`
            `GHASH-TEST` `GHASH-HASH`.
 
-  Note: THASH-TABLE test functions and hash functions changed in STMX 2.0.0.
-  They now must be function names (i.e. symbols), previously they were actual functions.
+  Warning: retrieving the number of elements in a transactional container is potentially expensive:
+  to maintain consistency, it inhibits concurrent insertion and removal from other threads.
+  For this reason, use `GHASH-TABLE-COUNT` sparingly.
 
-  Note: THASH-TABLE has been completely rewritten in STMX 1.3.3 and
-  has now much better performance. Previously its methods contained
-  `THASH` instead of `GHASH` in their names.
+  THASH-TABLE constructor arguments `test` and `hash` changed in STMX 2.0.0.
+  They now must be function names (i.e. symbols), previously they were actual functions.
 
 - `TMAP` is a transactional sorted map, backed by a red-black tree.
   It is created with `(make-instance 'tmap :pred compare-function)`
@@ -835,16 +829,17 @@ use `(describe 'some-symbol)` at REPL:
   `'fixnum<` or `'fixnum>`.
   For string keys, typical COMPARE-FUNCTIONs are `'string<` and `'string>`.
 
+  Note: COMPARE-FUNCTIONs changed in STMX 2.0.0. They now must be function names
+  (i.e. symbols), previously they were actual functions.
+
   Methods: `GMAP-PRED` `GMAP-COUNT` `GMAP-EMPTY?` `CLEAR-GMAP`
            `GET-GMAP` `(SETF GET-GMAP)` `SET-GMAP` `REM-GMAP` 
            `MIN-GMAP` `MAX-GMAP` `MAP-GMAP` `DO-GMAP`
            `GMAP-KEYS` `GMAP-VALUES` `GMAP-PAIRS`.
 
-  Note: COMPARE-FUNCTIONs changed in STMX 2.0.0. They now must be function names
-  (i.e. symbols), previously they were actual functions.
-
-  Note: TMAP methods changed in STMX 1.3.3. They now contain `GMAP` in their names,
-  previously they contained `BMAP` in the name.
+  Warning: retrieving the number of elements in a transactional container is potentially expensive:
+  to maintain consistency, it inhibits concurrent insertion and removal from other threads.
+  For this reason, use `GMAP-COUNT` sparingly.
 
 - `GHASH-TABLE` is the non-transactional version of `THASH-TABLE`. Not so
   interesting by itself, as Common Lisp offers a standard (and usually faster)
@@ -963,6 +958,14 @@ and is considered by the author to be stable.
 
 STMX is a full rewrite of CL-STM, which has been developed by Hoan Ton-That
 for the Google Summer of Code 2006.
+
+Donations
+---------
+
+STMX is a spare-time project. Donations can help the project by
+recognizing its usefulness and covering expenses.
+
+You can <a href="http://stmx.org/donations">donate with PayPal or credit card</a>.
 
 Legal
 -----

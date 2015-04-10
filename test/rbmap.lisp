@@ -73,7 +73,7 @@ bmap-count must be the actual nodes count, root must be black."
   (declare (type rbmap m))
 
   (let* ((root  (_ m root))
-         (count (_ m count))
+         (count (gmap-count m))
          (seen  (make-hash-table :test 'eq :size count))
          (nodes (fsck-rbmap-at m ref root seen)))
     (unless (black? root)

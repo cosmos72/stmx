@@ -20,18 +20,19 @@
 ;;;; ** constants
 
 (declaim (type symbol +unbound-tvar+))
-;; do NOT use (define-constant ... (if (boundp '...) (symbol-value '...) <actual-definition>))
-;; as it causes bugs at least on SBCL
-(define-global +unbound-tvar+ (gensym (symbol-name 'unbound-tvar-)))
+(defconstant +unbound-tvar+ '+unbound-tvar+
+  "Unbound TVARs actually contain this value. Use with care.")
 
 (declaim (type version-type +invalid-version+))
 (defconstant +invalid-version+ (- +global-clock-delta+))
 
 
-;;;; ** tvar approximate counter (fast but not fully exact in multi-threaded usage)
+;;;; ** tvar-id counter (thread-local, it reduces conflicts with respect to a global counter)
 
-(declaim (type fixnum +tvar-id+))
-(define-global +tvar-id+ -1)
+(declaim (type fixnum *tvar-id*))
+(defvar *tvar-id* -1)
+(eval-always
+  (ensure-thread-initial-binding '*tvar-id* -1))
 
 (declaim (inline get-next-id))
 (defun get-next-id (id)
@@ -46,7 +47,7 @@
         (1+ id))))
 
 (defmacro tvar-id/next ()
-  `(setf +tvar-id+ (get-next-id +tvar-id+)))
+  `(setf *tvar-id* (get-next-id *tvar-id*)))
 
 
 

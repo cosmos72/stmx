@@ -72,8 +72,9 @@ initialize all its elements to NIL and return it."))
    (hash-fun     :type ghash-hash-fun)
    (aref-fun     :type ghash-aref-fun     :initform #'svref)
    (set-aref-fun :type ghash-set-aref-fun :initform #+(or sbcl cmucl) #'(setf svref)
-                                                    #-(or sbcl cmucl) #'%setf-svref)
-   (count        :type (or fixnum tvar)   :initform 0)
+                 #-(or sbcl cmucl) #'%setf-svref)
+   ;; (eq count nil) means unknown count
+   (count        :type (or null fixnum tvar) :initform 0)
 
    (test-sym     :type symbol             :initarg :test  :initform 'eql)
    (hash-sym     :type symbol             :initarg :hash  :initform nil))
@@ -140,52 +141,90 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
   (the symbol (_ hash hash-sym)))
 
 
-(defun ghash-table-count (hash)
-  "Return the number of KEY/VALUE entries in ghash-table HASH."
-  (declare (type ghash-table hash))
-  (the (integer 0 #.most-positive-fixnum) (_ hash count)))
 
-(defun ghash-table-empty? (hash)
-  "Return T if GHASH-TABLE is empty, i.e. if it contains no entries."
-  (declare (type ghash-table hash))
-  (zerop (the fixnum (_ hash count))))
-
-
-
-(defmacro do-ghash-pairs ((pair) hash &body body)
+(defmacro do-ghash-pairs ((pair &optional index) hash &body body)
   "Execute BODY on each GHASH-PAIR pair contained in HASH. Return NIL."
-  (with-gensyms (h vec i n left aref-fun next loop-name)
-    `(let* ((,h    (the ghash-table ,hash))
-            (,vec  (the ghash-vector (_ ,h vec)))
-            (,n    (the fixnum (length ,vec)))
-            (,left (ghash-table-count ,h))
-            (,aref-fun (the function (_ ,h aref-fun))))
-       (declare (type fixnum ,left))
-           
-       (dotimes (,i ,n)
-         (when (zerop ,left)
-           (return))
-         (loop named ,loop-name ;; (return) will exit from (dotimes) above
-            for ,pair = (funcall ,aref-fun ,vec ,i) then ,next
-            with ,next = nil
-            while ,pair
-            do
-              (setf ,next (_ ,pair next))
-              (decf ,left)
-              (locally ,@body))))))
+  (with-gensyms (h vec vlen i count n end aref-fun next outer-loop inner-loop)
+    (let ((count (or index count)))
+      `(let* ((,h    (the ghash-table ,hash))
+              (,vec  (the ghash-vector (_ ,h vec)))
+              (,vlen (the fixnum (length ,vec)))
+              (,count 0)
+              (,n    (_ ,h count)) ;; NIL if unknown count
+              (,end  (or ,n most-positive-fixnum))
+              (,aref-fun (the function (_ ,h aref-fun))))
+         (declare (type fixnum ,count ,end))
+
+         (block nil
+           (loop named ,outer-loop
+              for ,i below ,vlen
+              while (< ,count ,end)
+              do
+                (loop named ,inner-loop
+                   for ,pair = (funcall ,aref-fun ,vec ,i) then ,next
+                   with ,next = nil
+                   while ,pair
+                   do
+                     (setf ,next (_ ,pair next))
+                     (incf (the fixnum ,count))
+                     (locally ,@body))) ;; (return) will exit from (block nil) above
+
+           ;; we iterated on the whole hash table,
+           ;; so any chance of concurrent modification is lost.
+           ;; we may as well set the actual COUNT
+           (unless (and ,n (= ,count ,n))
+             (setf (_ ,h count) ,count))
+           nil)))))
                 
 
-
-(defmacro do-ghash ((key &optional value) hash &body body)
+(defmacro do-ghash ((key &optional value index) hash &body body)
   "Execute BODY on each KEY/VALUE contained in HASH. Return NIL."
   (with-gensym pair
-    `(do-ghash-pairs (,pair) ,hash
+    `(do-ghash-pairs (,pair ,index) ,hash
        (let ((,key (_ ,pair key))
              ,@(when value `((,value (_ ,pair value)))))
          ,@body))))
                 
 
-         
+(defun ghash-table-count (hash)
+  "Return the number of KEY/VALUE entries in ghash-table HASH."
+  (declare (type ghash-table hash))
+  (when-bind n (_ hash count)
+    (return-from ghash-table-count (the fixnum n)))
+
+  ;; (do-ghash-pairs) computes (_ hash count) unless body exits early
+  (do-ghash-pairs (pair) hash)
+  (the fixnum (_ hash count)))
+          
+
+(defun ghash-table-count> (hash count)
+  "Return T if ghash-table HASH contains more than COUNT key/value entries."
+  (declare (type ghash-table hash)
+           (type fixnum count))
+  (when (< count 0)
+    (return-from ghash-table-count> t))
+  (when-bind n (_ hash count)
+    (return-from ghash-table-count> (> (the fixnum n) count)))
+  
+  (do-ghash-pairs (pair index) hash
+    (when (> index count)
+      (return-from ghash-table-count> t)))
+  nil)
+          
+(declaim (inline ghash-table-count<=))
+(defun ghash-table-count<= (hash count)
+  "Return T if ghash-table HASH contains at most COUNT key/value entries."
+  (not (ghash-table-count> hash count)))
+
+
+(declaim (inline ghash-table-empty?))
+(defun ghash-table-empty? (hash)
+  "Return T if GHASH-TABLE is empty, i.e. if it contains no entries."
+  (declare (type ghash-table hash))
+  (ghash-table-count<= hash 0))
+
+
+
 (declaim (inline ghash-mask))
 (defun ghash-mask (vec-len)
   "Return the bitmask to use for hash indexes."
@@ -284,22 +323,39 @@ Otherwise return (values DEFAULT nil)."
          (vec          (the ghash-vector (_ hash vec)))
          (subscript    (ghash-subscript hash-code vec))
          (head         (funcall aref-fun vec subscript))
-         (test-fun     (the function     (_ hash test-fun))))
+         (test-fun     (the function     (_ hash test-fun)))
+         (bucket-len   0))
 
     (loop for pair = head then (_ pair next)
        while pair do
+         (incf (the fixnum bucket-len))
          (when (funcall test-fun key (_ pair key))
            (return-from set-ghash (setf (_ pair value) value))))
 
-    (let1 pair (ghash/new-pair hash key value head)
-      (funcall set-aref-fun pair vec subscript))
+    (let ((pair (ghash/new-pair hash key value head))
+          (count-or-nil (_ hash count)))
 
-    (let1 count (incf (the fixnum (_ hash count)))
-      (when (<= (length vec) count (ash +ghash-max-capacity+ -1))
-        (rehash-ghash hash)))
+      (funcall set-aref-fun pair vec subscript)
+      ;; do not update COUNT, just set to NIL *before* calling other functions
+      (when (_ hash count)
+        (setf (_ hash count) nil))
 
-    value))
-
+      (flet ((%need-rehash ()
+               (let ((vlen (length vec)))
+                 (cond
+                   ;; capacity already maxed out?
+                   ((> vlen (ash +ghash-max-capacity+ -1))
+                    nil)
+                   (count-or-nil
+                    (> (the fixnum count-or-nil) vlen))
+                   (t
+                    (and (> bucket-len 2)
+                         (ghash-table-count> hash vlen)))))))
+        
+        ;; rehash-ghash sets (_ hash count)
+        (when (%need-rehash)
+          (rehash-ghash hash)))))
+  value)
 
 
 (declaim (inline (setf get-ghash)))
@@ -335,7 +391,9 @@ Return T if KEY was present in HASH, otherwise return NIL."
            (if prev
                (setf (_ prev next) next)
                (funcall set-aref-fun next vec subscript))
-           (decf (the fixnum (_ hash count)))
+           ;; do not update COUNT. just set it to NIL, i.e. "unknown"
+           (when (_ hash count)
+             (setf (_ hash count) nil))
            (return t)))))
                
 
@@ -346,13 +404,14 @@ Return T if KEY was present in HASH, otherwise return NIL."
   "Remove all keys and values from HASH. Return HASH."
   (declare (type ghash-table hash))
 
-  (unless (ghash-table-empty? hash)
-    (let* ((vec (the simple-vector (_ hash vec)))
-           (n (length vec))
-           (set-aref-fun (the function (_ hash set-aref-fun))))
-      (dotimes (i n)
-        (funcall set-aref-fun nil vec i)))
-    (setf (_  hash count) 0))
+  (let ((count (_ hash count)))
+    (unless (and count (zerop count))
+      (let* ((vec (the simple-vector (_ hash vec)))
+             (n (length vec))
+             (set-aref-fun (the function (_ hash set-aref-fun))))
+        (dotimes (i n)
+          (funcall set-aref-fun nil vec i)))
+      (setf (_  hash count) 0)))
   hash)
 
 

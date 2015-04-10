@@ -17,7 +17,9 @@
 
 ;;;; ** Transactional cell, it can be empty or hold a single value
 
-(define-global +empty-tcell+ (gensym "EMPTY-TCELL-"))
+(declaim (type symbol +unbound-tvar+))
+(defconstant +empty-tcell+ '+empty-tcell+
+  "Empty TCELL objects actually contain this symbol in their VALUE slot. Use with care.")
 
 (transactional
  (defclass tcell ()

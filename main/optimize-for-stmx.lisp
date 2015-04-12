@@ -225,11 +225,12 @@ a lambda list created for a function."
                ,@declares
                
                #?+hw-transactions
-               (if (/= +invalid-version+ (hw-tlog-write-version))
-                   ,(call-fun :hwtx params)
-                   (if (use-$-swtx?)
-                       ,(call-fun :swtx params)
-                       ,(call-fun :notx params))))
+               (when (/= +invalid-version+ (hw-tlog-write-version))
+		 (return-from ,mangled-name ,(call-fun :hwtx params)))
+
+	       (if (use-$-swtx?)
+		   ,(call-fun :swtx params)
+		   ,(call-fun :notx params)))
 
              ;; macrolet used by WITH-TX cannot bind names like (setf ...)
              ;; thus we use a mangled name

@@ -18,7 +18,7 @@
 (enable-#?-syntax)
 
 (optimize-for-stmx
- (defun $-slot (var)
+  (defun $-slot (var)
    "Get the value from the transactional variable VAR and return it.
 Signal an error if VAR is not bound to a value.
 

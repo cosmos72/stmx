@@ -91,7 +91,8 @@
 
   
 #?+bt/make-thread
-(defun test-tmap-threads (&key (thread-pairs 4) (iterations 10000))
+(defun test-tmap-threads (&key (thread-pairs 4)
+			    (iterations #+abcl 1000 #-abcl 10000))
   (declare (type fixnum thread-pairs iterations))
 
   (start-multithreading)

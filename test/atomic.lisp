@@ -63,7 +63,6 @@
         (log (make-tlog)))
         
     (is (= 1 ($ var)))
-    (is (= 1 ($-slot var)))
     (is (= 1 (raw-value-of var)))
     (with-recording-to-tlog log
       ;; global-clock GV5 used by hardware transactions
@@ -71,24 +70,21 @@
       (setf (stmx::tlog-read-version log) (stmx::tvar-version var))
 
       (is (= 1 ($ var)))
-      (is (= 1 ($-slot var)))
       (is (= 1 (raw-value-of var)))
       
       (is (= 2 (setf ($ var) 2)))
       (is (= 2 ($ var)))
-      (is (= 2 ($-slot var)))
       (is (= 1 (raw-value-of var)))
 
-      (is (= 3 (setf ($-slot var) 3)))
+      (is (= 3 (setf ($ var) 3)))
       (is (= 3 ($ var)))
-      (is (= 3 ($-slot var)))
       (is (= 1 (raw-value-of var)))
 
       (is-true (valid? log))
       (is-true (commit log))
       (is (= 3 (raw-value-of var))))
     (is (= 3 ($ var)))
-    (is (= 3 ($-slot var)))))
+    (is (= 3 (raw-value-of var)))))
 
 (def-test $ (:compile-at :definition-time)
   ($-test))
@@ -99,11 +95,13 @@
 
     (is (eq +unbound-tvar+ ($ var)))
     (signals unbound-slot ($-slot var))
+    (is-false (bound-$? var))
     (is (eq +unbound-tvar+ (raw-value-of var)))
 
     (setf ($-slot var) 0)
     (is (= 0 ($ var)))
     (is (= 0 ($-slot var)))
+    (is-true (bound-$? var))
     (is (= 0 (raw-value-of var)))
 
     (with-recording-to-tlog log
@@ -113,10 +111,12 @@
 
       (is (= 0 ($ var)))
       (is (= 0 ($-slot var)))
+      (is-true (bound-$? var))
       (is (= 0 (raw-value-of var)))
 
-      (setf ($ var) +unbound-tvar+)
+      (unbind-$ var)
       (is (eq +unbound-tvar+ ($ var)))
+      (is-false (bound-$? var))
       (signals unbound-slot ($-slot var))
       (is (= 0 (raw-value-of var)))
 
@@ -126,6 +126,7 @@
 
     (is (eq +unbound-tvar+ ($ var)))
     (signals unbound-slot ($-slot var))
+    (is-false (bound-$? var))
     (is (eq +unbound-tvar+ (raw-value-of var)))))
     
 (def-test $-slot (:compile-at :definition-time)

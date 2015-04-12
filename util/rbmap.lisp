@@ -215,7 +215,7 @@ Return some node in rebalanced tree and its stack as multiple values"
 
      rule-1
      (unless parent
-       (break "NIL parent at rule 1 in
+       (break "STMX internal error! NIL parent at rule 1 in
   (%rbmap-remove-black-node-at parent=~S node=~S brother=~S left-node?=~S stack=~S)"
               parent node brother left-node? stack))
 
@@ -251,7 +251,7 @@ Return some node in rebalanced tree and its stack as multiple values"
      ;; 2.1) if such double-red occurs, set parent's color to black -> DONE
 
      (unless brother
-       (break "NIL brother at rule 2 in
+       (break "STMX internal error! NIL brother at rule 2 in
 (%rbmap-remove-black-node-at parent=~S node=~S brother=~S left-node?=~S stack=~S)"
               parent node brother left-node? stack))
 
@@ -293,7 +293,7 @@ Return some node in rebalanced tree and its stack as multiple values"
      ;; brother B may have changed, recompute its left and right children
 
      (unless brother
-       (break "NIL brother at rule 3.1 in
+       (break "STMX internal error! NIL brother at rule 3.1 in
 (%rbmap-remove-black-node-at parent=~S node=~S brother=~S left-node?=~S stack=~S)"
               parent node brother left-node? stack))
 

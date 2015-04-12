@@ -31,7 +31,7 @@
 (enable-#?-syntax)  
 
 (declaim (ftype (function (                   cons) fixnum) eat-from-plate)
-         (ftype (function (t                  cons) fixnum) eat-from-plate/swtx)
+         (ftype (function (stmx::tlog         cons) fixnum) eat-from-plate/swtx)
          (ftype (function (stmx::version-type cons) fixnum) eat-from-plate/hwtx)
          (inline
            eat-from-plate
@@ -46,18 +46,18 @@
 (defun eat-from-plate/hwtx (helper plate)
   "Decrease by one TVAR in plate."
   (declare (type cons plate))
-  (decf (the fixnum ($-hwtx helper (car plate)))))
+  (decf (the fixnum ($-hwtx (car plate) helper))))
 
 (defun eat-from-plate/swtx (helper plate)
   "Decrease by one TVAR in plate."
   (declare (type cons plate))
-  (decf (the fixnum ($-swtx helper (car plate)))))
+  (decf (the fixnum ($-swtx (car plate) helper))))
 
 
-(declaim (ftype (function (       tvar tvar cons) fixnum) philosopher-eats
-                #||#                                      fast-philosopher-eats)
-         (ftype (function (t      tvar tvar cons) fixnum) fast-philosopher-eats/swtx)
-         (ftype (function (fixnum tvar tvar cons) fixnum) fast-philosopher-eats/hwtx)
+(declaim (ftype (function (                   tvar tvar cons) fixnum) philosopher-eats
+                #||#                                                  fast-philosopher-eats)
+         (ftype (function (stmx::tlog         tvar tvar cons) fixnum) fast-philosopher-eats/swtx)
+         (ftype (function (stmx::version-type tvar tvar cons) fixnum) fast-philosopher-eats/hwtx)
          (inline philosopher-eats
                  fast-philosopher-eats
                  fast-philosopher-eats/hwtx
@@ -115,13 +115,13 @@
         (free t)
         (busy +unbound-tvar+))
 
-    (when (eq free ($-hwtx helper fork1))
-      (setf ($-hwtx helper fork1) busy)
-      (when (eq free ($-hwtx helper fork2))
-        (setf ($-hwtx helper fork2) busy
+    (when (eq free ($-hwtx fork1 helper))
+      (setf ($-hwtx fork1 helper) busy)
+      (when (eq free ($-hwtx fork2 helper))
+        (setf ($-hwtx fork2 helper) busy
               hunger (eat-from-plate/hwtx helper plate)
-              ($-hwtx helper fork2) free))
-      (setf ($-hwtx helper fork1) free))
+              ($-hwtx fork2 helper) free))
+      (setf ($-hwtx fork1 helper) free))
 
     #+never
     (when (= -1 hunger)
@@ -142,13 +142,13 @@
         (free t)
         (busy +unbound-tvar+))
 
-    (when (eq free ($-swtx helper fork1))
-      (setf ($-swtx helper fork1) busy)
-      (when (eq free ($-swtx helper fork2))
-        (setf ($-swtx helper fork2) busy
+    (when (eq free ($-swtx fork1 helper))
+      (setf ($-swtx fork1 helper) busy)
+      (when (eq free ($-swtx fork2 helper))
+        (setf ($-swtx fork2 helper) busy
               hunger (eat-from-plate/swtx helper plate)
-              ($-swtx helper fork2) free))
-      (setf ($-swtx helper fork1) free))
+              ($-swtx fork2 helper) free))
+      (setf ($-swtx fork1 helper) free))
 
     hunger))
 

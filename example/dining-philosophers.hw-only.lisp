@@ -87,7 +87,7 @@
    ;; without this yield, the % of aborted transactions is huge
    (when (= -1 hunger)
      (bt:thread-yield)
-     ;; (sb-thread:thread-yield) -- MUCH slower!
+     ;; (sb-thread:thread-yield) ;; MUCH slower!
      (go start))
    
    (return hunger)))

@@ -68,7 +68,7 @@ If it fails for some other reason, execute BODY in a software memory transaction
   (if body
       #?+hw-transactions
       (let ((form `(block nil (locally ,@body))))
-        `(%hw-atomic2 () ,form (%run-sw-atomic (lambda () ,form))))
+        `(%hw-atomic2 () ,form (%run-sw-atomic (lambda () (with-swtx ,form)))))
       #?-hw-transactions
       `(sw-atomic ,@body)
 

@@ -153,11 +153,24 @@ while it is normally disabled in these cases:
      ,@body))
 
 
+(declaim (inline hw-transaction?))
+(defun hw-transaction? ()
+  "Return true if inside a hardware transaction."
+  #?+hw-transactions
+  (/= +invalid-version+ (hw-tlog-write-version))
+  #?-hw-transactions
+  nil)
+
+(declaim (inline sw-transaction?))
+(defun sw-transaction? ()
+  "Return true if inside a software transaction."
+  (recording?))
+  
+
 (declaim (inline transaction?))
 (defun transaction? ()
   "Return true if inside a software or hardware transaction."
-  (or (hw-transaction-supported-and-running?)
-      *record-to-tlogs*))
+  (or (hw-transaction?) (sw-transaction?)))
 
 
 

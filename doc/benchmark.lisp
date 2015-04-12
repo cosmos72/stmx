@@ -17,17 +17,17 @@
 (defmacro 1g (&rest body)
   `(time (dotimes (i 1000000000)
            ,@body)))
-(defvar v (tvar 0))
-(defvar c (tcell 0))
-(defvar m  (new 'rbmap :pred 'fixnum<)) 
-(defvar tm (new 'tmap  :pred 'fixnum<)) 
-(defvar h  (new 'ghash-table :test 'fixnum= :hash 'identity)) 
-(defvar th (new 'thash-table :test 'fixnum= :hash 'identity)) 
+(defvar *v* (tvar 0))
+(defvar *c* (tcell 0))
+(defvar *m*  (new 'rbmap :pred 'fixnum<)) 
+(defvar *tm* (new 'tmap  :pred 'fixnum<)) 
+(defvar *h*  (new 'ghash-table :test 'fixnum= :hash 'identity)) 
+(defvar *th* (new 'thash-table :test 'fixnum= :hash 'identity)) 
 ;; some initial values
-(setf (get-gmap m 1) 0)
-(setf (get-gmap tm 1) 0)
-(setf (get-ghash h 1) 0)
-(setf (get-ghash th 1) 0)
+(setf (get-gmap *m* 1) 0)
+(setf (get-gmap *tm* 1) 0)
+(setf (get-ghash *h* 1) 0)
+(setf (get-ghash *th* 1) 0)
 
 (defmacro sw-atomic (&rest body)
   `(stmx::sw-atomic ,@body))
@@ -38,7 +38,7 @@
 (defmacro simple-hw-atomic (&rest body)
   `(if (= +hw-transaction-started+ (hw-transaction-begin))
        (multiple-value-prog1
-           (progn ,@body)
+           (stmx::with-hwtx ,@body)
          (hw-transaction-end))
        (stmx::sw-atomic ,@body)))
 
@@ -48,106 +48,164 @@
                      ,@(when body? `(,body (sw-atomic ,fallback)))))
 
 (defmacro run1m (&rest body)
-  `(let ((v v)
-         (c c)
-         (m m)
-         (tm tm)
-         (h h)
-         (th th))
+  `(let ((v *v*)
+         (c *c*)
+         (m *m*)
+         (tm *tm*)
+         (h *h*)
+         (th *th*))
+     (declare (ignorable v c m tm h th))
      (x3 (1m ,@body))))
 
 (defmacro run10m (&rest body)
-  `(let ((v v)
-         (c c)
-         (m m)
-         (tm tm)
-         (h h)
-         (th th))
+  `(let ((v *v*)
+         (c *c*)
+         (m *m*)
+         (tm *tm*)
+         (h *h*)
+         (th *th*))
+     (declare (ignorable v c m tm h th))
      (x3 (10m ,@body))))
 
 (defmacro run1g (&rest body)
-  `(let ((v v)
-         (c c)
-         (m m)
-         (tm tm)
-         (h h)
-         (th th))
+  `(let ((v *v*)
+         (c *c*)
+         (m *m*)
+         (tm *tm*)
+         (h *h*)
+         (th *th*))
+     (declare (ignorable v c m tm h th))
      (x3 (1g ,@body))))
 
-
+;;;; nil
 (run10m (sw-atomic nil))
 (run10m (atomic nil))
 (run10m (simple-hw-atomic nil))
 
-
-(run10m (sw-atomic  ($-swtx (sw-tlog) v)))
+;;;; read-1
+(run10m (sw-atomic  ($ v)))
 (run10m (atomic     ($ v)))
-(run10m (hw-atomic  (hw-helper)
-                    ($-hwtx hw-helper v) ;; hw transaction
-                    ($-swtx (sw-tlog) v))) ;; sw transaction
+(run10m (simple-hw-atomic ($ v)))
 
-
-(run10m (sw-atomic  (setf ($-swtx (sw-tlog) v) 1)))
+;;;; write-1
+(run10m (sw-atomic  (setf ($ v) 1)))
 (run10m (atomic     (setf ($ v) 1)))
 (run10m (hw-atomic  (hw-helper)
-                    (setf ($-hwtx hw-helper v) 1)
-                    (setf ($-swtx (sw-tlog) v) 1)))
+                    (setf ($-hwtx v hw-helper) 1)
+                    (setf ($ v) 1)))
 
-
-(run10m (sw-atomic  (incf (the fixnum ($-swtx (sw-tlog) v)))))
+;;;; read-write-1
+(run10m (sw-atomic  (incf (the fixnum ($ v)))))
 (run10m (atomic     (incf (the fixnum ($ v)))))
 (run10m (hw-atomic  (hw-helper)
-                    (incf (the fixnum ($-hwtx hw-helper v)))
-                    (incf (the fixnum ($-swtx (sw-tlog) v)))))
+                    (incf (the fixnum ($-hwtx v hw-helper)))
+                    (incf (the fixnum ($-swtx v (sw-tlog))))))
 
 
+;;;; read-write-10
 (run10m (sw-atomic  (let ((sw-helper (sw-tlog)))
-                      (dotimes (j 10) (incf (the fixnum ($-swtx sw-helper v)))))))
+                      (dotimes (j 10) (incf (the fixnum ($-swtx v sw-helper)))))))
 (run10m (atomic     (dotimes (j 10) (incf (the fixnum ($ v))))))
 (run10m (hw-atomic  (hw-helper)
-                    (dotimes (j 10) (incf (the fixnum ($-hwtx hw-helper v))))
+                    (dotimes (j 10) (incf (the fixnum ($-hwtx v hw-helper))))
                     (let ((sw-helper (sw-tlog)))
-                      (dotimes (j 10) (incf (the fixnum ($-swtx sw-helper v)))))))
-(let ((n 0))
-  (x3 (10m (simple-hw-atomic (incf (the fixnum n))))))
+                      (dotimes (j 10) (incf (the fixnum ($-swtx v sw-helper)))))))
 
 
-
-(run10m (sw-atomic  (dotimes (j 100) (incf (the fixnum ($-swtx v))))))
+;;;; read-write-100
+(run10m (sw-atomic  (let ((sw-helper (sw-tlog)))
+                      (dotimes (j 100) (incf (the fixnum ($-swtx v sw-helper)))))))
 (run10m (atomic     (dotimes (j 100) (incf (the fixnum ($ v))))))
 (run10m (hw-atomic  (hw-helper)
                     (dotimes (j 100) (incf (the fixnum ($-hwtx v hw-helper))))
-                    (dotimes (j 100) (incf (the fixnum ($-swtx v))))))
+                    (let ((sw-helper (sw-tlog)))
+                      (dotimes (j 100) (incf (the fixnum ($-swtx v sw-helper)))))))
 
-
-(run1m (sw-atomic  (dotimes (j 1000) (incf (the fixnum ($-swtx v))))))
+;;;; read-write-1000
+(run1m (sw-atomic  (let ((sw-helper (sw-tlog)))
+                     (dotimes (j 1000) (incf (the fixnum ($-swtx v sw-helper)))))))
 (run1m (atomic     (dotimes (j 1000) (incf (the fixnum ($ v))))))
 (run1m (hw-atomic  (hw-helper)
                    (dotimes (j 1000) (incf (the fixnum ($-hwtx v hw-helper))))
-                   (dotimes (j 1000) (incf (the fixnum ($-swtx v))))))
+                   (let ((sw-helper (sw-tlog)))
+                     (dotimes (j 1000) (incf (the fixnum ($-swtx v sw-helper)))))))
 
-
+;; orelse empty
 (run10m (sw-atomic (orelse)))
 (run10m (atomic (orelse)))
 (run10m (simple-hw-atomic (orelse)))
 
+;; orelse unary
+(run1m (sw-atomic (orelse ($ v))))
+(run1m (atomic    (orelse ($ v))))
 
+;; orelse retry-1
+(run1m (sw-atomic (orelse (retry) ($ v))))
+(run1m (atomic    (orelse (retry) ($ v))))
+
+;; orelse retry-2
+(run1m (sw-atomic (orelse (retry) (retry) ($ v))))
+(run1m (atomic    (orelse (retry) (retry) ($ v))))
+
+;; orelse retry-4
+(run1m (sw-atomic (orelse (retry) (retry) (retry) (retry) ($ v))))
+(run1m (atomic    (orelse (retry) (retry) (retry) (retry) ($ v))))
+
+;; tmap read-1
 (run1m (sw-atomic (get-gmap tm 1)))
 (run1m (atomic    (get-gmap tm 1)))
+(run1m (simple-hw-atomic (get-gmap tm 1)))
+                   
 
+;; tmap read-write-1
 (run1m (sw-atomic (incf (the fixnum (get-gmap tm 1)))))
 (run1m (atomic    (incf (the fixnum (get-gmap tm 1)))))
+(run1m (hw-atomic  ()
+                   (incf (the fixnum (get-gmap tm 1)))
+                   (incf (the fixnum (get-gmap tm 1)))))
 
+;; grow tmap (up to 10)
+(run1m (sw-atomic (when (zerop (mod i  10)) (clear-gmap tm))
+                  (set-gmap tm i t)))
+(run1m (atomic    (when (zerop (mod i  10)) (clear-gmap tm))
+                  (set-gmap tm i t)))
+
+;; grow tmap (up to 100)
 (run1m (sw-atomic (when (zerop (mod i  100)) (clear-gmap tm))
                   (set-gmap tm i t)))
 (run1m (atomic    (when (zerop (mod i  100)) (clear-gmap tm))
                   (set-gmap tm i t)))
 
+;; grow tmap (up to 1000)
+(run1m (sw-atomic (when (zerop (mod i  1000)) (clear-gmap tm))
+                  (set-gmap tm i t)))
+(run1m (atomic    (when (zerop (mod i  1000)) (clear-gmap tm))
+                  (set-gmap tm i t)))
 
 
 
+;; thash read-write-1
+(run1m (sw-atomic (incf (get-ghash th 1))))
+(run1m (atomic    (incf (get-ghash th 1))))
 
 
+;; grow thash (up to 10)
+(run1m (sw-atomic (when (zerop (mod i   10)) (clear-ghash th))
+                  (set-ghash th i t)))
+(run1m (atomic    (when (zerop (mod i   10)) (clear-ghash th))
+                  (set-ghash th i t)))
+
+;; grow thash (up to 100)
+(run1m (sw-atomic (when (zerop (mod i  100)) (clear-ghash th))
+                  (set-ghash th i t)))
+(run1m (atomic    (when (zerop (mod i  100)) (clear-ghash th))
+                  (set-ghash th i t)))
+
+;; grow thash (up to 1000)
+(run1m (sw-atomic (when (zerop (mod i  1000)) (clear-ghash th))
+                  (set-ghash th i t)))
+(run1m (atomic    (when (zerop (mod i  1000)) (clear-ghash th))
+                  (set-ghash th i t)))
 
 
 ;; 0.455 seconds

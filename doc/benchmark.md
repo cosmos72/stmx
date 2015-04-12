@@ -95,99 +95,99 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.15 (x86_64), STMX 1.3.3
 
 
  <tr><td>nil       </td><td><code>nil</code></td>
-     <td>0.070</td><td>0.022</td><td>0.012</td></tr>
+     <td>0.074</td><td>0.023</td><td>0.012</td></tr>
      <!-- laptop 0.153; gv6 0.159 -->
 
  <tr><td>read-1    </td><td><code>($ v)</code></td>
-     <td>0.087</td><td>0.022</td>0.021<td></td></tr>
+     <td>0.094</td><td>0.023</td><td>0.014</td></tr>
      <!-- laptop 0.187; gv6 0.195 -->
 
  <tr><td>write-1   </td><td><code>(setf ($ v) 1)</code></td>
-     <td>0.108</td><td>0.027</td><td>0.022</td></tr>
+     <td>0.116</td><td>0.027</td><td>0.026</td></tr>
      <!-- laptop 0.277; gv6 0.257 -->
 
  <tr><td>read-write-1</td><td><code>(incf (the fixnum ($ v)))</code></td>
-     <td>0.148</td><td>0.027</td><td>0.022</td></tr>
+     <td>0.148</td><td>0.027</td><td>0.024</td></tr>
      <!-- laptop 0.339; gv6 0.596 -->
 
  <tr><td>read-write-10</td>
      <td><code>(dotimes (j 10) (incf (the fixnum ($ v))))</code></td>
-     <td>0.272</td><td>0.059</td><td>0.036</td></tr>
+     <td>0.272</td><td>0.036</td><td>0.033</td></tr>
      <!-- laptop 0.686; gv6 0.971 -->
 
  <tr><td>read-write-100</td>
      <td><code>(dotimes (j 100) (incf (the fixnum ($ v))))</code></td>
-     <td>1.399</td><td>0.409</td><td>0.196</td></tr>
+     <td>1.312</td><td>0.197</td><td>0.196</td></tr>
      <!-- laptop 3.703; gv6 4.160 -->
 
  <tr><td>read-write-1000</td>
      <td><code>(dotimes (j 1000) (incf (the fixnum ($ v))))</code></td>
-     <td>9.922</td><td>3.852</td><td>1.656</td></tr>
+     <td>9.922</td><td>1.896</td><td>1.749</td></tr>
      <!-- laptop 33.070; gv6 34.607 -->
 
  <tr><td>read-write-N</td><td>best fit of the 3 runs above</td>
      <td>(0.142+N*0.0098)</td><td>(0.0226+N*0.0036)</td><td>(0.0260+N*0.0016)</td></tr>
 
  <tr><td>orelse empty     </td><td><code>(orelse)</code></td>
-     <td>0.043</td><td>0.026</td><td>0.021</td></tr>
+     <td>0.046</td><td>0.027</td><td>0.022</td></tr>
 
  <tr><td>orelse unary     </td><td><code>(orelse ($ v))</code></td>
-     <td>0.234</td><td>0.266</td></tr>
+     <td>0.234</td><td>0.263</td><td>N/A</td></tr>
 
  <tr><td>orelse retry-1   </td><td><code>(orelse (retry) ($ v))</code></td>
-     <td>0.429</td><td>0.488</td></tr>
+     <td>0.391</td><td>0.438</td><td>N/A</td></tr>
 
  <tr><td>orelse retry-2   </td><td><code>(orelse (retry) (retry) ($ v))</code></td>
-     <td>0.601</td><td>0.674</td></tr>
+     <td>0.526</td><td>0.586</td><td>N/A</td></tr>
 
  <tr><td>orelse retry-4   </td><td><code>(orelse (retry) (retry)<br/>
                                          (retry) (retry) ($ v))</code></td>
-     <td>0.963</td><td>1.035</td></tr>
+     <td>0.843</td><td>0.872</td><td>N/A</td></tr>
 
  <tr><td>orelse retry-N   </td><td>best fit of the 3 runs above</td>
      <td>(0.248+N*0.178)</td><td>(0.308+N*0.182)</td></tr>
 
  <tr><td>tmap read-1</td>
      <td><code>(get-gmap tm 1)</code></td>
-     <td>0.236</td><td>0.175</td></tr>
+     <td>0.236</td><td>0.184</td><td>0.178</td></tr>
 
  <tr><td>tmap read-write-1</td>
      <td><code>(incf (get-gmap tm 1))</code></td>
-     <td>0.531</td><td>0.419</td></tr>
+     <td>0.531</td><td>0.419</td><td>0.409</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
      <td><code>(when (zerop (mod i   10)) (clear-gmap tm))<br>
                (set-gmap tm i t)</code></td>
-     <td>3.882</td><td>4.035</td></tr>
+     <td>3.620</td><td>3.706</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 100)</td>
      <td><code>(when (zerop (mod i  100)) (clear-gmap tm))<br>
                (set-gmap tm i t)</code></td>
-     <td>5.392</td><td>5.641</td></tr>
+     <td>5.072</td><td>5.249</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 1000)</td>
      <td><code>(when (zerop (mod i 1000)) (clear-gmap tm))<br>
               (set-gmap tm i t)</code></td>
-     <td>6.443</td><td>6.775</td></tr>
+     <td>6.290</td><td>6.464</td></tr>
 
  <tr><td>thash read-write-1</td>
      <td><code>(incf (get-ghash th 1))</code></td>
-     <td>0.674</td><td>0.525</td></tr>
+     <td>1.024</td><td>0.566</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 10)</td>
      <td><code>(when (zerop (mod i   10)) (clear-ghash th))<br>
               (set-ghash th i t)</code></td>
-     <td>2.024</td><td>2.381</td></tr>
+     <td>1.669</td><td>1.738</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 100)</td>
      <td><code>(when (zerop (mod i  100)) (clear-ghash th))<br>
               (set-ghash th i t)</code></td>
-     <td>1.913</td><td>2.176</td></tr>
+     <td>1.334</td><td>1.400</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 1000)</td>
      <td><code>(when (zerop (mod i  1000)) (clear-ghash th))<br>
               (set-ghash th i t)</code></td>
-     <td>1.933</td><td>2.183</td></tr>
+     <td>1.267</td><td>1.325</td></tr>
 
  </table>
 

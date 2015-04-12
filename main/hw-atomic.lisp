@@ -28,14 +28,18 @@
                        body fallback)
   "Run BODY in a hardware memory transaction.
 If the transaction aborts, retry it as long as it has chances to succeed.
-If it has no chances to succeed, execute FALLBACK."
+If it has no chances to succeed, execute FALLBACK.
+Warning: if a transaction is already running, execute BODY inside it"
 
   (let ((tvar-write-version (or tvar-write-version (gensym (symbol-name 'tvar-write-version))))
         (err (or err (gensym (symbol-name 'err)))))
     
     (with-gensyms (tx-begin tx-fallback attempts)
       `(cond
-         ,@(if test-for-running-tx? `(((transaction?) ,body)) `())
+         ,@(if test-for-running-tx?
+               `(((hw-transaction?) (with-hwtx ,body))
+                 ((sw-transaction?) (with-swtx ,body)))
+               `())
          (t
           (prog ((,err 0)
                  (,attempts +hw-atomic-max-attempts+)
@@ -61,7 +65,7 @@ If it has no chances to succeed, execute FALLBACK."
 
                  (return ;; returns from (prog ...)
                    (multiple-value-prog1
-                       ,body
+                       (with-hwtx ,body)
                      (hw-transaction-end)
                      ,(if (eq update-stat :swtx)
                           `(global-clock/sw/stat-committed)
@@ -97,7 +101,7 @@ If it fails for some other reason, execute FALLBACK."
   (if body?
       `(%hw-atomic2 (,tvar-write-version :err ,err :test-for-running-tx? ,test-for-running-tx?
                                          :update-stat ,update-stat)
-                    (with-hwtx ,@body)
+                    ,body
                     ,fallback)
       `(values)))
 

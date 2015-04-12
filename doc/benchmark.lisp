@@ -113,10 +113,10 @@
 
 
 ;;;; read-write-100
-(run10m (sw-atomic  (let ((sw-helper (sw-tlog)))
+(run1m (sw-atomic  (let ((sw-helper (sw-tlog)))
                       (dotimes (j 100) (incf (the fixnum ($-swtx v sw-helper)))))))
-(run10m (atomic     (dotimes (j 100) (incf (the fixnum ($ v))))))
-(run10m (hw-atomic  (hw-helper)
+(run1m (atomic     (dotimes (j 100) (incf (the fixnum ($ v))))))
+(run1m (hw-atomic  (hw-helper)
                     (dotimes (j 100) (incf (the fixnum ($-hwtx v hw-helper))))
                     (let ((sw-helper (sw-tlog)))
                       (dotimes (j 100) (incf (the fixnum ($-swtx v sw-helper)))))))

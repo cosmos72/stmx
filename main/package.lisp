@@ -73,5 +73,6 @@
 
            #:bound-$? #:unbind-$
 
-           #:fast-atomic))
+           ;; helpers to optimize code
+           #:fast-atomic #:optimize-for-stmx))
 

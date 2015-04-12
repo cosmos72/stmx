@@ -26,7 +26,7 @@
         (var (tvar 1)))
     (is (= 1 (raw-value-of var)))
     (is (= 1 (tx-read-of var log)))
-    (tx-write-of var 2 log)
+    (tx-write-of 2 var log)
     (is (= 1 (raw-value-of var)))
     (is (= 2 (tx-read-of var log)))))
 
@@ -50,7 +50,7 @@
 (defun commit-test ()
   (let ((log (make-tlog))
         (var (tvar 1)))
-    (tx-write-of var 2 log)
+    (tx-write-of 2 var log)
     (is-true (valid? log))
     (is-true (commit log))
     (is (= 2 (raw-value-of var)))))
@@ -59,21 +59,81 @@
   (commit-test))
 
 (defun $-test ()
-  (let ((log (make-tlog))
-        (var (tvar 1)))
+  (let ((var (tvar 1))
+        (log (make-tlog)))
+        
     (is (= 1 ($ var)))
+    (is (= 1 ($-slot var)))
+    (is (= 1 (raw-value-of var)))
     (with-recording-to-tlog log
+      ;; global-clock GV5 used by hardware transactions
+      ;; causes 50% of software transactions to abort... work around it
+      (setf (stmx::tlog-read-version log) (stmx::tvar-version var))
+
       (is (= 1 ($ var)))
+      (is (= 1 ($-slot var)))
+      (is (= 1 (raw-value-of var)))
+      
       (is (= 2 (setf ($ var) 2)))
       (is (= 2 ($ var)))
+      (is (= 2 ($-slot var)))
       (is (= 1 (raw-value-of var)))
+
+      (is (= 3 (setf ($-slot var) 3)))
+      (is (= 3 ($ var)))
+      (is (= 3 ($-slot var)))
+      (is (= 1 (raw-value-of var)))
+
       (is-true (valid? log))
       (is-true (commit log))
-      (is (= 2 (raw-value-of var))))
-    (is (= 2 ($ var)))))
+      (is (= 3 (raw-value-of var))))
+    (is (= 3 ($ var)))
+    (is (= 3 ($-slot var)))))
 
 (def-test $ (:compile-at :definition-time)
   ($-test))
+
+(defun $-slot-test ()
+  (let ((var (tvar))
+        (log (make-tlog)))
+
+    (is (eq +unbound-tvar+ ($ var)))
+    (signals unbound-slot ($-slot var))
+    (is (eq +unbound-tvar+ (raw-value-of var)))
+
+    (setf ($-slot var) 0)
+    (is (= 0 ($ var)))
+    (is (= 0 ($-slot var)))
+    (is (= 0 (raw-value-of var)))
+
+    (with-recording-to-tlog log
+      ;; global-clock GV5 used by hardware transactions
+      ;; causes 50% of software transactions to abort... work around it
+      (setf (stmx::tlog-read-version log) (stmx::tvar-version var))
+
+      (is (= 0 ($ var)))
+      (is (= 0 ($-slot var)))
+      (is (= 0 (raw-value-of var)))
+
+      (setf ($ var) +unbound-tvar+)
+      (is (eq +unbound-tvar+ ($ var)))
+      (signals unbound-slot ($-slot var))
+      (is (= 0 (raw-value-of var)))
+
+      (is-true (valid? log))
+      (is-true (commit log))
+      (is (eq +unbound-tvar+ (raw-value-of var))))
+
+    (is (eq +unbound-tvar+ ($ var)))
+    (signals unbound-slot ($-slot var))
+    (is (eq +unbound-tvar+ (raw-value-of var)))))
+    
+(def-test $-slot (:compile-at :definition-time)
+  ($-slot-test))
+
+      
+
+
 
 (defun atomic-test ()
   (let ((var (tvar 0))

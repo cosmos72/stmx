@@ -23,6 +23,8 @@
 
   (:export #:define-global    #:define-constant-once
 
+           #:do-tree
+           #:stringify    #:concat-symbols
            #:with-gensym  #:with-gensyms
            #:eval-always  #:new          #:let1
            #:when-bind    #:awhen

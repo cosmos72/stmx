@@ -192,13 +192,12 @@ inside TOBJs slots while executing BODY."
 (defvar *tlog* nil
   "The current transaction log.")
 
-(declaim (inline current-tlog))
-(defun current-tlog ()
-  "Return the current transaction log"
-  *tlog*)
+(defmacro current-tlog ()
+  "Return the current software transaction log"
+  '*tlog*)
 
 (defmacro with-tlog (log &body body)
-  "Use LOG as the current transaction log while executing BODY."
+  "Use LOG as the current software transaction log while executing BODY."
   `(let1 *tlog* ,log
      ,@body))
 

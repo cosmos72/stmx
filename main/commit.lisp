@@ -354,7 +354,7 @@ Note: invokes HW-ATOMIC2, which in turn invokes GLOBAL-CLOCK/HW/STAT-{COMMITTED,
             ;; the hardware transaction guarantees to abort if the tvar changes value
             (unless (eq val (raw-value-of var))
               (put-txfifo changed entry)
-              (setf ($-hwtx var write-version) val))))
+              (setf ($-hwtx write-version var) val))))
         t)
 
       ;; fallback

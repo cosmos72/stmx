@@ -97,7 +97,8 @@ If it fails for some other reason, execute FALLBACK."
   (if body?
       `(%hw-atomic2 (,tvar-write-version :err ,err :test-for-running-tx? ,test-for-running-tx?
                                          :update-stat ,update-stat)
-                   ,body ,fallback)
+                    (with-hwtx ,@body)
+                    ,fallback)
       `(values)))
 
 

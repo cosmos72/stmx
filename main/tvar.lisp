@@ -70,7 +70,7 @@ for debugging purposes. Use (SETF ($-SLOT VAR) VALUE) or (SETF ($ VAR) VALUE) in
   
 
 
-(defun tx-read-of (var &optional (log (current-tlog)))
+(defun tx-read-of (var log)
   "If VAR's value is stored in writes of transaction LOG, return the stored value.
 Otherwise, validate VAR version, add VAR into the reads of transaction LOG,
 and return (raw-value-of VAR). If VAR version validation fails, call (rerun).
@@ -100,7 +100,7 @@ TX-READ-OF is an internal function called by ($ VAR) and by reading TOBJs slots.
 
 
 (declaim (inline tx-write-of))
-(defun tx-write-of (var value &optional (log (current-tlog)))
+(defun tx-write-of (value var log)
   "Store in transaction LOG the writing of VALUE into VAR; return VALUE.
 
 TX-WRITE-OF is an internal function called by (SETF ($ VAR) VALUE)
@@ -112,56 +112,80 @@ and by writing TOBJs slots."
 
 
 
-
-(declaim (inline $-swtx))
-(defun $-swtx (var)
-    "Get the value from the transactional variable VAR and return it.
-Return +unbound-tvar+ if VAR is not bound to a value.
-Works ONLY inside software memory transactions."
-  (declare (type tvar var))
-  (tx-read-of var))
-
-
-(declaim (inline (setf $-swtx)))
-(defun (setf $-swtx) (value var)
-  "Store VALUE inside transactional variable VAR and return VALUE.
-Works ONLY inside software memory transactions."
-  (declare (type tvar var))
-  (tx-write-of var value))
-
-
-
-
+;;;; ** hwtx
 
 (declaim (inline $-hwtx))
 #?+hw-transactions
-(defun $-hwtx (var &optional unused)
-    "Get the value from the transactional variable VAR and return it.
+(defun $-hwtx (var &optional (hwtx-version (hw-tlog-write-version)))
+  "Get the value from the transactional variable VAR and return it.
 Return +unbound-tvar+ if VAR is not bound to a value.
 Works ONLY inside hardware memory transactions.
 
-The argument UNUSED is not used. It only exists for simmetry with
-\(SETF $-HWTX) to allow idioms as (INCF ($-HWTX var version))"
-  (declare (type tvar var)
-           (ignore unused))
+HWTX-VERSION is not used, its only purpose is symmetry with (setf $-hwtx)"
+  (declare (ignore hwtx-version)
+           (type tvar var))
   (tvar-value var))
 
 
-(declaim (inline (setf $-hwtx)))
+;; WITH-TX uses macrolet, which cannot bind names like (setf ...)
+;; thus we use define set-$-hwtx and create a setf-expander on $-hwtx
+
 #?+hw-transactions
-(defun (setf $-hwtx) (value var &optional (version (hw-tlog-write-version)))
+(declaim (inline set-$-hwtx))
+#?+hw-transactions
+(defun set-$-hwtx (value var &optional (hwtx-version (hw-tlog-write-version)))
   "Store VALUE inside transactional variable VAR and return VALUE.
 Works ONLY inside hardware memory transactions.
 
-VERSION is an optional parameter that, if used, MUST be equal to the value
-returned by (HW-TLOG-WRITE-VERSION) - it is a per-transaction constant.
+HWTX-VERSION *must* be equal to the value returned by (HW-TLOG-WRITE-VERSION),
+it is a per-transaction constant.
 Its purpose is to speed up this function, by removing the two nanoseconds
 required to retrieve such value from thread-local storage."
-  (declare (type tvar var))
-  (setf (tvar-version var) version
+  (declare (type version-type hwtx-version)
+           (type tvar var))
+  (setf (tvar-version var) hwtx-version
         (tvar-value var) value))
 
+;; support live upgrade, older versions had (defun (setf $-hwtx))
+(fmakunbound '(setf $-hwtx))
 
+#?+hw-transactions
+(defsetf $-hwtx (var &optional (hwtx-version '(hw-tlog-write-version))) (value)
+  `(set-$-hwtx ,value ,var ,hwtx-version))
+
+
+
+;;;; ** swtx
+
+(declaim (inline $-swtx))
+(defun $-swtx (var &optional (log (current-tlog)))
+    "Get the value from the transactional variable VAR and return it.
+Return +unbound-tvar+ if VAR is not bound to a value.
+Works ONLY inside software memory transactions."
+  (declare (type tvar var))
+  (tx-read-of var log))
+
+
+;; WITH-TX uses macrolet, which cannot bind names like (setf ...)
+;; thus we use define set-$-swtx and create a setf-expander on $-swtx
+(declaim (inline set-$-swtx))
+(defun set-$-swtx (value var &optional (log (current-tlog)))
+  "Store VALUE inside transactional variable VAR and return VALUE.
+Works ONLY inside software memory transactions."
+  (declare (type tvar var))
+  (tx-write-of value var log))
+
+;; support live upgrade, older versions had (defun (setf $-hwtx))
+(fmakunbound '(setf $-swtx))
+
+(defsetf $-swtx (var &optional (log '(current-tlog))) (value)
+  `(set-$-swtx ,value ,var ,log))
+
+
+
+
+
+;;;; ** notx
 
 (declaim (inline $-notx))
 (defun $-notx (var)
@@ -175,14 +199,27 @@ Works ONLY outside memory transactions."
   (raw-value-of var))
 
 
-(declaim (inline (setf $-notx)))
-(defun (setf $-notx) (value var)
+;; WITH-TX uses macrolet, which cannot bind names like (setf ...)
+;; thus we use define set-$-hwtx and create a setf-expander on $-hwtx
+(declaim (inline set-$-notx))
+(defun set-$-notx (value var)
   "Store VALUE inside transactional variable VAR and return VALUE.
 Works ONLY outside memory transactions."
   (declare (type tvar var))
 
   (setf (raw-value-of var) value))
 
+;; support live upgrade, older versions had (defun (setf $-notx))
+(fmakunbound '(setf $-notx))
+
+(defsetf $-notx (var) (value)
+  `(set-$-notx ,value ,var))
+
+
+
+
+
+;;; ** more macros
 
 (defmacro use-$-hwtx? ()
   "Return T if $-hwtx and (setf $-hwtx) should be used, otherwise return NIL."
@@ -207,29 +244,20 @@ During transactions, it uses transaction log to record the read
 and to check for any value stored in the log."
   (declare (type tvar var))
 
-  (cond
-    #?+hw-transactions ((use-$-hwtx?) ($-hwtx var))
-    ((use-$-swtx?)   ($-swtx   var))
-    (t             ($-notx var))))
+  #?+hw-transactions
+  (let ((hwtx-version (hw-tlog-write-version)))
+    (unless (= +invalid-version+ hwtx-version)
+      (return-from $ ($-hwtx var hwtx-version))))
+
+  (if (use-$-swtx?)
+      ($-swtx var)
+      ($-notx var)))
 
                
-(defun $-slot (var)
-  "Get the value from the transactional variable VAR and return it.
-Signal an error if VAR is not bound to a value.
-
-Works both inside and outside transactions.
-During transactions, it uses transaction log to record the read
-and to check for any value stored in the log."
-  (declare (type tvar var))
-
-  (let1 value ($ var)
-    (unless (eq value +unbound-tvar+)
-      (return-from $-slot value))
-    (unbound-tvar-error var)))
-
-
-
-(defun (setf $) (value var)
+;; WITH-TX uses macrolet, which cannot bind names like (setf ...)
+;; thus we use define set-$ and create a setf-expander on $
+(declaim (notinline set-$))
+(defun set-$ (value var)
   "Store VALUE inside transactional variable VAR and return VALUE.
 
 Works both outside and inside transactions.
@@ -237,108 +265,21 @@ During transactions, it uses transaction log to record the value."
   (declare (type tvar var))
 
   #?+hw-transactions
-  (let ((hw-write-version *hw-tlog-write-version*))
-    (cond
-      ((/= +invalid-version+ hw-write-version) (setf ($-hwtx var hw-write-version) value))
-      ((use-$-swtx?)                             (setf ($-swtx   var) value))
-      (t                                       (setf ($-notx var) value))))
+  (let ((hwtx-version (hw-tlog-write-version)))
+    (when (/= +invalid-version+ hwtx-version)
+      (return-from set-$ (setf ($-hwtx var hwtx-version) value))))
 
-  #?-hw-transactions
-  (cond
-    ((use-$-swtx?) (setf ($-swtx var) value))
-    (t           (setf ($-notx var) value))))
+  (if (use-$-swtx?)
+      (setf ($-swtx var) value)
+      (setf ($-notx var) value)))
 
+;; support live upgrade, older versions had (defun (setf $))
+(fmakunbound '(setf $))
 
-(declaim (inline (setf $-slot)))
-(defun (setf $-slot) (value var)
-  (declare (type tvar var))
-  (setf ($ var) value))
+(defsetf $ (var) (value)
+  `(set-$ ,value ,var))
 
   
-(defun bound-$? (var)
-    "Return true if transactional variable VAR is bound to a value.
-Works both outside and inside transactions.
-    
-During transactions, it uses transaction log to record the read
-and to check for any value stored in the log."
-  (declare (type tvar var))
-
-  (not (eq +unbound-tvar+ ($ var))))
-
-
-(defun unbind-$ (var)
-    "Unbind the value inside transactional variable VAR.
-Works both outside and inside transactions.
-    
-During transactions, it uses transaction log to record the 'unbound' value."
-  (declare (type tvar var))
-
-  (setf ($ var) +unbound-tvar+)
-  var)
-
-
-(declaim (inline try-take-$ try-put-$))
-
-(defun peek-$ (var &optional default)
-    "Get the value from the transactional variable VAR
-and return it and t as multiple values.
-If VAR is not bound to a value, return (values DEFAULT nil).
-
-Works both inside and outside transactions."
-  (declare (type tvar var))
-
-  (let1 value ($ var)
-    (if (eq value +unbound-tvar+)
-      (values default nil)
-      (values value   t))))
-
-
-(defun try-take-$ (var &optional default)
-    "Get the value from the transactional variable VAR,
-unbind it and and return t and the original value as multiple values.
-If VAR is not bound to a value, return (values nil DEFAULT).
-
-Works both inside and outside transactions."
-  (declare (type tvar var))
-
-  (let1 value ($ var)
-    (if (eq value +unbound-tvar+)
-        (values nil default)
-        (progn
-          (setf ($ var) +unbound-tvar+)
-          (values t value)))))
-
-
-(defun try-put-$ (var value &optional default)
-    "If VAR is not bound, bind it to VALUE and return (values VALUE t)
-If VAR is already bound to a value, return (values DEFAULT nil).
-
-Works only inside software transactions."
-  (declare (type tvar var))
-
-  (let1 old-value ($ var)
-    (if (eq old-value +unbound-tvar+)
-        (values t (setf ($ var) value))
-        (values nil default))))
-
-
-
-;;;; ** Accessors
-
-
-(defgeneric value-of (place))
-(defgeneric (setf value-of) (value place))
-
-(defmethod value-of ((var tvar))
-  "Return the value inside a TVAR. Works both outside and inside transactions.
-Equivalent to ($-slot var)"
-  ($-slot var))
-
-(defmethod (setf value-of) (value (var tvar))
-  "Set the value inside a TVAR. Works both outside and inside transactions.
-Equivalent to (setf ($-slot var) value)"
-  (setf ($-slot var) value))
-
 
 
 ;;;; ** Locking and unlocking

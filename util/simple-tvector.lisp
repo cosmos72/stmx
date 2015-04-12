@@ -68,14 +68,14 @@ Works both inside and outside transactions"
 Works ONLY inside transactions"
   (declare (type simple-tvector tvec)
            (type fixnum index))
-  ($-swtx (svref tvec index)))
+  ($-swtx (stmx::current-tlog) (svref tvec index)))
 
 (defun (setf tsvref/$-swtx) (value tvec index)
   "Set the INDEX-th element of simple-tvector TVEC to VALUE.
 Works ONLY inside transactions"
   (declare (type simple-tvector tvec)
            (type fixnum index))
-  (setf ($-swtx (svref tvec index)) value))
+  (setf ($-swtx (stmx::current-tlog) (svref tvec index)) value))
 
 
 (defun tsvref/$-notx (tvec index)

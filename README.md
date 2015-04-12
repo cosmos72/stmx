@@ -905,8 +905,8 @@ For more performance considerations and a lot of raw numbers produced by running
 see the included files [doc/benchmark.md](doc/benchmark.md), [doc/benchmark-abcl.md](doc/benchmark-abcl.md),
 [doc/benchmark-ccl64.md](doc/benchmark-ccl64.md) and [doc/benchmark-cmucl.md](doc/benchmark-cmucl.md).
 
-The short version is: as of August 2013, on a fast consumer PC (Core i7 4770 @ 3.5GHz
-or better) with SBCL 1.1.9 or better, STMX can execute more than 39 millions
+The short version is: as of March 2015, on a fast consumer PC (Core i7 4770 @ 3.5GHz
+or better) with 64-bit SBCL 1.1.9 or better, STMX can execute more than 35 millions
 **hardware** transactions per second per CPU core, and more than 7 millions
 **software** transactions per second per CPU core.
 The second platform in terms of performance is CCL (x86_64),
@@ -916,7 +916,7 @@ using two threads, but STMX performance quickly decreases with more threads
 
 A small example with very short transactions is the [dining philosophers](example/dining-philosophers-stmx.lisp),
 with 5 reads and 5 writes to transactional memory per atomic block,
-where each CPU core runs approximately 4.4 millions software transactions
+where each CPU core runs approximately 4.5 millions software transactions
 per second - hyperthreading has very limited effects.
 
 Obviously, performance in other usage scenarios will depend on the complexity

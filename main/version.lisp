@@ -18,7 +18,7 @@
 ;;;; ** constants
 
 (declaim (type cons *stmx-version*))
-(defparameter *stmx-version* '(2 0 2))
+(defparameter *stmx-version* '(2 0 4))
 
 
 (defun stmx-internal-error (datum &rest arguments)

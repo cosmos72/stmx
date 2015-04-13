@@ -123,12 +123,17 @@ a lambda list created for a function."
 
   (defun add-optimized-fun* (fun simple-vector)
     (declare (type simple-vector simple-vector))
-    (setf (get-hash *optimized-funs* fun) simple-vector)
+    (setf (gethash fun *optimized-funs*) simple-vector)
     fun)
 
   (defun add-optimized-fun (fun fun-hwtx fun-swtx fun-notx lambda-list)
-    (add-optimized-fun* fun (make-array 4 :initial-contents
-                                        (list fun-hwtx fun-swtx fun-notx lambda-list))))
+    (add-optimized-fun*
+     fun (make-array 4 :initial-contents
+                     (list fun-hwtx fun-swtx fun-notx
+                           ;; warning: saving for future macrolets
+                           ;; a lambda-list created for a function.
+                           ;; we must quote all default forms!
+                           (lambda-list-quote-default-forms lambda-list)))))
 
   (add-optimized-fun* '$ #($-hwtx $-swtx $-notx (var)))
   (add-optimized-fun* 'set-$ #(set-$-hwtx set-$-swtx set-$-notx (value var))))
@@ -137,10 +142,7 @@ a lambda list created for a function."
 (defun bind-optimized-fun (fun fun-tx lambda-list)
   "Return a form suitable for MACROLET"
   (let ((args (lambda-list-to-args lambda-list)))
-    ;; warning: reusing in a macro a lambda-list created for a function.
-    ;; we must quote all default forms!
-    `(,fun ,(lambda-list-quote-default-forms lambda-list)
-           `(,',fun-tx ,,@args))))
+    `(,fun ,lambda-list `(,',fun-tx ,,@args))))
    
 (defmacro with-tx ((kind) &body body)
   (check-type kind compiling-transaction)
@@ -166,60 +168,106 @@ a lambda list created for a function."
 
 
 
+(defmacro options-for-defun ((&key inline (block-name nil block-name-p) defsetf-name)
+                            (defun name args &body body))
+  (with-docstrings-declares (docstrings declares var-body) body
+    `(progn
+       (declaim (,(if inline 'inline 'notinline) ,name))
+       ,@(when defsetf-name
+           ;; safe, and a bit paranoid..
+           `((fmakunbound '(setf ,defsetf-name))
+             (defsetf ,defsetf-name ,(rest args) (,(first args))
+               ,@docstrings
+               `(,',name ,,@args))))
+       (,defun ,name ,args
+         ,@docstrings
+         ,@declares
+         ,(if block-name-p
+              `(block ,block-name ,@var-body)
+              `(progn ,@var-body))))))
+
+
     
 
-(defmacro optimize-for-tx ((kind &optional
-                                (simple-name nil simple-name-p) inline)
-                                  (defun name args &body body))
-  (with-docstrings-declares (docstrings declares var-body) body
-    (let ((tx-body `(with-tx (,kind) ,@var-body)))
+;; known options are :hwtx :swtx :notx :inline
+(defmacro optimize-for-transaction* ((&key inline
+                                    (body-hwtx nil body-hwtx?)
+                                    (body-swtx nil body-swtx?)
+                                    (body-notx nil body-notx?))
+                                 (defun-or-defmethod name (&rest args) &body body))
+
+  (check-type defun-or-defmethod (member defun defmethod))
+
+  (when (eq 'defmethod defun-or-defmethod)
+    (loop for opt in '(:body-hwtx :body-swtx :body-notx)
+       for body? in (list body-hwtx? body-swtx? body-notx?)
+       when body?
+       do
+         (compile-error
+          "error compiling (OPTIMIZE-FOR-TRANSACTION* (~S ...) (DEFMETHOD ~A ~A ...)):
+option ~S is supported only for DEFUN, not for DEFMETHOD"
+          opt name args opt))
+
+    (return-from optimize-for-transaction*
       `(progn
          (declaim (,(if inline 'inline 'notinline) ,name))
-         (,defun ,name ,args
-           ,@docstrings
-           ,@declares
-           ,(if simple-name-p
-                `(block ,simple-name ,tx-body)
-                `(progn ,tx-body)))))))
-
-
-(defmacro optimize-for-stmx* ((&key inline &allow-other-keys)
-                                    (defun-or-defmethod name (&rest args) &body body))
-
-  (unless (eq 'defun defun-or-defmethod)
-    (return-from optimize-for-stmx*
-      `(progn
-         ,@(when inline `((declaim (inline ,name))))
          (,defun-or-defmethod ,name ,args ,@body))))
 
   (with-docstrings (docstrings d-body) body
-    (with-declares (declares) d-body
+    (with-declares (declares n-body) d-body
       
       ;; support function names '(setf ...)
       (let* ((simple-name? (not (consp name)))
              (simple-name  (if simple-name? name (second name)))
              (infix        (if simple-name? '/ '-set/))
              (mangled-name (if simple-name? name (concat-symbols '%stmx-impl/tx infix simple-name)))
-             (fun-hwtx (concat-symbols '%stmx-impl/hwtx infix simple-name))
-             (fun-swtx (concat-symbols '%stmx-impl/swtx infix simple-name))
-             (fun-notx (concat-symbols '%stmx-impl/notx infix simple-name))
-             (inline   (if inline :inline nil))
+             (kinds        '(:hwtx :swtx :notx))
+             (active-kinds #?+hw-transactions kinds
+                           #?-hw-transactions (rest kinds))
+             (funs         (loop for kind in kinds
+                              collect
+                                (if (member kind active-kinds)
+                                    (concat-symbols '%stmx-impl/ kind infix simple-name)
+                                    nil)))
+             (fun-plist    (loop for kind in kinds for fun in funs
+                              collect kind collect fun))
+             (bodies       (list
+                            (if body-hwtx? body-hwtx `((with-hwtx ,@n-body)))
+                            (if body-swtx? body-swtx `((with-swtx ,@n-body)))
+                            (if body-notx? body-notx `((with-notx ,@n-body)))))
              (params   (lambda-list-to-args args)))
-
+        
+        
         (flet ((call-fun (kind params)
-                 (let ((fun-tx-name (getf `(:hwtx ,fun-hwtx
-                                            :swtx ,fun-swtx
-                                            :notx ,fun-notx)
-                                          kind)))
+                 (let ((fun-tx-name (getf fun-plist kind)))
                    `(,fun-tx-name ,@params))))
         
           `(progn
-             #?+hw-transactions
-             (optimize-for-tx (:hwtx ,simple-name ,inline) (defun ,fun-hwtx ,params ,@d-body))
-             (optimize-for-tx (:swtx ,simple-name ,inline) (defun ,fun-swtx ,params ,@d-body))
-             (optimize-for-tx (:notx ,simple-name ,inline) (defun ,fun-notx ,params ,@d-body))
+             ,@(loop for kind in kinds
+                  for fun in funs
+                  for defsetf = (if simple-name? nil
+                                    (concat-symbols '%stmx-impl/ kind '/ simple-name))
+                  for body in bodies
+                  when (member kind active-kinds)
+                  collect `(options-for-defun
+                            (:inline ,inline :block-name ,simple-name :defsetf-name ,defsetf)
+                            (defun ,fun ,params ,@declares ,@body)))
 
              (declaim (inline ,mangled-name))
+
+             ;; macrolet used by WITH-TX cannot bind names like (setf ...)
+             ;; thus we use a mangled name
+             ;; and create a setf-expander on the original name
+             ,@(unless simple-name?
+                  ;; warning: reusing in a macro a lambda-list created for a function.
+                  ;; we must quote all default forms!
+                  (let ((args-quoted (lambda-list-quote-default-forms args)))
+                    ;; safe, and a bit paranoid..
+                    `((fmakunbound '(setf ,simple-name))
+                      (defsetf ,simple-name ,(rest args-quoted) (,(first args-quoted))
+                        ,@docstrings
+                        `(,',mangled-name ,,@params)))))
+             
              (,defun-or-defmethod ,mangled-name ,args
                ,@docstrings
                ,@declares
@@ -232,26 +280,11 @@ a lambda list created for a function."
 		   ,(call-fun :swtx params)
 		   ,(call-fun :notx params)))
 
-             ;; macrolet used by WITH-TX cannot bind names like (setf ...)
-             ;; thus we use a mangled name
-             ;; and create a setf-expander on the original name
-             ,@(unless simple-name?
-                  ;; warning: reusing in a macro a lambda-list created for a function.
-                  ;; we must quote all default forms!
-                  (let ((args-quoted (lambda-list-quote-default-forms args)))
-                    ;; safe, and a bit paranoid..
-                    `((fmakunbound '(setf ,simple-name))
-                      (defsetf ,simple-name ,(rest args-quoted) (,(first args-quoted))
-                        `(,',mangled-name ,,@params)))))
              (eval-always
-               (add-optimized-fun* ',mangled-name #(,fun-hwtx ,fun-swtx ,fun-notx ,args)))
+               (add-optimized-fun* ',mangled-name #(,@funs ,args)))
              
              ',name))))))
 
-(defmacro optimize-for-stmx ((defun-or-defmethod name (&rest args) &body body))
-  `(optimize-for-stmx* () (,defun-or-defmethod ,name ,args ,@body)))
-
-(defmacro optimize-for-stmx-inline ((defun-or-defmethod name (&rest args) &body body))
-  `(optimize-for-stmx* (:inline t) (,defun-or-defmethod ,name ,args ,@body)))
-
+(defmacro optimize-for-transaction ((defun-or-defmethod name (&rest args) &body body))
+  `(optimize-for-transaction* () (,defun-or-defmethod ,name ,args ,@body)))
 

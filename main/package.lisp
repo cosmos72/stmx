@@ -66,13 +66,11 @@
            #:transactional-class
 
            ;; low-level API to use TVARs directly
-           #:tvar #:+unbound-tvar+
-           #:$-slot #:$ #:$-swtx #:$-hwtx #:$-notx
-	   ;; also (setf $-slot) (setf $) (setf $-swtx)
-	   ;; (setf $-hwtx) and (setf $-notx)
+           #:tvar #:+unbound-tvar+ #:$-slot #:$ 
+	   ;; also (setf $-slot) (setf $)
 
            #:bound-$? #:unbind-$
 
            ;; helpers to optimize code
-           #:fast-atomic #:optimize-for-stmx))
+           #:fast-atomic #:optimize-for-transaction #:optimize-for-transaction*))
 

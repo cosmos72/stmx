@@ -46,51 +46,34 @@ methods cannot be specialized on it."
   (length tvec))
 
 
-(declaim (inline tsvref (setf tsvref) tsvref-x (setf tsvref-tx) tsvref-notx (setf tsvref-notx)))
-
-(defun tsvref (tvec index)
-  "Return the INDEX-th element of simple-tvector TVEC.
+(optimize-for-transaction*
+ (:inline t)
+ (defun tsvref (tvec index)
+   "Return the INDEX-th element of simple-tvector TVEC.
 Works both inside and outside transactions"
-  (declare (type simple-tvector tvec)
-           (type fixnum index))
-  ($ (svref tvec index)))
+   (declare (type simple-tvector tvec)
+            (type fixnum index))
+   ($ (svref tvec index))))
 
-(defun (setf tsvref) (value tvec index)
-  "Set the INDEX-th element of simple-tvector TVEC to VALUE.
+(optimize-for-transaction*
+ (:inline t)
+ (defun (setf tsvref) (value tvec index)
+   "Set the INDEX-th element of simple-tvector TVEC to VALUE.
 Works both inside and outside transactions"
+   (declare (type simple-tvector tvec)
+            (type fixnum index))
+   (setf ($ (svref tvec index)) value)))
+
+
+;; (SETF TSVREF) above is compiled with OPTIMIZE-FOR-TRANSACTION*
+;; which turns it into a complex defsetf expansion...
+;; but thash-table needs an actual function
+(declaim (notinline %setf-tsvref))
+(defun %setf-tsvref (value tvec index)
   (declare (type simple-tvector tvec)
            (type fixnum index))
-  (setf ($ (svref tvec index)) value))
+   (setf ($ (svref tvec index)) value))
 
-
-(defun tsvref/$-swtx (tvec index)
-  "Return the INDEX-th element of simple-tvector TVEC.
-Works ONLY inside transactions"
-  (declare (type simple-tvector tvec)
-           (type fixnum index))
-  ($-swtx (stmx::current-tlog) (svref tvec index)))
-
-(defun (setf tsvref/$-swtx) (value tvec index)
-  "Set the INDEX-th element of simple-tvector TVEC to VALUE.
-Works ONLY inside transactions"
-  (declare (type simple-tvector tvec)
-           (type fixnum index))
-  (setf ($-swtx (stmx::current-tlog) (svref tvec index)) value))
-
-
-(defun tsvref/$-notx (tvec index)
-  "Return the INDEX-th element of simple-tvector TVEC.
-Works ONLY outside transactions"
-  (declare (type simple-tvector tvec)
-           (type fixnum index))
-  ($-notx (svref tvec index)))
-
-(defun (setf tsvref/$-notx) (value tvec index)
-  "Set the INDEX-th element of simple-tvector TVEC to VALUE.
-Works ONLY outside transactions"
-  (declare (type simple-tvector tvec)
-           (type fixnum index))
-  (setf ($-notx (svref tvec index)) value))
 
 
 (defmacro do-simple-tvector ((element) tvec &body body)

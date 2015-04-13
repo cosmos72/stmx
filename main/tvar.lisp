@@ -53,7 +53,7 @@
 
 
 (declaim (ftype (function (t tvar) t)           (setf raw-value-of))
-         (inline
+         (notinline
            (setf raw-value-of)))
 
 (defun (setf raw-value-of) (value var)
@@ -114,44 +114,42 @@ and by writing TOBJs slots."
 
 ;;;; ** hwtx
 
-(declaim (inline $-hwtx))
 #?+hw-transactions
-(defun $-hwtx (var &optional (hwtx-version (hw-tlog-write-version)))
-  "Get the value from the transactional variable VAR and return it.
+(progn
+  (declaim (inline $-hwtx))
+  (defun $-hwtx (var &optional (hwtx-version (hw-tlog-write-version)))
+    "Get the value from the transactional variable VAR and return it.
 Return +unbound-tvar+ if VAR is not bound to a value.
 Works ONLY inside hardware memory transactions.
 
 HWTX-VERSION is not used, its only purpose is symmetry with (setf $-hwtx)"
-  (declare (ignore hwtx-version)
-           (type tvar var))
-  (tvar-value var))
+    (declare (ignore hwtx-version)
+             (type tvar var))
+    (tvar-value var))
 
 
-;; WITH-TX uses macrolet, which cannot bind names like (setf ...)
-;; thus we use define set-$-hwtx and create a setf-expander on $-hwtx
+  ;; WITH-TX uses macrolet, which cannot bind names like (setf ...)
+  ;; thus we use define set-$-hwtx and create a setf-expander on $-hwtx
 
-#?+hw-transactions
-(declaim (inline set-$-hwtx))
-#?+hw-transactions
-(defun set-$-hwtx (value var &optional (hwtx-version (hw-tlog-write-version)))
-  "Store VALUE inside transactional variable VAR and return VALUE.
+  (declaim (inline set-$-hwtx))
+  (defun set-$-hwtx (value var &optional (hwtx-version (hw-tlog-write-version)))
+    "Store VALUE inside transactional variable VAR and return VALUE.
 Works ONLY inside hardware memory transactions.
 
 HWTX-VERSION *must* be equal to the value returned by (HW-TLOG-WRITE-VERSION),
 it is a per-transaction constant.
 Its purpose is to speed up this function, by removing the two nanoseconds
 required to retrieve such value from thread-local storage."
-  (declare (type version-type hwtx-version)
-           (type tvar var))
-  (setf (tvar-version var) hwtx-version
-        (tvar-value var) value))
+    (declare (type version-type hwtx-version)
+             (type tvar var))
+    (setf (tvar-version var) hwtx-version
+          (tvar-value var) value))
 
-;; support live upgrade, older versions had (defun (setf $-hwtx))
-(fmakunbound '(setf $-hwtx))
+  ;; support live upgrade, older versions had (defun (setf $-hwtx))
+  (fmakunbound '(setf $-hwtx))
 
-#?+hw-transactions
-(defsetf $-hwtx (var &optional (hwtx-version '(hw-tlog-write-version))) (value)
-  `(set-$-hwtx ,value ,var ,hwtx-version))
+  (defsetf $-hwtx (var &optional (hwtx-version '(hw-tlog-write-version))) (value)
+    `(set-$-hwtx ,value ,var ,hwtx-version)))
 
 
 

@@ -47,7 +47,7 @@
   (declare (ignore other-keys))
 
   (setf (_ hash aref-fun)     #'tsvref
-        (_ hash set-aref-fun) #'(setf tsvref)))
+        (_ hash set-aref-fun) #'%setf-tsvref)) ;; (setf tsvref) has a defsetf expansion :(
 
 
 

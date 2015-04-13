@@ -512,7 +512,7 @@ Note: TRANSACTIONAL-STRUCT supports only one constructor"
          `((declaim (inline ,reader
                             ,@(unless read-only `((setf ,writer)))))))
 
-     (,(if tx 'optimize-for-stmx 'progn)
+     (,@(if tx '(optimize-for-transaction* (:inline t)) '(progn))
        (defun ,reader (,instance)
          (declare (type ,struct-type ,instance))
          (the (values ,type &optional)
@@ -521,7 +521,7 @@ Note: TRANSACTIONAL-STRUCT supports only one constructor"
                    `(,accessor-impl ,instance)))))
 
      ,(unless read-only
-        `(,(if tx 'optimize-for-stmx 'progn)
+         `(,@(if tx '(optimize-for-transaction* (:inline t)) '(progn))
            (defun (setf ,writer) (,value ,instance)
              (declare (type ,struct-type ,instance)
                       (type ,type ,value))

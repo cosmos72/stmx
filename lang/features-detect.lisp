@@ -94,9 +94,9 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
 
  #+cmucl
  (set-features '(bt/lock-owner mp::lock-process)
-               ;; if running without the command-line options "-fpu" "x87"
-               ;; uncomment the following line
-               ;; '(mem-rw-barriers nil)
+               ;; do NOT use :trivial memory barriers: they are very fragile,
+               ;; even if running with the command-line options "-fpu" "x87"
+               '(mem-rw-barriers nil)
                'closer-mop/works-on-structs
                '(sxhash-equalp (lisp::internal-equalp-hash * 0)))
  

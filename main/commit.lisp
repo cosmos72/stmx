@@ -339,7 +339,7 @@ Note: invokes HW-ATOMIC2, which in turn invokes GLOBAL-CLOCK/HW/STAT-{COMMITTED,
            (type txfifo changed))
 
   (the (member t nil :fail)
-    (hw-atomic2 (write-version :test-for-running-tx? nil :update-stat :swtx)
+    (hw-atomic2 (:hw-write-version write-version :test-for-running-tx? nil :update-stat :swtx)
 
       (block nil
         ;; hardware transaction. if you need to jump out of it
@@ -355,7 +355,7 @@ Note: invokes HW-ATOMIC2, which in turn invokes GLOBAL-CLOCK/HW/STAT-{COMMITTED,
             ;; the hardware transaction guarantees to abort if the tvar changes value
             (unless (eq val (raw-value-of var))
               (put-txfifo changed entry)
-              (setf ($-hwtx write-version var) val))))
+              (setf ($-hwtx var write-version) val))))
         t)
 
       ;; fallback

@@ -4,6 +4,9 @@
 (fiveam:run! 'stmx.test:suite)
 
 (in-package :stmx.util)
+(import '(stmx::current-tlog stmx::sw-atomic
+          stmx::hw-atomic2   stmx::with-hwtx 
+          stmx::$-hwtx       stmx::$-swtx))
 
 (defmacro x3 (&rest body)
   `(dotimes (,(gensym) 3)
@@ -29,22 +32,20 @@
 (setf (get-ghash *h* 1) 0)
 (setf (get-ghash *th* 1) 0)
 
-(defmacro sw-atomic (&rest body)
-  `(stmx::sw-atomic ,@body))
-
 (defmacro sw-tlog ()
-  `(stmx::current-tlog))
+  `(current-tlog))
 
 (defmacro simple-hw-atomic (&rest body)
   `(if (= +hw-transaction-started+ (hw-transaction-begin))
        (multiple-value-prog1
-           (stmx::with-hwtx ,@body)
+           (with-hwtx ,@body)
          (hw-transaction-end))
-       (stmx::sw-atomic ,@body)))
+       (sw-atomic ,@body)))
 
-(defmacro hw-atomic ((&optional hw-helper &key err (test-for-running-tx? nil))
+(defmacro hw-atomic ((&key hw-write-version err (test-for-running-tx? nil))
                       &optional (body nil body?) fallback)
-  `(stmx::hw-atomic2 (,hw-helper :err ,err :test-for-running-tx? ,test-for-running-tx?)
+  `(hw-atomic2 (:hw-write-version ,hw-write-version :err ,err
+                                        :test-for-running-tx? ,test-for-running-tx?)
                      ,@(when body? `(,body (sw-atomic ,fallback)))))
 
 (defmacro run1m (&rest body)
@@ -90,14 +91,14 @@
 ;;;; write-1
 (run10m (sw-atomic  (setf ($ v) 1)))
 (run10m (atomic     (setf ($ v) 1)))
-(run10m (hw-atomic  (hw-helper)
+(run10m (hw-atomic  (:hw-write-version hw-helper)
                     (setf ($-hwtx v hw-helper) 1)
-                    (setf ($ v) 1)))
+                    (setf ($-swtx v) 1)))
 
 ;;;; read-write-1
 (run10m (sw-atomic  (incf (the fixnum ($ v)))))
 (run10m (atomic     (incf (the fixnum ($ v)))))
-(run10m (hw-atomic  (hw-helper)
+(run10m (hw-atomic  (:hw-write-version hw-helper)
                     (incf (the fixnum ($-hwtx v hw-helper)))
                     (incf (the fixnum ($-swtx v (sw-tlog))))))
 

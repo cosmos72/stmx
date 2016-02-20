@@ -15,7 +15,60 @@
 
 (in-package :sb-transaction)
 
+(defun split-string (string separator)
+  (declare (type string string)
+	   (type character separator))
+  (loop :for beg = 0 :then (1+ end)
+     :for end = (position separator string :start beg)
+     :collect (subseq string beg end)
+     :while end))
 
+(defun string-to-int-list (string &optional (separator #\.))
+  (declare (type string string)
+	   (type character separator))
+  (loop
+     :for token in (split-string string separator)
+     :for i = (parse-integer token :junk-allowed t)
+     :while i
+     :collect i))
+
+(defun int-list>= (list1 list2)
+  (declare (type list list1 list2))
+  (loop
+     :for n1 = (pop list1)
+     :for n2 = (pop list2)
+     :do
+     (cond
+       ((null n1) (return (null n2)))
+       ((null n2) (return t))
+       ((< n1 n2) (return nil))
+       ((> n1 n2) (return t)))))
+
+;;;; conditional compile helper, use as follows:
+;;;; #+#.(sb-transaction::compile-if-package :package-name) (form ...)
+;;;; #+#.(sb-transaction::compile-if-lisp-version>= '(1 2 13)) (form ...)
+(defun compile-if (flag)
+  (if flag '(:and) '(:or)))
+
+(defun compile-if-package (package-name)
+  (compile-if (find-package package-name)))
+
+(defun lisp-version>= (version-int-list)
+  (declare (type (or string list) version-int-list))
+  (let ((current-version (string-to-int-list
+			  (lisp-implementation-version)))
+	(min-version (if (listp version-int-list)
+			 version-int-list
+			 (string-to-int-list version-int-list))))
+    (int-list>= current-version min-version)))
+
+(defun compile-if-sbcl-disassem<=32-bit ()
+  ;; SBCL < 1.2.14 disassembler does not support instructions longer than 32 bits,
+  ;; so we will have to work around it by using a prefilter
+  ;; to read beyond 32 bits while disassembling
+  (compile-if (not (lisp-version>= '(1 2 14)))))
+
+    
 ;;;; new compiler intrinsic functions
 
 (defconstant +defknown-has-overwrite-fndb-silently+

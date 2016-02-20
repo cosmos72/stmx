@@ -132,7 +132,7 @@ HWTX-VERSION is not used, its only purpose is symmetry with (setf $-hwtx)"
   ;; thus we use define set-$-hwtx and create a setf-expander on $-hwtx
 
   (declaim (inline set-$-hwtx))
-  (defun set-$-hwtx (value var &optional (hwtx-version (hw-tlog-write-version)))
+  (defun set-$-hwtx (var value &optional (hwtx-version (hw-tlog-write-version)))
     "Store VALUE inside transactional variable VAR and return VALUE.
 Works ONLY inside hardware memory transactions.
 
@@ -140,8 +140,8 @@ HWTX-VERSION *must* be equal to the value returned by (HW-TLOG-WRITE-VERSION),
 it is a per-transaction constant.
 Its purpose is to speed up this function, by removing the two nanoseconds
 required to retrieve such value from thread-local storage."
-    (declare (type version-type hwtx-version)
-             (type tvar var))
+    (declare (type tvar var)
+             (type version-type hwtx-version))
     (setf (tvar-version var) hwtx-version
           (tvar-value var) value))
 
@@ -149,7 +149,7 @@ required to retrieve such value from thread-local storage."
   (fmakunbound '(setf $-hwtx))
 
   (defsetf $-hwtx (var &optional (hwtx-version '(hw-tlog-write-version))) (value)
-    `(set-$-hwtx ,value ,var ,hwtx-version)))
+    `(set-$-hwtx ,var ,value ,hwtx-version)))
 
 
 
@@ -167,17 +167,18 @@ Works ONLY inside software memory transactions."
 ;; WITH-TX uses macrolet, which cannot bind names like (setf ...)
 ;; thus we use define set-$-swtx and create a setf-expander on $-swtx
 (declaim (inline set-$-swtx))
-(defun set-$-swtx (value var &optional (log (current-tlog)))
+(defun set-$-swtx (var value &optional (log (current-tlog)))
   "Store VALUE inside transactional variable VAR and return VALUE.
 Works ONLY inside software memory transactions."
-  (declare (type tvar var))
+  (declare (type tvar var)
+           (type tlog log))
   (tx-write-of value var log))
 
 ;; support live upgrade, older versions had (defun (setf $-hwtx))
 (fmakunbound '(setf $-swtx))
 
 (defsetf $-swtx (var &optional (log '(current-tlog))) (value)
-  `(set-$-swtx ,value ,var ,log))
+  `(set-$-swtx ,var ,value ,log))
 
 
 

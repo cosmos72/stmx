@@ -138,7 +138,8 @@
                              (:file "retry"          :depends-on ("package"))
                              (:file "orelse"         :depends-on ("package"))
                              (:file "accessors"      :depends-on ("atomic"))
-                             (:file "tmap"           :depends-on ("rbmap" "orelse"))))))
+                             (:file "tmap"           :depends-on ("rbmap" "orelse"))
+                             (:file "run-suite"      :depends-on ("tmap"))))))
 
 
 (defmethod asdf:perform ((op asdf:test-op) (system (eql (asdf:find-system :stmx))))

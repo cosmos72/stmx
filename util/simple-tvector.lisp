@@ -57,22 +57,17 @@ Works both inside and outside transactions"
 
 (optimize-for-transaction*
  (:inline t)
- (defun (setf tsvref) (value tvec index)
+ ;; do NOT (defun (setf tsvref) ..) because
+ ;; thash-table needs an actual function #'set-tsvref
+ (defun set-tsvref (tvec index value)
    "Set the INDEX-th element of simple-tvector TVEC to VALUE.
 Works both inside and outside transactions"
    (declare (type simple-tvector tvec)
             (type fixnum index))
    (setf ($ (svref tvec index)) value)))
 
+(defsetf tsvref set-tsvref)
 
-;; (SETF TSVREF) above is compiled with OPTIMIZE-FOR-TRANSACTION*
-;; which turns it into a complex defsetf expansion...
-;; but thash-table needs an actual function
-(declaim (notinline %setf-tsvref))
-(defun %setf-tsvref (value tvec index)
-  (declare (type simple-tvector tvec)
-           (type fixnum index))
-   (setf ($ (svref tvec index)) value))
 
 
 

@@ -15,8 +15,16 @@
 
 (in-package :stmx.test)
 
+(defun time-to-string (&optional (time (get-universal-time)))
+  (multiple-value-bind (ss mm hh day month year day-of-week daylight tz)
+      (decode-universal-time time)
+    (format nil "~4,'0D-~2,'0D-~2,'0DT~2,'0D:~2,'0D:~2,'0D~A~2,'0D:00"
+            year month day hh mm ss (if (minusp tz) #\+ #\-) (abs tz))))
+
 (defun loop-run-suite (&optional (suite 'suite))
-  (loop always
+  (loop
+     do (format t "~&~A~&" (time-to-string))
+     always
        (loop for test in (fiveam:run suite)
           always (typep test 'fiveam::test-passed))))
               

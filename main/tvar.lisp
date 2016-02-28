@@ -201,7 +201,7 @@ Works ONLY outside memory transactions."
 ;; WITH-TX uses macrolet, which cannot bind names like (setf ...)
 ;; thus we use define set-$-hwtx and create a setf-expander on $-hwtx
 (declaim (inline set-$-notx))
-(defun set-$-notx (value var)
+(defun set-$-notx (var value)
   "Store VALUE inside transactional variable VAR and return VALUE.
 Works ONLY outside memory transactions."
   (declare (type tvar var))
@@ -211,8 +211,7 @@ Works ONLY outside memory transactions."
 ;; support live upgrade, older versions had (defun (setf $-notx))
 (fmakunbound '(setf $-notx))
 
-(defsetf $-notx (var) (value)
-  `(set-$-notx ,value ,var))
+(defsetf $-notx set-$-notx)
 
 
 
@@ -256,7 +255,7 @@ and to check for any value stored in the log."
 ;; WITH-TX uses macrolet, which cannot bind names like (setf ...)
 ;; thus we use define set-$ and create a setf-expander on $
 (declaim (notinline set-$))
-(defun set-$ (value var)
+(defun set-$ (var value)
   "Store VALUE inside transactional variable VAR and return VALUE.
 
 Works both outside and inside transactions.
@@ -266,17 +265,16 @@ During transactions, it uses transaction log to record the value."
   #?+hw-transactions
   (let ((hwtx-version (hw-tlog-write-version)))
     (when (/= +invalid-version+ hwtx-version)
-      (return-from set-$ (setf ($-hwtx var hwtx-version) value))))
+      (return-from set-$ (set-$-hwtx var value hwtx-version))))
 
   (if (use-$-swtx?)
-      (setf ($-swtx var) value)
-      (setf ($-notx var) value)))
+      (set-$-swtx var value)
+      (set-$-notx var value)))
 
 ;; support live upgrade, older versions had (defun (setf $))
 (fmakunbound '(setf $))
 
-(defsetf $ (var) (value)
-  `(set-$ ,value ,var))
+(defsetf $ set-$)
 
   
 

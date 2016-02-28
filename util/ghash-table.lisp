@@ -42,7 +42,7 @@ Equal to MOST-POSITIVE-FIXNUM rounded down to nearest power of 2."))
 (deftype ghash-test-fun     () '(function (t t) boolean))
 (deftype ghash-hash-fun     () '(function (t)   fixnum))
 (deftype ghash-aref-fun     () '(function (ghash-vector fixnum) t))
-(deftype ghash-set-aref-fun () '(function (t ghash-vector fixnum) t))
+(deftype ghash-set-aref-fun () '(function (ghash-vector fixnum t) t))
 
 
 
@@ -57,11 +57,13 @@ initialize all its elements to NIL and return it."))
 
 
 
-#-(or sbcl cmucl)
-(defun %setf-svref (value vec subscript)
+(defun set-svref (vec subscript value)
   "On several CL implementations, (setf svref) is not a function."
-  (declare (type ghash-vector vec)
-           (type fixnum subscript))
+  ;;(declare (type ghash-vector vec)
+  ;;         (type fixnum subscript))
+  (unless (and (typep vec 'ghash-vector)
+	       (typep subscript 'fixnum))
+    (break))
   (setf (svref vec subscript) value))
 
 
@@ -71,8 +73,7 @@ initialize all its elements to NIL and return it."))
    (test-fun     :type ghash-test-fun)
    (hash-fun     :type ghash-hash-fun)
    (aref-fun     :type ghash-aref-fun     :initform #'svref)
-   (set-aref-fun :type ghash-set-aref-fun :initform #+(or sbcl cmucl) #'(setf svref)
-                 #-(or sbcl cmucl) #'%setf-svref)
+   (set-aref-fun :type ghash-set-aref-fun :initform #'set-svref)
    ;; (eq count nil) means unknown count
    (count        :type (or null fixnum tvar) :initform 0)
 
@@ -293,7 +294,7 @@ Otherwise return (values DEFAULT nil)."
              (head (funcall aref-fun vec2 subscript)))
         
         (setf (_ pair next) head)
-        (funcall set-aref-fun pair vec2 subscript)))
+        (funcall set-aref-fun vec2 subscript pair)))
 
     (setf (_ hash vec) vec2)))
         
@@ -335,7 +336,7 @@ Otherwise return (values DEFAULT nil)."
     (let ((pair (ghash/new-pair hash key value head))
           (count-or-nil (_ hash count)))
 
-      (funcall set-aref-fun pair vec subscript)
+      (funcall set-aref-fun vec subscript pair)
       ;; do not update COUNT, just set to NIL *before* calling other functions
       (when (_ hash count)
         (setf (_ hash count) nil))
@@ -358,12 +359,8 @@ Otherwise return (values DEFAULT nil)."
   value)
 
 
-(declaim (inline (setf get-ghash)))
-(defun (setf get-ghash) (value hash key)
-  "Add KEY to HASH, associating it to VALUE. Return VALUE."
-  (declare (type ghash-table hash))
-
-  (set-ghash hash key value))
+(fmakunbound '(setf get-ghash))
+(defsetf get-ghash set-ghash)
   
 
           
@@ -390,7 +387,7 @@ Return T if KEY was present in HASH, otherwise return NIL."
          (when (funcall test-fun key (_ pair key))
            (if prev
                (setf (_ prev next) next)
-               (funcall set-aref-fun next vec subscript))
+               (funcall set-aref-fun vec subscript next))
            ;; do not update COUNT. just set it to NIL, i.e. "unknown"
            (when (_ hash count)
              (setf (_ hash count) nil))
@@ -410,7 +407,7 @@ Return T if KEY was present in HASH, otherwise return NIL."
              (n (length vec))
              (set-aref-fun (the function (_ hash set-aref-fun))))
         (dotimes (i n)
-          (funcall set-aref-fun nil vec i)))
+          (funcall set-aref-fun vec i nil)))
       (setf (_  hash count) 0)))
   hash)
 

@@ -21,10 +21,17 @@
     (format nil "~4,'0D-~2,'0D-~2,'0DT~2,'0D:~2,'0D:~2,'0D~A~2,'0D:00"
             year month day hh mm ss (if (minusp tz) #\+ #\-) (abs tz))))
 
-(defun loop-run-suite (&optional (suite 'suite))
+(defun show-failed-test (test &key (interactive t))
+  (if interactive
+      (inspect test)
+      (describe test))
+  nil)
+
+(defun loop-run-tests (&key (suite 'suite) (interactive t))
   (loop
      do (format t "~&~A~&" (time-to-string))
      always
        (loop for test in (fiveam:run suite)
-          always (typep test 'fiveam::test-passed))))
+          always (or (typep test 'fiveam::test-passed)
+                     (show-failed-test test :interactive interactive)))))
               

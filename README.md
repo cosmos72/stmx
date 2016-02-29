@@ -60,29 +60,34 @@ Supported systems
 STMX is currently tested on the following Common Lisp implementations:
 
 * [SBCL](http://sbcl.org/)
-  * version 1.2.10      (x86_64)   on Debian GNU/Linux jessie (x86_64)
-  * version 1.1.15      (x86_64)   on Debian GNU/Linux jessie (x86_64)
-  * version 1.1.14      (x86)      on Debian GNU/Linux jessie (x86_64)
-  * version 1.2.8       (armhf)    on Debian GNU/Linux wheezy (armhf) inside Qemu
-  * version 1.1.15      (powerpc)  on Debian GNU/Linux jessie (powerpc) inside Qemu
-  * version 1.2.7       (x86_64)   on Windows 7               (x86_64)
+  * version 1.3.2       (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.3.1       (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.2.10      (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.1.15      (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.1.14      (x86)      on Debian GNU/Linux stretch (x86_64)
+  * version 1.2.8       (armhf)    on Debian GNU/Linux wheezy  (armhf) inside Qemu
+  * version 1.1.15      (powerpc)  on Debian GNU/Linux stretch (powerpc) inside Qemu
+  * version 1.2.7       (x86_64)   on Windows 7                (x86_64)
   
 * [ABCL](http://www.abcl.org/)
-  * version 1.3.1 with OpenJDK 7u75 (x86_64) on Debian GNU/Linux jessie (x86_64)
+  * version 1.3.3 with OpenJDK 7u91 (x86_64) on Debian GNU/Linux stretch (x86_64)
+  * version 1.3.2 with OpenJDK 7u91 (x86_64) on Debian GNU/Linux stretch (x86_64)
+  * version 1.3.1 with OpenJDK 7u91 (x86_64) on Debian GNU/Linux stretch (x86_64)
+  * version 1.2.1 with OpenJDK 7u91 (x86_64) on Debian GNU/Linux stretch (x86_64)
   
 * [CCL](http://ccl.clozure.com/)
-  * version 1.10        (x86_64)   on Debian GNU/Linux jessie (x86_64)
-  * version 1.10        (x86)      on Debian GNU/Linux jessie (x86_64)
-  * version 1.10        (linuxarm) on Debian GNU/Linux wheezy (armhf) inside Qemu
-  * version 1.9-r15761  (linuxppc) on Debian GNU/Linux wheezy (powerpc) inside Qemu
+  * version 1.10        (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.10        (x86)      on Debian GNU/Linux stretch (x86_64)
+  * version 1.10        (linuxarm) on Debian GNU/Linux wheezy  (armhf) inside Qemu
+  * version 1.9-r15761  (linuxppc) on Debian GNU/Linux wheezy  (powerpc) inside Qemu
 
 * [CLISP](http://www.clisp.org/)
-  * version 2.49        (x86_64)   on Debian GNU/Linux jessie (x86_64)
+  * version 2.49        (x86_64)   on Debian GNU/Linux stretch (x86_64)
     (lacks multi-threading)
   
 * [CMUCL](http://www.cons.org/cmucl/)
-  * version 20e Unicode (x86)      on Debian GNU/Linux jessie (x86_64)
-  * version 20d Unicode (x86)      on Debian GNU/Linux jessie (x86_64)
+  * version 20e Unicode (x86)      on Debian GNU/Linux stretch (x86_64)
+  * version 20d Unicode (x86)      on Debian GNU/Linux stretch (x86_64)
   
   CMUCL must be started with the command line options "-fpu" "x87"
   to run STMX reliably, see [doc/supported-systems.md](doc/supported-systems.md).
@@ -90,11 +95,19 @@ STMX is currently tested on the following Common Lisp implementations:
 ### Partially supported systems
 
 * [ECL](http://ecls.sourceforge.net/)
-  * version 15.2.21     (x86_64)   on Debian GNU/Linux jessie (x86_64)
-  * version 13.5.1      (x86_64)   on Debian GNU/Linux jessie (x86_64)
+  * version 16.0.0      (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 15.2.21     (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 13.5.1      (x86_64)   on Debian GNU/Linux stretch (x86_64)
 
   There are known problems running STMX on ECL,
   see [doc/supported-systems.md](doc/supported-systems.md) for details.
+
+### Unsupported systems
+
+* [CMUCL](http://www.cons.org/cmucl/)
+  
+  CMUCL 20f no longer supports the command line options "-fpu" "x87"
+  needed to run STMX reliably.
 
 ### Untested systems
 

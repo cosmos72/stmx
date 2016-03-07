@@ -15,25 +15,23 @@
 
 (in-package :sb-transaction)
 
-;; SBCL >= 1.3.2 requires x86-64 CPU instructions to be defined
+;; SBCL >= 1.3.3 does NOT support defining new CPU instructions,
+;; we can only hope that it already contains the definitions of
+;; Intel TSX CPU instructions xbegin, xend, xtest, xabort.
+;;
+;; SBCL 1.3.2 requires x86-64 CPU instructions to be defined
 ;; in package :sb-x86-64-asm due to package locks.
 ;;
 ;; older SBCL versions are more lenient, and allow defining
 ;; x86-64 CPU instructions either in :sb-vm or
-;; (with more difficulty) in other packages
+;; (with more difficulty) in any other package
 ;;
-#+#.(sb-transaction::compile-if-package :sb-x86-64-asm)
-(in-package :sb-x86-64-asm)
-
-#-#.(sb-transaction::compile-if-package :sb-x86-64-asm)
-(in-package :sb-vm)
+(in-package #.(package-name (or (find-package :sb-x86-64-asm)
+                                (find-package :sb-vm))))
 
 
 
-
-
-
-
+#+#.(sb-transaction::compile-if-symbol :sb-disassem :define-instruction-format)
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
   ;; utilities copied from sbcl/src/compiler/x86-64/insts.lisp:

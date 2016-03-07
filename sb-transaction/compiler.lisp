@@ -53,6 +53,12 @@
 (defun compile-if-package (package-name)
   (compile-if (find-package package-name)))
 
+(defun compile-if-symbol (package-name symbol-name)
+  (let ((symbol-name (if (stringp symbol-name)
+                         symbol-name
+                         (symbol-name symbol-name))))
+    (compile-if (find-symbol symbol-name package-name))))
+
 (defun lisp-version>= (version-int-list)
   (declare (type (or string list) version-int-list))
   (let ((current-version (string-to-int-list

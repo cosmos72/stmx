@@ -15,20 +15,20 @@
 
 (in-package :sb-transaction)
 
-;; SBCL >= 1.3.3 does NOT support defining new CPU instructions,
-;; we can only hope that it already contains the definitions of
+;; SBCL >= 1.3.3 does NOT support defining new CPU instruction formats,
+;; we can only check that it already contains the code to disasseble
 ;; Intel TSX CPU instructions xbegin, xend, xtest, xabort.
 ;;
 ;; SBCL 1.3.2 requires x86-64 CPU instructions to be defined
-;; in package :sb-x86-64-asm due to package locks.
+;; in package :sb-x86-asm (for 32-bit SBCL) or :sb-x86-64-asm (for 64-bit SBCL)
+;; due to package locks.
 ;;
-;; older SBCL versions are more lenient, and allow defining
-;; x86-64 CPU instructions either in :sb-vm or
-;; (with more difficulty) in any other package
+;; older SBCL versions are more lenient, and allow defining CPU instructions
+;; either in :sb-vm or (with more difficulty) in any other package
 ;;
 (in-package #.(package-name (or (find-package :sb-x86-64-asm)
+                                (find-package :sb-x86-asm)
                                 (find-package :sb-vm))))
-
 
 
 #+#.(sb-transaction::compile-if-symbol :sb-disassem :define-instruction-format)
@@ -82,73 +82,73 @@
   (sb-disassem:define-instruction-format (xabort
 					  24 :default-printer '(:name :tab imm))
       (op    :fields (list (byte 8 0) (byte 8 8)) :value '(#xc6 #xf8))
-    (imm   :field (byte 8 16)))
+    (imm   :field (byte 8 16))))
+
 
 
 ;;;; ** low-level: assemble machine-language instructions
 
-  (defun emit-dword-displacement-backpatch (segment target)
-    (sb-vm::emit-back-patch segment
-     4
-     (lambda (segment posn)
-       (let ((disp (- (sb-vm::label-position target) (+ 4 posn))))
-         (sb-int:aver (<= #x-80000000 disp #x7fffffff))
-         (let ((disp (the (integer #x-80000000 #x7fffffff) disp)))
-           (sb-vm::emit-byte segment (ldb (byte 8  0) disp))
-           (sb-vm::emit-byte segment (ldb (byte 8  8) disp))
-           (sb-vm::emit-byte segment (ldb (byte 8 16) disp))
-           (sb-vm::emit-byte segment (ldb (byte 8 24) disp)))))))
+(defun emit-dword-displacement-backpatch (segment target)
+  (sb-vm::emit-back-patch segment
+   4
+   (lambda (segment posn)
+     (let ((disp (- (sb-vm::label-position target) (+ 4 posn))))
+       (sb-int:aver (<= #x-80000000 disp #x7fffffff))
+       (sb-vm::emit-byte segment (ldb (byte 8  0) disp))
+       (sb-vm::emit-byte segment (ldb (byte 8  8) disp))
+       (sb-vm::emit-byte segment (ldb (byte 8 16) disp))
+       (sb-vm::emit-byte segment (ldb (byte 8 24) disp))))))
                      
 
-;;; ** HLE - hardware lock elision
 
-  (sb-vm::define-instruction xacquire (segment) ;; same byte as repne/repnz
-    (:emitter
-     (sb-vm::emit-byte segment #xf2)))
+;;; ** HLE - hardware lock elision, not actually used by STMX
 
-  (sb-vm::define-instruction xrelease (segment) ;; same byte as rep/repe/repz
-    (:emitter
-     (sb-vm::emit-byte segment #xf3)))
+(sb-vm::define-instruction xacquire (segment) ;; same byte as repne/repnz
+  (:emitter
+   (sb-vm::emit-byte segment #xf2)))
+
+(sb-vm::define-instruction xrelease (segment) ;; same byte as rep/repe/repz
+  (:emitter
+   (sb-vm::emit-byte segment #xf3)))
 
 
 
 ;;; ** RTM - restricted memory transaction
 
-  (sb-vm::define-instruction xbegin (segment &optional where)
-    (:printer xbegin ())
-    (:emitter
-     (sb-vm::emit-byte segment #xc7)
-     (sb-vm::emit-byte segment #xf8)
-     (if where
-	 ;; emit 32-bit, signed relative offset for where
-	 (emit-dword-displacement-backpatch segment where)
-	 ;; nowhere to jump: simply jump to the next instruction
-	 (sb-vm::emit-skip segment 4 0))))
+(sb-vm::define-instruction xbegin (segment &optional where)
+  #+#.(sb-transaction::compile-if-symbol :sb-disassem :define-instruction-format)
+  (:printer xbegin ())
+  (:emitter
+   (sb-vm::emit-byte segment #xc7)
+   (sb-vm::emit-byte segment #xf8)
+   (if where
+       ;; emit 32-bit, signed relative offset for where
+       (emit-dword-displacement-backpatch segment where)
+       ;; nowhere to jump: simply jump to the next instruction
+       (sb-vm::emit-skip segment 4 0))))
 
+(sb-vm::define-instruction xend (segment)
+  #+#.(sb-transaction::compile-if-symbol :sb-disassem :define-instruction-format)
+  (:printer three-bytes ((op '(#x0f #x01 #xd5))))
+  (:emitter
+   (sb-vm::emit-byte segment #x0f)
+   (sb-vm::emit-byte segment #x01)
+   (sb-vm::emit-byte segment #xd5)))
 
-  (sb-vm::define-instruction xend (segment)
-    (:printer three-bytes ((op '(#x0f #x01 #xd5))))
-    (:emitter
-     (sb-vm::emit-byte segment #x0f)
-     (sb-vm::emit-byte segment #x01)
-     (sb-vm::emit-byte segment #xd5)))
+(sb-vm::define-instruction xabort (segment reason)
+  #+#.(sb-transaction::compile-if-symbol :sb-disassem :define-instruction-format)
+  (:printer xabort ())
+  (:emitter
+   (sb-int:aver (<= 0 reason #xff))
+   (sb-vm::emit-byte segment #xc6)
+   (sb-vm::emit-byte segment #xf8)
+   (sb-vm::emit-byte segment reason)))
 
+(sb-vm::define-instruction xtest (segment)
+  #+#.(sb-transaction::compile-if-symbol :sb-disassem :define-instruction-format)
+  (:printer three-bytes ((op '(#x0f #x01 #xd6))))
+  (:emitter
+   (sb-vm::emit-byte segment #x0f)
+   (sb-vm::emit-byte segment #x01)
+   (sb-vm::emit-byte segment #xd6)))
 
-  (sb-vm::define-instruction xabort (segment reason)
-    (:printer xabort ())
-    (:emitter
-     (sb-int:aver (<= 0 reason #xff))
-     (sb-vm::emit-byte segment #xc6)
-     (sb-vm::emit-byte segment #xf8)
-     (sb-vm::emit-byte segment reason)))
-
-
-  (sb-vm::define-instruction xtest (segment)
-    (:printer three-bytes ((op '(#x0f #x01 #xd6))))
-    (:emitter
-     (sb-vm::emit-byte segment #x0f)
-     (sb-vm::emit-byte segment #x01)
-     (sb-vm::emit-byte segment #xd6)))
-
-
-) ; EVAL-WHEN

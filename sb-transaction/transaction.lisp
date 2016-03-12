@@ -38,7 +38,7 @@ otherwise return code of the error that caused the transaction to abort.
 Invoking TRANSACTION-BEGIN while there is already a running hardware
 memory transaction has implementation-dependent effects."
   (the (values fixnum  &optional)
-    #+never (%transaction-begin)
+    #-(and) (%transaction-begin)
     (sb-c::%primitive %xbegin)))
 
 
@@ -55,7 +55,7 @@ a non-zero error code (that describes the abort reason).
 
 Invoking TRANSACTION-END without a running hardware memory transaction
 has undefined consequences."
-  #+never (%transaction-end)
+  #-(and) (%transaction-end)
   (sb-c::%primitive %xend)
   0)
 

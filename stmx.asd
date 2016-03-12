@@ -32,15 +32,15 @@
 
                
                (:module :sb-transaction
-                :components #-(and sbcl x86-64)
+                :components #-(and sbcl (or x86 x86-64))
                             ()
-                            #+(and sbcl x86-64)
+                            #+(and sbcl (or x86 x86-64))
                             ((:file "package")
-                             (:file "compiler"     :depends-on ("package"))
-                             (:file "x86-64-insts" :depends-on ("compiler"))
-                             (:file "x86-64-vm"    :depends-on ("x86-64-insts"))
-                             (:file "cpuid"        :depends-on ("x86-64-vm"))
-                             (:file "transaction"  :depends-on ("x86-64-vm"))))
+                             (:file "compiler"        :depends-on ("package"))
+                             (:file "x86-32,64-insts" :depends-on ("compiler"))
+                             (:file "x86-32,64-vops"  :depends-on ("x86-32,64-insts"))
+                             (:file "cpuid"           :depends-on ("x86-32,64-vops"))
+                             (:file "transaction"     :depends-on ("x86-32,64-vops"))))
 
                (:module :lang
                 :components ((:file "package")

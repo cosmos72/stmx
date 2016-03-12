@@ -50,7 +50,6 @@ Intel Core i7 4770K, do **NOT** support HLE."
         (not (zerop (logand ebx #x10)))))))
 
 
-
 (defun transaction-supported-p ()
   "Test for RTM, i.e. hardware memory transactions.
 RTM is supported if (cpuid 7) returns ebx with bit 11 set.
@@ -65,23 +64,10 @@ As of June 2013, the only x86-64 CPUs supporting RTM are:
 Beware: at the time of writing all the known K models, as for example
 Intel Core i7 4770K, do **NOT** support RTM."
 
-  (let ((max-cpuid (cpuid 0)))
-    (when (>= max-cpuid 7)
-      (let ((ebx (nth-value 1 (cpuid 7))))
-        (not (zerop (logand ebx #x800)))))))
-
-
-;;(eval-when (:compile-toplevel :load-toplevel :execute)
-;;  (when (transaction-supported-p)
-;;    (pushnew :memory-transaction-vops *features*)))
-
-
-
-
-
-
-
-
+    (let ((max-cpuid (cpuid 0)))
+      (when (>= max-cpuid 7)
+        (let ((ebx (nth-value 1 (cpuid 7))))
+          (not (zerop (logand ebx #x800)))))))
 
 
 #|

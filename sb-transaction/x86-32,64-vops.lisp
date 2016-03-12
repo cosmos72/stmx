@@ -28,8 +28,10 @@
          (ecx-val :scs (sb-vm::unsigned-reg) :target ecx))
   (:arg-types sb-vm::unsigned-num sb-vm::unsigned-num)
   (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::eax-offset :target r1 :from (:argument 0)) eax)
-  (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::ebx-offset :target r2) ebx)
   (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::ecx-offset :target r3 :from (:argument 1)) ecx)
+  #+x86-64
+  (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::ebx-offset :target r2) ebx)
+  #+x86-64
   (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::edx-offset :target r4) edx)
   (:results
    (r1 :scs (sb-vm::unsigned-reg))
@@ -41,11 +43,40 @@
   (:generator 8
    (sb-c:move eax eax-val)
    (sb-c:move ecx ecx-val)
-   (sb-assem:inst cpuid)
-   (sb-c:move r1 eax)
-   (sb-c:move r2 ebx)
-   (sb-c:move r3 ecx)
-   (sb-c:move r4 edx)))
+   #+x86-64
+   (progn
+     (sb-assem:inst cpuid)
+     (sb-c:move r1 eax)
+     (sb-c:move r2 ebx)
+     (sb-c:move r3 ecx)
+     (sb-c:move r4 edx))
+   #-x86-64
+   (let ((ebx sb-vm::ebx-tn)
+         (edx sb-vm::edx-tn)
+         (save-ebx t)
+         (save-edx t))
+     (dolist (r (list r1 r2 r3 r4))
+       (when (sb-c::location= r ebx)
+         (setf save-ebx nil))
+       (when (sb-c::location= r edx)
+         (setf save-edx nil)))
+     (when save-edx
+       (sb-assem:inst push edx))
+     (when save-edx
+       (sb-assem:inst push ebx))
+     (sb-assem:inst cpuid)
+     (sb-assem:inst push edx)
+     (sb-assem:inst push ebx)
+     (sb-c:move r1 eax)
+     (sb-assem:inst pop r2)
+     (sb-c:move r3 ecx)
+     (sb-assem:inst pop r4)
+     (when save-ebx
+       (sb-assem:inst pop ebx))
+     (when save-edx
+       (sb-assem:inst pop edx)))))
+
+
 
 
 ;;; HLE vops - hardware lock elision
@@ -71,10 +102,9 @@ abort error codes.")
   (:results   (r1 :scs (sb-vm::unsigned-reg)))
   (:result-types sb-vm::unsigned-num)
   (:generator 0
-   (sb-vm::move-immediate eax +transaction-started+)
+   (sb-assem:inst mov eax +transaction-started+)
    (sb-assem:inst xbegin)
-   (unless (sb-vm::location= r1 eax)
-     (sb-c:move r1 eax))))
+   (sb-c:move r1 eax)))
 
 
 (sb-c:define-vop (%xend)

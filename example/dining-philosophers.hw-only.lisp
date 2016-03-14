@@ -16,11 +16,11 @@
 (in-package :cl-user)
 
 
-;; This version of the dining-philosophers uses SB-TRANSACTION
+;; This version of the dining-philosophers uses STMX.ASM
 ;; to take advantage of hardware transactional memory.
 
 (defpackage #:stmx.example.dining-philosophers.hw-only
-  (:use #:cl #:sb-transaction)
+  (:use #:cl #:stmx.asm)
 
   (:import-from #:stmx.lang
                 #:eval-always

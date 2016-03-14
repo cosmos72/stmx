@@ -1,6 +1,6 @@
 ;; -*- lisp -*-
 
-;; This file is part of SB-TRANSACTION.
+;; This file is part of STMX
 ;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
@@ -13,7 +13,42 @@
 ;; See the Lisp Lesser General Public License for more details.
 
 
-(in-package :sb-transaction)
+(in-package :stmx.asm)
+
+(defconstant +impl-package+ 
+  (loop :for pkg in '(:sb-x86-64-asm :sb-x86-asm :sb-vm)
+     :when (find-package pkg)
+     :return pkg)
+  "Designator for the compiler internal package where we define Intel TSX CPU instructions")
+
+(defun symbol-name* (symbol-name)
+  (declare (type (or symbol string) symbol-name))
+  (if (stringp symbol-name)
+      symbol-name
+      (symbol-name symbol-name)))
+
+(defun find-symbol* (symbol-name &optional (package-name +impl-package+))
+  "Find and return the symbol named SYMBOL-NAME in PACKAGE"
+  (declare (type (or symbol string) symbol-name))
+  (let ((symbol-name (symbol-name* symbol-name)))
+    (find-symbol symbol-name package-name)))
+  
+;;;; conditional compile helpers, use as follows:
+;;;; #+#.(stmx.asm::compile-if-package :package-name) (form ...)
+;;;; #+#.(stmx.asm::compile-if-symbol :symbol-name :package-name) (form ...)
+;;;; #+#.(stmx.asm::compile-if-lisp-version>= '(1 2 13)) (form ...)
+(defun compile-if (flag)
+  (if flag '(:and) '(:or)))
+
+(defun compile-if-package (package-name)
+  (compile-if (find-package package-name)))
+
+(defun compile-if-symbol (package-name symbol-name)
+  (compile-if (find-symbol* symbol-name package-name)))
+
+
+
+
 
 (defun split-string (string separator)
   (declare (type string string)
@@ -43,21 +78,6 @@
        ((null n2) (return t))
        ((< n1 n2) (return nil))
        ((> n1 n2) (return t)))))
-
-;;;; conditional compile helper, use as follows:
-;;;; #+#.(sb-transaction::compile-if-package :package-name) (form ...)
-;;;; #+#.(sb-transaction::compile-if-lisp-version>= '(1 2 13)) (form ...)
-(defun compile-if (flag)
-  (if flag '(:and) '(:or)))
-
-(defun compile-if-package (package-name)
-  (compile-if (find-package package-name)))
-
-(defun compile-if-symbol (package-name symbol-name)
-  (let ((symbol-name (if (stringp symbol-name)
-                         symbol-name
-                         (symbol-name symbol-name))))
-    (compile-if (find-symbol symbol-name package-name))))
 
 (defun lisp-version>= (version-int-list)
   (declare (type (or string list) version-int-list))

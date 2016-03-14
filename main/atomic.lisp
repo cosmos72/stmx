@@ -37,13 +37,12 @@ Since STMX transactions do not lock memory, it is possible for different
 transactions to try to update the same memory (almost) simultaneously.
 In such case, the conflict is detected when they try to commit or rollback,
 and only one conflicting transaction is allowed to commit:
-all others are immediately re-run again from the beginning,
-also ignoring any error they may have signalled.
+all others are immediately re-run again from the beginning.
 
-For this reason, a transaction ABSOLUTELY MUST NOT perform any irreversible
+For this reason, a transaction SHOULD NOT perform any irreversible
 operation such as INPUT/OUTPUT: the result would be that I/O is executed
-multiple times, or executed even when it should not!
-Irreversible operations MUST be performed OUTSIDE transactions,
+multiple times, or executed even when it shouldn't have!
+Irreversible operations SHOULD be performed OUTSIDE transactions,
 for example by queueing them into transactional memory that another thread
 will consume and then, OUTSIDE transactions, actually perform them.
 
@@ -54,7 +53,7 @@ For advanced features inside transactions, see RETRY, ORELSE, NONBLOCKING,
 
 For pre-defined transactional classes, see the package STMX.UTIL"
 
-#+never
+#-(and)
  "Run BODY in a hardware memory transaction. All changes to transactional memory
 will be visible to other threads only after BODY returns normally (commits).
 If BODY signals an error, its effects on transactional memory are rolled back
@@ -117,3 +116,7 @@ transactional memory it read has changed."
   #?-hw-transactions
   (run-sw-atomic tx))
 
+
+
+(defun hw-transaction-test ()
+  (atomic (hw-transaction-supported-and-running?)))

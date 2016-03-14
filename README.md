@@ -662,6 +662,11 @@ There are several ways. The easiest are:
   It internally calls the CPUID assembler instruction and returns T if hardware
   transactions are supported, or NIL if they are not.
 - Try to use them, for example by executing `(ATOMIC (HW-TRANSACTION-SUPPORTED-AND-RUNNING?))`
+  in compiled code - hardware transactions typically do not work in interpreted code.
+  Thus actually execute something like
+  `(DEFUN HW-TRANSACTION-TEST ()
+     (ATOMIC (HW-TRANSACTION-SUPPORTED-AND-RUNNING?)))
+   (HW-TRANSACTION-TEST)`
 
 ### How to use hardware transactions
 

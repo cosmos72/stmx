@@ -209,12 +209,12 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
   ;;
   (default-feature 'hw-transactions nil)
   (when (all-features 'mem-rw-barriers 'mutex-owner)
-    ;; do we also have the sb-transaction package exposing CPU hardware transactions?
-    #?+(symbol sb-transaction transaction-supported-p)
+    ;; do we also have the STMX.ASM package exposing CPU hardware transactions?
+    #?+(symbol stmx.asm transaction-supported-p)
     ;; good, and does the current CPU actually support hardware transactions?
-    (when (sb-transaction:transaction-supported-p) 
+    (when (stmx.asm:transaction-supported-p) 
       ;; yes. start the turbines.
-      (set-feature 'hw-transactions :sb-transaction)))
+      (set-feature 'hw-transactions :stmx.asm)))
 
 
 

@@ -17,7 +17,7 @@
 
 
 (defpackage #:stmx.example5
-  (:use #:cl #:sb-transaction  #:stmx.lang))
+  (:use #:cl #:stmx.asm  #:stmx.lang))
                 
 (in-package :stmx.example5)
 

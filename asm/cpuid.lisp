@@ -1,6 +1,6 @@
 ;; -*- lisp -*-
 
-;; This file is part of SB-TRANSACTION.
+;; This file is part of STMX.
 ;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
@@ -13,7 +13,7 @@
 ;; See the Lisp Lesser General Public License for more details.
 
 
-(in-package :sb-transaction)
+(in-package :stmx.asm)
 
 
 

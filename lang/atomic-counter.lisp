@@ -62,7 +62,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmacro incf-atomic-place (place &optional (delta 1) &key place-mutex)
+(defmacro incf-atomic-place (place &optional (delta 1) place-mutex)
   "Increase atomic PLACE by DELTA and return its new value."
   (declare (ignorable place-mutex))
 
@@ -77,6 +77,8 @@
 
   #?-fast-atomic-counter
   (with-gensym delta-var
+    (when (null place-mutex)
+      (error "attempt to invoke (INCF-ATOMIC-PLACE ~S) with PLACE-MUTEX = NIL" place))
     `(let1 ,delta-var ,delta
        ;; locking version
        (with-lock (,place-mutex)
@@ -113,7 +115,7 @@
   #?-fast-atomic-counter
   ;; locking version
   (incf-atomic-place (atomic-counter-version counter) delta
-                     :place-mutex (atomic-counter-mutex counter)))
+                     (atomic-counter-mutex counter)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -130,7 +132,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmacro get-atomic-place (place &key place-mutex)
+(defmacro get-atomic-place (place &optional place-mutex)
   "Return current value of atomic PLACE."
   (declare (ignorable place-mutex))
        
@@ -143,8 +145,10 @@
 
   #?-fast-atomic-counter
   ;; locking version
-  `(with-lock (,place-mutex)
-     (the atomic-counter-num ,place)))
+  (if (null place-mutex)
+      (error "attempt to invoke (GET-ATOMIC-PLACE ~S) with PLACE-MUTEX = NIL" place)
+      `(with-lock (,place-mutex)
+         (the atomic-counter-num ,place))))
 
 
 
@@ -152,31 +156,28 @@
   "Return current value of atomic COUNTER."
   (declare (type atomic-counter counter))
        
-  #?+fast-atomic-counter
-  (get-atomic-place (atomic-counter-version counter))
-
-  #?-fast-atomic-counter
-  ;; locking version
   (get-atomic-place (atomic-counter-version counter)
-                    :place-mutex (atomic-counter-mutex counter)))
+                    #?-fast-atomic-counter
+                    (atomic-counter-mutex counter)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmacro get-atomic-place-plus-delta (place delta)
+(defmacro get-atomic-place-plus-delta (place delta &optional place-mutex)
   "Return DELTA plus current value of atomic PLACE."
+  (declare (ignorable place-mutex))
        
   #?+fixnum-is-large-powerof2
   `(the atomic-counter-num
      (logand most-positive-fixnum
              (+ ,delta
-                (get-atomic-place ,place))))
+                (get-atomic-place ,place ,place-mutex))))
 
   #?-fixnum-is-large-powerof2
   (progn
     #?+fixnum-is-large
     (with-gensyms (n delta-var)
-      `(let ((,n (get-atomic-place ,place))
+      `(let ((,n (get-atomic-place ,place ,place-mutex))
              (,delta-var delta))
          (the fixnum
            (if (> ,n (the fixnum (- most-positive-fixnum ,delta-var)))
@@ -184,7 +185,7 @@
                (+ ,delta-var ,n)))))
 
       #?-fixnum-is-large
-      `(+ ,delta (get-atomic-place ,place))))
+      `(+ ,delta (get-atomic-place ,place ,place-mutex))))
 
 
 
@@ -194,7 +195,9 @@
   (declare (type atomic-counter counter)
            (type positive-fixnum delta))
        
-  (get-atomic-place-plus-delta (atomic-counter-version counter) delta))
+  (get-atomic-place-plus-delta (atomic-counter-version counter) delta
+                               #?-fast-atomic-counter
+                               (atomic-counter-mutex counter)))
 
 
 
@@ -202,7 +205,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defmacro set-atomic-place (place value &key place-mutex)
+(defmacro set-atomic-place (place value &optional place-mutex)
   "Set and return value of atomic PLACE."
 
   #?+fast-atomic-counter
@@ -216,9 +219,11 @@
 
   #?-fast-atomic-counter
   ;; locking version
-  `(the atomic-counter-num
-     (with-lock (,place-mutex)
-       (setf ,place ,value))))
+  (if (null place-mutex)
+      (error "attempt to invoke (SET-ATOMIC-PLACE ~S ~S) with PLACE-MUTEX = NIL" place value)
+      `(the atomic-counter-num
+            (with-lock (,place-mutex)
+              (setf ,place ,value)))))
 
 
 (defun set-atomic-counter (counter value)
@@ -226,10 +231,6 @@
   (declare (type atomic-counter counter)
            (type atomic-counter-num value))
        
-  #?+fast-atomic-counter
-  (set-atomic-place (atomic-counter-version counter) value)
-
-  #?-fast-atomic-counter
-  ;; locking version
   (set-atomic-place (atomic-counter-version counter) value
-                    :place-mutex (atomic-counter-mutex counter)))
+                    #?-fast-atomic-counter
+                    (atomic-counter-mutex counter)))

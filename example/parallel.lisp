@@ -18,7 +18,7 @@
 (defpackage #:stmx.example.parallel
   (:use #:cl
         #:bordeaux-threads
-        #:sb-transaction
+        #:stmx.asm
         #:stmx.lang
         #:stmx
         #:stmx.util))

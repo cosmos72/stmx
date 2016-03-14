@@ -126,6 +126,17 @@ and are later committed to memory if the transaction completes successfully."
 
 
 
+;;;; ** Current hardware transaction log
+
+(declaim (type version-type *hw-tlog-write-version*))
+(defvar *hw-tlog-write-version* +invalid-version+)
+
+(defmacro hw-tlog-write-version ()
+  "Return the WRITE-VERSION for the current hardware transaction"
+  '*hw-tlog-write-version*)
+
+
+
 
 
 
@@ -221,21 +232,8 @@ to TLOGs while executing BODY."
      (with-recording
        ,@body)))
 
-
-;;;; ** Current hardware transaction log
-
-(declaim (type version-type *hw-tlog-write-version*))
-(defvar *hw-tlog-write-version* +invalid-version+)
-
-(defmacro hw-tlog-write-version ()
-  "Return the WRITE-VERSION for the current hardware transaction"
-  '*hw-tlog-write-version*)
-
-
-
 (eval-when (:load-toplevel :execute)
   (save-thread-initial-bindings *tlog* *record-to-tlogs* *hide-tvars* *hw-tlog-write-version*))
-
 
 
 ;;;; ** Retrying

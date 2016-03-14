@@ -1,6 +1,6 @@
 ;; -*- lisp -*-
 
-;; This file is part of SB-TRANSACTION.
+;; This file is part of STMX.
 ;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
@@ -27,10 +27,13 @@
 
 (in-package :cl-user)
 
-(defpackage #:sb-transaction
+(defpackage #:stmx.asm
   (:use #:cl)
 
-  (:export #:cpuid  #:lock-elision-supported-p  #:transaction-supported-p
+  (:export #:+impl-package+ #:find-symbol* #:symbol-name*
+           #:compile-if #:compile-if-package #:compile-if-symbol
+
+           #:cpuid  #:lock-elision-supported-p  #:transaction-supported-p
 
            #:transaction-begin #:transaction-end
            #:transaction-abort #:transaction-running-p

@@ -23,13 +23,14 @@
 
 (defun tpairlis (keys data &optional talist)
   "Construct an association list from KEYS and DATA (adding to TALIST)."
-  (declare (type tlist talist))
-  (do ((x keys (tcdr x))
-       (y data (tcdr y)))
-      ((and (tendp x) (tendp y)) talist)
-    (if (or (tendp x) (tendp y))
+  (declare (type tlist talist)
+           (type list keys data))
+  (do ((x keys (cdr x))
+       (y data (cdr y)))
+      ((and (endp x) (endp y)) talist)
+    (if (or (endp x) (endp y))
         (error "The lists of keys and data are of unequal length."))
-    (setf talist (tacons (tcar x) (tcar y) talist))))
+    (setf talist (tacons (car x) (car y) talist))))
 
 
 (defun copy-talist (talist)
@@ -51,36 +52,87 @@
             ((tendp x)))
         result)))
 
+(declaim (inline %coerce-to-fun))
+(defun %coerce-to-fun (thing)
+  (coerce thing 'function))
+
+(defmacro %t-assoc (item talist key test test-not tcar)
+  (labels ((%call (fun &rest args)
+             (if fun
+                 `(funcall ,fun ,@args)
+                 (first args)))
+           (%key (item)
+             (%call key item))
+           (%match (item e)
+             (cond
+               (test     (%call test item e))
+               (test-not `(not ,(%call test-not item e)))
+               (t        `(eql ,item ,e)))))
+    (with-gensyms (e)
+      `(do-tlist (,e ,talist)
+         (when ,(%match item (%key `(,tcar ,e)))
+           (return ,e))))))
+
+(defmacro %tassoc (item talist key test test-not)
+  `(%t-assoc ,item ,talist ,key ,test ,test-not tcar))
+
+(defmacro %trassoc (item talist key test test-not)
+  `(%t-assoc ,item ,talist ,key ,test ,test-not tcdr))
+
+(defun tassoc (item talist &key key (test nil testp) (test-not nil notp))
+  "Return the tcons in TALIST whose tcar is equal (by a given test or EQL) to
+   the ITEM."
+  (declare (type tlist talist))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-to-fun key)))
+        (test (and testp (%coerce-to-fun test)))
+        (test-not (and notp (%coerce-to-fun test-not))))
+  
+    (cond (test
+           (if key
+               (%tassoc item talist key test nil)
+               (%tassoc item talist nil test nil)))
+          (test-not
+           (if key
+               (%tassoc item talist key nil test-not)
+               (%tassoc item talist nil nil test-not)))
+          (t
+           (if key
+               (%tassoc item talist key nil nil)
+               (%tassoc item talist nil nil nil))))))
+
+
+(defun trassoc (item talist &key key (test nil testp) (test-not nil notp))
+  "Return the cons in TALIST whose tcdr is equal (by a given test or EQL) to
+   the ITEM."
+  (declare (type tlist talist))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-to-fun key)))
+        (test (and testp (%coerce-to-fun test)))
+        (test-not (and notp (%coerce-to-fun test-not))))
+    (cond (test
+           (if key
+               (%trassoc item talist key test nil)
+               (%trassoc item talist nil test nil)))
+          (test-not
+           (if key
+               (%trassoc item talist key nil test-not)
+               (%trassoc item talist nil nil test-not)))
+          (t
+           (if key
+               (%trassoc item talist key nil nil)
+               (%trassoc item talist nil nil nil))))))
 
 #| TODO
 
 
-(defun assoc (item alist &key key (test nil testp) (test-not nil notp))
-  "Return the cons in ALIST whose car is equal (by a given test or EQL) to
-   the ITEM."
-  (when (and testp notp)
-    (error ":TEST and :TEST-NOT were both supplied."))
-  (let ((key (and key (%coerce-callable-to-fun key)))
-        (test (and testp (%coerce-callable-to-fun test)))
-        (test-not (and notp (%coerce-callable-to-fun test-not))))
-    (cond (test
-           (if key
-               (%assoc-key-test item alist key test)
-               (%assoc-test item alist test)))
-          (test-not
-           (if key
-               (%assoc-key-test-not item alist key test-not)
-               (%assoc-test-not item alist test-not)))
-          (t
-           (if key
-               (%assoc-key item alist key)
-               (%assoc item alist))))))
-
 (defun assoc-if (predicate alist &key key)
   "Return the first cons in ALIST whose CAR satisfies PREDICATE. If
    KEY is supplied, apply it to the CAR of each cons before testing."
-  (let ((predicate (%coerce-callable-to-fun predicate))
-        (key (and key (%coerce-callable-to-fun key))))
+  (let ((predicate (%coerce-to-fun predicate))
+        (key (and key (%coerce-to-fun key))))
     (if key
         (%assoc-if-key predicate alist key)
         (%assoc-if predicate alist))))
@@ -88,39 +140,18 @@
 (defun assoc-if-not (predicate alist &key key)
   "Return the first cons in ALIST whose CAR does not satisfy PREDICATE.
   If KEY is supplied, apply it to the CAR of each cons before testing."
-  (let ((predicate (%coerce-callable-to-fun predicate))
-        (key (and key (%coerce-callable-to-fun key))))
+  (let ((predicate (%coerce-to-fun predicate))
+        (key (and key (%coerce-to-fun key))))
     (if key
         (%assoc-if-not-key predicate alist key)
         (%assoc-if-not predicate alist))))
 
-(defun rassoc (item alist &key key (test nil testp) (test-not nil notp))
-  (declare (list alist))
-  "Return the cons in ALIST whose CDR is equal (by a given test or EQL) to
-   the ITEM."
-  (when (and testp notp)
-    (error ":TEST and :TEST-NOT were both supplied."))
-  (let ((key (and key (%coerce-callable-to-fun key)))
-        (test (and testp (%coerce-callable-to-fun test)))
-        (test-not (and notp (%coerce-callable-to-fun test-not))))
-    (cond (test
-           (if key
-               (%rassoc-key-test item alist key test)
-               (%rassoc-test item alist test)))
-          (test-not
-           (if key
-               (%rassoc-key-test-not item alist key test-not)
-               (%rassoc-test-not item alist test-not)))
-          (t
-           (if key
-               (%rassoc-key item alist key)
-               (%rassoc item alist))))))
 
 (defun rassoc-if (predicate alist &key key)
   "Return the first cons in ALIST whose CDR satisfies PREDICATE. If KEY
   is supplied, apply it to the CDR of each cons before testing."
-  (let ((predicate (%coerce-callable-to-fun predicate))
-        (key (and key (%coerce-callable-to-fun key))))
+  (let ((predicate (%coerce-to-fun predicate))
+        (key (and key (%coerce-to-fun key))))
     (if key
         (%rassoc-if-key predicate alist key)
         (%rassoc-if predicate alist))))
@@ -128,8 +159,8 @@
 (defun rassoc-if-not (predicate alist &key key)
   "Return the first cons in ALIST whose CDR does not satisfy PREDICATE.
   If KEY is supplied, apply it to the CDR of each cons before testing."
-  (let ((predicate (%coerce-callable-to-fun predicate))
-        (key (and key (%coerce-callable-to-fun key))))
+  (let ((predicate (%coerce-to-fun predicate))
+        (key (and key (%coerce-to-fun key))))
     (if key
         (%rassoc-if-not-key predicate alist key)
         (%rassoc-if-not predicate alist))))
@@ -140,9 +171,9 @@
   "Substitute from ALIST into TREE nondestructively."
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
-  (let ((key (and key (%coerce-callable-to-fun key)))
-        (test (if testp (%coerce-callable-to-fun test) test))
-        (test-not (if notp (%coerce-callable-to-fun test-not) test-not)))
+  (let ((key (and key (%coerce-to-fun key)))
+        (test (if testp (%coerce-to-fun test) test))
+        (test-not (if notp (%coerce-to-fun test-not) test-not)))
     (declare (type function test test-not))
     (declare (inline assoc))
     (labels ((s (subtree)
@@ -174,9 +205,9 @@
   "Substitute from ALIST into TRUE destructively."
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
-  (let ((key (and key (%coerce-callable-to-fun key)))
-        (test (if testp (%coerce-callable-to-fun test) test))
-        (test-not (if notp (%coerce-callable-to-fun test-not) test-not)))
+  (let ((key (and key (%coerce-to-fun key)))
+        (test (if testp (%coerce-to-fun test) test))
+        (test-not (if notp (%coerce-to-fun test-not) test-not)))
     (declare (inline assoc))
     (let (temp)
       (labels ((s (subtree)

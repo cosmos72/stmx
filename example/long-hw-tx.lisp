@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -17,7 +17,7 @@
 
 
 (defpackage #:stmx.example5
-  (:use #:cl #:sb-transaction  #:stmx.lang))
+  (:use #:cl #:stmx.asm  #:stmx.lang))
                 
 (in-package :stmx.example5)
 

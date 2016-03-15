@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -67,16 +67,18 @@ and the error is propagated normally.
 Also, no work-in-progress transactional memory will ever be visible to other
 threads."
   (if body
-      `(run-sw-atomic (lambda () (block nil (locally ,@body))))
+      `(run-sw-atomic (lambda () (with-swtx (block nil (locally ,@body)))))
       `(values)))
 
 
 (defmacro fast-sw-atomic (&rest body)
   (if body
       (let1 form `(block nil (locally ,@body))
-        `(if (transaction?)
-             ,form
-             (%run-sw-atomic (lambda () ,form))))
+        `(cond
+           #?+hw-transactions
+           ((hw-transaction?) (with-hwtx ,form))
+           ((sw-transaction?) (with-swtx ,form))
+           (t (%run-sw-atomic (lambda () (with-swtx ,form))))))
       `(values)))
 
        

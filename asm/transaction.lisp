@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
-;; This file is part of SB-TRANSACTION.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; This file is part of STMX.
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -13,7 +13,7 @@
 ;; See the Lisp Lesser General Public License for more details.
 
 
-(in-package :sb-transaction)
+(in-package :stmx.asm)
 
 
 (declaim (ftype (function () fixnum)        transaction-begin)
@@ -38,7 +38,7 @@ otherwise return code of the error that caused the transaction to abort.
 Invoking TRANSACTION-BEGIN while there is already a running hardware
 memory transaction has implementation-dependent effects."
   (the (values fixnum  &optional)
-    #+never (%transaction-begin)
+    #-(and) (%transaction-begin)
     (sb-c::%primitive %xbegin)))
 
 
@@ -55,7 +55,7 @@ a non-zero error code (that describes the abort reason).
 
 Invoking TRANSACTION-END without a running hardware memory transaction
 has undefined consequences."
-  #+never (%transaction-end)
+  #-(and) (%transaction-end)
   (sb-c::%primitive %xend)
   0)
 

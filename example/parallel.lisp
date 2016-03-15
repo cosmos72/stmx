@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -18,7 +18,7 @@
 (defpackage #:stmx.example.parallel
   (:use #:cl
         #:bordeaux-threads
-        #:sb-transaction
+        #:stmx.asm
         #:stmx.lang
         #:stmx
         #:stmx.util))
@@ -39,10 +39,10 @@
   (loop until
        (zerop
         (the fixnum
-          (stmx::hw-atomic2 (helper :test-for-running-tx? nil)
-           (decf (the fixnum (stmx::$-hwtx var helper)))
+          (stmx::hw-atomic2 (hwtx-version :test-for-running-tx? nil)
+           (decf (the fixnum (stmx::$-hwtx hwtx-version var)))
            (stmx::sw-atomic
-            (decf (the fixnum (stmx::$-swtx var)))))))))
+            (decf (the fixnum (stmx::$-swtx (stmx::current-tlog) var)))))))))
 
 
 (defun run-one-thread/hw-only (var)

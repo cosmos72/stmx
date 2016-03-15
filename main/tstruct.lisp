@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -127,7 +127,7 @@ Cannot generate functions in package NIL" symbol))
   
 
 (defun %impl/names-to-symbol (package &rest names)
-  (apply #'names-to-symbol package (symbol-name '%stmx-impl/) names))
+  (apply #'names-to-symbol package (symbol-name '%stmx-impl/tstruct/) names))
       
 
 (defun tstruct-def-package (struct-def)
@@ -143,7 +143,7 @@ Cannot generate functions in package NIL" symbol))
 
 
 (defun tstruct-def-tx-constructor (struct-def)
-  "Return the %stmx-impl constructor name of a tstruct"
+  "Return the %stmx-tstruct constructor name of a tstruct"
   (declare (type tstruct-def struct-def))
   (if-bind constructor (tstruct-def-constructor struct-def)
     (%impl/names-to-symbol (tstruct-def-package struct-def) constructor)
@@ -368,7 +368,7 @@ Slot initform is ~S"
 
 
 (defun tstruct-slot-tx-accessor (slot struct-def)
-  "Return the %stmx-impl accessor symbol of given struct slot"
+  "Return the %stmx-tstruct accessor symbol of given struct slot"
   (declare (type tstruct-slot slot)
            (type tstruct-def  struct-def))
 
@@ -512,21 +512,23 @@ Note: TRANSACTIONAL-STRUCT supports only one constructor"
          `((declaim (inline ,reader
                             ,@(unless read-only `((setf ,writer)))))))
 
-     (defun ,reader (,instance)
-       (declare (type ,struct-type ,instance))
-       (the (values ,type &optional)
-            ,(if tx
-                 `($ (,accessor-impl ,instance))
-                 `(,accessor-impl ,instance))))
+     (,@(if tx '(optimize-for-transaction* (:inline t)) '(progn))
+       (defun ,reader (,instance)
+         (declare (type ,struct-type ,instance))
+         (the (values ,type &optional)
+              ,(if tx
+                   `($ (,accessor-impl ,instance))
+                   `(,accessor-impl ,instance)))))
 
      ,(unless read-only
-         `(defun (setf ,writer) (,value ,instance)
-            (declare (type ,struct-type ,instance)
-                     (type ,type ,value))
-            (the (values ,type &optional)
-                 ,(if tx
-                      `(setf ($ (,accessor-impl ,instance)) ,value)
-                      `(setf (,accessor-impl ,instance) ,value)))))))
+         `(,@(if tx '(optimize-for-transaction* (:inline t)) '(progn))
+           (defun (setf ,writer) (,value ,instance)
+             (declare (type ,struct-type ,instance)
+                      (type ,type ,value))
+             (the (values ,type &optional)
+                  ,(if tx
+                       `(setf ($ (,accessor-impl ,instance)) ,value)
+                       `(setf (,accessor-impl ,instance) ,value))))))))
 
 
 (defun tstruct-def->defun-accessor (slot struct-def)
@@ -561,12 +563,12 @@ Note: TRANSACTIONAL-STRUCT supports only one constructor"
 
 
 (defun tstruct-def->tx-accessors (struct-def)
-  "List %stmx-impl hidden accessor functions,
+  "List %stmx-tstruct hidden accessor functions,
 in order to declaim them inline"
   (declare (type tstruct-def struct-def))
 
   #+cmucl
-  ;; CMUCL chokes if %stmx-impl/... struct accessors are declaimed inline
+  ;; CMUCL chokes if %stmx-tstruct/... struct accessors are declaimed inline
   (declare (ignore struct-def))
 
   #-cmucl
@@ -654,7 +656,7 @@ See NON-TRANSACTIONAL-STRUCT for that."
 
 
 (defun tstruct-def->tx-functions (struct-def)
-  "List %stmx-impl hidden constructor and accessors functions,
+  "List %stmx-tstruct hidden constructor and accessors functions,
 in order to declaim them inline"
   (declare (type tstruct-def struct-def))
   

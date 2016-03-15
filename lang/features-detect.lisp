@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -24,7 +24,6 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
     ;; unknown system - for safety, disable even features
     ;; enabled by default on known systems
     (set-features '(bt/with-lock nil)
-                  '(mem-rw-barriers nil)
                   '(define-constant-once nil))
 
 
@@ -58,9 +57,7 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
   
  #+lispworks ;; incomplete porting
  (set-features '(tclass-options ((:optimize-slot-access nil)))
-               '(bt/lock-owner mp:lock-owner)
-               #+(or x86 x8664 x86-64 x86_64)
-               '(mem-rw-barriers :trivial))
+               '(bt/lock-owner mp:lock-owner))
  
  #+abcl
  (set-features '(bt/lock-owner :abcl)
@@ -71,8 +68,9 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
 
  #+ccl
  (set-features '(bt/lock-owner ccl::%%lock-owner)
-               #+x86 '(mem-rw-barriers nil) ;; causes "bogus object" errors.
+               ;; trivial mem barriers cause "bogus object" errors.
                '(define-constant-once nil) ;; causes deadlocks
+               #?+(symbol ccl defstatic) '(define-global ccl:defstatic)
                'use-initialize-instance-before
                'closer-mop/works-on-structs
                '(sxhash-equalp ccl::%%equalphash))
@@ -82,7 +80,6 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
  ;; thus STMX compiles in single-thread mode, without using bt/with-lock and mem-rw-barriers.
  ;; On the other hand, define-constant-once and use-initialize-instance-before work.
  (set-features '(bt/with-lock nil)
-               '(mem-rw-barriers nil)
                'use-initialize-instance-before
                'closer-mop/works-on-structs
                ;; on CLISP, SXHASH can be used for SXHASH-EQUALP,
@@ -94,9 +91,6 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
 
  #+cmucl
  (set-features '(bt/lock-owner mp::lock-process)
-               ;; if running without the command-line options "-fpu" "x87"
-               ;; uncomment the following line
-               ;; '(mem-rw-barriers nil)
                'closer-mop/works-on-structs
                '(sxhash-equalp (lisp::internal-equalp-hash * 0)))
  
@@ -105,7 +99,6 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
  ;; as of 2015-02-07, latest ECL from git://git.code.sf.net/p/ecls/ecl seems to fix them
  (set-features '(bt/lock-owner mp::lock-owner)
                '(bt/with-lock nil) ;; bugged?
-               '(mem-rw-barriers nil) ;; bugged?
                '(define-constant-once nil) ;; bugged?
                'use-initialize-instance-before
                'closer-mop/works-on-structs
@@ -113,7 +106,7 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
  
  #+sbcl
  (set-features #+compare-and-swap-vops '(atomic-ops :sbcl)
-               #+memory-barrier-vops   '(mem-rw-barriers :sbcl)
+               #+memory-barrier-vops '(mem-rw-barriers :sbcl)
 
                ;; usually, bt/lock-owner it not needed on SBCL: the combo
                ;; ATOMIC-OPS + MEM-RW-BARRIERS provides FAST-MUTEX, which implements
@@ -185,10 +178,12 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
   ;; Summarizing, for most Lisp compilers (ECL being a notable exception)
   ;; 'mem-rw-barriers feature can be set to :trivial on x86 and x86-64
   ;; (unless a better implementation is available, obviously)
+  ;;
+  ;; For safety, we let each implementation decide whether to set
+  ;; '(mem-rw-barriers :trivial) on x86 and x86-64
 
 
-  #+(or x86 x8664 x86-64 x86_64)
-  (default-feature 'mem-rw-barriers :trivial)
+  (default-feature 'mem-rw-barriers nil)
 
 
   ;; FAST-MUTEX requires atomic compare-and-swap plus *real* memory barriers.
@@ -214,12 +209,12 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
   ;;
   (default-feature 'hw-transactions nil)
   (when (all-features 'mem-rw-barriers 'mutex-owner)
-    ;; do we also have the sb-transaction package exposing CPU hardware transactions?
-    #?+(symbol sb-transaction transaction-supported-p)
+    ;; do we also have the STMX.ASM package exposing CPU hardware transactions?
+    #?+(symbol stmx.asm transaction-supported-p)
     ;; good, and does the current CPU actually support hardware transactions?
-    (when (sb-transaction:transaction-supported-p) 
+    (when (stmx.asm:transaction-supported-p) 
       ;; yes. start the turbines.
-      (set-feature 'hw-transactions :sb-transaction)))
+      (set-feature 'hw-transactions :stmx.asm)))
 
 
 

@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -16,11 +16,11 @@
 (in-package :cl-user)
 
 
-;; This version of the dining-philosophers uses SB-TRANSACTION
+;; This version of the dining-philosophers uses STMX.ASM
 ;; to take advantage of hardware transactional memory.
 
 (defpackage #:stmx.example.dining-philosophers.hw-only
-  (:use #:cl #:sb-transaction)
+  (:use #:cl #:stmx.asm)
 
   (:import-from #:stmx.lang
                 #:eval-always
@@ -87,7 +87,7 @@
    ;; without this yield, the % of aborted transactions is huge
    (when (= -1 hunger)
      (bt:thread-yield)
-     ;; (sb-thread:thread-yield) -- MUCH slower!
+     ;; (sb-thread:thread-yield) ;; MUCH slower!
      (go start))
    
    (return hunger)))

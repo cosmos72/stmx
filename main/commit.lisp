@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -252,7 +252,8 @@ is re-executed from the beginning.
 WARNING: BODY cannot (retry) - attempts to do so will signal an error.
 Starting a nested transaction and retrying inside that is acceptable,
 as long as the (retry) does not propagate outside BODY."
-  `(call-before-commit (lambda () ,@body)))
+  ;; use WITH-SWTX: only software transactions support BEFORE-COMMIT
+  `(call-before-commit (lambda () (with-swtx ,@body))))
 
 
 (defmacro after-commit (&body body)
@@ -263,17 +264,17 @@ but the transaction remains committed.
 
 WARNING: Code registered with after-commit has a number or restrictions:
 
-1) BODY must not write to *any* transactional memory: the consequences
-are undefined.
+1) if BODY signal an error when executed, the error is propagated to the caller,
+   forms registered later with AFTER-COMMIT are not executed,
+   but the transaction remains committed.
 
-2) BODY can only read from transactional memory already read or written
-during the same transaction. Reading from other transactional memory
-has undefined consequences.
-
-3) BODY cannot (retry) - attempts to do so will signal an error.
-Starting a nested transaction and retrying inside that is acceptable
-as long as the (retry) does not propagate outside BODY."
-  `(call-after-commit (lambda () ,@body)))
+2) BODY is *not* executed inside a transaction: while it is certainly possible
+   to explicitly run an (atomic) block from it, doing so would probably
+   defeat the purpose of AFTER-COMMIT and it may also cause a significant
+   performance penalty."
+  
+  ;; use WITH-NOTX: AFTER-COMMIT forms run outside any transaction
+  `(call-after-commit (lambda () (with-notx ,@body))))
 
 
 
@@ -316,9 +317,9 @@ If any of them signals an error, it will be propagated to the caller
 but the TLOG will remain committed."
   (declare (type tlog log))
   (when-bind funcs (tlog-after-commit log)
-    ;; do NOT restore recording and log as the current tlog,
-    ;; AFTER-COMMIT functions run outside any transaction
-    ;; (with-recording-to-tlog log
+    ;; AFTER-COMMIT functions run outside any transaction,
+    ;; do not restore log
+    ;; with-recording-to-tlog log
     (loop-funcall-on-appendable-vector funcs)))
 
 
@@ -338,7 +339,7 @@ Note: invokes HW-ATOMIC2, which in turn invokes GLOBAL-CLOCK/HW/STAT-{COMMITTED,
            (type txfifo changed))
 
   (the (member t nil :fail)
-    (hw-atomic2 (write-version :test-for-running-tx? nil :update-stat :swtx)
+    (hw-atomic2 (:hw-write-version write-version :test-for-running-tx? nil :update-stat :swtx)
 
       (block nil
         ;; hardware transaction. if you need to jump out of it

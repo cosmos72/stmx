@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -64,30 +64,38 @@ To use TCONS cells, prepend T to the name of most list-manipulating functions. E
   "Create and return a new TCONS."
   (make-tcons :first first :rest rest))
 
-          
-(defun tfirst (tlist)
-  "Return the first element in a TCONS or TLIST."
-  (when tlist (tcons-first tlist)))
-  
-(defun trest (tlist)
-  "Return the rest element in a TCONS or TLIST."
-  (when tlist (tcons-rest tlist)))
 
-(defun (setf tfirst) (value cons)
-  "Set VALUE as the first element in a TCONS or non-null TLIST.
+(optimize-for-transaction*
+ (:inline t)
+ (defun tfirst (tlist)
+   "Return the first element in a TCONS or TLIST."
+   (when tlist (tcons-first tlist))))
+  
+(optimize-for-transaction*
+ (:inline t)
+ (defun trest (tlist)
+   "Return the rest element in a TCONS or TLIST."
+   (when tlist (tcons-rest tlist))))
+
+(optimize-for-transaction*
+ (:inline t)
+ (defun (setf tfirst) (value cons)
+   "Set VALUE as the first element in a TCONS or non-null TLIST.
 
 This function should always be executed inside an STMX atomic block."
-  (declare (type tcons cons))
-  (the (values t &optional)
-       (setf (tcons-first cons) value)))
+   (declare (type tcons cons))
+   (the (values t &optional)
+        (setf (tcons-first cons) value))))
 
-(defun (setf trest) (value cons)
+(optimize-for-transaction*
+ (:inline t)
+ (defun (setf trest) (value cons)
    "Set VALUE as the rest element in a TCONS or non-null TLIST.
 
 This function should always be executed inside an STMX atomic block."
    (declare (type tcons cons))
    (the (values t &optional)
-        (setf (tcons-rest cons) value)))
+        (setf (tcons-rest cons) value))))
 
 
 ;; defined automatically by (defstruct tcons ...) above
@@ -127,18 +135,22 @@ This function should always be executed inside an STMX atomic block."
 
 
 
-(defun trplaca (tcons x)
-  "Change the TCAR of TCONS to X and return the TCONS."
-  (declare (type tcons tcons))
-  (setf (tcons-first tcons) x)
-  tcons)
+(optimize-for-transaction*
+ (:inline t)
+ (defun trplaca (tcons x)
+   "Change the TCAR of TCONS to X and return the TCONS."
+   (declare (type tcons tcons))
+   (setf (tcons-first tcons) x)
+   tcons))
            
 
-(defun trplacd (tcons x)
-  "Change the TCDR of TCONS to X and return the TCONS."
-  (declare (type tcons tcons))
-  (setf (tcons-rest tcons) x)
-  tcons)
+(optimize-for-transaction*
+ (:inline t)
+ (defun trplacd (tcons x)
+   "Change the TCDR of TCONS to X and return the TCONS."
+   (declare (type tcons tcons))
+   (setf (tcons-rest tcons) x)
+   tcons))
            
 
 (defmacro tpush (value place)
@@ -187,9 +199,9 @@ Removes and returns the first element in PLACE."
 (defun tlist (&rest list)
   "Create and return a new TLIST, whose cells are TCONS."
   (when list
-    (let* ((list #?+&rest-is-fresh-list (nreverse list)
-                 #?-&rest-is-fresh-list (reverse list))
-           (result nil))
+    (let ((list #?+&rest-is-fresh-list (nreverse list)
+                #?-&rest-is-fresh-list (reverse list))
+          (result nil))
       (dolist (e list result)
         (setf result (tcons e result))))))
                
@@ -261,29 +273,36 @@ to terminate immediately the iterations and return zero or more values."
 ;;; basic tlist operations.
 
 
-(declaim (inline tcar tcdr (setf tcar) (setf tcdr)))
+(optimize-for-transaction*
+ (:inline t)
+ (defun tcar (list)
+   "Return the 1st object in a TLIST."
+   (declare (type tlist list))
+   (tfirst list)))
 
-(defun tcar (list)
-  "Return the 1st object in a TLIST."
-  (declare (type tlist list))
-  (tfirst list))
-(defun tcdr (list)
-  "Return all but the first object in a TLIST."
-  (declare (type tlist list))
-  (trest list))
+(optimize-for-transaction*
+ (:inline t)
+ (defun tcdr (list)
+   "Return all but the first object in a TLIST."
+   (declare (type tlist list))
+   (trest list)))
 
 
-(defun (setf tcar) (value cons)
-  "Set VALUE as the first element in a TCONS or non-null TLIST.
+(optimize-for-transaction*
+ (:inline t)
+ (defun (setf tcar) (value cons)
+   "Set VALUE as the first element in a TCONS or non-null TLIST.
 This function should always be executed inside an STMX atomic block."
-  (declare (type tcons cons))
-  (setf (tcons-first cons) value))
+   (declare (type tcons cons))
+   (setf (tcons-first cons) value)))
 
-(defun (setf tcdr) (value cons)
+(optimize-for-transaction*
+ (:inline t)
+ (defun (setf tcdr) (value cons)
    "Set VALUE as the rest element in a TCONS or non-null TLIST.
 This function should always be executed inside an STMX atomic block."
-  (declare (type tcons cons))
-  (setf (tcons-rest cons) value))
+   (declare (type tcons cons))
+   (setf (tcons-rest cons) value)))
 
 
 

@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -85,12 +85,16 @@ bmap-count must be the actual nodes count, root must be black."
   nil)
 
 
-(def-test new-rbmap (:compile-at :definition-time)
-  (let1 m (new 'rbmap :pred 'fixnum<)
+(defun test-new-rbmap-class (class-name)
+  (declare (type symbol class-name))
+  (let1 m (new class-name :pred 'fixnum<)
     (is-true (gmap-empty? m))
     (is (= 0 (gmap-count m)))
     (do-gmap (key value) m
       (fail "unexpected entry ~A = ~A in empty rbmap" key value))))
+
+(def-test new-rbmap (:compile-at :definition-time)
+  (test-new-rbmap-class 'rbmap))
 
 
 

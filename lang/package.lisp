@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -23,6 +23,8 @@
 
   (:export #:define-global    #:define-constant-once
 
+           #:do-tree
+           #:stringify    #:concat-symbols
            #:with-gensym  #:with-gensyms
            #:eval-always  #:new          #:let1
            #:when-bind    #:awhen

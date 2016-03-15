@@ -26,6 +26,10 @@
 
 ========== DONE ==========
 
+23) fix sb-transaction/x86-64-insts.lisp to work with both sbcl >= 1.3.2 and older ones
+
+22) fix (disassemble (lambda () (sb-transaction:transaction-begin)))
+
 21) removed method override on SHARED-INITIALIZE (not allowed by CLOS MOP standard),
     overridden instead INITIALIZE-INSTANCE and REINITIALIZE-INSTANCE.
 

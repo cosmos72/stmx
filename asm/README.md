@@ -3,7 +3,7 @@ SB-TRANSACTION
 
 Summary
 -------
-SB-TRANSACTION is a SBCL plugin for the x86-64 family of CPUs.
+STMX.ASM is a library to use hardware memory transactions on x86 and x86-64 SBCL.
 
 It defines regular, easy to use Common Lisp functions to start, commit, abort
 and test hardware memory transactions, exploiting a set of new CPU instructions
@@ -18,12 +18,12 @@ to use hardware memory transactions:
   with locking code that already uses atomic compare-and-swap
   instructions LOCK CMPXCHG and LOCK CMPXCHG8B.
 
-The current implementation of SB-TRANSACTION only knowns about RTM.
+The current implementation of STMX.ASM only knowns about RTM.
 
 
 Supported systems
 -----------------
-Due to its nature, SB-TRANSACTION is highly dependent on specific hardware and software:
+Due to its nature, STMX.ASM is highly dependent on specific hardware and software:
 
 - It can be **compiled** only with SBCL on a x86-64 CPU.
 
@@ -51,15 +51,15 @@ is technically possibile but this version currently supports only native 64-bit 
 Installation and loading
 ------------------------
 
-SB-TRANSACTION is currently packaged together with [STMX](https://github.com/cosmos72/stmx.git),
+STMX.ASM is currently packaged together with [STMX](https://github.com/cosmos72/stmx.git),
 a high-performance Common Lisp library that implements transactional memory in software.
 
 It can be used by itself, yet the author's objective is to provide
-SB-TRANSACTION as a foundation for STMX and possible third-party libraries
+STMX.ASM as a foundation for STMX and possible third-party libraries
 to exploit hardware support and improve the performance of transactional memory
 libraries beyond the possibilities of software-only solutions.
 
-SB-TRANSACTION is available from GitHub. The simplest way to install it
+STMX.ASM is available from GitHub. The simplest way to install it
 is to first install [Quicklisp](http://www.quicklisp.org), then download it
 into your Quicklisp local-projects folder. Open a shell and run the commands:
 
@@ -72,12 +72,12 @@ then load a REPL and run:
     ;; lots of output...
     CL-USER> (use-package :stmx)
      
-If all goes well, it will automatically load both SB-TRANSACTION and STMX,
-as well as STMX dependencies (SB-TRANSACTION has no dependencies).
+If all goes well, it will automatically load both STMX.ASM and STMX,
+as well as STMX dependencies (STMX.ASM has no dependencies).
 
 Note: a stable version of STMX can be downloaded directly from Quicklisp with
 `(ql:quickload "stmx")` without going through GitHub. Such version does **NOT**
-contain SB-TRANSACTION yet. 
+contain STMX.ASM yet. 
 
 
 ### Troubleshooting
@@ -148,7 +148,7 @@ On such a machine, hardware transaction-based code is just regular Lisp code:
 Basic usage
 -----------
 
-SB-TRANSACTION offers the following Lisp functions, also documented
+STMX.ASM offers the following Lisp functions, also documented
 in the sources - remember `(describe 'some-symbol)` at REPL.
 
 - `TRANSACTION-SUPPORTED-P` is a function returning T if the CPU supports 
@@ -199,7 +199,7 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
 Examples
 --------
 
-Since SB-TRANSACTIONS is a low-level library, short examples are necessarily limited
+Since STMX.ASMS is a low-level library, short examples are necessarily limited
 to very simple tasks.
 
 For example, a macro that tries to transactionally swap two memory locations (places) could
@@ -257,11 +257,11 @@ The author will also try to answer support requests, but gives no guarantees.
 Status
 ------
 
-As of June 2013, SB-TRANSACTION is being written by Massimiliano Ghilardi
+As of June 2013, STMX.ASM is being written by Massimiliano Ghilardi
 and is considered by the author to be stable.
 
 Legal
 -----
 
-SB-TRANSACTION is released under the terms of the [Lisp Lesser General Public
+STMX.ASM is released under the terms of the [Lisp Lesser General Public
 License](http://opensource.franz.com/preamble.html), known as the LLGPL.

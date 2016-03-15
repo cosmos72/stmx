@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; this file is part of stmx.
-;; copyright (c) 2013-2014 Massimiliano Ghilardi
+;; copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; this library is free software: you can redistribute it and/or
 ;; modify it under the terms of the lisp lesser general public license
@@ -252,24 +252,21 @@ Increment +gv+ and return its new value."
 (defmacro gv5/get-nohw-counter ()
   "This is GV5 implementation of GLOBAL-CLOCK/GET-NOHW-COUNTER.
 Return the number of software-only transaction commits currently running."
-  `(get-atomic-place (gv156-nohw-counter +gv+)))
+  `(get-atomic-place (gv156-nohw-counter +gv+)
+                      #?-fast-atomic-counter (atomic-counter-mutex +gv+)))
 
 
 (defmacro gv5/incf-nohw-counter (&optional (delta +global-clock-nohw-delta+))
   "This is GV5 implementation of GLOBAL-CLOCK/INCF-NOHW-COUNTER.
 Increment by DELTA the slot NOHW-COUNTER of +gv+ and return its new value."
-  `(incf-atomic-place (gv156-nohw-counter +gv+)
-                      ,delta
-                      #?-fast-atomic-counter :place-mutex
+  `(incf-atomic-place (gv156-nohw-counter +gv+) ,delta
                       #?-fast-atomic-counter (atomic-counter-mutex +gv+)))
 
 
 (defmacro gv5/decf-nohw-counter (&optional (delta +global-clock-nohw-delta+))
   "This is GV5 implementation of GLOBAL-CLOCK/DECF-NOHW-COUNTER.
 Decrement by DELTA the slot NOHW-COUNTER of +gv+ and return its new value."
-  `(incf-atomic-place (gv156-nohw-counter +gv+)
-                      (- ,delta)
-                      #?-fast-atomic-counter :place-mutex
+  `(incf-atomic-place (gv156-nohw-counter +gv+) (- ,delta)
                       #?-fast-atomic-counter (atomic-counter-mutex +gv+)))
 
 

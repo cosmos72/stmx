@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -18,15 +18,54 @@
 
 ;;;; * Miscellaneous macros
 
+(defun visit-tree (function tree &optional result)
+  (let ((function (coerce function 'function)))
+    (labels ((%visit-tree (tree)
+               (dolist (e tree)
+                 (if (consp e)
+                     (%visit-tree e)
+                     (funcall function e)))))
+      (%visit-tree tree)
+      result)))
+  
+
+(defmacro do-tree ((atom tree &optional result) &body body)
+  "Execute BODY for each atom inside TREE"
+  `(visit-tree (lambda (,atom) ,@body) ,tree ,result))
+
+
+(defun stringify (&rest things)
+  "Print the things to a string and return it"
+  (let ((s (make-array 0 :element-type 'character :adjustable t :fill-pointer 0))
+        (*print-array*    t)
+        (*print-base*     10)
+        (*print-escape*   nil)
+        (*print-gensym*   nil)
+        (*print-pretty*   nil)
+        (*print-radix*    nil)
+        (*print-readably* nil))
+    (do-tree (thing things s)
+      (format s "~A" thing))))
+
+(defun concat-symbols (&rest things)
+  "Print the things to a string, the convert the string into a symbol interned in current package.
+Return the symbol"
+  (values (intern (apply #'stringify things) *package*)))
+
+
+
 (defmacro with-gensym (name &body body)
-  `(let ((,name (gensym (symbol-name ',name))))
-     ,@body))
+  (let ((sym (if (consp name) (first name) name))
+        (str (if (consp name) `(stringify ,@(rest name) '-) (stringify name '-))))
+    `(let ((,sym (gensym ,str)))
+       ,@body)))
 
 (defmacro with-gensyms ((&rest names) &body body)
-  `(let ,(loop for name in names collect `(,name (gensym (symbol-name ',name))))
+  `(let ,(loop for name in names
+            for sym = (if (consp name) (first name) name)
+            for str = (if (consp name) `(stringify ,@(rest name) '-) (stringify name '-))
+            collect `(,sym (gensym ,str)))
      ,@body))
-
-
 
 ;;;; ** A minimal clean-room reimplementation of some macros found in ARNESI
 

@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -47,7 +47,7 @@
   (declare (ignore other-keys))
 
   (setf (_ hash aref-fun)     #'tsvref
-        (_ hash set-aref-fun) #'(setf tsvref)))
+        (_ hash set-aref-fun) #'set-tsvref)) ;; (setf tsvref) has a defsetf expansion :(
 
 
 

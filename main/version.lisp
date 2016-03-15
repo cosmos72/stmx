@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; this file is part of stmx.
-;; copyright (c) 2013-2014 Massimiliano Ghilardi
+;; copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; this library is free software: you can redistribute it and/or
 ;; modify it under the terms of the lisp lesser general public license
@@ -18,7 +18,7 @@
 ;;;; ** constants
 
 (declaim (type cons *stmx-version*))
-(defparameter *stmx-version* '(2 0 2))
+(defparameter *stmx-version* '(2 0 5))
 
 
 (defun stmx-internal-error (datum &rest arguments)

@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; this file is part of stmx.
-;; copyright (c) 2013-2014 Massimiliano Ghilardi
+;; copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; this library is free software: you can redistribute it and/or
 ;; modify it under the terms of the lisp lesser general public license
@@ -126,6 +126,17 @@ and are later committed to memory if the transaction completes successfully."
 
 
 
+;;;; ** Current hardware transaction log
+
+(declaim (type version-type *hw-tlog-write-version*))
+(defvar *hw-tlog-write-version* +invalid-version+)
+
+(defmacro hw-tlog-write-version ()
+  "Return the WRITE-VERSION for the current hardware transaction"
+  '*hw-tlog-write-version*)
+
+
+
 
 
 
@@ -153,11 +164,24 @@ while it is normally disabled in these cases:
      ,@body))
 
 
+(declaim (inline hw-transaction?))
+(defun hw-transaction? ()
+  "Return true if inside a hardware transaction."
+  #?+hw-transactions
+  (/= +invalid-version+ (hw-tlog-write-version))
+  #?-hw-transactions
+  nil)
+
+(declaim (inline sw-transaction?))
+(defun sw-transaction? ()
+  "Return true if inside a software transaction."
+  (recording?))
+  
+
 (declaim (inline transaction?))
 (defun transaction? ()
   "Return true if inside a software or hardware transaction."
-  (or (hw-transaction-supported-and-running?)
-      *record-to-tlogs*))
+  (or (hw-transaction?) (sw-transaction?)))
 
 
 
@@ -192,13 +216,12 @@ inside TOBJs slots while executing BODY."
 (defvar *tlog* nil
   "The current transaction log.")
 
-(declaim (inline current-tlog))
-(defun current-tlog ()
-  "Return the current transaction log"
-  *tlog*)
+(defmacro current-tlog ()
+  "Return the current software transaction log"
+  '*tlog*)
 
 (defmacro with-tlog (log &body body)
-  "Use LOG as the current transaction log while executing BODY."
+  "Use LOG as the current software transaction log while executing BODY."
   `(let1 *tlog* ,log
      ,@body))
 
@@ -209,21 +232,8 @@ to TLOGs while executing BODY."
      (with-recording
        ,@body)))
 
-
-;;;; ** Current hardware transaction log
-
-(declaim (type version-type *hw-tlog-write-version*))
-(defvar *hw-tlog-write-version* +invalid-version+)
-
-(defmacro hw-tlog-write-version ()
-  "Return the WRITE-VERSION for the current hardware transaction"
-  '*hw-tlog-write-version*)
-
-
-
 (eval-when (:load-toplevel :execute)
   (save-thread-initial-bindings *tlog* *record-to-tlogs* *hide-tvars* *hw-tlog-write-version*))
-
 
 
 ;;;; ** Retrying

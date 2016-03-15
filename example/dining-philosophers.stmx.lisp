@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -66,7 +66,7 @@
   ;; use a normal (non-transactional) counter to keep track
   ;; of retried transactions for demonstration purposes.
   (decf (the fixnum (cdr plate)))
-   
+
   (let ((hunger -1) ;; unknown
         (free t)
         (busy +unbound-tvar+))
@@ -96,8 +96,11 @@
 
 
   ;; NOTE: this simpler version works too, but allocates a closure at each iteration:
-  ;; (loop until (zerop (the fixnum (atomic (philosopher-eats fork1 fork2 plate)))))
 
+  #-(and)
+  (loop until (zerop (the fixnum (atomic (fast-philosopher-eats fork1 fork2 plate)))))
+  
+  #+(and)
   (let1 lambda-philosopher-eats
         (lambda () (fast-philosopher-eats fork1 fork2 plate))
     (loop until (zerop (the fixnum (run-atomic lambda-philosopher-eats))))))

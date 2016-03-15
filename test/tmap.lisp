@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -91,7 +91,8 @@
 
   
 #?+bt/make-thread
-(defun test-tmap-threads (&key (thread-pairs 4) (iterations 10000))
+(defun test-tmap-threads (&key (thread-pairs 4)
+			    (iterations #+x86-64 1000 #-x86-64 100))
   (declare (type fixnum thread-pairs iterations))
 
   (start-multithreading)

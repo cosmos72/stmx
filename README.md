@@ -60,29 +60,39 @@ Supported systems
 STMX is currently tested on the following Common Lisp implementations:
 
 * [SBCL](http://sbcl.org/)
-  * version 1.2.10      (x86_64)   on Debian GNU/Linux jessie (x86_64)
-  * version 1.1.15      (x86_64)   on Debian GNU/Linux jessie (x86_64)
-  * version 1.1.14      (x86)      on Debian GNU/Linux jessie (x86_64)
-  * version 1.2.8       (armhf)    on Debian GNU/Linux wheezy (armhf) inside Qemu
-  * version 1.1.15      (powerpc)  on Debian GNU/Linux jessie (powerpc) inside Qemu
-  * version 1.2.7       (x86_64)   on Windows 7               (x86_64)
+  * version 1.3.3       (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.3.2       (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.3.1       (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.2.10      (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.1.15      (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.1.14      (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.2.6       (x86)      on Debian GNU/Linux stretch (x86_64)
+  * version 1.1.14      (x86)      on Debian GNU/Linux stretch (x86_64)
+  * version 1.2.8       (armhf)    on Debian GNU/Linux wheezy  (armhf) inside Qemu
+  * version 1.1.15      (powerpc)  on Debian GNU/Linux stretch (powerpc) inside Qemu
+  * version 1.2.7       (x86_64)   on Windows 7                (x86_64)
   
 * [ABCL](http://www.abcl.org/)
-  * version 1.3.1 with OpenJDK 7u75 (x86_64) on Debian GNU/Linux jessie (x86_64)
+  * version 1.3.3 with OpenJDK 7u91 (x86_64) on Debian GNU/Linux stretch (x86_64)
+  * version 1.3.2 with OpenJDK 7u91 (x86_64) on Debian GNU/Linux stretch (x86_64)
+  * version 1.3.1 with OpenJDK 7u91 (x86_64) on Debian GNU/Linux stretch (x86_64)
+  * version 1.2.1 with OpenJDK 7u91 (x86_64) on Debian GNU/Linux stretch (x86_64)
   
 * [CCL](http://ccl.clozure.com/)
-  * version 1.10        (x86_64)   on Debian GNU/Linux jessie (x86_64)
-  * version 1.10        (x86)      on Debian GNU/Linux jessie (x86_64)
-  * version 1.10        (linuxarm) on Debian GNU/Linux wheezy (armhf) inside Qemu
-  * version 1.9-r15761  (linuxppc) on Debian GNU/Linux wheezy (powerpc) inside Qemu
+  * version 1.11        (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.10        (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.11        (x86)      on Debian GNU/Linux stretch (x86_64)
+  * version 1.10        (x86)      on Debian GNU/Linux stretch (x86_64)
+  * version 1.10        (linuxarm) on Debian GNU/Linux wheezy  (armhf) inside Qemu
+  * version 1.9-r15761  (linuxppc) on Debian GNU/Linux wheezy  (powerpc) inside Qemu
 
 * [CLISP](http://www.clisp.org/)
-  * version 2.49        (x86_64)   on Debian GNU/Linux jessie (x86_64)
+  * version 2.49        (x86_64)   on Debian GNU/Linux stretch (x86_64)
     (lacks multi-threading)
   
 * [CMUCL](http://www.cons.org/cmucl/)
-  * version 20e Unicode (x86)      on Debian GNU/Linux jessie (x86_64)
-  * version 20d Unicode (x86)      on Debian GNU/Linux jessie (x86_64)
+  * version 20e Unicode (x86)      on Debian GNU/Linux stretch (x86_64)
+  * version 20d Unicode (x86)      on Debian GNU/Linux stretch (x86_64)
   
   CMUCL must be started with the command line options "-fpu" "x87"
   to run STMX reliably, see [doc/supported-systems.md](doc/supported-systems.md).
@@ -90,11 +100,18 @@ STMX is currently tested on the following Common Lisp implementations:
 ### Partially supported systems
 
 * [ECL](http://ecls.sourceforge.net/)
-  * version 15.2.21     (x86_64)   on Debian GNU/Linux jessie (x86_64)
-  * version 13.5.1      (x86_64)   on Debian GNU/Linux jessie (x86_64)
+  * version 16.0.0      (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 15.2.21     (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 13.5.1      (x86_64)   on Debian GNU/Linux stretch (x86_64)
 
-  There are known problems running STMX on ECL,
+  There are known issues running STMX on ECL,
   see [doc/supported-systems.md](doc/supported-systems.md) for details.
+
+### Unsupported systems
+
+* [CMUCL](http://www.cons.org/cmucl/)
+  * version 20f and later no longer support the command line options "-fpu" "x87"
+  needed to run STMX reliably.
 
 ### Untested systems
 
@@ -649,6 +666,11 @@ There are several ways. The easiest are:
   It internally calls the CPUID assembler instruction and returns T if hardware
   transactions are supported, or NIL if they are not.
 - Try to use them, for example by executing `(ATOMIC (HW-TRANSACTION-SUPPORTED-AND-RUNNING?))`
+  in compiled code - hardware transactions typically do not work in interpreted code.
+  Thus actually execute something like
+  `(DEFUN HW-TRANSACTION-TEST ()
+     (ATOMIC (HW-TRANSACTION-SUPPORTED-AND-RUNNING?)))
+   (HW-TRANSACTION-TEST)`
 
 ### How to use hardware transactions
 
@@ -905,8 +927,8 @@ For more performance considerations and a lot of raw numbers produced by running
 see the included files [doc/benchmark.md](doc/benchmark.md), [doc/benchmark-abcl.md](doc/benchmark-abcl.md),
 [doc/benchmark-ccl64.md](doc/benchmark-ccl64.md) and [doc/benchmark-cmucl.md](doc/benchmark-cmucl.md).
 
-The short version is: as of August 2013, on a fast consumer PC (Core i7 4770 @ 3.5GHz
-or better) with SBCL 1.1.9 or better, STMX can execute more than 39 millions
+The short version is: as of March 2015, on a fast consumer PC (Core i7 4770 @ 3.5GHz
+or better) with 64-bit SBCL 1.1.9 or better, STMX can execute more than 35 millions
 **hardware** transactions per second per CPU core, and more than 7 millions
 **software** transactions per second per CPU core.
 The second platform in terms of performance is CCL (x86_64),
@@ -916,7 +938,7 @@ using two threads, but STMX performance quickly decreases with more threads
 
 A small example with very short transactions is the [dining philosophers](example/dining-philosophers-stmx.lisp),
 with 5 reads and 5 writes to transactional memory per atomic block,
-where each CPU core runs approximately 4.4 millions software transactions
+where each CPU core runs approximately 4.5 millions software transactions
 per second - hyperthreading has very limited effects.
 
 Obviously, performance in other usage scenarios will depend on the complexity

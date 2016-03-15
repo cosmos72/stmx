@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -88,7 +88,9 @@
            #:tendp   #:tlist-length #:tnthcdr #:tnth
            #:tsecond #:tthird #:tfourth #:tfifth #:tsixth #:tseventh #:teighth #:tninth #:ttenth
            #:ttree-equal #:ttree-equal-test #:ttree-equal-test-not
-           #:tlast   #:tlist* #:make-tlist))
+           #:tlast   #:tlist* #:make-tlist
+
+           #:tacons #:tpairlis #:copy-talist #:tassoc #:trassoc))
            
 
 

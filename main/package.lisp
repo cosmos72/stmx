@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -66,12 +66,11 @@
            #:transactional-class
 
            ;; low-level API to use TVARs directly
-           #:tvar #:+unbound-tvar+
-           #:$-slot #:$ #:$-swtx #:$-hwtx #:$-notx
-	   ;; also (setf $-slot) (setf $) (setf $-swtx)
-	   ;; (setf $-hwtx) and (setf $-notx)
+           #:tvar #:+unbound-tvar+ #:$-slot #:$ 
+	   ;; also (setf $-slot) (setf $)
 
            #:bound-$? #:unbind-$
 
-           #:fast-atomic))
+           ;; helpers to optimize code
+           #:fast-atomic #:optimize-for-transaction #:optimize-for-transaction*))
 

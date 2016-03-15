@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -17,7 +17,7 @@
 
 (asdf:defsystem :stmx
   :name "STMX"
-  :version "2.0.2"
+  :version "2.0.5"
   :license "LLGPL"
   :author "Massimiliano Ghilardi"
   :description "Composable Transactional Memory"
@@ -31,16 +31,17 @@
   :components ((:static-file "stmx.asd")
 
                
-               (:module :sb-transaction
-                :components #-(and sbcl x86-64)
+               (:module :asm
+                :components #-(and sbcl (or x86 x86-64))
                             ()
-                            #+(and sbcl x86-64)
+                            #+(and sbcl (or x86 x86-64))
                             ((:file "package")
-                             (:file "compiler"     :depends-on ("package"))
-                             (:file "x86-64-insts" :depends-on ("compiler"))
-                             (:file "x86-64-vm"    :depends-on ("x86-64-insts"))
-                             (:file "cpuid"        :depends-on ("x86-64-vm"))
-                             (:file "transaction"  :depends-on ("x86-64-vm"))))
+                             (:file "compiler"        :depends-on ("package"))
+                             (:file "compiler-late"   :depends-on ("compiler"))
+                             (:file "x86-32,64-insts" :depends-on ("compiler-late"))
+                             (:file "x86-32,64-vops"  :depends-on ("x86-32,64-insts"))
+                             (:file "cpuid"           :depends-on ("x86-32,64-vops"))
+                             (:file "transaction"     :depends-on ("x86-32,64-vops"))))
 
                (:module :lang
                 :components ((:file "package")
@@ -58,7 +59,7 @@
                              (:file "hash-table"      :depends-on ("cons"))
                              (:file "print"           :depends-on ("macro"))
                              (:file "class-precedence-list" :depends-on ("macro")))
-                :depends-on (:sb-transaction))
+                :depends-on (:asm))
 
                (:module :main
                 :components ((:file "package")
@@ -69,8 +70,10 @@
                              (:file "txhash"         :depends-on ("classes"))
                              (:file "tlog"           :depends-on ("txhash"))
                              (:file "tvar"           :depends-on ("tlog"))
-                             (:file "tstruct"        :depends-on ("tvar"))
-                             (:file "tclass"         :depends-on ("tvar" "tstruct"))
+                             (:file "optimize-for"   :depends-on ("tvar"))
+                             (:file "tvar-slot"      :depends-on ("optimize-for"))
+                             (:file "tstruct"        :depends-on ("tvar-slot"))
+                             (:file "tclass"         :depends-on ("tvar-slot" "tstruct"))
                              (:file "tslot"          :depends-on ("tclass"))
                              (:file "hw-atomic"      :depends-on ("classes"))
                              (:file "commit"         :depends-on ("tvar" "hw-atomic"))
@@ -113,7 +116,7 @@
 
 (asdf:defsystem :stmx.test
   :name "STMX.TEST"
-  :version "2.0.2"
+  :version "2.0.5"
   :author "Massimiliano Ghilardi"
   :license "LLGPL"
   :description "test suite for STMX"
@@ -136,7 +139,8 @@
                              (:file "retry"          :depends-on ("package"))
                              (:file "orelse"         :depends-on ("package"))
                              (:file "accessors"      :depends-on ("atomic"))
-                             (:file "tmap"           :depends-on ("rbmap" "orelse"))))))
+                             (:file "tmap"           :depends-on ("rbmap" "orelse"))
+                             (:file "run-suite"      :depends-on ("tmap"))))))
 
 
 (defmethod asdf:perform ((op asdf:test-op) (system (eql (asdf:find-system :stmx))))

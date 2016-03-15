@@ -71,11 +71,11 @@ Benchmark results
 What follows are some timings obtained on the authors's system, and by no means they
 claim to be exact, absolute or reproducible: your mileage may vary.
 
-Date: 27 July 2013
+Date: 12 April 2015
 
 Hardware: Intel Core-i7 4770 @3.4 GHz (quad-core w/ hyper-threading), 16GB RAM
 
-Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.15 (x86_64), STMX 1.3.3
+Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.2.10 (x86_64), STMX 2.0.4
 
 
 <table>
@@ -95,99 +95,99 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.15 (x86_64), STMX 1.3.3
 
 
  <tr><td>nil       </td><td><code>nil</code></td>
-     <td>0.070</td><td>0.022</td><td>0.012</td></tr>
+     <td>0.071</td><td>0.023</td><td>0.012</td></tr>
      <!-- laptop 0.153; gv6 0.159 -->
 
  <tr><td>read-1    </td><td><code>($ v)</code></td>
-     <td>0.087</td><td>0.022</td>0.021<td></td></tr>
+     <td>0.089</td><td>0.023</td><td>0.014</td></tr>
      <!-- laptop 0.187; gv6 0.195 -->
 
  <tr><td>write-1   </td><td><code>(setf ($ v) 1)</code></td>
-     <td>0.108</td><td>0.027</td><td>0.022</td></tr>
+     <td>0.113</td><td>0.027</td><td>0.026</td></tr>
      <!-- laptop 0.277; gv6 0.257 -->
 
  <tr><td>read-write-1</td><td><code>(incf (the fixnum ($ v)))</code></td>
-     <td>0.148</td><td>0.027</td><td>0.022</td></tr>
+     <td>0.138</td><td>0.027</td><td>0.024</td></tr>
      <!-- laptop 0.339; gv6 0.596 -->
 
  <tr><td>read-write-10</td>
      <td><code>(dotimes (j 10) (incf (the fixnum ($ v))))</code></td>
-     <td>0.272</td><td>0.059</td><td>0.036</td></tr>
+     <td>0.226</td><td>0.036</td><td>0.033</td></tr>
      <!-- laptop 0.686; gv6 0.971 -->
 
  <tr><td>read-write-100</td>
      <td><code>(dotimes (j 100) (incf (the fixnum ($ v))))</code></td>
-     <td>1.399</td><td>0.409</td><td>0.196</td></tr>
+     <td>1.114</td><td>0.197</td><td>0.196</td></tr>
      <!-- laptop 3.703; gv6 4.160 -->
 
  <tr><td>read-write-1000</td>
      <td><code>(dotimes (j 1000) (incf (the fixnum ($ v))))</code></td>
-     <td>9.922</td><td>3.852</td><td>1.656</td></tr>
+     <td>9.909</td><td>1.896</td><td>1.749</td></tr>
      <!-- laptop 33.070; gv6 34.607 -->
 
  <tr><td>read-write-N</td><td>best fit of the 3 runs above</td>
      <td>(0.142+N*0.0098)</td><td>(0.0226+N*0.0036)</td><td>(0.0260+N*0.0016)</td></tr>
 
  <tr><td>orelse empty     </td><td><code>(orelse)</code></td>
-     <td>0.043</td><td>0.026</td><td>0.021</td></tr>
+     <td>0.042</td><td>0.027</td><td>0.022</td></tr>
 
  <tr><td>orelse unary     </td><td><code>(orelse ($ v))</code></td>
-     <td>0.234</td><td>0.266</td></tr>
+     <td>0.219</td><td>0.263</td><td>N/A</td></tr>
 
  <tr><td>orelse retry-1   </td><td><code>(orelse (retry) ($ v))</code></td>
-     <td>0.429</td><td>0.488</td></tr>
+     <td>0.354</td><td>0.438</td><td>N/A</td></tr>
 
  <tr><td>orelse retry-2   </td><td><code>(orelse (retry) (retry) ($ v))</code></td>
-     <td>0.601</td><td>0.674</td></tr>
+     <td>0.501</td><td>0.586</td><td>N/A</td></tr>
 
  <tr><td>orelse retry-4   </td><td><code>(orelse (retry) (retry)<br/>
                                          (retry) (retry) ($ v))</code></td>
-     <td>0.963</td><td>1.035</td></tr>
+     <td>0.781</td><td>0.872</td><td>N/A</td></tr>
 
  <tr><td>orelse retry-N   </td><td>best fit of the 3 runs above</td>
      <td>(0.248+N*0.178)</td><td>(0.308+N*0.182)</td></tr>
 
  <tr><td>tmap read-1</td>
      <td><code>(get-gmap tm 1)</code></td>
-     <td>0.236</td><td>0.175</td></tr>
+     <td>0.261</td><td>0.184</td><td>0.178</td></tr>
 
  <tr><td>tmap read-write-1</td>
      <td><code>(incf (get-gmap tm 1))</code></td>
-     <td>0.531</td><td>0.419</td></tr>
+     <td>0.558</td><td>0.419</td><td>0.409</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 10)</td>
      <td><code>(when (zerop (mod i   10)) (clear-gmap tm))<br>
                (set-gmap tm i t)</code></td>
-     <td>3.882</td><td>4.035</td></tr>
+     <td>3.232</td><td>3.706</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 100)</td>
      <td><code>(when (zerop (mod i  100)) (clear-gmap tm))<br>
                (set-gmap tm i t)</code></td>
-     <td>5.392</td><td>5.641</td></tr>
+     <td>4.669</td><td>5.249</td></tr>
 
  <tr><td>grow tmap from N to N+1 entries (up to 1000)</td>
      <td><code>(when (zerop (mod i 1000)) (clear-gmap tm))<br>
               (set-gmap tm i t)</code></td>
-     <td>6.443</td><td>6.775</td></tr>
+     <td>5.842</td><td>6.464</td></tr>
 
  <tr><td>thash read-write-1</td>
      <td><code>(incf (get-ghash th 1))</code></td>
-     <td>0.674</td><td>0.525</td></tr>
+     <td>0.956</td><td>0.566</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 10)</td>
      <td><code>(when (zerop (mod i   10)) (clear-ghash th))<br>
               (set-ghash th i t)</code></td>
-     <td>2.024</td><td>2.381</td></tr>
+     <td>1.669</td><td>1.738</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 100)</td>
      <td><code>(when (zerop (mod i  100)) (clear-ghash th))<br>
               (set-ghash th i t)</code></td>
-     <td>1.913</td><td>2.176</td></tr>
+     <td>1.224</td><td>1.400</td></tr>
 
  <tr><td>grow thash from N to N+1 entries (up to 1000)</td>
      <td><code>(when (zerop (mod i  1000)) (clear-ghash th))<br>
               (set-ghash th i t)</code></td>
-     <td>1.933</td><td>2.183</td></tr>
+     <td>1.174</td><td>1.325</td></tr>
 
  </table>
 
@@ -221,27 +221,27 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.15 (x86_64), STMX 1.3.3
 
  <tr><td>1 thread</td>
      <td><code>(dining-philosophers 1)</code></td>
-     <td>4.27</td><td>24.45</td><td>34.97</td>
+     <td>4.511</td><td>24.45</td><td>34.97</td>
      <td>50.00</td><td>68.97</td><td>14.64</td></tr>
 
  <tr><td>2 threads</td>
      <td><code>(dining-philosophers 2)</code></td>
-     <td>7.77</td><td>9.46</td><td>11.48</td>
+     <td>8.150</td><td>9.46</td><td>11.48</td>
      <td>26.44</td><td>56.92</td><td>11.43</td></tr>
 
  <tr><td>3 threads</td>
      <td><code>(dining-philosophers 3)</code></td>
-     <td>11.37</td><td>9.67</td><td>10.40</td>
+     <td>11.86</td><td>9.67</td><td>10.40</td>
      <td>30.33</td><td>51.62</td><td>9.48</td></tr>
 
  <tr><td>4 threads</td>
      <td><code>(dining-philosophers 4)</code></td>
-     <td>14.87</td><td>11.83</td><td>13.84</td>
+     <td>15.48</td><td>11.83</td><td>13.84</td>
      <td>32.05</td><td>44.98</td><td>14.24</td></tr>
 
  <tr><td>5 threads</td>
      <td><code>(dining-philosophers 5)</code></td>
-     <td>14.64</td><td>13.05</td><td>15.16</td>
+     <td>13.72</td><td>13.05</td><td>15.16</td>
      <td>32.38</td><td>63.13</td><td>18.59</td></tr>
 
  <tr><td>6 threads</td>
@@ -256,7 +256,7 @@ Software: Debian GNU/Linux 7.0 (x86_64), SBCL 1.1.15 (x86_64), STMX 1.3.3
 
  <tr><td>8 threads</td>
      <td><code>(dining-philosophers 8)</code></td>
-     <td>15.43</td><td>13.59</td><td>14.15</td>
+     <td>15.79</td><td>13.59</td><td>14.15</td>
      <td>47.90</td><td>102.11</td><td>23.55</td></tr>
 
  <tr><td>10 threads</td>

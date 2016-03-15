@@ -1,7 +1,7 @@
 ;; -*- lisp -*-
 
 ;; This file is part of STMX.
-;; Copyright (c) 2013-2014 Massimiliano Ghilardi
+;; Copyright (c) 2013-2016 Massimiliano Ghilardi
 ;;
 ;; This library is free software: you can redistribute it and/or
 ;; modify it under the terms of the Lisp Lesser General Public License
@@ -22,20 +22,24 @@
 
 (defconstant +hw-atomic-max-attempts+ 10)
 
-(defmacro %hw-atomic2 ((&optional tvar-write-version &key err
-                                  (test-for-running-tx? t)
-                                  (update-stat :hwtx))
+(defmacro %hw-atomic2 ((&key hw-write-version err
+                             (test-for-running-tx? t)
+                             (update-stat :hwtx))
                        body fallback)
   "Run BODY in a hardware memory transaction.
 If the transaction aborts, retry it as long as it has chances to succeed.
-If it has no chances to succeed, execute FALLBACK."
+If it has no chances to succeed, execute FALLBACK.
+Warning: if a transaction is already running, execute BODY inside it"
 
-  (let ((tvar-write-version (or tvar-write-version (gensym (symbol-name 'tvar-write-version))))
+  (let ((tvar-write-version (or hw-write-version (gensym (symbol-name 'tvar-write-version))))
         (err (or err (gensym (symbol-name 'err)))))
     
     (with-gensyms (tx-begin tx-fallback attempts)
       `(cond
-         ,@(if test-for-running-tx? `(((transaction?) ,body)) `())
+         ,@(if test-for-running-tx?
+               `(((hw-transaction?) (with-hwtx ,body))
+                 ((sw-transaction?) (with-swtx ,body)))
+               `())
          (t
           (prog ((,err 0)
                  (,attempts +hw-atomic-max-attempts+)
@@ -61,7 +65,7 @@ If it has no chances to succeed, execute FALLBACK."
 
                  (return ;; returns from (prog ...)
                    (multiple-value-prog1
-                       ,body
+                       (with-hwtx ,body)
                      (hw-transaction-end)
                      ,(if (eq update-stat :swtx)
                           `(global-clock/sw/stat-committed)
@@ -81,9 +85,9 @@ If it has no chances to succeed, execute FALLBACK."
                ,fallback)))))))
 
 
-(defmacro hw-atomic2 ((&optional tvar-write-version &key err
-                                 (test-for-running-tx? t)
-                                 (update-stat :hwtx))
+(defmacro hw-atomic2 ((&key hw-write-version err
+                            (test-for-running-tx? t)
+                            (update-stat :hwtx))
                      &optional (body nil body?) fallback)
   "Run BODY in a hardware memory transaction. All changes to transactional memory
 will be visible to other threads only after BODY returns normally (commits).
@@ -95,9 +99,11 @@ threads.
 If hardware memory transaction aborts for a conflict, rerun it.
 If it fails for some other reason, execute FALLBACK."
   (if body?
-      `(%hw-atomic2 (,tvar-write-version :err ,err :test-for-running-tx? ,test-for-running-tx?
-                                         :update-stat ,update-stat)
-                   ,body ,fallback)
+      `(%hw-atomic2 (:hw-write-version ,hw-write-version :err ,err
+                                       :test-for-running-tx? ,test-for-running-tx?
+                                       :update-stat ,update-stat)
+                    ,body
+                    ,fallback)
       `(values)))
 
 

@@ -90,7 +90,7 @@ the scenes the slots will be stored in transactional memory implemented by tvars
   (the fixnum (tvar-id var)))
 
 
-(declaim (ftype (function (#-ecl tvar #+ecl t) t) raw-value-of)
+(declaim (ftype (function (#-ecl tvar #+ecl t) (values t &optional)) raw-value-of)
          (inline raw-value-of))
 
 (defun raw-value-of (var)
@@ -105,9 +105,10 @@ for debugging purposes. please use ($-slot var) instead."
 
 
 
-(declaim (ftype (function (tvar) (values atomic-counter-num t)) %tvar-version-and-value)
+(declaim (ftype (function (tvar) (values atomic-counter-num t &optional))
+                %tvar-version-and-value)
          (inline
-           %tvar-version-and-value))
+          %tvar-version-and-value))
 
 (defun %tvar-version-and-value (var)
   "Internal function used only by TVAR-VALUE-AND-VERSION-OR-FAIL."
@@ -130,7 +131,7 @@ for debugging purposes. please use ($-slot var) instead."
 
 
 
-(declaim (ftype (function (tvar) (values t atomic-counter-num bit))
+(declaim (ftype (function (tvar) (values t atomic-counter-num bit &optional))
 		tvar-value-and-version-or-fail)
          (inline
            tvar-value-and-version-or-fail))
@@ -212,7 +213,7 @@ for debugging purposes. please use ($-slot var) instead."
 
 
 
-(declaim (ftype (function (tvar t atomic-counter-num) (values t))
+(declaim (ftype (function (tvar t atomic-counter-num) (values t &optional))
 		set-tvar-value-and-version)
          (inline
            set-tvar-value-and-version))
@@ -245,8 +246,8 @@ also set it (which may unlock VAR!). Return VALUE."
 
 ;;;; ** Locking and unlocking
 
-(declaim (ftype (function (tvar)        boolean) try-lock-tvar)
-         (ftype (function (tvar)        null)    unlock-tvar)
+(declaim (ftype (function (tvar)  (values boolean &optional)) try-lock-tvar)
+         (ftype (function (tvar)  (values null    &optional)) unlock-tvar)
          (inline
            try-lock-tvar unlock-tvar))
 

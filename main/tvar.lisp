@@ -23,38 +23,12 @@
   (the tvar
     (make-tvar :value value :id (tvar-id/next))))
 
-(declaim (ftype (function (#-ecl tvar #+ecl t) t) $)
-         (ftype (function (t tvar) t) (setf $)))
-         
 
-;;;; ** Signalling unbound variables
-
-(defun unbound-tvar-error (var)
-  "Signal an unbound-slot error and allow the user to continue by specifying or storing a value."
-  (declare (type tvar var))
-  (restart-case (error 'unbound-slot :instance var :name 'value)
-    (use-value (value)
-      :report "Specify a value to use."
-      :interactive (lambda ()
-                     (format t "~&Value to use: ")
-                     (list (eval (read))))
-      value)
-    (store-value (value)
-      :report "Specify a value to use and store."
-      :interactive (lambda ()
-                     (format t "~&Value to use and store: ")
-                     (list (eval (read))))
-      (setf ($ var) value)
-      value)))
-
-  
 ;;;; ** Reading and writing
 
 
-
-(declaim (ftype (function (t tvar) t)           (setf raw-value-of))
-         (notinline
-           (setf raw-value-of)))
+(declaim (ftype (function (t tvar) (values t &optional)) (setf raw-value-of))
+         (notinline (setf raw-value-of)))
 
 (defun (setf raw-value-of) (value var)
   "Set the VALUE of VAR. Return VALUE.
@@ -68,8 +42,6 @@ for debugging purposes. Use (SETF ($-SLOT VAR) VALUE) or (SETF ($ VAR) VALUE) in
 
   
   
-
-
 (defun tx-read-of (var log)
   "If VAR's value is stored in writes of transaction LOG, return the stored value.
 Otherwise, validate VAR version, add VAR into the reads of transaction LOG,
@@ -232,7 +204,15 @@ Works ONLY outside memory transactions."
   `(recording?))
 
 
-(declaim (inline $))
+;; finally, the two core functions to read/write TVARs:
+;; ($ TVAR) AND (SETF ($ TVAR) VALUE)
+
+(declaim (ftype (function (#-ecl tvar #+ecl t) (values t &optional)) $)
+         (ftype (function (tvar t) (values t &optional)) set-$)
+         (inline $)
+         (notinline set-$))
+
+
 (defun $ (var)
   "Get the value from the transactional variable VAR and return it.
 Return +unbound-tvar+ if VAR is not bound to a value.
@@ -254,7 +234,6 @@ and to check for any value stored in the log."
                
 ;; WITH-TX uses macrolet, which cannot bind names like (setf ...)
 ;; thus we use define set-$ and create a setf-expander on $
-(declaim (notinline set-$))
 (defun set-$ (var value)
   "Store VALUE inside transactional variable VAR and return VALUE.
 
@@ -281,8 +260,9 @@ During transactions, it uses transaction log to record the value."
 
 ;;;; ** Locking and unlocking
 
-(declaim (ftype (function (tvar t tlog) boolean) tvar-valid-and-unlocked?
-                #||#                             tvar-valid-and-own-or-unlocked?)
+(declaim (ftype (function (tvar t tlog) (values boolean &optional))
+                tvar-valid-and-unlocked?
+                tvar-valid-and-own-or-unlocked?)
          (inline
            tvar-valid-and-unlocked?
            tvar-valid-and-own-or-unlocked?))
@@ -387,6 +367,27 @@ if VAR changes."
         (notify-tlog log var)))))
 
 
+;;;; ** Signalling unbound variables
+
+(defun unbound-tvar-error (var)
+  "Signal an unbound-slot error and allow the user to continue by specifying or storing a value."
+  (declare (type tvar var))
+  (restart-case (error 'unbound-slot :instance var :name 'value)
+    (use-value (value)
+      :report "Specify a value to use."
+      :interactive (lambda ()
+                     (format t "~&Value to use: ")
+                     (list (eval (read))))
+      value)
+    (store-value (value)
+      :report "Specify a value to use and store."
+      :interactive (lambda ()
+                     (format t "~&Value to use and store: ")
+                     (list (eval (read))))
+      (setf ($ var) value)
+      value)))
+
+  
 ;;;; ** Printing
 
 (defprint-object (var tvar :identity nil)

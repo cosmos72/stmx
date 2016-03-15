@@ -70,7 +70,7 @@
   (sb-disassem:define-instruction-format (xbegin
 					  48 :default-printer '(:name :tab label))
       (op  :fields (list (byte 8 0) (byte 8 8)) :value '(#xc7 #xf8))
-    (label :field (byte 32 16) :type 'displacement))
+    (label :field (byte 32 16) :type '#.(stmx.asm:find-symbol* 'displacement)))
   
 
   (sb-disassem:define-instruction-format (xabort

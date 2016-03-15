@@ -60,10 +60,13 @@ Supported systems
 STMX is currently tested on the following Common Lisp implementations:
 
 * [SBCL](http://sbcl.org/)
+  * version 1.3.3       (x86_64)   on Debian GNU/Linux stretch (x86_64)
   * version 1.3.2       (x86_64)   on Debian GNU/Linux stretch (x86_64)
   * version 1.3.1       (x86_64)   on Debian GNU/Linux stretch (x86_64)
   * version 1.2.10      (x86_64)   on Debian GNU/Linux stretch (x86_64)
   * version 1.1.15      (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.1.14      (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.2.6       (x86)      on Debian GNU/Linux stretch (x86_64)
   * version 1.1.14      (x86)      on Debian GNU/Linux stretch (x86_64)
   * version 1.2.8       (armhf)    on Debian GNU/Linux wheezy  (armhf) inside Qemu
   * version 1.1.15      (powerpc)  on Debian GNU/Linux stretch (powerpc) inside Qemu
@@ -76,7 +79,9 @@ STMX is currently tested on the following Common Lisp implementations:
   * version 1.2.1 with OpenJDK 7u91 (x86_64) on Debian GNU/Linux stretch (x86_64)
   
 * [CCL](http://ccl.clozure.com/)
+  * version 1.11        (x86_64)   on Debian GNU/Linux stretch (x86_64)
   * version 1.10        (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.11        (x86)      on Debian GNU/Linux stretch (x86_64)
   * version 1.10        (x86)      on Debian GNU/Linux stretch (x86_64)
   * version 1.10        (linuxarm) on Debian GNU/Linux wheezy  (armhf) inside Qemu
   * version 1.9-r15761  (linuxppc) on Debian GNU/Linux wheezy  (powerpc) inside Qemu
@@ -99,14 +104,13 @@ STMX is currently tested on the following Common Lisp implementations:
   * version 15.2.21     (x86_64)   on Debian GNU/Linux stretch (x86_64)
   * version 13.5.1      (x86_64)   on Debian GNU/Linux stretch (x86_64)
 
-  There are known problems running STMX on ECL,
+  There are known issues running STMX on ECL,
   see [doc/supported-systems.md](doc/supported-systems.md) for details.
 
 ### Unsupported systems
 
 * [CMUCL](http://www.cons.org/cmucl/)
-  
-  CMUCL 20f no longer supports the command line options "-fpu" "x87"
+  * version 20f and later no longer support the command line options "-fpu" "x87"
   needed to run STMX reliably.
 
 ### Untested systems

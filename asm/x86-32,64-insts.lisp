@@ -86,18 +86,6 @@
 
 ;;;; ** low-level: assemble machine-language instructions
 
-(defun emit-dword-displacement-backpatch (segment target)
-  (sb-vm::emit-back-patch segment
-   4
-   (lambda (segment posn)
-     (let ((disp (- (sb-vm::label-position target) (+ 4 posn))))
-       (sb-int:aver (<= #x-80000000 disp #x7fffffff))
-       (sb-vm::emit-byte segment (ldb (byte 8  0) disp))
-       (sb-vm::emit-byte segment (ldb (byte 8  8) disp))
-       (sb-vm::emit-byte segment (ldb (byte 8 16) disp))
-       (sb-vm::emit-byte segment (ldb (byte 8 24) disp))))))
-                     
-
 ;; if instructions are already defined (for example in SBCL core),
 ;; do not overwrite them: we risk redefining them WITHOUT :printer
 
@@ -116,6 +104,21 @@
 
 
 ;;; ** RTM - restricted memory transaction
+
+#-#.(stmx.asm::compile-if-instruction-defined 'xbegin)
+(defun emit-dword-displacement-backpatch (segment target &optional (n-extra 0))
+  ;; N-EXTRA is how many more instruction bytes will follow, to properly compute
+  ;; the displacement from the beginning of the next instruction to TARGET.
+  (sb-vm::emit-back-patch segment
+   4
+   (lambda (segment posn)
+     (let ((disp (- (sb-vm::label-position target) (+ 4 posn n-extra))))
+       (sb-int:aver (<= #x-80000000 disp #x7fffffff))
+       (sb-vm::emit-byte segment (ldb (byte 8  0) disp))
+       (sb-vm::emit-byte segment (ldb (byte 8  8) disp))
+       (sb-vm::emit-byte segment (ldb (byte 8 16) disp))
+       (sb-vm::emit-byte segment (ldb (byte 8 24) disp))))))
+
 
 #-#.(stmx.asm::compile-if-instruction-defined 'xbegin)
 (sb-vm::define-instruction xbegin (segment &optional where)

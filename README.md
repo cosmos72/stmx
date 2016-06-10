@@ -60,6 +60,9 @@ Supported systems
 STMX is currently tested on the following Common Lisp implementations:
 
 * [SBCL](http://sbcl.org/)
+  * version 1.3.6       (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.3.5       (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 1.3.4       (x86_64)   on Debian GNU/Linux stretch (x86_64)
   * version 1.3.3       (x86_64)   on Debian GNU/Linux stretch (x86_64)
   * version 1.3.2       (x86_64)   on Debian GNU/Linux stretch (x86_64)
   * version 1.3.1       (x86_64)   on Debian GNU/Linux stretch (x86_64)
@@ -69,7 +72,7 @@ STMX is currently tested on the following Common Lisp implementations:
   * version 1.2.6       (x86)      on Debian GNU/Linux stretch (x86_64)
   * version 1.1.14      (x86)      on Debian GNU/Linux stretch (x86_64)
   * version 1.0.57      (x86)      on Debian GNU/Linux wheezy  (x86)
-                                      [using old Quicklisp and libraries]
+                                      [requires old Quicklisp and libraries]
   * version 1.2.8       (armhf)    on Debian GNU/Linux wheezy  (armhf) inside Qemu
   * version 1.1.15      (powerpc)  on Debian GNU/Linux stretch (powerpc) inside Qemu
   * version 1.2.7       (x86_64)   on Windows 7                (x86_64)
@@ -100,22 +103,32 @@ STMX is currently tested on the following Common Lisp implementations:
   
   CMUCL must be started with the command line options "-fpu" "x87"
   to run STMX reliably, see [doc/supported-systems.md](doc/supported-systems.md).
+  
+  Version 20f and later no longer support the command line options "-fpu" "x87"
+  and are not supported by STMX, see Unsupported systems below.
+
 
 ### Partially supported systems
 
 * [ECL](http://ecls.sourceforge.net/)
+  * version 16.1.2      (x86_64)   on Debian GNU/Linux stretch (x86_64)
   * version 16.0.0      (x86_64)   on Debian GNU/Linux stretch (x86_64)
   * version 15.2.21     (x86_64)   on Debian GNU/Linux stretch (x86_64)
   * version 13.5.1      (x86_64)   on Debian GNU/Linux stretch (x86_64)
 
-  There are known issues running STMX on ECL,
-  see [doc/supported-systems.md](doc/supported-systems.md) for details.
+  There are known issues running STMX on ECL, see
+  [Github issues](https://github.com/cosmos72/stmx/issues/4)
+
+  ECL versions 16.0.0 and 16.1.2 run STMX reliably enough for lightweight use,
+  but sometimes still hang in test suite.
+
 
 ### Unsupported systems
 
 * [CMUCL](http://www.cons.org/cmucl/)
   * version 20f and later no longer support the command line options "-fpu" "x87"
   needed to run STMX reliably.
+
 
 ### Untested systems
 

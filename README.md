@@ -90,7 +90,9 @@ STMX is currently tested on the following Common Lisp implementations:
 
 * [CLISP](http://www.clisp.org/)
   * version 2.49        (x86_64)   on Debian GNU/Linux stretch (x86_64)
-    (lacks multi-threading)
+
+  CLISP lacks multi-threading, and its builtin ASDF must be *manually* upgraded to ASDF3
+  to load STMX.
   
 * [CMUCL](http://www.cons.org/cmucl/)
   * version 20e Unicode (x86)      on Debian GNU/Linux stretch (x86_64)

@@ -131,7 +131,7 @@
          (log:trace "ipc thread ready")
 
          (loop while (eq t (ipc-command ipc))
-            do (bt:condition-wait wait-cmd lock :timeout 1))
+            do (bt:condition-wait wait-cmd lock #-ecl :timeout #-ecl 1))
 
          (let ((command (ipc-command ipc))
                (args    (ipc-args    ipc)))

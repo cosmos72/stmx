@@ -131,7 +131,7 @@
        ;; emit 32-bit, signed relative offset for where
        (emit-dword-displacement-backpatch segment where)
        ;; nowhere to jump: simply jump to the next instruction
-       (sb-vm::emit-skip segment 4 0))))
+       (sb-assem::%emit-skip segment 4 0))))
 
 
 #-#.(stmx.asm::compile-if-instruction-defined 'xend)

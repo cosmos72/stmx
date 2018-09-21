@@ -1,5 +1,5 @@
-SB-TRANSACTION
-==============
+STMX.ASM
+========
 
 Summary
 -------
@@ -25,9 +25,9 @@ Supported systems
 -----------------
 Due to its nature, STMX.ASM is highly dependent on specific hardware and software:
 
-- It can be **compiled** only with SBCL on a x86-64 CPU.
+- It can be **compiled** only with SBCL on a x86 or x86-64 CPU.
 
-- It can be **used** only with SBCL on a x86-64 CPU that actually supports Intel TSX.
+- It can be **used** only with SBCL on a x86 or x86-64 CPU that actually supports Intel TSX.
   As of February 2014, the CPUs supporting Intel TSX are:
     * Intel Core i7 4771
     * Intel Core i7 4770, 4770S, 4770T, 4770TE
@@ -37,15 +37,15 @@ Due to its nature, STMX.ASM is highly dependent on specific hardware and softwar
     
   Note: all the current Intel Core K and R models, as for example Core i7 4770K and Core i5 4670K,
   do **not** support Intel TSX.
-
+  
 Tested systems:
 * SBCL  version 1.1.14           (x86-64) on Debian GNU/Linux 7.0 (x86-64) on Intel Core i7 4770
 * SBCL  version 1.1.8            (x86-64) on Debian GNU/Linux 7.0 (x86-64) on Intel Core i7 4770
 * SBCL  version 1.1.8.60-77641d6 (x86-64) on Debian GNU/Linux 7.0 (x86-64) on Intel Core i7 4770
 * SBCL  version 1.0.57.0.debian  (x86-64) on Debian GNU/Linux 7.0 (x86-64) on Intel Core i7 4770
 
-A 32-bit version - targeting the same x86-64 CPUs running in 32-bit legacy mode -
-is technically possibile but this version currently supports only native 64-bit mode.
+The x86 version of STMX.ASM targets the same (x86-64) CPUs running in 32-bit legacy mode.
+
 
 
 Installation and loading
@@ -98,7 +98,7 @@ In case you get errors:
 
 A simple test is the following. From the REPL, run:
 
-    CL-USER> (use-package :sb-transaction)
+    CL-USER> (use-package :stmx.asm)
              (defun dummy-tx () (progn
                   (when (= (transaction-begin) +transaction-started+)
                     (transaction-end)
@@ -137,8 +137,7 @@ You can test if your CPU supports RTM with the function:
     T
 
 It will return T if RTM instructions are supported by the CPU, otherwise it will return NIL.
-Again, as of June 2013 only the Intel Core i5 4570, Core i5 4670 and Core i7 4770 do support RTM.
-On such a machine, hardware transaction-based code is just regular Lisp code:
+On such machines, hardware transaction-based code is just regular Lisp code:
 
     CL-USER> (dummy-tx)
     T
@@ -154,7 +153,8 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
 - `TRANSACTION-SUPPORTED-P` is a function returning T if the CPU supports 
   hardware memory transactions (RTM), and NIL if it does not.
   If `(transaction-supported-p)` returns NIL, invoking any of the functions below
-  has undefined consequences - usually *bad* consequences like unhandled memory faults.
+  has undefined consequences - usually *bad* consequences like SIGILL signals
+  or unhandled memory faults.
 
 - `TRANSACTION-BEGIN` starts a new transaction. It returns a fixnum
   equal to `+transaction-started+` if the transaction started successfully,
@@ -199,7 +199,7 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
 Examples
 --------
 
-Since STMX.ASMS is a low-level library, short examples are necessarily limited
+Since STMX.ASM is a low-level library, short examples are necessarily limited
 to very simple tasks.
 
 For example, a macro that tries to transactionally swap two memory locations (places) could
@@ -212,7 +212,7 @@ be written as:
           t))
 
 Please note that this example is intentionally simplified: a robust implementation
-should also handle signals and, depending on the situation, probably invoke either
+should also handle errors and, depending on the situation, probably invoke either
 (transaction-abort) or (transaction-end) before propagating the signal,
 and it should surely provide an alternative solution to perform the swap
 if the transaction aborts.

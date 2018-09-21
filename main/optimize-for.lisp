@@ -255,6 +255,19 @@ option ~S is supported only for DEFUN, not for DEFMETHOD"
 
              (declaim (inline ,mangled-name))
 
+             (,defun-or-defmethod ,mangled-name ,args
+               ,@docstrings
+               ,@declares
+               
+               (cond
+                 #?+hw-transactions
+                 ((/= +invalid-version+ (hw-tlog-write-version)) ,(call-fun :hwtx params))
+                 ((use-$-swtx?)                                  ,(call-fun :swtx params))
+                 (t                                              ,(call-fun :notx params))))
+
+             (eval-always
+               (add-optimized-fun* ',mangled-name #(,@funs ,args)))
+             
              ;; macrolet used by WITH-TX cannot bind names like (setf ...)
              ;; thus we use a mangled name
              ;; and create a setf-expander on the original name
@@ -266,22 +279,7 @@ option ~S is supported only for DEFUN, not for DEFMETHOD"
                     `((fmakunbound '(setf ,simple-name))
                       (defsetf ,simple-name ,(rest args-quoted) (,(first args-quoted))
                         ,@docstrings
-                        `(,',mangled-name ,,@params)))))
-             
-             (,defun-or-defmethod ,mangled-name ,args
-               ,@docstrings
-               ,@declares
-               
-               #?+hw-transactions
-               (when (/= +invalid-version+ (hw-tlog-write-version))
-		 (return-from ,mangled-name ,(call-fun :hwtx params)))
-
-	       (if (use-$-swtx?)
-		   ,(call-fun :swtx params)
-		   ,(call-fun :notx params)))
-
-             (eval-always
-               (add-optimized-fun* ',mangled-name #(,@funs ,args)))
+                        (list ',mangled-name ,@params)))))
              
              ',name))))))
 

@@ -54,11 +54,8 @@ To use TCONS cells, prepend T to the name of most list-manipulating functions. E
 (deftype tlist () '(or tcons null))
 
 (declaim (ftype (function (t t) (values tcons &optional)) tcons)
-         (ftype (function (#-ecl tlist #+ecl t) t) tfirst trest)
-         (notinline tcons)
-         (inline    tfirst (setf tfirst)
-                    trest  (setf trest)))
-
+         (ftype (function (#-ecl tlist #+ecl t) (values t &optional)) tfirst trest)
+         (notinline tcons))
 
 (defun tcons (first rest)
   "Create and return a new TCONS."

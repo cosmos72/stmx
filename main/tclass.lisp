@@ -95,7 +95,7 @@ Exactly analogous to TRANSACTIONAL-DIRECT-SLOT."))
 
 (defun list-classes-containing-direct-slots (direct-slots class)
   (if *recursive-call-list-classes-containing-direct-slots*
-      "error listing superclasses, recursive call to listing superclasses"
+      (error "unexpected recursive call to (stmx::list-classes-containing-direct-slots)")
       (let1 *recursive-call-list-classes-containing-direct-slots* t
         (handler-case
             (loop for superclass in (class-precedence-list class)

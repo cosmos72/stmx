@@ -18,20 +18,23 @@
 (let ((not-found (gensym (symbol-name 'not-found-))))
   (defun instruction-defined? (inst-name &optional (package-name +impl-package+))
     (block nil
-      ;; recent SBCL versions annotate lowercase instructions symbols
+      ;; recent SBCL versions annotate uppercase instructions symbols
       ;; with sb-disassem:instruction-flavors
+      ;;
+      ;; less recent SBCL versions annotate lowercase instructions symbols instead
       #+#.(stmx.asm:compile-if-symbol :sb-disassem :instruction-flavors)
-      (let* ((inst-name (string-downcase (symbol-name* inst-name)))
-             (inst (find-symbol* inst-name package-name)))
+      (let* ((inst-name (symbol-name* inst-name))
+             (inst (or (find-symbol* (string-upcase   inst-name) package-name)
+		       (find-symbol* (string-downcase inst-name) package-name))))
         (when
             (and inst
                  (not (eq not-found
                           (get inst 'sb-disassem::instruction-flavors not-found))))
           (return t)))
 
-      ;; instead old SBCL versions use hash-table sb-assem:*assem-instructions*
+      ;; finally, old SBCL versions use hash-table sb-assem:*assem-instructions*
       ;;
-      ;; but we actually don't care: on such old versions we can always
+      ;; but we actually don't care about the latter: on such old versions we can always
       ;; define CPU instructions, as we have all the necessary tools:
       ;; SB-DISASSEM:DEFINE-INSTRUCTION-FORMAT and SB-VM:DEFINE-INSTRUCTION
       #+#.(stmx.asm:compile-if-symbol :sb-assem :*assem-instructions*)

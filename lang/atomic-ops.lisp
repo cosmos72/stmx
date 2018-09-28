@@ -50,7 +50,7 @@ STMX assumes it can hold at least NIL and values of type BORDEAUX-THREADS:THREAD
 the operation completes -- the write does not occur until such time
 that no other thread modified PLACE between the read and the write.
 
-Works only on places supported by COMPARE-AND-SWAP."
+Works only on places supported by ATOMIC-COMPARE-AND-SWAP."
     #?+(symbol sb-ext atomic-push)
     `(sb-ext:atomic-push ,obj ,place)
 
@@ -70,7 +70,7 @@ Works only on places supported by COMPARE-AND-SWAP."
 the operation completes -- the write does not occur until such time
 that no other thread modified PLACE between the read and the write.
 
-Works only on places supported by COMPARE-AND-SWAP."
+Works only on places supported by ATOMIC-COMPARE-AND-SWAP."
     #?+(symbol sb-ext atomic-pop)
     `(sb-ext:atomic-pop ,place)
 

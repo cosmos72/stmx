@@ -105,10 +105,21 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
                '(sxhash-equalp si:hash-equalp))
  
  #+sbcl
- (set-features #+compare-and-swap-vops '(atomic-ops :sbcl)
-               #+memory-barrier-vops '(mem-rw-barriers :sbcl)
+ ;; on SBCL, #+compare-and-swap-vops and #+memory-barrier-vops are build artifacts
+ ;; and should not be relied upon, see https://sourceforge.net/p/sbcl/mailman/message/36413606/
+ ;; Thus check directly for the symbols we need.
+ (set-features #?+(and (symbol sb-ext word)
+                       (symbol sb-ext atomic-incf)
+                       (symbol sb-ext atomic-decf)
+                       (symbol sb-ext compare-and-swap)
+                       (or (symbol sb-ext get-cas-expansion)
+                           (and (symbol sb-ext compare-atomic-push)
+                                (symbol sb-ext compare-atomic-pop)))
+                       ) '(atomic-ops :sbcl)
 
-               ;; usually, bt/lock-owner it not needed on SBCL: the combo
+               #?+(symbol sb-thread barrier) '(mem-rw-barriers :sbcl)
+
+               ;; usually, bt/lock-owner is not needed on SBCL: the combo
                ;; ATOMIC-OPS + MEM-RW-BARRIERS provides FAST-MUTEX, which implements
                ;; its own mutex-owner, without resorting to bt/lock-owner
                '(bt/lock-owner sb-thread::mutex-owner)

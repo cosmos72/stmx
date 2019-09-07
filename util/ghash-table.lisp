@@ -142,7 +142,6 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
   (the symbol (_ hash hash-sym)))
 
 
-
 (defmacro do-ghash-pairs ((pair &optional index) hash &body body)
   "Execute BODY on each GHASH-PAIR pair contained in HASH. Return NIL."
   (with-gensyms (h vec vlen i count n end aref-fun next outer-loop inner-loop)
@@ -186,6 +185,16 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
              ,@(when value `((,value (_ ,pair value)))))
          ,@body))))
                 
+(defun map-ghash (hash func)
+  "Invoke FUNC on each key/value pair contained in HASH. Return NIL.
+FUNC must be a function accepting two arguments: key and value.
+
+Adding or removing keys from HASH during this call (even from other threads)
+has undefined consequences. Not even the current key can be removed."
+  (declare (type ghash-table hash)
+           (type function func))
+  (do-ghash (key value) hash
+    (funcall func key value)))
 
 (defun ghash-table-count (hash)
   "Return the number of KEY/VALUE entries in ghash-table HASH."

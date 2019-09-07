@@ -122,13 +122,15 @@
           (ghash-table-empty? ghash)))
   (is (= (hash-table-count hash)
          (ghash-table-count ghash)))
-  (do-ghash (k v1) ghash
-    (multiple-value-bind (v2 present) (gethash k hash)
-      (is-true present "key ~S has value ~S in GHASH-TABLE, but is missing from HASH-TABLE"
-               k v1)
-      (when present
-        (is (equalp v1 v2) "key ~S has value ~S in HASH-TABLE, but value ~S in GHASH-TABLE"
-            k v1 v2))))
+  ; also test map-ghash
+  (map-ghash ghash
+    (lambda (k v1)
+      (multiple-value-bind (v2 present) (gethash k hash)
+        (is-true present "key ~S has value ~S in GHASH-TABLE, but is missing from HASH-TABLE"
+                 k v1)
+        (when present
+          (is (equalp v1 v2) "key ~S has value ~S in HASH-TABLE, but value ~S in GHASH-TABLE"
+              k v1 v2)))))
 
   (loop for k being the hash-keys in hash using (hash-value v2) do
     (multiple-value-bind (v1 present) (get-ghash ghash k)

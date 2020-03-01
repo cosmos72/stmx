@@ -27,7 +27,7 @@
                      (funcall function e)))))
       (%visit-tree tree)
       result)))
-  
+
 
 (defmacro do-tree ((atom tree &optional result) &body body)
   "Execute BODY for each atom inside TREE"

@@ -113,7 +113,7 @@ for debugging purposes. please use ($-slot var) instead."
 (defun %tvar-version-and-value (var)
   "Internal function used only by TVAR-VALUE-AND-VERSION-OR-FAIL."
   (declare (type tvar var))
-  
+
   ;; if we have memory barriers, we MUST use them
   ;; and read version first, then value
   ;; otherwise we VIOLATE read consistency!
@@ -121,11 +121,11 @@ for debugging purposes. please use ($-slot var) instead."
   #?+mem-rw-barriers
   (values (progn (mem-read-barrier) (tvar-version var))
           (progn (mem-read-barrier) (tvar-value var)))
-        
+
   #?-mem-rw-barriers
   ;; no way to guarantee the order
   (values (tvar-version var) (tvar-value var)))
-   
+
 
 
 
@@ -148,15 +148,15 @@ for debugging purposes. please use ($-slot var) instead."
   ;; no concurrent modifications to protect against
   (multiple-value-bind (version value) (%tvar-version-and-value var)
     (values value version 0))
-  
-  
+
+
   #?+(eql tvar-lock :bit)
   ;; lock is lowest bit of tvar-version. extract and check it.
   ;; we must get version, value and version again EXACTLY in this order.
   ;; see doc/consistent-reads.md for the gory details
   (multiple-value-bind (version0+lock value) (%tvar-version-and-value var)
     (let1 version1+lock (progn (mem-read-barrier) (tvar-version var))
-      
+
       (declare (type atomic-counter-num version0+lock version1+lock))
 
       (let* ((version1 (logand version1+lock (lognot 1)))
@@ -175,7 +175,7 @@ for debugging purposes. please use ($-slot var) instead."
     (multiple-value-bind (version0 value) (%tvar-version-and-value var)
       (let ((free? (mutex-is-free? (the mutex var)))
             (version1 (tvar-version var)))
-        
+
         (declare (type boolean free?)
                  (type atomic-counter-num version0 version1))
 
@@ -258,7 +258,7 @@ also set it (which may unlock VAR!). Return VALUE."
   #?+(eql tvar-lock :single-thread)
   ;; no lock to take
   t
-  
+
   #?+(eql tvar-lock :bit)
   (let1 version (progn (mem-read-barrier) (the version-type (tvar-version var)))
     (declare (type atomic-counter-num version))
@@ -270,8 +270,8 @@ also set it (which may unlock VAR!). Return VALUE."
 
   #?+(eql tvar-lock :mutex)
   (try-acquire-mutex (the mutex var)))
-  
-  
+
+
 (defun unlock-tvar (var)
   "Unlock VAR. always return NIL."
   (declare (ignorable var))

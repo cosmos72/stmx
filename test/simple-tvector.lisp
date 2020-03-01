@@ -51,7 +51,7 @@
         (incf count))
       (is (= n count)))))
 
-      
+
 
 (def-test svref-simple-tvector (:compile-at :definition-time)
   (let* ((n 10)

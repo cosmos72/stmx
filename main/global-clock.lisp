@@ -64,7 +64,7 @@ is reserved as \"prevent HW transactions\"")
 (defconstant +gv-max-stat+ 512)
 
 
-           
+
 (declaim (type gv156 +gv+))
 (define-constant-once +gv+ (make-gv156))
 
@@ -130,7 +130,7 @@ is reserved as \"prevent HW transactions\"")
                    for fallback-name = (%gvx-expand0-f gvx suffix)
                    unless (fboundp name)
                    do
-                     (push 
+                     (push
                       `(defmacro ,name (,@args)
                          ,(concatenate 'string "This is " (symbol-name gvx)
                                        " implementation of GLOBAL-CLOCK/" (symbol-name infix+suffix)
@@ -138,7 +138,7 @@ is reserved as \"prevent HW transactions\"")
                          (list ',fallback-name ,@args))
                       macros)))
            macros))))
-      
+
 
 
 
@@ -192,7 +192,7 @@ Return the current +gv+ value."
 
 
 ;; define stub macros (GV5/STAT-COMMITTED) (GV5/STAT-ABORTED)
-;; (GV1/GET-NOHW-COUNTER) (GV1/INCF-NOHW-COUNTER) and (GV1/DECF-NOHW-COUNTER) 
+;; (GV1/GET-NOHW-COUNTER) (GV1/INCF-NOHW-COUNTER) and (GV1/DECF-NOHW-COUNTER)
 (eval-always
   (gvx-add-missing gv1))
 
@@ -461,7 +461,7 @@ Calls (GV5/DECF-NOHW-COUNTER)."
             (,stat (the fixnum (incf (the fixnum (,which ,lv)) ,delta))))
        (when (>= ,stat +gv-max-stat+)
          (gv6/%update-gv-stat ,lv)))))
-  
+
 
 (defmacro gv6/hw/stat-committed ()
   "This is GV6 implementation of GLOBAL-CLOCK/HW/STAT-COMMITTED.
@@ -641,7 +641,7 @@ to let the latter run, since their current implementations are mutually incompat
 
 (defmacro global-clock/sw/stat-aborted ()
   `(%gv-expand sw/stat-aborted))
-  
+
 
 
 
@@ -661,4 +661,4 @@ so they can be tested with #?+ and #?- reader macros."
 
 
 ) ;; eval-always
-    
+

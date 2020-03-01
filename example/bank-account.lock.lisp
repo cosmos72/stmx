@@ -124,10 +124,10 @@
 (defun transfer (delta account1 account2)
   (declare (type unsigned-fixnum delta)
            (type account account1 account2))
-  
+
   (transfer-deadlock-not-oo delta account1 account2))
 
-  
+
 (defparameter *account1* (new 'account :name "Mario rossi" :balance 1000))
 (defparameter *account2* (new 'account :name "Giuseppe Verdi"))
 

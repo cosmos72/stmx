@@ -61,7 +61,7 @@
 (defun $-test ()
   (let ((var (tvar 1))
         (log (make-tlog)))
-        
+
     (is (= 1 ($ var)))
     (is (= 1 (raw-value-of var)))
     (with-recording-to-tlog log
@@ -71,7 +71,7 @@
 
       (is (= 1 ($ var)))
       (is (= 1 (raw-value-of var)))
-      
+
       (is (= 2 (setf ($ var) 2)))
       (is (= 2 ($ var)))
       (is (= 1 (raw-value-of var)))
@@ -128,11 +128,11 @@
     (signals unbound-slot ($-slot var))
     (is-false (bound-$? var))
     (is (eq +unbound-tvar+ (raw-value-of var)))))
-    
+
 (def-test $-slot (:compile-at :definition-time)
   ($-slot-test))
 
-      
+
 
 
 
@@ -160,12 +160,12 @@
 
 (def-test rollback (:compile-at :definition-time)
   (let1 var (tvar 1)
-    
+
     (signals test-error
       (atomic
        (setf ($ var) 2)
        (error 'test-error :format-arguments "test-error signalled to cause rollback"))
-      
+
       (fail "error signaled inside ATOMIC was not propagated to caller"))
 
     (is (= (raw-value-of var) 1))
@@ -193,10 +193,10 @@
      (return-from transaction-return-from (setf ($ var) value)))
    (setf ($ var) (- value))))
 
-     
+
 (def-test transaction-return-from (:compile-at :definition-time)
   (let1 var (tvar 1)
-    
+
     (transaction-return-from var 2 :return-from? nil)
     (is (= -2 ($ var)))
 
@@ -209,7 +209,7 @@
     (setf (transaction-return-from var :return-from? t) 5)
     (is (= 5 ($ var)))))
 
-    
 
-    
-  
+
+
+

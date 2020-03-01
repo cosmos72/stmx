@@ -125,7 +125,7 @@ otherwise signal an error."
 
   (let ((*recursive-call-compute-effective-slot-definition*
          (cons class *recursive-call-compute-effective-slot-definition*))
-        
+
         (effective-slot (call-next-method))
         (direct-slots (loop for slot in direct-slots
                          when (typep slot 'transactional-direct-slot)
@@ -146,12 +146,12 @@ This is not allowed, please set all the relevant :TRANSACTIONAL flags
 to the same value. Problematic classes containing slot ~S: ~{~S ~}"
                     (class-name class) slot-name (class-name class) slot-name
                     (list-classes-containing-direct-slots direct-slots class))))
-        
+
       (let* ((direct-slot (first direct-slots))
              (is-tslot? (transactional-slot? direct-slot)))
 
         (setf (transactional-slot? effective-slot) is-tslot?)))
-    
+
     effective-slot))
 
 
@@ -235,7 +235,7 @@ if not already present in the superclass list."
      for slot = (find-slot-by-name slot-name slots)
      when slot
      collect slot))
-           
+
 
 (defun slot-form-transactional? (slot-form)
   "Does SLOT-FORM define a transactional slot?
@@ -246,12 +246,12 @@ UNLESS explicitly defined with the option :transactional nil."
   (block nil
     (when (symbolp slot-form)
       (return t))
-      
+
     (let ((tx-opt-and-rest (member :transactional slot-form)))
       ;; return T unless we find :transactional nil
       (unless tx-opt-and-rest
         (return t))
-      
+
       (let ((tx-opt (second tx-opt-and-rest)))
         (when (member tx-opt '(nil t))
           (return tx-opt))
@@ -259,7 +259,7 @@ UNLESS explicitly defined with the option :transactional nil."
         (compile-error "Error compiling TRANSACTIONAL-CLASS slot ~S:
 Unsupported :TRANSACTIONAL flag ~S, expecting either T or NIL"
                        (first slot-form) tx-opt)))))
-                    
+
 
 
 (defun slot-form-name (slot-form)
@@ -300,13 +300,13 @@ Return modified SLOT-FORM."
       (push key temp)
       (push value temp))
     (nreverse temp)))
-    
+
 (defun copy-slot-form (slot-form)
   (declare (type (or symbol list) slot-form))
   (if (symbolp slot-form)
       (list slot-form)
       (copy-list slot-form)))
-  
+
 
 (defun typespec-allows? (type typespec)
   "Return T if TYPESPEC is compatible with TYPE, i.e. if:
@@ -333,12 +333,12 @@ Otherwise return NIL."
 (defun error-tclass-slot-name (class-name slot-name)
   (declare (type symbol class-name slot-name))
   (compile-error "Error compiling TRANSACTIONAL-CLASS ~S.
-Unsupported slot name ~S" class-name slot-name)) 
+Unsupported slot name ~S" class-name slot-name))
 
 
 (defun cerror-tclass-slot-change (class-name slot-name option old-value new-value)
   (declare (type symbol class-name slot-name))
-  
+
   (unless (eq old-value new-value)
     (compile-cerror
      "Continue anyway."
@@ -357,7 +357,7 @@ Possible solutions:
    c) if the slot is inherited from some transactional superclass,
       you are out of luck: the only way is discarding the whole class
       and recursively applying one of these workarounds on all superclasses."
-           
+
             class-name class-name slot-name option old-value option new-value
             class-name class-name)))
 
@@ -402,7 +402,7 @@ wrap its :initform with a TVAR and alter its :type to also accept TVARs"
            (type (or symbol list) slot-form)
            (type (or null transactional-effective-slot) old-effective-slot)
            (type cons errors))
-            
+
   (let* ((slot-name (slot-form-name slot-form))
          (is-tx (slot-form-transactional? slot-form))
          (was-tx (if old-effective-slot
@@ -411,7 +411,7 @@ wrap its :initform with a TVAR and alter its :type to also accept TVARs"
 
     (check-tclass-slot-name class-name slot-name errors)
     (check-tclass-slot-change class-name slot-name :transactional was-tx is-tx errors)
-    
+
     (unless is-tx
       ;; not transactional, just return
       (return-from adjust-transactional-slot-form slot-form))
@@ -420,10 +420,10 @@ wrap its :initform with a TVAR and alter its :type to also accept TVARs"
     (setf slot-form (copy-slot-form slot-form))
 
     (let* ((plist (rest slot-form))
-           
+
            (type? (member :type plist))
            (type (second type?))
-           
+
            (super-tx?   nil) ;; super-slot type is already TVAR-aware?
            (super-type? nil)
            (super-type  nil)
@@ -433,7 +433,7 @@ wrap its :initform with a TVAR and alter its :type to also accept TVARs"
       ;; CLOS allows to add type restrictions to a derived slot type,
       ;; but forbids adding alternatives... we cannot add TVARs as allowed :type,
       ;; the only hope is for them to be already allowed
-      
+
       ;; find the most restrictive :type
       (loop for slot in super-slots
          until super-type?
@@ -442,7 +442,7 @@ wrap its :initform with a TVAR and alter its :type to also accept TVARs"
              (setf super-tx?   (transactional-slot? slot)
                    super-type? (slot-definition-type slot)
                    super-type  super-type?)))
-      
+
       (unless (or super-tx? (member super-type '(t nil))
                   (typespec-allows? 'tvar super-type))
         (warn "STMX error!
@@ -475,7 +475,7 @@ add TVAR as one of the slot allowed types, as for example:
 Maybe use :allocation :instance in slot ~S ?" slot-name)))
 
       (cons slot-name plist))))
-    
+
 
 (defun adjust-transactional-slot-forms (class-name direct-superclasses-names
                                         slot-forms errors)
@@ -528,13 +528,13 @@ and alter its :type to also accept TVARs"
 
             (check-tclass-slot-change class-name slot-name
                                       :transactional was-tx is-tx errors)))))
-    
+
     (loop for slot-form in slot-forms
        for slot-name = (slot-form-name slot-form)
        for old-effective-slot = (find-slot-by-name slot-name old-effective-slots)
        collect (adjust-transactional-slot-form class-name class-precedence-list
                                                slot-form old-effective-slot errors))))
-                                               
+
 
 
 (defmacro do-class-transactional-effective-slots ((slot class) &body body)
@@ -573,7 +573,7 @@ and alter its :type to also accept TVARs"
         (when method
           (remove-method generic-func method)
           t)))))
-  
+
 
 (defun undefine-method (generic-func-name class-name)
   "Remove from GENERIC-FUNC-NAME the method specialized for CLASS-NAME"
@@ -621,13 +621,13 @@ and alter its :type to also accept TVARs"
              (undefine-method-before 'initialize-instance ',class-name)
              (undefine-method        'initialize-instance ',class-name))))
 
-      
+
       #?+use-initialize-instance-before
       (with-gensym obj
         `(progn
            (eval-always
              (undefine-method 'initialize-instance ',class-name))
-           
+
            (defmethod initialize-instance :before ((,obj ,class-name) &key &allow-other-keys)
              ,(format nil "Put a TVAR into every transactional direct slot of ~S
 *before* the normal slots initialization." class-name)
@@ -653,7 +653,7 @@ and alter its :type to also accept TVARs"
                     for slot-name = (slot-form-name slot-form)
                     collect `(tvar-wrap-slot-macro ,obj ',slot-name)))))))))
 
-        
+
 
 
 (defmacro transactional-class ((defclass class-name direct-superclasses

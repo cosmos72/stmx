@@ -17,7 +17,7 @@
 
 ;;;; ** Transactional simple-vector: fixed-size one dimensional array
 
-(deftype simple-tvector (&optional length) 
+(deftype simple-tvector (&optional length)
   "SIMPLE-TVECTOR is a transactional, one dimensional array.
 It is currently a deftype, not a class or struct:
 methods cannot be specialized on it."

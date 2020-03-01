@@ -88,7 +88,7 @@
   (let ((key (and key (%coerce-to-fun key)))
         (test (and testp (%coerce-to-fun test)))
         (test-not (and notp (%coerce-to-fun test-not))))
-  
+
     (cond (test
            (if key
                (%tassoc item talist key test nil)

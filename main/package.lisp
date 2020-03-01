@@ -53,7 +53,7 @@
            ;; defining classes, structs, functions and methods
            #:transactional      #:transaction          #:transaction?
            #:transactional-class
-           
+
            #:transactional-struct #:non-transactional-struct #:analyze-struct
 
            ;; utilities
@@ -66,7 +66,7 @@
            #:transactional-class
 
            ;; low-level API to use TVARs directly
-           #:tvar #:+unbound-tvar+ #:$-slot #:$ 
+           #:tvar #:+unbound-tvar+ #:$-slot #:$
 	   ;; also (setf $-slot) (setf $)
 
            #:bound-$? #:unbind-$

@@ -81,7 +81,7 @@
 
 ;;;; ** TXHASH-TABLE, a hash table specialized for TVAR keys
 
-          
+
 
 
 (defmacro do-txhash-entries ((pair) hash &body body)
@@ -92,7 +92,7 @@
             (,n    (the fixnum (length ,vec)))
             (,left (txhash-table-count ,h)))
        (declare (fixnum ,left))
-           
+
        (dotimes (,i ,n)
          (when (zerop ,left)
            (return))
@@ -103,7 +103,7 @@
                 (setf ,next (txpair-next ,pair))
                 (decf ,left)
                 ,@body)))))
-                
+
 
 
 (defmacro do-txhash ((key &optional value) hash &body body)
@@ -113,11 +113,11 @@
        (let ((,key (txpair-key ,pair))
              ,@(when value `((,value (txpair-value ,pair)))))
          ,@body))))
-                
 
 
 
-           
+
+
 (declaim (inline txhash-mask))
 
 (defun txhash-mask (vec-len)
@@ -139,7 +139,7 @@
      (logxor hash-code
              (ash (logand hash-code most-positive-fixnum)
                   -10)))))
-               
+
 
 
 (defun find-txhash (hash key)
@@ -151,7 +151,7 @@ Otherwise return NIL."
   (let* ((id (the fixnum (tvar-id key)))
          (vec (txhash-table-vec hash))
          (subscript (txhash-subscript id vec)))
-         
+
     (the (or null txpair)
       (loop for pair = (svref vec subscript) then (txpair-next pair)
          while pair do
@@ -168,28 +168,28 @@ Otherwise return (values DEFAULT nil)."
     (values (txpair-value pair) t)
     (values default nil)))
 
-    
-  
+
+
 (defun rehash-txhash (hash)
   (declare (type txhash-table hash))
 
   (let* ((vec1 (the simple-vector (txhash-table-vec hash)))
          (n2   (the fixnum (ash (length vec1) 1)))
          (vec2 (the simple-vector (make-array n2 :initial-element nil))))
-    
+
     (do-txhash-entries (pair) hash
       (let* ((key (txpair-key pair))
              (id (tvar-id key))
              (subscript (txhash-subscript id vec2 n2))
              (head (svref vec2 subscript)))
-        
+
         (setf (txpair-next pair) head
               (svref vec2 subscript) pair)))
 
     (setf (txhash-table-vec hash) vec2)))
-        
-        
-      
+
+
+
 (declaim (inline new-txpair-from-pool))
 (defun new-txpair-from-pool (hash txpair-next key value)
   (declare (type txhash-table hash)
@@ -246,8 +246,8 @@ Otherwise return (values DEFAULT nil)."
          (setf (txpair-next pair) (txhash-table-pool hash))
          (return)))
   (setf (txhash-table-pool hash) txpair))
-            
-               
+
+
 
 (declaim (type fixnum +txhash-threshold-capacity+))
 (defconstant +txhash-threshold-capacity+ 64)
@@ -274,7 +274,7 @@ Otherwise return (values DEFAULT nil)."
 
 
 
-       
+
 (defun copy-txhash-table-into (dst src)
   "Clear DST, then copy SRC contents into it. Return NIL."
   (declare (type txhash-table src dst))
@@ -300,7 +300,7 @@ otherwise return nil.
       (set-txhash dst var val1)))
   t)
 
-  
+
 ;; (defvar ht (make-txhash-table))
 ;; (declaim (type fixnum n))
 ;; (defvar n 0)

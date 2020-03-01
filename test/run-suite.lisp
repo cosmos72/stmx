@@ -34,4 +34,4 @@
        (loop for test in (fiveam:run suite)
           always (or (typep test 'fiveam::test-passed)
                      (show-failed-test test :interactive interactive)))))
-              
+

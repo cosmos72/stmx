@@ -25,7 +25,7 @@
 
 (in-package :stmx.example.parallel)
 
-(enable-#?-syntax)  
+(enable-#?-syntax)
 
 (defun run-one-thread (var)
   "loop invoking transactions that decrease VAR until it is zero"
@@ -125,7 +125,7 @@
    (:n-threads   3 :tx-speed 111.6f6 :tx-speed/thread 37.22f6) ;;2.688 secs
    (:n-threads   4 :tx-speed 148.9f6 :tx-speed/thread 37.22f6) ;;2.686 secs
    (:n-threads   5 :tx-speed 154.6f6 :tx-speed/thread 30.96f6) ;;3.234 secs
-   (:n-threads   6 :tx-speed 185.8f6 :tx-speed/thread 30.96f6) ;;3.230 secs  
+   (:n-threads   6 :tx-speed 185.8f6 :tx-speed/thread 30.96f6) ;;3.230 secs
    (:n-threads   7 :tx-speed 209.8f6 :tx-speed/thread 29.98f6) ;;3.336 secs
    (:n-threads   8 :tx-speed 237.5f6 :tx-speed/thread 29.68f6) ;;3.369 secs
    (:n-threads   9 :tx-speed 191.5f6 :tx-speed/thread 21.28f6) ;;4.700 secs
@@ -199,20 +199,20 @@
         :algorithm '(transaction-begin tvar-value transaction-end)
    (:n-threads   1 :tx-speed  51.4f6 :tx-speed/thread 51.44f6) ;;1.944 secs
    (:n-threads   2 :tx-speed 102.7f6 :tx-speed/thread 51.33f6) ;;1.948 secs
-   (:n-threads   3 :tx-speed 153.9f6 :tx-speed/thread 51.31f6) ;;1.949 secs 
+   (:n-threads   3 :tx-speed 153.9f6 :tx-speed/thread 51.31f6) ;;1.949 secs
    (:n-threads   4 :tx-speed 204.9f6 :tx-speed/thread 51.23f6) ;;1.952 secs
-   (:n-threads   5 :tx-speed 247.5f6 :tx-speed/thread 49.50f6) ;;2.020 secs 
+   (:n-threads   5 :tx-speed 247.5f6 :tx-speed/thread 49.50f6) ;;2.020 secs
    (:n-threads   6 :tx-speed 296.7f6 :tx-speed/thread 49.46f6) ;;2.022 secs
    (:n-threads   7 :tx-speed 345.3f6 :tx-speed/thread 49.33f6) ;;2.027 secs
-   (:n-threads   8 :tx-speed 394.9f6 :tx-speed/thread 49.36f6) ;;2.026 secs 
+   (:n-threads   8 :tx-speed 394.9f6 :tx-speed/thread 49.36f6) ;;2.026 secs
    (:n-threads   9 :tx-speed 300.0f6 :tx-speed/thread 33.33f6) ;;3.000 secs
-   (:n-threads  10 :tx-speed 327.9f6 :tx-speed/thread 32.79f6) ;;3.050 secs 
+   (:n-threads  10 :tx-speed 327.9f6 :tx-speed/thread 32.79f6) ;;3.050 secs
    (:n-threads  11 :tx-speed 329.4f6 :tx-speed/thread 29.95f6) ;;3.339 secs
    (:n-threads  12 :tx-speed 354.3f6 :tx-speed/thread 29.52f6) ;;3.387 secs
    (:n-threads  14 :tx-speed 389.0f6 :tx-speed/thread 27.79f6) ;;3.599 secs
    (:n-threads  16 :tx-speed 380.2f6 :tx-speed/thread 23.76f6) ;;4.208 secs
    (:n-threads  20 :tx-speed 389.4f6 :tx-speed/thread 19.47f6) ;;5.136 secs
-   (:n-threads  24 :tx-speed 387.8f6 :tx-speed/thread 16.16f6) ;;6.188 secs 
+   (:n-threads  24 :tx-speed 387.8f6 :tx-speed/thread 16.16f6) ;;6.188 secs
    (:n-threads  32 :tx-speed 389.1f6 :tx-speed/thread 12.16f6) ;;8.225 secs
    (:n-threads  48 :tx-speed 391.4f6 :tx-speed/thread  8.16f6) ;;12.263 secs
    (:n-threads  64 :tx-speed 393.8f6 :tx-speed/thread  6.15f6) ;;16.250 secs

@@ -176,7 +176,7 @@ while it is normally disabled in these cases:
 (defun sw-transaction? ()
   "Return true if inside a software transaction."
   (recording?))
-  
+
 
 (declaim (inline transaction?))
 (defun transaction? ()
@@ -295,7 +295,7 @@ to application code only in case of bugs"))
 
 Before re-executing, the transaction will wait on all variables that it read
 until at least one of them changes."
-    
+
     #?+hw-transactions
     (when (hw-transaction-supported-and-running?)
       (hw-transaction-abort))
@@ -311,6 +311,6 @@ beginning without waiting. Automatically invoked when a SW transaction detects
 a possibly inconsistent read."
     (error rerun-error-obj)))
 
-  
+
 
 

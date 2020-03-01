@@ -62,7 +62,7 @@ Equivalent to (setf ($-slot var) value)"
  (defun bound-$? (var)
    "Return true if transactional variable VAR is bound to a value.
 Works both outside and inside transactions.
-    
+
 During transactions, it uses transaction log to record the read
 and to check for any value stored in the log."
    (declare (type tvar var))
@@ -74,7 +74,7 @@ and to check for any value stored in the log."
  (defun unbind-$ (var)
    "Unbind the value inside transactional variable VAR.
 Works both outside and inside transactions.
-    
+
 During transactions, it uses transaction log to record the 'unbound' value."
    (declare (type tvar var))
 

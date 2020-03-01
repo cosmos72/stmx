@@ -52,7 +52,7 @@
                (log.trace "L <= ~A" x))
              (log.debug "left ~A in L" x)
              x))
-      
+
          (retry-right ()
            (let1 x 0.0f0
              (declare (type single-float x))

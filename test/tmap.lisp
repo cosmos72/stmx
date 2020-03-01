@@ -46,7 +46,7 @@
 
 (def-test tmap-rollback (:compile-at :definition-time)
   (test-tmap-rollback))
-      
+
 
 (def-test tmap (:compile-at :definition-time)
   (test-rbmap-class 'tmap))
@@ -89,7 +89,7 @@
         (setf max (max result max))))))
 
 
-  
+
 #?+bt/make-thread
 (defun test-tmap-threads (&key (thread-pairs 4)
 			    (iterations #+x86-64 1000 #-x86-64 100))
@@ -98,7 +98,7 @@
   (start-multithreading)
 
   (let ((m (new 'tmap :pred 'fixnum<)))
-    
+
     (flet ((tmap-insert ()
              (tmap-insert-func m iterations))
            (tmap-remove ()

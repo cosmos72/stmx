@@ -46,7 +46,7 @@
    (setf (front-of f) (back-of f))
    f))
 
-                  
+
 
 (transaction
  (defmethod peek ((f tfifo) &optional default)
@@ -78,7 +78,7 @@ Since tfifo can contain unlimited values, this method never blocks."
              (trest  back) cell
              back cell)))
    value))
-   
+
 
 (transaction
  (defmethod try-take ((f tfifo))
@@ -89,7 +89,7 @@ Otherwise return (values nil nil)"
      (if (eq front back)
          (values nil nil)
          (values t (tpop front))))))
-   
+
 
 (defmethod try-put  ((f tfifo) value)
   "Append VALUE as last element in tfifo F and return (values t VALUE).
@@ -102,7 +102,7 @@ Since tfifo can contain unlimited values, this method never fails."
   (let ((list (_ obj front))
         (end  (_ obj back)))
     (unless (eq list end)
-      (loop 
+      (loop
          for value = (tfirst list)
          for rest = (trest list)
          do

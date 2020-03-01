@@ -123,11 +123,11 @@ bmap-count must be the actual nodes count, root must be black."
 
       (setf (_ m root) (%build-gmap list))
       m)))
-    
+
 (defun build-rbmap (pred &optional list)
   (build-gmap 'rbmap pred list))
 
-           
+
 
 (defun is-equal-gmap-and-hash-table (m hash)
   (declare (type gmap m)
@@ -144,7 +144,7 @@ bmap-count must be the actual nodes count, root must be black."
 (defun is-equal-gmap (m1 m2)
   (is (equal (gmap-pairs m1)
              (gmap-pairs m2))))
-  
+
 
 (defun test-rbmap-class (class-name &key (count 100))
   (declare (type symbol class-name)
@@ -161,7 +161,7 @@ bmap-count must be the actual nodes count, root must be black."
         (is-equal-gmap-and-hash-table m1 hash)
         (fsck-rbmap m1 m2)
         (set-gmap m2 key value)))
-        
+
     (dotimes (i (* 2 count))
       ;; (format t "~&pass 2/3, step ~S/~S " i (* 2 count))
       (let1 key (random count)

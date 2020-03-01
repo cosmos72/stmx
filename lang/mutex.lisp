@@ -72,7 +72,7 @@
 	    (ignore mutex))
    nil))
 
-	   
+	
 
 #?-(eql fast-mutex :single-thread)
 (defstruct (mutex (:constructor %make-mutex) (:conc-name))
@@ -94,7 +94,7 @@
   nil
   #?-(eql fast-mutex :single-thread)
   (the mutex (%make-mutex)))
-    
+
 
 (declaim #?-fast-mutex
          (ftype (function (mutex) (values (member t nil :recursion) &optional))
@@ -119,14 +119,14 @@
  (defun mutex-owner (mutex)
    "Return the thread that locked a mutex, or NIL if mutex is free."
    (declare (type mutex mutex))
-   
+
    (lock-owner (mutex-lock mutex))))
 
 
 
 
 ;; ABCL needs its own magic... defined later
-#?+(and mutex-owner (not (eql bt/lock-owner :abcl))) 
+#?+(and mutex-owner (not (eql bt/lock-owner :abcl)))
 (eval-always
 
   (declaim (ftype (function (mutex) boolean) mutex-is-free? mutex-is-own? mutex-is-own-or-free?)
@@ -136,7 +136,7 @@
   (defun mutex-is-free? (mutex)
     "Return T if MUTEX is free. Return NIL if MUTEX
 is currently locked by current thread or some other thread."
-    
+
     (mem-read-barrier)
     (let1 owner (mutex-owner mutex)
       (eq owner nil)))
@@ -165,10 +165,10 @@ Return NIL if MUTEX is currently locked by some other thread."
 #?+(and mutex-owner (eql bt/lock-owner :abcl)) ;; ABCL needs its own magic
 (eval-always
 
-  (defconstant +bt-lock-is-locked+ 
+  (defconstant +bt-lock-is-locked+
     (java:jmethod "java.util.concurrent.locks.ReentrantLock" "isLocked"))
 
-  (defconstant +bt-lock-is-locked-by-current-thread+ 
+  (defconstant +bt-lock-is-locked-by-current-thread+
     (java:jmethod "java.util.concurrent.locks.ReentrantLock" "isHeldByCurrentThread"))
 
 
@@ -183,7 +183,7 @@ is currently locked by current thread or some other thread."
     (let ((jlock (bt::mutex-lock (mutex-lock mutex))))
       (mem-read-barrier)
       (not (java:jcall +bt-lock-is-locked+ jlock))))
-  
+
 
   (defun mutex-is-own? (mutex)
     "Return T if MUTEX is locked by current thread."

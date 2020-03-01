@@ -23,7 +23,7 @@
 
 #?+(eql hw-transactions :stmx.asm)
 (progn
-  
+
   (defconstant +hw-transaction-started+ stmx.asm:+transaction-started+)
 
   (defmacro hw-transaction-supported? ()

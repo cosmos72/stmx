@@ -182,16 +182,16 @@ otherwise return (values DEFAULT NIL)."
     (if (< to-index from-index)
 	(loop while (< to-index to-index-end) do
 	     (
-	     
-	       
-  
+	
+	
+
 
 (defun b-node-add (node pred key value)
   "Insert KEY and VALUE into NODE. Return T if successful,
 or NIL if NODE is already full."
   (declare (type b-node node)
 	   (type function pred))
-  
+
   (when (>= (b-node-count node)
 	    (b-node-size node))
     (return-from b-node-add nil))
@@ -199,7 +199,7 @@ or NIL if NODE is already full."
   (let ((index (b-node-lower-bound node pred key))
 	(min (b-node-min node))
 	(max (b-node-max node)))
-    
+
 	
-    
+
 	

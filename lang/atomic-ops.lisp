@@ -22,7 +22,7 @@
 
 #?+(eql atomic-ops :sbcl)
 (progn
-  
+
   (deftype atomic-num ()
     "ATOMIC-NUM must be a type suitable for ATOMIC-INCF and ATOMIC-DECF.
 STMX also assumes it is the same or wider than fixnum."

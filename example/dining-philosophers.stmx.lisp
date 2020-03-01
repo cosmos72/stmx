@@ -28,7 +28,7 @@
 
 (in-package :stmx.example.dining-philosophers.stmx)
 
-(enable-#?-syntax)  
+(enable-#?-syntax)
 
 (declaim (ftype (function (cons) fixnum) eat-from-plate)
          (inline
@@ -51,7 +51,7 @@
   ;; use a normal (non-transactional) counter to keep track
   ;; of retried transactions for demonstration purposes.
   (decf (the fixnum (cdr plate)))
-   
+
   (let ((f1 (take fork1))
         (f2 (take fork2)))
     (prog1 (eat-from-plate plate)
@@ -99,7 +99,7 @@
 
   #-(and)
   (loop until (zerop (the fixnum (atomic (fast-philosopher-eats fork1 fork2 plate)))))
-  
+
   #+(and)
   (let1 lambda-philosopher-eats
         (lambda () (fast-philosopher-eats fork1 fork2 plate))

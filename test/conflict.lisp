@@ -23,7 +23,7 @@
 (defun conflict-test ()
   (let ((var (tvar 5))
         (counter 0))
-    
+
     (atomic
       (log:debug "($ var) is ~A" ($ var))
       (incf ($ var))
@@ -38,7 +38,7 @@
             (is-false (valid? (current-tlog))))
           ;; else
           (is-true (valid? (current-tlog)))))
-          
+
     (is (= 11 ($ var))))) ;; 10 for "(setf (raw-value-of var) 10)" plus 1 for "(incf ($ var))"
 
 (def-test conflict (:compile-at :definition-time)
@@ -59,7 +59,7 @@
       (is-false (valid? (current-tlog)))
       ;; but reading from tvar must return the value written during transaction
       (is (= 1 ($ var)))
-      
+
       ;; an invalid transaction cannot become valid again
       ;; by writing into its vars. test it.
       (setf ($ var) (raw-value-of var))
@@ -146,7 +146,7 @@
                ((null ret-list)        (log:trace "command returned no values"))
                ((null (rest ret-list)) (log:trace "command returned: ~S" (first ret-list)))
                (t                      (log:trace "command returned values: ~{~S~^ ~}" ret-list)))
-                
+
              (setf (ipc-ret-list ipc) ret-list))
 
            (bt:condition-notify wait-ret)
@@ -169,7 +169,7 @@
       (setf (ipc-command  ipc) command
             (ipc-args     ipc) args
             (ipc-ret-list ipc) t)
-      
+
       (bt:condition-notify wait-cmd)
 
       (loop for ret-list = (ipc-ret-list ipc)
@@ -177,7 +177,7 @@
          do (bt:condition-wait wait-ret lock)
          finally (return (values-list ret-list))))))
 
-        
+
 (defun ipc-start-thread (ipc)
   (start-thread (lambda () (ipc-run ipc))))
 
@@ -185,7 +185,7 @@
   (ipc-call ipc nil))
 
 
-            
+
 
 (defun conflict-locked-test ()
   (start-multithreading)
@@ -210,7 +210,7 @@
        (is-false (ipc-call ipc #'unlock-tvar b))
        (is-true (try-lock-tvar b))
        (unlock-tvar b))
-	    
+	
 
      (setf ($ a) ($ b))
      (incf ($ a))
@@ -226,7 +226,7 @@
 
        ;; but there is a lock in the way
        (is-false (valid-and-unlocked? (current-tlog)))
-       
+
        ;; reading from a must return the value set during the transaction
        (is (= 1 ($ a)))
        ;; but reading from B must detect the lock and rerun

@@ -64,7 +64,7 @@
                        (putf  putf))
 
                    (declare (type function takef putf))
-                   
+
                    (multiple-value-bind (took? value) (funcall takef place)
                      (are-true (not took?)
                                (null value)
@@ -84,7 +84,7 @@
                      (are-true took?
                                (eq value unique)
                                (empty? place))))))))
-      
+
 (def-test orelse (:compile-at :definition-time)
   (orelse-test))
 
@@ -116,7 +116,7 @@
           (setf name (svref names 3))
           (log:trace "RETRIED, taking from cell ~A" name)
           (setf x (take (svref cells 3))))))
-    
+
       (log:debug "took ~A from cell ~A" x name)
       (incf x)
 
@@ -178,7 +178,7 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
 
   (let* ((names '("A" "B" "C" "D"))
          (cells (loop repeat (length names) collect (tcell)))
-         
+
          (cells1 (to-vector cells))
          (names1 (to-vector names))
 
@@ -219,7 +219,7 @@ and finishes after each thread executed ITERATIONS loops, returning the final ce
   (declare (type fixnum threads iterations))
 
   (let ((thread-pairs (truncate (1+ threads) 2)))
-    
+
     (multiple-value-bind (values cells)
         (orelse-threads :thread-pairs thread-pairs :iterations iterations)
 

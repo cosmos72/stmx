@@ -18,7 +18,7 @@
 (in-package :cl-user)
 
 (defpackage #:stmx.util
-  
+
   (:use #:cl
         #:stmx.lang
         #:stmx)
@@ -37,7 +37,7 @@
                 #:+dummy-tvar+ #:peek-$ #:try-take-$ #:try-put-$)
 
   (:export #:tcell #:tfifo #:tstack #:tchannel #:tport  ;; transactional containers
-           
+
            #:full? #:empty? #:empty! ;; methods for transactional containers
            #:peek   #:take   #:put
            #:try-take    #:try-put
@@ -91,7 +91,7 @@
            #:tlast   #:tlist* #:make-tlist
 
            #:tacons #:tpairlis #:copy-talist #:tassoc #:trassoc))
-           
+
 
 
 

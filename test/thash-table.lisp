@@ -41,7 +41,7 @@
              (new 'thash-table :test 'fixnum= :hash 'identity)))
     (test-ghash-table thash pred :count count)))
 
-      
+
 
 (def-test thash-table (:compile-at :definition-time)
   (test-new-thash-table #'fixnum<))

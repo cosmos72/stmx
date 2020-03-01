@@ -25,7 +25,7 @@
   (:import-from #:stmx.lang
                 #:eval-always
                 #:start-thread #:wait4-thread))
-                
+
 
 (in-package :stmx.example.dining-philosophers.hw-only)
 
@@ -46,7 +46,7 @@
 (defun release-lock (lock)
   (declare (type lock lock))
   (setf (first lock) nil))
-  
+
 
 (declaim (ftype (function (plate) fixnum) eat-from-plate)
          (inline eat-from-plate))
@@ -58,14 +58,14 @@
 
 (declaim (ftype (function (lock lock plate) fixnum) philosopher-eats)
          (inline philosopher-eats))
-                
+
 (defun philosopher-eats (fork1 fork2 plate)
   "Try to eat once. Return remaining hunger."
   (declare (type lock fork1 fork2)
            (type plate plate))
 
   ;; also keep track of failed lock attempts for demonstration purposes.
-  
+
   (prog ((hunger -1)) ;; unknown
 
    (declare (type fixnum hunger))
@@ -83,17 +83,17 @@
          (release-lock fork2))
        (release-lock fork1))
      (transaction-end))
-   
+
    ;; without this yield, the % of aborted transactions is huge
    (when (= -1 hunger)
      (bt:thread-yield)
      ;; (sb-thread:thread-yield) ;; MUCH slower!
      (go start))
-   
+
    (return hunger)))
 
-    
-    
+
+
 
 
 
@@ -134,7 +134,7 @@ Note: the default initial hunger is 10 millions,
                      (fork2 (nth (mod i nforks) forks))
                      (plate (nth (1- i)         plates))
                      (j i))
-                 
+
                  ;; make the last philospher left-handed
                  ;; to help transactional memory machinery
                  (when (= i n)

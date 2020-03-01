@@ -40,8 +40,8 @@ for debugging purposes. Use (SETF ($-SLOT VAR) VALUE) or (SETF ($ VAR) VALUE) in
                                (global-clock/sw/start-write
                                 (global-clock/sw/start-read)))))
 
-  
-  
+
+
 (defun tx-read-of (var log)
   "If VAR's value is stored in writes of transaction LOG, return the stored value.
 Otherwise, validate VAR version, add VAR into the reads of transaction LOG,
@@ -231,7 +231,7 @@ and to check for any value stored in the log."
       ($-swtx var)
       ($-notx var)))
 
-               
+
 ;; WITH-TX uses macrolet, which cannot bind names like (setf ...)
 ;; thus we use define set-$ and create a setf-expander on $
 (defun set-$ (var value)
@@ -255,7 +255,7 @@ During transactions, it uses transaction log to record the value."
 
 (defsetf $ set-$)
 
-  
+
 
 
 ;;;; ** Locking and unlocking
@@ -275,7 +275,7 @@ Return NIL if VAR has different value, or is locked by some thread (including cu
   (declare (type tvar var)
            (type tlog log)
            (ignore log))
-  
+
   (multiple-value-bind (value version fail) (tvar-value-and-version-or-fail var)
     (declare (ignore version)
              (type bit fail))
@@ -291,7 +291,7 @@ Return NIL if VAR has different value, or is locked by some other thread."
   (declare (type tvar var)
            (type tlog log)
            (ignorable log))
-    
+
 
   (multiple-value-bind (value version fail) (tvar-value-and-version-or-fail var)
     (declare (ignore version)
@@ -355,7 +355,7 @@ if VAR changes."
   (declare (type tvar var))
   ;; this is (almost) the infamous double-check locking anti-pattern.
   ;; in this particular case, it is safe to check the lazily-initialized
-  ;; slot (tvar-waiting-for var) without locking, 
+  ;; slot (tvar-waiting-for var) without locking,
   ;; because we actually use it only while holding the lock.
   ;;
   ;; the effect of this trick is a significant speedup under heavy load
@@ -387,7 +387,7 @@ if VAR changes."
       (setf ($ var) value)
       value)))
 
-  
+
 ;;;; ** Printing
 
 (defprint-object (var tvar :identity nil)

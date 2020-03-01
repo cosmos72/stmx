@@ -22,7 +22,7 @@
 
 
 (defun stmx-internal-error (datum &rest arguments)
-  (error "STMX internal error!~&  ~A" 
+  (error "STMX internal error!~&  ~A"
          (apply #'format nil datum arguments)))
 
 
@@ -37,8 +37,8 @@ Please check if it's a known bug at https://github.com/cosmos72/stmx/issues
    * CPU model
    * Operating system, including version
    * Lisp compiler, including version
-   * STMX version: report both stmx:*stmx-version* and (ql:system-apropos \"stmx\") 
+   * STMX version: report both stmx:*stmx-version* and (ql:system-apropos \"stmx\")
    * a short, self-contained example that causes the bug."))
-    
+
 
 

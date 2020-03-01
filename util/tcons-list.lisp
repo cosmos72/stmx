@@ -38,7 +38,7 @@
       ;; the slow, exact test is: (unless (tconsp ,tcons) ...)
       ;; instead we only check for nil,
       ;; relying on compiler's safety level for other non-TCONS
-      `((unless ,tcons 
+      `((unless ,tcons
           (go type-error))
         ,@(if next-ops
               `((setf ,tcons (,op ,tcons))
@@ -345,7 +345,7 @@ This function should always be executed inside an STMX atomic block."
       form))
 
 
-            
+
 
 (defmacro %tappend-consing (lists &key (do-outer-list 'dolist) (do-inner-list 'dolist))
   ;; cons an intermediate list rather than using SETF on newly created TVARS.
@@ -355,7 +355,7 @@ This function should always be executed inside an STMX atomic block."
         (,do-outer-list (,list ,lists)
           (,do-inner-list (,obj ,list)
             (push ,obj ,rev-lists)))
-        
+
         (let ((,tlist nil))
           (dolist (,obj ,rev-lists)
             (setf ,tlist (tcons ,obj ,tlist)))
@@ -374,7 +374,7 @@ This function should always be executed inside an STMX atomic block."
              (setf (tcons-rest ,prev) ,next
                    ,prev ,next))))
        (tcons-rest ,top))))
-    
+
 
 (defun tappend (&rest tlists)
   "Construct a new tlist by concatenating the TLIST arguments"
@@ -385,7 +385,7 @@ This function should always be executed inside an STMX atomic block."
   (if (stmx::use-$-swtx?)
       (%tappend-consing tlists :do-inner-list do-tlist)
       (%tappend-setf-tvar tlists :do-inner-list do-tlist)))
-        
+
 
 (defun tappend-lists (&rest lists)
   "Construct a new tlist by concatenating the LIST arguments"
@@ -396,9 +396,9 @@ This function should always be executed inside an STMX atomic block."
   (if (stmx::use-$-swtx?)
       (%tappend-consing lists)
       (%tappend-setf-tvar lists)))
-      
 
-    
+
+
 (defmacro %copy-tlist-consing (list-or-tlist &key (car 'car) (cdr 'cdr) (consp 'consp))
   ;; cons an intermediate list rather than using SETF on newly created TVARS.
   ;; preferred inside software transactions, where SETF on TVARS is expensive
@@ -437,7 +437,7 @@ This function should always be executed inside an STMX atomic block."
           (unless (null ,orig)
             (setf (trest ,splice) ,orig))
           (return ,copy))))
-  
+
 
 
 (defun copy-tlist (tlist)
@@ -465,8 +465,8 @@ This function should always be executed inside an STMX atomic block."
 
 
 
-         
-  
+
+
 ;;;; more advanced list functions
 
 

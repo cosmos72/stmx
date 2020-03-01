@@ -41,11 +41,11 @@ If M does not contain KEY, return (values DEFAULT NIL)."
   (declare (type b-tree))
   (let ((node (%b-tree-root b))
         (pred (%b-tree-pred-func b)))
-    (loop while node 
+    (loop while node
        for xkey = (_ node key) do
          (case (compare-keys pred key xkey)
            (#.k< (setf node (_ node left)))
            (#.k> (setf node (_ node right)))
            (t    (return-from get-gmap (values (_ node value) t)))))
     (values default nil)))
-  
+

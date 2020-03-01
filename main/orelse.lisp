@@ -72,7 +72,7 @@ Return nil if all tx are valid and want to retry."
            (ignorable me))
 
   (let1 log (orelse-tx-log (svref txs 0))
-    
+
     (loop for i from 1 to (1- (length txs))
        for itx    = (svref txs i)
        for ilog   = (orelse-tx-log   itx)
@@ -82,7 +82,7 @@ Return nil if all tx are valid and want to retry."
                       (~ ilog) (~ (orelse-tx-func  itx)))
            (return-from merge-tlog-reads-tx nil)))
     log))
-        
+
 
 (defun run-orelse (&rest funcs)
   "Function variant of `orelse'. Execute the functions in FUNCS list
@@ -110,7 +110,7 @@ Can only be used inside an ATOMIC block."
   ;;       1.4 otherwise it means all tx[i] wanted to retry, so jump to b.
   ;;    3. if tx[i] wants to commit (returns normally), merge to parent log and return
   ;;    4. if tx[i] wants to rollback (signals an error), rollback and signal the error
-  ;; 
+  ;;
   ;; b. all tx[i] want to retry.
   ;;    1. if tx[0] ... tx[n-1] are incompatible => at least one of them is invalid
   ;;       1.1 if parent-tx is invalid, tell it to re-execute with (rerun)
@@ -120,7 +120,7 @@ Can only be used inside an ATOMIC block."
   ;;       2.2 otherwise, if parent-tx is invalid, tell it to re-execute with (rerun)
   ;;       2.3 otherwise, run tx[0] (set i=0 and jump to a).
 
-  
+
   ;; ORELSE does not support hardware transactions!
   (when (hw-transaction-supported-and-running?)
     (if funcs
@@ -150,7 +150,7 @@ Can only be used inside an ATOMIC block."
                  (setf (svref txs index) tx))
                (setf rerunning nil)
                tx)
-             
+
              (set-index (idx)
                (setf index idx)
                (ensure-tx))
@@ -162,7 +162,7 @@ Can only be used inside an ATOMIC block."
              (wants-to-rerun ()
                (global-clock/sw/stat-aborted)
                (setf (orelse-tx-retry tx) nil)))
-           
+
 
       (prog (func log (me (log.make-logger)))
 
@@ -191,7 +191,7 @@ Can only be used inside an ATOMIC block."
                (log.debug me "Tlog ~A {~A} committed to parent tlog ~A"
                           (~ log) (~ func) (~ parent-log))
                (free-tx-logs txs)))
-         
+
          (retry-error ()
            (log.debug me "Tlog ~A {~A} wants to retry, trying next one"
                       (~ log) (~ func))
@@ -234,7 +234,7 @@ Can only be used inside an ATOMIC block."
          (setf rerunning t)
          (go run-tx))
 
-         
+
 
        run-next
        (when (< (incf index) (length txs))
@@ -269,10 +269,10 @@ Can only be used inside an ATOMIC block."
          ;; some tlog was incompatible with previous ones
          (maybe-yield-before-rerun)
          (go start))
-           
+
        (log.debug me "ORELSE will sleep, then re-run")
        (wait-tlog log)
-       
+
        ;; since we are validating parent-log, we should update its read-version
        ;; otherwise the nested transactions (which inherit the parent read-version)
        ;; can enter an infinite retry or rerun loop
@@ -285,7 +285,7 @@ Can only be used inside an ATOMIC block."
 
        (log.debug me "Re-running ORELSE")
        (go start)))))
-         
+
 
 
 (defmacro orelse (&body body)
@@ -305,8 +305,8 @@ Can only be used inside an ATOMIC block."
   (let ((funcs (loop for form in body collect
                     `(lambda () ,form))))
     `(run-orelse ,@funcs)))
-         
-      
+
+
 
 
 

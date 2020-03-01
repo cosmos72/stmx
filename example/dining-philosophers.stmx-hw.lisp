@@ -28,7 +28,7 @@
 
 (in-package :stmx.example.dining-philosophers.stmx-hw)
 
-(enable-#?-syntax)  
+(enable-#?-syntax)
 
 (declaim (ftype (function (                   cons) fixnum) eat-from-plate)
          (ftype (function (stmx::tlog         cons) fixnum) eat-from-plate/swtx)
@@ -70,7 +70,7 @@
   ;; use a normal (non-transactional) counter to keep track
   ;; of retried transactions for demonstration purposes.
   (decf (the fixnum (cdr plate)))
-   
+
   (let ((f1 (take fork1))
         (f2 (take fork2)))
     (prog1 (eat-from-plate plate)
@@ -85,7 +85,7 @@
   ;; use a normal (non-transactional) counter to keep track
   ;; of retried transactions for demonstration purposes.
   (decf (the fixnum (cdr plate)))
-   
+
   (let ((hunger -1) ;; unknown
         (free t)
         (busy +unbound-tvar+))
@@ -110,7 +110,7 @@
   ;; inside a HW transaction, ALL memory is transactional.
   ;; so move this counter outside the HW TX.
   #+never (decf (the fixnum (cdr plate)))
-   
+
   (let ((hunger -1) ;; unknown
         (free t)
         (busy +unbound-tvar+))
@@ -126,7 +126,7 @@
     #+never
     (when (= -1 hunger)
       (hw-transaction-abort))
-    
+
     hunger))
 
 
@@ -137,7 +137,7 @@
   ;; use a normal (non-transactional) counter to keep track
   ;; of retried transactions for demonstration purposes.
   (decf (the fixnum (cdr plate)))
-   
+
   (let ((hunger -1) ;; unknown
         (free t)
         (busy +unbound-tvar+))
@@ -186,7 +186,7 @@
        until
          (zerop
           (the fixnum
-            
+
             (stmx::hw-atomic2 (helper :test-for-running-tx? nil)
 
              (fast-philosopher-eats/hwtx helper fork1 fork2 plate)

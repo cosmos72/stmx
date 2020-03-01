@@ -18,11 +18,6 @@
 ;; it only builds with SBCL running on a x86-64 CPU,
 ;; and (except for CPUID and TRANSACTION-SUPPORTED-P) defines CPU instructions
 ;; that require RTM support, i.e. hardware memory transactions.
-;;
-;; As of June 2013, the only x86-64 CPUs supporting RTM are:
-;; * Intel Core i5 4570
-;; * Intel Core i5 4670
-;; * Intel Core i7 4770
 
 
 (in-package :cl-user)

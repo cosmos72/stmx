@@ -56,7 +56,7 @@ i.e. (typep initial-element element-type) must return true."
   (the fast-vector
     (%make-fast-vector :vec (fast-vector-make-array initial-capacity element-type initial-element)
                        :initial-element initial-element)))
-    
+
 
 (declaim (ftype (function (fast-vector) fixnum) fast-vector-length fast-vector-capacity)
          (inline
@@ -144,10 +144,10 @@ the index of the pushed element."
                                               (fast-vector-initial-element fast-vector))))
         (dotimes (i len)
           (setf (svref new-vec i) (svref vec i)))
-        
+
         (setf (fast-vector-vec fast-vector) new-vec
               vec new-vec)))
-    
+
     (setf (svref vec len) new-element
           (fast-vector-len fast-vector) (the fixnum (1+ len)))
     (the fixnum len)))
@@ -165,7 +165,7 @@ the index of the pushed element."
 
     (dotimes (i len)
       (setf (svref vec i) element))
-    
+
     (setf (fast-vector-len fast-vector) 0)
     fast-vector))
 

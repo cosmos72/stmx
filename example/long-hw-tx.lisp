@@ -18,19 +18,19 @@
 
 (defpackage #:stmx.example5
   (:use #:cl #:stmx.asm  #:stmx.lang))
-                
+
 (in-package :stmx.example5)
 
 
 (deftype non-negative-fixnum () '(and (integer 0) fixnum))
 (deftype positive-fixnum     () '(and (integer 1) fixnum))
-                
+
 (declaim (inline empty-tx))
 (defun empty-tx (cell)
   "An empty HW transaction. Used to measure the overhead each HW transaction.
 On Intel Core i7 4770 @3.5GHz, the overhead is about 11 nanoseconds."
   (declare (type cons cell))
-  
+
   (when (= (transaction-begin) +transaction-started+)
     (let1 result (first cell)
       (transaction-end)
@@ -49,7 +49,7 @@ with almost no load, some typical results are
   1.0 milliseconds: maximum commit probability 10% to 25%
 Beyond that, maximum commit probability goes to zero very quickly."
   (declare (type cons cell))
-  
+
   (when (= (transaction-begin) +transaction-started+)
     (let1 n (the positive-fixnum (first cell))
       (dotimes (i n)
@@ -62,7 +62,7 @@ Beyond that, maximum commit probability goes to zero very quickly."
   "At least on SBCL, trying to allocate - even ONE SINGLE cons -
 inside a HW transaction appears to abort it with probability > 99.9%"
   (declare (type cons cell))
-  
+
   (let1 tx-length (the positive-fixnum (first cell))
 
     (when (= (transaction-begin) +transaction-started+)
@@ -107,4 +107,4 @@ inside a HW transaction appears to abort it with probability > 99.9%"
 
       (log:info "avg. time in each transaction ~S microseconds"
                 (* 1000000 (/ elapsed-secs runs))))))
-                    
+

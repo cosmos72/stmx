@@ -16,7 +16,7 @@
 (in-package :stmx.lang)
 
 (eval-always
-  
+
  (pushnew :stmx *features*)
 
  (declaim (type list *feature-list*))

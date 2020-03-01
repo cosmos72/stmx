@@ -45,7 +45,7 @@
            (type function comp))
   (loop for pair in (ghash-table-to-sorted-pairs ghash comp)
      collect (rest pair)))
-         
+
 
 
 (defun sort-and-compare-ghash-and-hash-table (ghash hash comp)
@@ -71,7 +71,7 @@
            (type function comp))
   (is (equal (ghash-table-to-sorted-pairs ghash1 comp)
              (ghash-table-to-sorted-pairs ghash2 comp))))
-  
+
 
 (defun test-ghash-table (ghash comp &key (count 16))
   (declare (type ghash-table ghash)
@@ -141,10 +141,10 @@
             k v1 v2)))))
 
 
-       
 
 
-    
+
+
 (defstruct %pair
   a b)
 
@@ -162,11 +162,11 @@
 (defun test-ghash-table-equalp ()
   "hash tables using 'EQUALP test are tricky,
 because they cannot rely on SXHASH for hashing."
-  
+
   (let ((h (make-hash-table :test 'equalp))
         (g (new 'ghash-table :test 'equalp)))
 
-    (macrolet ((with-test-data ((k v) &body body) 
+    (macrolet ((with-test-data ((k v) &body body)
                  `(loop for ,v from 0
                      for ,k in `(0 1 1/5 -7/3 ,(1- most-negative-fixnum) ,(1+ most-positive-fixnum)
                                   #\a #\z #c(1.0 2.0)
@@ -195,7 +195,7 @@ because they cannot rely on SXHASH for hashing."
 
     (equalp-ghash-and-hash-table g h)))
 
-      
+
 
 (def-test ghash-table-equalp (:compile-at :definition-time)
   (test-ghash-table-equalp))

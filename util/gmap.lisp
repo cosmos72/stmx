@@ -56,7 +56,7 @@ bad style; I prefer to be notified early if I try to do something plainly wrong.
     (check-type pred-sym symbol)
     (setf (_ m pred-func) (fdefinition pred-sym))))
 
-  
+
 
 
 ;;;; ** Public API
@@ -87,7 +87,7 @@ bad style; I prefer to be notified early if I try to do something plainly wrong.
            (type function func))
   (unless node
     (return-from fwd-traverse-gmap-at index))
-  
+
   (let ((index (fwd-traverse-gmap-at m (_ node left) index func)))
     (funcall func (_ node key) (_ node value) index)
     (incf (the fixnum index))
@@ -202,7 +202,7 @@ has undefined consequences. Not even the current key can be removed."
     (return-from gmap-count> t))
   (when-bind n (_ m count)
     (return-from gmap-count> (> (the fixnum n) count)))
-  
+
   (do-gmap* (:index index) m
     (when (> index count)
       (return-from gmap-count> t)))
@@ -339,7 +339,7 @@ as multiple values"
               (t    (return)))))
      (values (the list stack)
              (the (or null comp-result) comp))))
-     
+
 
 (defun set-gmap (m key value)
   "Add KEY to binary tree M if not present, and associate KEY to VALUE in M.
@@ -349,7 +349,7 @@ Return VALUE."
     (declare (type list stack)
              (type (or null comp-result) comp))
     (let1 node (first stack)
-       
+
       (if (eql k= comp)
           ;; key already present
           (setf (_ node value) value)
@@ -366,7 +366,7 @@ Return VALUE."
                 (setf (_ m root) child))
 
             (gmap/rebalance-after-insert m child stack))))
-      
+
     (free-list^ stack)
     value))
 
@@ -449,7 +449,7 @@ or (values nil nil nil) if M is empty."
            while child
            finally (return (values (_ node key) (_ node value) t)))
         (values nil nil nil))))
-           
+
 
 (defun max-gmap (m)
   "Return the largest key in M, its value, and t as multiple values,
@@ -462,7 +462,7 @@ or (values nil nil nil) if M is empty"
            while child
            finally (return (values (_ node key) (_ node value) t)))
         (values nil nil nil))))
-           
+
 
 
 (defun copy-gmap-into (mcopy m)
@@ -531,12 +531,12 @@ all entries in M."
   to-alist)
 
 
-    
+
 
 
 
 ;;;; ** Helper functions used by subclasses
-         
+
 
 (declaim (inline is-left-gmap-node-child?))
 (defun is-left-gmap-node-child? (node parent)
@@ -573,7 +573,7 @@ and also update parent's link to subtree root."
   (declare (type gmap-node node)
            (type (or null gmap-node) parent)
            (type boolean left))
-  
+
   (let1 new-node
       (if left
           (rotate-gmap-node-left node)

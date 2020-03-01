@@ -85,7 +85,7 @@
 
 
 ;;; RTM vops - restricted memory transaction
-   
+
 (declaim (type fixnum +transaction-started+))
 
 (defconstant +transaction-started+ 3
@@ -113,7 +113,7 @@ abort error codes.")
   (:generator 0
    (sb-assem:inst xend)))
 
-   
+
 (sb-c:define-vop (%xabort)
   (:policy :fast-safe)
   (:translate %transaction-abort)

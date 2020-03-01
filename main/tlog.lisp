@@ -67,10 +67,10 @@ Solution:
        "stmx:*current-thread* contains a stale value:~&   found ~S~&   expecting ~S"
        actual expected))))
 
-  
+
 ;;;; ** Creating, copying and clearing tlogs
 
-                                            
+
 (defun clear-tlog (log)
   "Remove all transactional reads and writes stored in LOG,
 as well as functions registered with BEFORE-COMMIT and AFTER-COMMIT;
@@ -113,7 +113,7 @@ return LOG itself."
       (clear-tlog log))
     (validate-tlog-pool))
   nil)
-    
+
 
 
 (defun new-or-clear-tlog (log &key parent)
@@ -198,7 +198,7 @@ Return t if log is valid and wait-tlog should sleep, otherwise return nil."
   (values))
 
 
-      
+
 (defun wait-once (log)
   "Sleep, i.e. wait for relevant TVARs to change.
 Return T if slept, or NIL if some TVAR definitely changed before sleeping."
@@ -212,7 +212,7 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
     (with-lock (lock)
       (unless (setf prevent-sleep (tlog-prevent-sleep log))
         (condition-wait (tlog-semaphore log) lock #-ecl :timeout #-ecl 10)))
-      
+
     (when (log.debug)
       (if prevent-sleep
           (log.debug "Tlog ~A prevented from sleeping, some TVAR must have changed" (~ log))
@@ -249,7 +249,7 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
     ;; call UNLISTEN-TVARS-OF also if an error is signaled
     (unlisten-tvars-of log))
   t)
-      
+
 
 
 

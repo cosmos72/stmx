@@ -16,7 +16,7 @@
 (in-package :stmx)
 
 ;;;; * Transactional structures
-       
+
 (enable-#?-syntax)
 
 
@@ -31,7 +31,7 @@
   (superclass  nil :type symbol)
   (options     nil :type list)
   (slots       nil :type list))
-                  
+
 
 (defstruct tstruct-slot
   (name          nil :type symbol)
@@ -124,11 +124,11 @@ Cannot generate functions in package NIL" symbol))
     (intern
      (apply #'concatenate 'string (mapcar #'string names))
      package)))
-  
+
 
 (defun %impl/names-to-symbol (package &rest names)
   (apply #'names-to-symbol package (symbol-name '%stmx-impl/tstruct/) names))
-      
+
 
 (defun tstruct-def-package (struct-def)
   (declare (type tstruct-def struct-def))
@@ -176,7 +176,7 @@ and all its superclasses"
           (dolist (slot (tstruct-def-slots struct))
             (push slot slots)))
         (nreverse slots))))
-    
+
 
 
 (defun tstruct-def->form (struct-def)
@@ -188,7 +188,7 @@ and all its superclasses"
      (:conc-name   ,(tstruct-def-tx-conc-name   struct-def))
      (:constructor ,(tstruct-def-tx-constructor struct-def))
      (:copier      nil)
-     
+
      ,@(tstruct-def-options   struct-def)))
 
 
@@ -216,7 +216,7 @@ and all its superclasses"
                  (compile-error "error in (~S ~S ...)
 ~S supports only one option ~S"
                         'defstruct name-and-options 'transactional-struct option)))
-           
+
              (check-unique-01-args (opt option args)
                (check-unique option)
                (when (and (consp args) (rest args))
@@ -244,7 +244,7 @@ found instead ~A"
 ~S does not support option ~A"
                          'defstruct name-and-options 'transactional-struct
                          (to-string opt))))))
-      
+
       (dolist (opt options)
         (let* ((symbol? (symbolp opt))
                (option  (if symbol? opt        (first opt)))
@@ -279,7 +279,7 @@ reason: the constructor is needed to implement the copier"
                  :constructor nil)
 
           (setf copier nil)))
-    
+
     (make-tstruct-def
      :name        name
      :conc-name   (if (eq conc-name +default+)
@@ -311,20 +311,20 @@ Slot initform is ~S"
 
   (if (stringp slot)
       slot
-     
+
       (let ((struct-name    (tstruct-def-name struct-def))
             (name           (tstruct-slot-name slot))
             (type           (tstruct-slot-type slot))
             (initform       (tstruct-slot-initform slot))
             (transactional? (tstruct-slot-transactional slot)))
-        
+
         `(,name
           ;; all tslots are initialized explicitly by constructor
           (tstruct-slot-initialize ',struct-name ',name ',initform)
           :type ,(if transactional? `(transactional ,type) type)
           :read-only ,(tstruct-slot-read-only slot)
           ,@(tstruct-slot-options slot)))))
-     
+
 
 
 (defun tstruct-slot-keyword (slot struct-def)
@@ -346,7 +346,7 @@ Slot initform is ~S"
          (pkg           (symbol-package-or-fail struct-name))
          (slot-name     (tstruct-slot-name slot)))
     (names-to-symbol pkg conc-name slot-name)))
-  
+
 
 (defun tstruct-slot-effective-reader (slot struct-def)
   "Return the reader name of given struct slot"
@@ -378,7 +378,7 @@ Slot initform is ~S"
          (slot-name     (tstruct-slot-name slot))
          (tx-accessor-name (names-to-symbol pkg tx-conc-name slot-name)))
     tx-accessor-name))
-           
+
 
 
 (defun parse-struct-slot (slot &key (tx +default+))
@@ -387,13 +387,13 @@ Slot initform is ~S"
   ;; documentation?
   (when (stringp slot)
     (return-from parse-struct-slot slot))
-   
+
   (cond
     ;; replace slot-name with (slot-name nil)
     ((symbolp slot)     (setf slot (list slot nil)))
     ;; replace (slot-name) with (slot-name nil)
     ((null (rest slot)) (setf slot (list (first slot) nil))))
-  
+
 
   (let ((read-only (getf slot :read-only))
         (accessor  (getf slot :accessor)))
@@ -414,7 +414,7 @@ Slot initform is ~S"
                       (unless (member transactional `(t nil ,+default+) :test 'eq)
                         (compile-error "STMX: unexpected slot option :TRANSACTIONAL ~S,
 expecting :TRANSACTIONAL T or :TRANSACTIONAL NIL" transactional))
-                      
+
                       (when (and read-only
                                  (eq t transactional))
                         (compile-error
@@ -430,8 +430,8 @@ read-only slots cannot be transactional" read-only transactional))
                 (dolist (option '(:type :read-only :transactional :reader :writer))
                   (remf options option))
                 options))))
-                       
-   
+
+
 (defun parse-struct-slots (slots &key (tx +default+))
   (declare (type list slots))
   (loop for slot in slots
@@ -460,7 +460,7 @@ read-only slots cannot be transactional" read-only transactional))
     :transactional ',(tstruct-slot-transactional obj)
     :options       ',(tstruct-slot-options       obj)))
 
-                       
+
 (defun make-load-form/tstruct-def (obj)
   (declare (type tstruct-def obj))
 
@@ -492,11 +492,11 @@ Note: TRANSACTIONAL-STRUCT supports only one constructor"
                                     (tstruct-slot-initform slot))))
          (declare ,@(loop for slot in slots
                        collect `(type ,(tstruct-slot-type slot) ,(tstruct-slot-name slot))))
-         
+
          (,(tstruct-def-tx-constructor struct-def)
            ,@(loop for slot in slots
                 collect (intern (symbol-name (tstruct-slot-name slot)) :keyword)
-                  
+
                 collect (let1 arg-name (tstruct-slot-name slot)
                           (if (tstruct-slot-transactional slot)
                               `(tvar ,arg-name)
@@ -533,7 +533,7 @@ Note: TRANSACTIONAL-STRUCT supports only one constructor"
 
 (defun tstruct-def->defun-accessor (slot struct-def)
   "Define accessor functions for SLOT of STRUCT-DEF"
-  
+
   (let ((struct-name (tstruct-def-name struct-def))
         (struct-type (tstruct-def-type struct-def))
         (reader      (tstruct-slot-effective-reader slot struct-def))
@@ -541,7 +541,7 @@ Note: TRANSACTIONAL-STRUCT supports only one constructor"
         (tx-accessor   (tstruct-slot-tx-accessor slot struct-def))
         (transactional (tstruct-slot-transactional slot))
         (slot-type     (tstruct-slot-type slot)))
-            
+
     `(define-tstruct-slot-accessor
          ,reader ,writer ,tx-accessor
          :type ,slot-type :struct-type ,(or struct-type struct-name)
@@ -558,7 +558,7 @@ Note: TRANSACTIONAL-STRUCT supports only one constructor"
 
         (push (tstruct-def->defun-accessor slot struct-def)
               defuns)))
-        
+
     (nreverse defuns)))
 
 
@@ -589,12 +589,12 @@ in order to declaim them inline"
 (defun tstruct-def->defun-copier (struct-def)
   "Define copier function"
   (declare (type tstruct-def struct-def))
-           
+
   (when-bind copier    (tstruct-def-copier      struct-def)
     (let ((name        (tstruct-def-name        struct-def))
           (type        (tstruct-def-type        struct-def))
           (constructor (tstruct-def-constructor struct-def)))
-      
+
       (with-gensym old-instance
         `(defun ,copier (,old-instance)
            (declare (type ,(or type name) ,old-instance))
@@ -609,7 +609,7 @@ in order to declaim them inline"
                       (push arg-keyword args)
                       (push `(,reader ,old-instance) args))))
                 (nreverse args))))))))
-         
+
 
 (defun tstruct-def->defmethod-tstruct-def (struct-def)
   (let ((name (tstruct-def-name struct-def)))
@@ -629,12 +629,12 @@ Use this macro to wrap a DEFSTRUCT as follows:
 Note: this macro only analyzes the structure definition, does *not* define the structure.
 See NON-TRANSACTIONAL-STRUCT for that."
   (declare (ignore defstruct))
-  
+
   (let ((struct-def (parse-struct-def-and-slots
                      name-and-options slot-descriptions :tx nil)))
     (tstruct-def->defmethod-tstruct-def struct-def)))
 
-    
+
 
 (defun tstruct-def->defun-functions (struct-def)
   "Define constructors, copier and accessors functions"
@@ -643,14 +643,14 @@ See NON-TRANSACTIONAL-STRUCT for that."
   (delete
    nil
    `(,(tstruct-def->defmethod-tstruct-def struct-def)
-           
+
       ,@(tstruct-def->defun-accessors struct-def)
 
       ,(tstruct-def->defun-constructor struct-def)
-              
+
       ,(tstruct-def->defun-copier struct-def))))
 
-     
+
 
 
 
@@ -659,13 +659,13 @@ See NON-TRANSACTIONAL-STRUCT for that."
   "List %stmx-tstruct hidden constructor and accessors functions,
 in order to declaim them inline"
   (declare (type tstruct-def struct-def))
-  
+
   (delete
    nil
    `(,(tstruct-def-tx-constructor struct-def)
-       
+
      ,@(tstruct-def->tx-accessors  struct-def))))
-     
+
 
 
 (defun tstruct-def->all (defstruct struct-def &optional slots)
@@ -675,7 +675,7 @@ in order to declaim them inline"
   (let ((slots (or slots (tstruct-def-slots struct-def))))
     `(progn
        (declaim (inline ,@(tstruct-def->tx-functions struct-def)))
-       
+
        (,defstruct ,(tstruct-def->form struct-def)
          ,@(loop for slot in slots
                 collect

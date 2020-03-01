@@ -15,7 +15,7 @@
 
 (in-package :stmx.asm)
 
-(defconstant +impl-package+ 
+(defconstant +impl-package+
   (loop :for pkg in '(:sb-x86-64-asm :sb-x86-asm :sb-vm)
      :when (find-package pkg)
      :return pkg)
@@ -32,7 +32,7 @@
   (declare (type (or symbol string) symbol-name))
   (let ((symbol-name (symbol-name* symbol-name)))
     (find-symbol symbol-name package-name)))
-  
+
 ;;;; conditional compile helpers, use as follows:
 ;;;; #+#.(stmx.asm::compile-if-package :package-name) (form ...)
 ;;;; #+#.(stmx.asm::compile-if-symbol :symbol-name :package-name) (form ...)
@@ -88,13 +88,24 @@
 			 (string-to-int-list version-int-list))))
     (int-list>= current-version min-version)))
 
+(defun compile-if-sbcl-lacks-rtm-instructions ()
+  ;; Instructions XBEGIN XEND XABORT XTEST are defined only in SBCL >= 1.3.4
+  ;;
+  ;; Attempts to directly inspect sbcl internals to detect whether
+  ;; the instructions are defined or not are doomed to break sooner or later,
+  ;; because they mess with SBCL internal implementation details
+  ;; subject to change without notice.
+  ;;
+  ;; Thus simply check for SBCL version.
+  (compile-if (not (lisp-version>= '(1 3 4)))))
+
 (defun compile-if-sbcl-disassem<=32-bit ()
   ;; SBCL < 1.2.14 disassembler does not support instructions longer than 32 bits,
   ;; so we will have to work around it by using a prefilter
   ;; to read beyond 32 bits while disassembling
   (compile-if (not (lisp-version>= '(1 2 14)))))
 
-    
+
 ;;;; new compiler intrinsic functions
 
 (defconstant +defknown-has-overwrite-fndb-silently+

@@ -49,13 +49,13 @@
 (defun make-atomic-counter ()
   "Create and return a new ATOMIC-COUNTER."
   (%make-atomic-counter))
-    
+
 
 (deftype positive-fixnum () '(and fixnum (integer 1)))
 
 (declaim (ftype (function (atomic-counter &optional positive-fixnum) atomic-counter-num)
                 incf-atomic-counter)
-         
+
          #?+fast-atomic-counter
          (inline incf-atomic-counter))
 
@@ -86,7 +86,7 @@
            ;; fast modulus arithmetic
            #?+fixnum-is-large-powerof2
            (setf ,place (logand most-positive-fixnum (+ ,place ,delta-var)))
-      
+
            #?-fixnum-is-large-powerof2
            (progn
              ;; fixnum arithmetic
@@ -135,7 +135,7 @@
 (defmacro get-atomic-place (place &optional place-mutex)
   "Return current value of atomic PLACE."
   (declare (ignorable place-mutex))
-       
+
   #?+fast-atomic-counter
   `(progn
      #?+mem-rw-barriers (mem-read-barrier)
@@ -155,7 +155,7 @@
 (defun get-atomic-counter (counter)
   "Return current value of atomic COUNTER."
   (declare (type atomic-counter counter))
-       
+
   (get-atomic-place (atomic-counter-version counter)
                     #?-fast-atomic-counter
                     (atomic-counter-mutex counter)))
@@ -166,7 +166,7 @@
 (defmacro get-atomic-place-plus-delta (place delta &optional place-mutex)
   "Return DELTA plus current value of atomic PLACE."
   (declare (ignorable place-mutex))
-       
+
   #?+fixnum-is-large-powerof2
   `(the atomic-counter-num
      (logand most-positive-fixnum
@@ -194,7 +194,7 @@
   "Return DELTA plus current value of atomic COUNTER."
   (declare (type atomic-counter counter)
            (type positive-fixnum delta))
-       
+
   (get-atomic-place-plus-delta (atomic-counter-version counter) delta
                                #?-fast-atomic-counter
                                (atomic-counter-mutex counter)))
@@ -210,7 +210,7 @@
 
   #?+fast-atomic-counter
   (declare (ignore place-mutex))
-       
+
   #?+fast-atomic-counter
   `(progn
      #?+mem-rw-barriers (mem-write-barrier)
@@ -230,7 +230,7 @@
   "Set and return value of atomic COUNTER."
   (declare (type atomic-counter counter)
            (type atomic-counter-num value))
-       
+
   (set-atomic-place (atomic-counter-version counter) value
                     #?-fast-atomic-counter
                     (atomic-counter-mutex counter)))

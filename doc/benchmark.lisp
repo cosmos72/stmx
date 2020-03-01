@@ -5,7 +5,7 @@
 
 (in-package :stmx.util)
 (import '(stmx::current-tlog stmx::sw-atomic
-          stmx::hw-atomic2   stmx::with-hwtx 
+          stmx::hw-atomic2   stmx::with-hwtx
           stmx::$-hwtx       stmx::$-swtx))
 
 (defmacro x3 (&rest body)
@@ -22,10 +22,10 @@
            ,@body)))
 (defvar *v* (tvar 0))
 (defvar *c* (tcell 0))
-(defvar *m*  (new 'rbmap :pred 'fixnum<)) 
-(defvar *tm* (new 'tmap  :pred 'fixnum<)) 
-(defvar *h*  (new 'ghash-table :test 'fixnum= :hash 'identity)) 
-(defvar *th* (new 'thash-table :test 'fixnum= :hash 'identity)) 
+(defvar *m*  (new 'rbmap :pred 'fixnum<))
+(defvar *tm* (new 'tmap  :pred 'fixnum<))
+(defvar *h*  (new 'ghash-table :test 'fixnum= :hash 'identity))
+(defvar *th* (new 'thash-table :test 'fixnum= :hash 'identity))
 ;; some initial values
 (setf (get-gmap *m* 1) 0)
 (setf (get-gmap *tm* 1) 0)
@@ -156,7 +156,7 @@
 (run1m (sw-atomic (get-gmap tm 1)))
 (run1m (atomic    (get-gmap tm 1)))
 (run1m (simple-hw-atomic (get-gmap tm 1)))
-                   
+
 
 ;; tmap read-write-1
 (run1m (sw-atomic (incf (the fixnum (get-gmap tm 1)))))
@@ -271,7 +271,7 @@
 
 ;; 1.124 seconds - v2.0.0 initialize-instance
 ;; 2.363 seconds - v1.9.0 initialize-instance
-(run1m (new 'thash-table :test 'fixnum= :hash 'identity)) 
+(run1m (new 'thash-table :test 'fixnum= :hash 'identity))
 
 ;; 0.298 seconds
 (let ((n 0))

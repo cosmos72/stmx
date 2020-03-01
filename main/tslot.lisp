@@ -59,7 +59,7 @@
           (if (eq value +unbound-tvar+)
               (unbound-slot-error class instance slot)
               value))
-    
+
         ;; Return the plain slot-value.
         obj)))
 
@@ -74,12 +74,12 @@
 
   (if (and (transactional-slot? slot)
            (or (recording?) (hide-tvars?)))
-    
+
       ;; Get the tvar from the slot and write inside it.
       ;; During transactions, writing tvars is recorded into the current tlog.
       (let1 var (slot-raw-tvar class instance slot)
         (setf ($ var) value))
-      
+
       ;; Write in the slot
       (call-next-method)))
 
@@ -108,7 +108,7 @@
       ;; Get the tvar from the slot, and unbind its value.
       ;; During transactions, unbinding the tvar is recorded into the current tlog.
       (unbind-$ (slot-raw-tvar class instance slot))
-    
+
       ;; raw access: unbind the slot.
       (call-next-method)))
 
@@ -120,14 +120,14 @@
 (defmethod update-instance-for-redefined-class
 
     #?+use-initialize-instance-before :before
-    
+
     ((instance transactional-object) added-slots discarded-slots
      property-list #-(and) &rest #-(and) initargs &key &allow-other-keys)
-  
+
   "Put TVARs into all newly-added transactional slots of INSTANCE"
 
   (declare (ignore discarded-slots property-list))
-  
+
   (stmx::without-recording-with-show-tvars
 
     #?-use-initialize-instance-before
@@ -140,16 +140,16 @@
           (let ((slot (find-slot-by-name slot-name effective-slots)))
             (when (transactional-slot? slot)
 
-              #?+use-initialize-instance-before 
+              #?+use-initialize-instance-before
               ;; added a transactional slot. put a TVAR into it
               ;; before its contents is initialized
               (setf (slot-value instance slot-name) (tvar))
 
-              #?-use-initialize-instance-before 
+              #?-use-initialize-instance-before
               ;; the new transactional slot is already initialized.
               ;; wrap the slot value with a TVAR.
               (tvar-wrap-slot instance slot-name))))))))
-              
+
 
 
 

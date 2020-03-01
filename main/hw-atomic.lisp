@@ -33,7 +33,7 @@ Warning: if a transaction is already running, execute BODY inside it"
 
   (let ((tvar-write-version (or hw-write-version (gensym (symbol-name 'tvar-write-version))))
         (err (or err (gensym (symbol-name 'err)))))
-    
+
     (with-gensyms (tx-begin tx-fallback attempts)
       `(cond
          ,@(if test-for-running-tx?
@@ -45,10 +45,10 @@ Warning: if a transaction is already running, execute BODY inside it"
                  (,attempts +hw-atomic-max-attempts+)
                  ;; create a a thread-local binding for *hw-tlog-write-version*
                  (*hw-tlog-write-version* +invalid-version+))
-             
+
              (unless (zerop (global-clock/get-nohw-counter))
                (go ,tx-fallback))
-             
+
              ,tx-begin
              (setf ,err (hw-transaction-begin))
              (when (= ,err +hw-transaction-started+)
@@ -61,7 +61,7 @@ Warning: if a transaction is already running, execute BODY inside it"
                       (setf *hw-tlog-write-version*
                             (global-clock/hw/start-write (global-clock/hw/start-read)))))
                  (declare (ignorable ,tvar-write-version))
-                  
+
 
                  (return ;; returns from (prog ...)
                    (multiple-value-prog1
@@ -79,7 +79,7 @@ Warning: if a transaction is already running, execute BODY inside it"
              ,(if (eq update-stat :swtx)
                   `(global-clock/sw/stat-aborted)
                   `(global-clock/hw/stat-aborted))
-             
+
              ,tx-fallback
              (return ;; returns from (prog ...)
                ,fallback)))))))

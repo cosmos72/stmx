@@ -21,7 +21,7 @@
   (:import-from #:stmx.lang
                 #:eval-always
                 #:start-thread #:wait4-thread))
-                
+
 
 (in-package :stmx.example.dining-philosophers.lock)
 
@@ -51,7 +51,7 @@
  (defmacro make-lock (&optional name)
    (declare (ignore name))
    `(stmx.lang::make-mutex))
- 
+
  (defmacro acquire-lock (lock)
    `(stmx.lang::try-acquire-mutex ,lock))
 

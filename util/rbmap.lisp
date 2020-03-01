@@ -77,7 +77,7 @@
   (let1 copy (gmap/new-node m (_ node key) (_ node value))
     (setf (_ copy color) (_ node color))
     copy))
-  
+
 
 (defun %rbmap-rebalance-after-insert (m stack)
   "Rebalance red-black tree after adding a child to (first stack).
@@ -92,7 +92,7 @@ If stack is nil, returned node is the new root to set."
          parent)
      (declare (type (or null rbnode) node parent))
      (declare (type boolean left-node?))
-           
+
      ;; 0) if X is black, we're DONE.
      rule-0
      (log.debug-gmap node parent stack "rule-0")
@@ -136,7 +136,7 @@ If stack is nil, returned node is the new root to set."
      ;;        / \   rotate around X:        / \   now move to C*
      ;;       X*  B  rotate-left if         C*  B       v
      ;;        \     X* is left child, ->  /       call it X* and go to 3)
-     ;;         C*   rotate-right if      X*    
+     ;;         C*   rotate-right if      X*
      ;;              X* is right child
      (log.debug-gmap node parent stack "rule-2")
      (setf left-node? (is-left-rbnode-child? node parent))
@@ -221,7 +221,7 @@ Return some node in rebalanced tree and its stack as multiple values"
 
      (setf brother (if left-node? (_ parent right) (_ parent left)))
      (log.debug-gmap node parent stack "start" :left-node? left-node? :brother brother)
-          
+
      ;; 1.1) if X has a red brother B, their parent A must be black and B must have
      ;;      two black children C and D. flip colors of parent A and brother B.
      ;;       A                      A*
@@ -242,7 +242,7 @@ Return some node in rebalanced tree and its stack as multiple values"
        ;; rotate around parent. grandparent (if exists) must also be linked
        ;; to former brother instead of former parent
        (push (rotate-gmap-node-around parent (first stack) :left left-node?) stack))
-           
+
      (log.debug-gmap node parent stack "rule-1" :brother brother)
 
      ;; X must have a black brother B.
@@ -354,7 +354,7 @@ from rebalanced tree. Some-node will be nil only if the tree is empty after remo
             (setf node   other-node
                   parent other-parent
                   stack  other-stack))
-                  
+
           (log.debug-gmap node parent stack "after swap with successor or predecessor"))))
 
 
@@ -365,7 +365,7 @@ from rebalanced tree. Some-node will be nil only if the tree is empty after remo
       (replace-gmap-node node nil parent)
       (log.debug-gmap node parent stack "after delete red node")
       (return-from %rbmap-remove-at (values parent (rest stack))))
-    
+
     ;; black node with < 2 children: either has no children, or one red leaf child
     (with-ro-slots (left right) node
       (when-bind child (or left right)
@@ -373,11 +373,11 @@ from rebalanced tree. Some-node will be nil only if the tree is empty after remo
         (replace-gmap-node node child parent)
         (log.debug-gmap node parent stack "after replace black node")
         (return-from %rbmap-remove-at (values child stack))))
-    
+
     ;; the hard case: black node with no children
     (log.debug-gmap node parent stack "before remove-black-node-at")
     (return-from %rbmap-remove-at (%rbmap-remove-black-node-at m node stack))))
-          
+
 
 
 (defmethod gmap/remove-at ((m rbmap) stack)

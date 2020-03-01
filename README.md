@@ -26,7 +26,12 @@ and aim at resolving the tension between granularity and concurrency.
 News
 ----
 
-### Latest news, 16th January 2015
+### Latest news, 1st March 2020
+
+Fixed STMX for internal changes in SBCL 2.0.0 and SBCL 2.0.2.
+Updated list of Intel CPUs supporting memory transactions in hardware (Intel TSX) - see below.
+
+### News, 16th January 2015
 
 Version 2.0.1 released.
 It adds support for transactional structs in addition to transactional CLOS objects,
@@ -60,22 +65,25 @@ Supported systems
 STMX is currently tested on the following Common Lisp implementations:
 
 * [SBCL](http://sbcl.org/)
-  * version 1.3.6       (x86_64)   on Debian GNU/Linux stretch (x86_64)
-  * version 1.3.5       (x86_64)   on Debian GNU/Linux stretch (x86_64)
-  * version 1.3.4       (x86_64)   on Debian GNU/Linux stretch (x86_64)
-  * version 1.3.3       (x86_64)   on Debian GNU/Linux stretch (x86_64)
-  * version 1.3.2       (x86_64)   on Debian GNU/Linux stretch (x86_64)
-  * version 1.3.1       (x86_64)   on Debian GNU/Linux stretch (x86_64)
-  * version 1.2.10      (x86_64)   on Debian GNU/Linux stretch (x86_64)
-  * version 1.1.15      (x86_64)   on Debian GNU/Linux stretch (x86_64)
-  * version 1.1.14      (x86_64)   on Debian GNU/Linux stretch (x86_64)
-  * version 1.2.6       (x86)      on Debian GNU/Linux stretch (x86_64)
-  * version 1.1.14      (x86)      on Debian GNU/Linux stretch (x86_64)
-  * version 1.0.57      (x86)      on Debian GNU/Linux wheezy  (x86)
-                                      [requires old Quicklisp and libraries]
-  * version 1.2.8       (armhf)    on Debian GNU/Linux wheezy  (armhf) inside Qemu
-  * version 1.1.15      (powerpc)  on Debian GNU/Linux stretch (powerpc) inside Qemu
-  * version 1.2.7       (x86_64)   on Windows 7                (x86_64)
+  * version 2.0.0       (x86_64)   on Debian GNU/Linux bullseye (x86_64)
+  * version 1.5.4       (x86_64)   on Debian GNU/Linux bullseye (x86_64)
+  * version 1.5.2       (x86_64)   on Debian GNU/Linux bullseye (x86_64)
+  * version 1.4.16      (x86_64)   on Debian GNU/Linux bullseye (x86_64)
+  * version 1.3.19      (x86_64)   on Debian GNU/Linux buster   (x86_64)
+  * version 1.3.6       (x86_64)   on Debian GNU/Linux stretch  (x86_64)
+  * version 1.3.5       (x86_64)   on Debian GNU/Linux stretch  (x86_64)
+  * version 1.3.4       (x86_64)   on Debian GNU/Linux stretch  (x86_64)
+  * version 1.3.3       (x86_64)   on Debian GNU/Linux stretch  (x86_64)
+  * version 1.3.2       (x86_64)   on Debian GNU/Linux stretch  (x86_64)
+  * version 1.3.1       (x86_64)   on Debian GNU/Linux stretch  (x86_64)
+  * version 1.2.10      (x86_64)   on Debian GNU/Linux stretch  (x86_64)
+  * version 1.1.15      (x86_64)   on Debian GNU/Linux stretch  (x86_64)
+  * version 1.1.14      (x86_64)   on Debian GNU/Linux stretch  (x86_64)
+  * version 1.2.6       (x86)      on Debian GNU/Linux stretch  (x86_64)
+  * version 1.1.14      (x86)      on Debian GNU/Linux stretch  (x86_64)
+  * version 1.2.8       (armhf)    on Debian GNU/Linux wheezy   (armhf) inside Qemu
+  * version 1.1.15      (powerpc)  on Debian GNU/Linux stretch  (powerpc) inside Qemu
+  * version 1.2.7       (x86_64)   on Windows 7                 (x86_64)
   
 * [ABCL](http://www.abcl.org/)
   * version 1.3.3 with OpenJDK 7u91 (x86_64) on Debian GNU/Linux stretch (x86_64)
@@ -655,19 +663,29 @@ Hardware transactions
 ---------------------
 
 STMX versions 1.9.0 or later can take advantage of hardware transactions
-on Intel CPUs that support Transactional Synchronization Extensions
-(TSX) - as of Juy 2013 the only CPUs actually supporting it are:
+on Intel CPUs that support Transactional Synchronization Extensions (TSX)
+As of February 2020, many recent consumer and server Intel CPUs support them,
+including at least:
 
-- Intel Core i5 4570
-- Intel Core i5 4670
-- Intel Core i7 4770
+-  7th generation Core i5: 7500 7500T 7600  7600K 7600T 7Y57
+-  8th generation Core i5: 8500 8500T 8600  8600T 8600K
+-  9th generation Core i5: 9500 9500E 9500F 9500T 9500TE 9600 9600K 9600KF 9600T
+- 10th generation Core i7: -
 
-Quite surprisingly, the overclocker-friendly Intel Core i7 4770K (note
-the final K) does **not** support hardware transactions.
+-  7th generation Core i7: 7600U 7660U 7700  7700K  7700T 7820EQ 7820HK 7820HQ 7920HQ 7Y75
+-  8th generation Core i7: 8086K 8650U 8665U 8665UE +8700 8700   8700B  8700K  8700T  8706G 8850H
+-  9th generation Core i7: 9700  9700E 9700F 9700K 9700KF 9700T  9700TE 9850H  9850HE 9850HL
+- 10th generation Core i7: -
+
+-  8th generation Core i9: 8950HK
+-  9th generation Core i9: 9880H 9900 9900K 9900KF 9900KS 9900T 9980HK
+
+(This list is necessarily incomplete. To check whether a specific Intel CPU
+supports Transactional Synchronization Extensions (TSX) browse https://ark.intel.com/)
 
 To actually use hardware transactions from STMX, there are two more requirements:
 
-- a recent, 64-bit version of SBCL - at the moment only version 1.1.19 is tested
+- a 64-bit version of SBCL - any version >= 1.2.0 should work
 - a 64-bit unix-like operating system - at the moment only Linux x86_64 is tested
 
 Also, hardware transactions only work in compiled code - SBCL sometimes

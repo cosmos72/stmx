@@ -109,7 +109,7 @@ Arguments are: package-name symbol-name."
                       (#\+ t)
                       (#\-  nil)))
            (args (read stream t)))
-      
+
       (if (or *read-suppress* (eq ch-flag (compile-if-eval ch args)))
           (read stream t nil t)
           (let ((*read-suppress* t))

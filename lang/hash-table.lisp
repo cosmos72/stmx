@@ -56,7 +56,7 @@ hash table operations for EACH iteration:
       do (progn
            (incf-hash-counter loop)
            ,@body)))
-        
+
 (declaim (inline get-hash))
 (defun get-hash (hash key)
   "Same as (gethash key hash), only with reversed arguments."
@@ -129,8 +129,8 @@ TO-ALIST contents is not destructively modified."
   (do-hash (key value) src
     (push^ (cons^ key value) to-alist))
   to-alist)
-  
-  
+
+
 (defun copy-hash-table (dst src)
   "Copy all key/value pairs from hash-table SRC into hash-table DST.
 Other keys (and their values) present in DST but not in SRC

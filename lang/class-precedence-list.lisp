@@ -59,7 +59,7 @@
                  remaining-constraints (delete choice
                                                remaining-constraints
                                                :test #'member)))))))
-        
+
 
 (defun clos-tie-breaker-rule (minimal-elements reverse-precedence-list)
   (log.trace "~%minimal-elements = ~A~%reverse-pcl = ~A" minimal-elements reverse-precedence-list)

@@ -27,7 +27,7 @@
 
 (defmethod tnreverse ((x tcons))
   #-(and)
-  (loop 
+  (loop
      for top = x then curr
      for curr = (prog1 (tcons-rest x)
                   (setf (tcons-rest x) nil)) then next
@@ -45,8 +45,8 @@
              next)
        (next))
       ((tendp curr) top)
-    
+
     (setf next (tcons-rest curr)
           (tcons-rest curr) top)))
 
-             
+

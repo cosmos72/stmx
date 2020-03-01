@@ -19,7 +19,7 @@
 (defun hash-table-to-sorted-keys (hash pred)
   (declare (type hash-table hash))
   (let ((pred-func (if (functionp pred) pred (fdefinition pred))))
-    
+
     (sort (hash-table-keys hash) pred-func)))
 
 
@@ -34,6 +34,6 @@
   (declare (type hash-table hash))
   (loop for pair in (hash-table-to-sorted-pairs hash pred)
      collect (rest pair)))
-         
+
 
 

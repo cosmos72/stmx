@@ -33,7 +33,7 @@
            #:enable-#?-syntax
            #:set-feature  #:set-features #:default-feature #:default-features
            #:get-feature  #:all-features #:assoc-feature
-           
+
            #:log.trace    #:log.debug    #:log.make-logger
 
            ;; bordeaux-threads helpers
@@ -77,7 +77,7 @@
            #:set-atomic-counter  #:set-atomic-place
            #:get-atomic-counter  #:get-atomic-place
            #:get-atomic-counter-plus-delta #:get-atomic-place-plus-delta
-           
+
 
            #:mutex             #:make-mutex
            #:mutex-owner       #:mutex-lock
@@ -91,7 +91,7 @@
            #:fast-vector-pop    #:fast-vector-pop-macro
            #:fast-vector-push   #:fast-vector-push-extend
            #:fast-vector-clear  #:do-fast-vector
-           
+
            #:get-hash #:set-hash ;; also (setf get-hash)
            #:rem-hash #:clear-hash #:do-hash
 

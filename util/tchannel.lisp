@@ -46,7 +46,7 @@ Since tchannel can contain unlimited values, this method never blocks."
              (trest  back) cell
              back cell)))
    value))
-   
+
 (defmethod try-put  ((c tchannel) value)
   "Append VALUE to tchannel C and return (values t VALUE).
 Since tchannel can contain unlimited values, this method never fails."
@@ -77,7 +77,7 @@ Values written into the tchannel are available to all reading ports in the same 
 (defun tport-empty? (p)
   (declare (type tport p))
   (eq (_ p front) (tchannel-back-of p)))
-  
+
 
 (defmethod initialize-instance :after ((p tport) &key &allow-other-keys)
   "Initialize the reading tport P for a multicast tchannel."
@@ -91,7 +91,7 @@ Values written into the tchannel are available to all reading ports in the same 
  (defmethod empty! ((p tport))
    (setf (_ p front) (tchannel-back-of p))
    p))
-                  
+
 (defmethod full? ((p tport))
   "Tports are read-only: it is never possible to store values in them,
 so assume they are always full and return t."

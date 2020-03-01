@@ -43,7 +43,7 @@ return arg-set-p, or NIL if not present"
   (when (consp param)
     (third param)))
 
-  
+
 (defun lambda-list-to-args (lambda-list)
   "Remove all occurrences of &optional &key &rest &allow-other-keys and &aux from LAMBDA-LIST.
 Also extract actual argument names from &optional, &key and &aux parameters.
@@ -77,7 +77,7 @@ a lambda list created for a function."
 
 
 
-  
+
 (defun extract-docstrings (body)
   (let ((docstrings (when (and (stringp (first body)) (rest body))
                       (list (pop body)))))
@@ -96,7 +96,7 @@ a lambda list created for a function."
          ,@body)
       `(let ((,docstrings (extract-docstrings ,func-body)))
          ,@body)))
-    
+
 (defmacro with-declares ((declares &optional var-body) func-body &body body)
   (if var-body
       `(multiple-value-bind (,declares ,var-body) (extract-declares ,func-body)
@@ -137,13 +137,13 @@ a lambda list created for a function."
 
   (add-optimized-fun* '$ #($-hwtx $-swtx $-notx (var)))
   (add-optimized-fun* 'set-$ #(set-$-hwtx set-$-swtx set-$-notx (value var))))
-  
-  
+
+
 (defun bind-optimized-fun (fun fun-tx lambda-list)
   "Return a form suitable for MACROLET"
   (let ((args (lambda-list-to-args lambda-list)))
     `(,fun ,lambda-list `(,',fun-tx ,,@args))))
-   
+
 (defmacro with-tx ((kind) &body body)
   (check-type kind compiling-transaction)
   (let ((index (position kind #(:hwtx :swtx :notx nil))))
@@ -187,7 +187,7 @@ a lambda list created for a function."
               `(progn ,@var-body))))))
 
 
-    
+
 
 ;; known options are :hwtx :swtx :notx :inline
 (defmacro optimize-for-transaction* ((&key inline
@@ -215,7 +215,7 @@ option ~S is supported only for DEFUN, not for DEFMETHOD"
 
   (with-docstrings (docstrings d-body) body
     (with-declares (declares n-body) d-body
-      
+
       ;; support function names '(setf ...)
       (let* ((simple-name? (not (consp name)))
              (simple-name  (if simple-name? name (second name)))
@@ -236,12 +236,12 @@ option ~S is supported only for DEFUN, not for DEFMETHOD"
                             (if body-swtx? body-swtx `((with-swtx ,@n-body)))
                             (if body-notx? body-notx `((with-notx ,@n-body)))))
              (params   (lambda-list-to-args args)))
-        
-        
+
+
         (flet ((call-fun (kind params)
                  (let ((fun-tx-name (getf fun-plist kind)))
                    `(,fun-tx-name ,@params))))
-        
+
           `(progn
              ,@(loop for kind in kinds
                   for fun in funs
@@ -258,7 +258,7 @@ option ~S is supported only for DEFUN, not for DEFMETHOD"
              (,defun-or-defmethod ,mangled-name ,args
                ,@docstrings
                ,@declares
-               
+
                (cond
                  #?+hw-transactions
                  ((/= +invalid-version+ (hw-tlog-write-version)) ,(call-fun :hwtx params))
@@ -267,7 +267,7 @@ option ~S is supported only for DEFUN, not for DEFMETHOD"
 
              (eval-always
                (add-optimized-fun* ',mangled-name #(,@funs ,args)))
-             
+
              ;; macrolet used by WITH-TX cannot bind names like (setf ...)
              ;; thus we use a mangled name
              ;; and create a setf-expander on the original name
@@ -280,7 +280,7 @@ option ~S is supported only for DEFUN, not for DEFMETHOD"
                       (defsetf ,simple-name ,(rest args-quoted) (,(first args-quoted))
                         ,@docstrings
                         (list ',mangled-name ,@params)))))
-             
+
              ',name))))))
 
 (defmacro optimize-for-transaction ((defun-or-defmethod name (&rest args) &body body))

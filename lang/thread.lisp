@@ -44,7 +44,7 @@
 
 
 
-  
+
 
 
 ;;;; * Wrappers around Bordeaux Threads to capture
@@ -56,7 +56,7 @@
 (eval-always
   (ensure-thread-initial-binding '*current-thread* '(current-thread))
 
-  
+
   (defun start-multithreading ()
     ;; on CMUCL, (bt:start-multiprocessing) is blocking!
     #-cmucl (bt:start-multiprocessing))
@@ -66,7 +66,7 @@
   (defmacro compile-log-warn (&rest args)
     `(when *compile-file-truename*
        (log:warn ,@args)))
-  
+
   (defun detect-thread-support()
     "test for multi-threading support:
   :STMX/DISABLE-THREADS most not be present CL:*FEATURES*,
@@ -81,7 +81,7 @@
          (compile-log-warn "Warning: compiling STMX without multi-threading support.
   reason: feature :STMX/DISABLE-THREADS found in CL:*FEATURES*")
          (return nil))
-       
+
        #-stmx/disable-threads
        (progn
          (unless bt:*supports-threads-p*
@@ -94,7 +94,7 @@
                     (y (bt:join-thread (bt:make-thread (lambda () x)))))
                (set-feature 'bt/join-thread (if (eq x y) :sane :broken))
                (return t))
-           
+
            (condition (c)
              (compile-log-warn "Warning: compiling STMX without multi-threading support.
   reason: (BORDEAUX-THREADS:JOIN-THREAD (BORDEAUX-THREADS:MAKE-THREAD ...))
@@ -127,7 +127,7 @@
 
   #?+bt/make-thread
   (progn
-    
+
     #?+(eql bt/join-thread :sane)
     (make-thread function :name name :initial-bindings initial-bindings)
 

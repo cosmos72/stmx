@@ -51,7 +51,7 @@ by **other** threads."
     (if (tvar-valid-and-own-or-unlocked? var val log)
 
         (log.trace "Tlog ~A tvar ~A is up-to-date and unlocked" (~ log) (~ var))
-        
+
         (progn
           (log.debug "Tlog ~A tvar ~A conflict or locked: not valid" (~ log) (~ var))
           (return-from valid-and-own-or-unlocked? nil))))
@@ -72,7 +72,7 @@ not even by the current thread."
     (if (tvar-valid-and-unlocked? var val log)
 
         (log.trace "Tlog ~A tvar ~A is up-to-date and unlocked" (~ log) (~ var))
-        
+
         (progn
           (log.debug "Tlog ~A tvar ~A conflict or locked: not valid" (~ log) (~ var))
           (return-from valid-and-unlocked? nil))))
@@ -113,7 +113,7 @@ but does *not* check log parents for validity."
   (declare (type tlog log))
   ;; current implementation always performs a deep validation
   (valid? log))
-  
+
 
 (declaim (inline shallow-invalid?))
 (defun shallow-invalid? (log)
@@ -174,7 +174,7 @@ After return, LOCKED will contain all TXPAIR entries of locked VARS."
 (defun unlock-tvars (locked)
   "Release vars in LOCKED in same order of acquisition."
   (declare (type txfifo locked))
-  
+
   ;; trivial optimization... nothing to unlock in single-thread mode
   #?+(eql tvar-lock :single-thread)
   (declare (ignore locked))
@@ -272,7 +272,7 @@ WARNING: Code registered with after-commit has a number or restrictions:
    to explicitly run an (atomic) block from it, doing so would probably
    defeat the purpose of AFTER-COMMIT and it may also cause a significant
    performance penalty."
-  
+
   ;; use WITH-NOTX: AFTER-COMMIT forms run outside any transaction
   `(call-after-commit (lambda () (with-notx ,@body))))
 
@@ -361,18 +361,18 @@ Note: invokes HW-ATOMIC2, which in turn invokes GLOBAL-CLOCK/HW/STAT-{COMMITTED,
       ;; fallback
       :fail)))
 
-    
-
-    
-    
 
 
 
-  
 
 
 
-  
+
+
+
+
+
+
 
 
 (declaim (inline commit-sw-update-tvars))
@@ -393,12 +393,12 @@ Note: invokes HW-ATOMIC2, which in turn invokes GLOBAL-CLOCK/HW/STAT-{COMMITTED,
             #?+(eql tvar-lock :bit)
             (unlock-tvar var)
             (rem-current-txfifo-entry))
-          
+
           (progn
             ;; if TVAR-LOCK is :BIT?, this also unlocks VAR.
             (set-tvar-value-and-version var val
                                         (global-clock/sw/write write-version))
-                   
+
             (log.trace "Tlog ~A tvar ~A changed value from ~A to ~A"
                        (~ log) (~ var) (raw-value-of var) val)))
 
@@ -420,7 +420,7 @@ b) another TLOG is writing the same TVARs being committed
    that the TLOG will still be valid.
 
 Note: internally invokes GLOBAL-CLOCK/{HW,SW}/STAT-{COMMITTED,ABORTED}"
-   
+
   (declare (type tlog log))
 
   ;; before-commit functions run without locks.
@@ -432,7 +432,7 @@ Note: internally invokes GLOBAL-CLOCK/{HW,SW}/STAT-{COMMITTED,ABORTED}"
 
   (let* ((writes     (the txhash-table (tlog-writes log)))
          (locked     (the txfifo       (tlog-locked log))))
-         
+
     (when (zerop (txhash-table-count writes))
       (log.debug "Tlog ~A committed (nothing to write)" (~ log))
       (global-clock/sw/stat-committed)
@@ -448,7 +448,7 @@ Note: internally invokes GLOBAL-CLOCK/{HW,SW}/STAT-{COMMITTED,ABORTED}"
          (case committed
            ((t)   (setf success t) (go committed))
            ((nil) (return nil))))
-             
+
 
        ;; HW-assisted commit failed, but transaction may still be valid.
        ;; fall back on SW commit
@@ -464,7 +464,7 @@ Note: internally invokes GLOBAL-CLOCK/{HW,SW}/STAT-{COMMITTED,ABORTED}"
 
                 (log.debug "Tlog ~A failed to lock tvars, not committed" (~ log))
                 (return))
-            
+
               (log.trace "Tlog ~A acquired locks..." (~ log))
 
               ;; check for log validity one last time, with locks held.
@@ -486,14 +486,14 @@ Note: internally invokes GLOBAL-CLOCK/{HW,SW}/STAT-{COMMITTED,ABORTED}"
 
          ;; cleanup
          #?+hw-transactions (global-clock/decf-nohw-counter)
-         
+
          (unless success
            (unlock-tvars locked)
            (log.trace "Tlog ~A ...released locks" (~ log))
            (global-clock/sw/stat-aborted)
            (return-from commit success)))
 
-       
+
        committed
 
        (log.debug "Tlog ~A ...committed (and released locks)" (~ log))
@@ -507,13 +507,13 @@ Note: internally invokes GLOBAL-CLOCK/{HW,SW}/STAT-{COMMITTED,ABORTED}"
        ;; after-commit functions run without locks
        (invoke-after-commit log)
        (return-from commit success))))
-                   
 
 
 
 
 
-                   
+
+
 
 
 
@@ -534,7 +534,7 @@ Destructively modifies (tlog-reads log1) and (tlog-reads log2)."
          (reads2 (tlog-reads log2))
          (n1 (txhash-table-count reads1))
          (n2 (txhash-table-count reads2)))
-         
+
     (when (< n1 n2)
       (rotatef log1 log2)
       (rotatef reads1 reads2)
@@ -544,7 +544,7 @@ Destructively modifies (tlog-reads log1) and (tlog-reads log2)."
         log1
         nil)))
 
-  
+
 
 
 (defun commit-nested (log)

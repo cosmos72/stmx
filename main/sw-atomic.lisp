@@ -40,13 +40,13 @@ The effect is the same as DEFUN - or DEFMETHOD - plus:
         do
           (push (pop body) declarations))
      (setf declarations (nreverse declarations))
-     
+
      `(,defun-or-defmethod ,func-name ,args
         ;; move docstring here
         ,@(when docstring (list docstring))
         ;; also move all declarations
         ,@declarations
-     
+
         (atomic
          ;; support (return-from ,func-name ...)
          (block ,(if (consp func-name)
@@ -81,7 +81,7 @@ threads."
            (t (%run-sw-atomic (lambda () (with-swtx ,form))))))
       `(values)))
 
-       
+
 
 (declaim (inline run-once))
 
@@ -94,7 +94,7 @@ using LOG as its transaction log."
            (type tlog log))
 
   (with-recording-to-tlog log
-     (log.debug "Tlog ~A {~A} starting~A" (~ log) (~ tx) 
+     (log.debug "Tlog ~A {~A} starting~A" (~ log) (~ tx)
                 (if-bind parent (tlog-parent log)
                     (format nil ", parent is tlog ~A" (~ parent))
                     ""))

@@ -60,7 +60,7 @@
            (type function pred))
   (loop for pair in (txhash-table-to-sorted-pairs txh pred)
      collect (rest pair)))
-         
+
 
 
 (defun is-equal-txhash-and-hash-table (txh hash pred)
@@ -82,7 +82,7 @@
            (type function pred))
   (is (equal (txhash-table-to-sorted-pairs txh1 pred)
              (txhash-table-to-sorted-pairs txh2 pred))))
-  
+
 
 (defun test-txhash (pred &key (count 4))
   (declare (type fixnum count))
@@ -94,11 +94,11 @@
         (set-txhash txh key value)
         (set-hash  hash key value)
         (is-equal-txhash-and-hash-table txh hash pred)))))
-           
+
 
 (def-test txhash (:compile-at :definition-time)
   (test-txhash #'tvar>))
 
 
-           
-    
+
+

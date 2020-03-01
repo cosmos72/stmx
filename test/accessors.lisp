@@ -45,7 +45,7 @@
          (is (eql 3 xa))
          (is (eql 4 ys))
          (is (eql 4 ya)))))))
-     
+
 
 (defun point-writers-test ()
   (let ((p (make-instance 'point :x 1 :y 2)))
@@ -58,9 +58,9 @@
          (is (eql 5 xa))
          (is (eql 6 ys))
          (is (eql 6 ya)))))))
-     
+
 
 (def-test point-accessors (:compile-at :definition-time)
   (point-readers-test)
   (point-writers-test))
-  
+

@@ -38,7 +38,7 @@
 (defmethod full? ((s tstack))
   "A tstack is never full, so this method always returns nil."
   nil)
-                  
+
 
 (defmethod peek ((s tstack) &optional default)
   "Return the first value in tstack S without removing it, and t as multiple values.
@@ -65,7 +65,7 @@ and return the first value."
 Since tstack can contain unlimited values, this method never blocks."
    (push value (_ s top))
    value))
-   
+
 
 (transaction
  (defmethod try-take ((s tstack))
@@ -76,7 +76,7 @@ Otherwise return (values nil nil)"
      (if (null top)
          (values nil nil)
          (values t (pop top))))))
-   
+
 
 (defmethod try-put  ((s tstack) value)
   "Append VALUE to tstack S and return (values t VALUE).

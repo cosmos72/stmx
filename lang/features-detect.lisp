@@ -54,11 +54,11 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
 
 
 (eval-always
-  
+
  #+lispworks ;; incomplete porting
  (set-features '(tclass-options ((:optimize-slot-access nil)))
                '(bt/lock-owner mp:lock-owner))
- 
+
  #+abcl
  (set-features '(bt/lock-owner :abcl)
                ;; (closer-mop:class-slots <struct>) returns a list of simple-vectors,
@@ -93,7 +93,7 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
  (set-features '(bt/lock-owner mp::lock-process)
                'closer-mop/works-on-structs
                '(sxhash-equalp (lisp::internal-equalp-hash * 0)))
- 
+
  #+ecl
  ;; ECL versions up to 13.5.1 have issues with reloading bordeaux-threads from cached FASLs.
  ;; as of 2015-02-07, latest ECL from git://git.code.sf.net/p/ecls/ecl seems to fix them
@@ -103,7 +103,7 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
                'use-initialize-instance-before
                'closer-mop/works-on-structs
                '(sxhash-equalp si:hash-equalp))
- 
+
  #+sbcl
  ;; on SBCL, #+compare-and-swap-vops and #+memory-barrier-vops are build artifacts
  ;; and should not be relied upon, see https://sourceforge.net/p/sbcl/mailman/message/36413606/
@@ -154,7 +154,7 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
                (all-features 'fixnum-is-large 'fixnum-is-powerof2)))
 
 
-              
+
 
 ;; fix features if no thread support
 #?-bt/make-thread
@@ -223,7 +223,7 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
     ;; do we also have the STMX.ASM package exposing CPU hardware transactions?
     #?+(symbol stmx.asm transaction-supported-p)
     ;; good, and does the current CPU actually support hardware transactions?
-    (when (stmx.asm:transaction-supported-p) 
+    (when (stmx.asm:transaction-supported-p)
       ;; yes. start the turbines.
       (set-feature 'hw-transactions :stmx.asm)))
 
@@ -240,7 +240,7 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
   (if (all-features 'fast-mutex 'fixnum-is-powerof2)
       (default-feature 'tvar-lock :bit)
       (default-feature 'tvar-lock :mutex))
-  
+
 
   ;; atomic counters are (almost) 64 bit.
   ;; if fixnums are (almost) 64 bit and memory barriers and atomic-ops are available,
@@ -257,7 +257,7 @@ STMX is currently tested only on ABCL, CCL, CLISP, CMUCL, ECL and SBCL.")
   ;;       with GV1 being unsuitable for hardware transactions
   ;;       and GV5 reducing performance of software transactions by ~50%
   ;;       because it causes a lot of (rerun)
-  (set-feature 'global-clock 
+  (set-feature 'global-clock
      (if (get-feature 'hw-transactions) :gv6 :gv1))
 
 
@@ -271,11 +271,11 @@ in all threads, i.e. it will not be special nor dynamically bound.
 
 This is implemented either with a compiler-specific macro (for example
 SB-EXT:DEFGLOBAL on SBCL), or as DEFVAR if no better implementation is available."
-    
+
     (let1 impl (get-feature 'define-global 'defvar)
       `(,impl ,name ,value ,@(when docp `(,doc)))))
 
-  
+
   (defmacro define-constant-once (name value &optional (doc nil docp))
     "Same as DEFCONSTANT, but evaluate VALUE only once:
 re-executing again the same (DEFINE-CONSTANT-ONCE name ...) has no effects."
@@ -283,7 +283,7 @@ re-executing again the same (DEFINE-CONSTANT-ONCE name ...) has no effects."
     (let1 impl (get-feature 'define-constant-once 'define-global)
       (case impl
         ((t)
-         `(defconstant ,name 
+         `(defconstant ,name
             (if (boundp ',name) (symbol-value ',name) ,value)
             ,@(when docp `(,doc))))
         (otherwise

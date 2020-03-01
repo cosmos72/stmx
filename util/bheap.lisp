@@ -22,14 +22,14 @@
 (defclass bheap ()
   ((vector :initarg :vector :initform *empty-vector*
            :type vector :accessor vector-of)
-   
+
    (length :initform 0
            :type fixnum :accessor length-of)
-   
-   (key    :initarg :key  :initform #'identity 
+
+   (key    :initarg :key  :initform #'identity
            :type function :reader key-of)
 
-   (pred   :initarg :pred :initform (error "missing :pred argument instantiating ~A or a subclass" 'bheap) 
+   (pred   :initarg :pred :initform (error "missing :pred argument instantiating ~A or a subclass" 'bheap)
            :type function :reader pred-of))
 
    (:documentation "Priority queue implemented with a binary min-heap.
@@ -100,7 +100,7 @@ Destructively modifies (vector-of Q)."
 
   (with-ro-slots (length) q
     (loop for start = (the fixnum (1- (floor length 2))) ;; index of last parent
-         #||#    then (the fixnum (1- start)) 
+         #||#    then (the fixnum (1- start))
        while (>= start 0) do
          (sift-down-bheap q start (1- length)))
     q))

@@ -31,7 +31,7 @@
 
   (defconstant +ghash-default-capacity+ 4
     "Default initial capacity of a GHASH-TABLE.")
-  
+
   (defconstant +ghash-max-capacity+  (ash 1 (1- (integer-length most-positive-fixnum)))
     "Maximum capacity of a GHASH-TABLE.
 Equal to MOST-POSITIVE-FIXNUM rounded down to nearest power of 2."))
@@ -122,13 +122,13 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
         (t
          (error "missing ~S argument, cannot instantiate ~S with custom ~S ~S"
                 :hash (type-of hash) :test test-sym))))
-    
+
     ;; convert :test and :hash from symbols to actual functions
     (setf (_ hash test-fun) (fdefinition test-sym)
           (_ hash hash-fun) (fdefinition hash-sym)
           ;; allocate internal vector
           (_ hash vec) (ghash/new-vec hash initial-capacity))))
-        
+
 
 (defun ghash-table-test (hash)
   "Return the symbol used by ghash-table HASH to compare keys."
@@ -175,7 +175,7 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
            (unless (and ,n (= ,count ,n))
              (setf (_ ,h count) ,count))
            nil)))))
-                
+
 
 (defmacro do-ghash ((key &optional value index) hash &body body)
   "Execute BODY on each KEY/VALUE contained in HASH. Return NIL."
@@ -184,7 +184,7 @@ it is the base for transactional hash-table implementation THASH-TABLE."))
        (let ((,key (_ ,pair key))
              ,@(when value `((,value (_ ,pair value)))))
          ,@body))))
-                
+
 (defun map-ghash (hash func)
   "Invoke FUNC on each key/value pair contained in HASH. Return NIL.
 FUNC must be a function accepting two arguments: key and value.
@@ -205,7 +205,7 @@ has undefined consequences. Not even the current key can be removed."
   ;; (do-ghash-pairs) computes (_ hash count) unless body exits early
   (do-ghash-pairs (pair) hash)
   (the fixnum (_ hash count)))
-          
+
 
 (defun ghash-table-count> (hash count)
   "Return T if ghash-table HASH contains more than COUNT key/value entries."
@@ -215,12 +215,12 @@ has undefined consequences. Not even the current key can be removed."
     (return-from ghash-table-count> t))
   (when-bind n (_ hash count)
     (return-from ghash-table-count> (> (the fixnum n) count)))
-  
+
   (do-ghash-pairs (pair index) hash
     (when (> index count)
       (return-from ghash-table-count> t)))
   nil)
-          
+
 (declaim (inline ghash-table-count<=))
 (defun ghash-table-count<= (hash count)
   "Return T if ghash-table HASH contains at most COUNT key/value entries."
@@ -285,7 +285,7 @@ Otherwise return (values DEFAULT nil)."
         (values (_ pair value) t)
         (values default nil))))
 
-    
+
 (defun rehash-ghash (hash)
   (declare (type ghash-table hash))
 
@@ -301,13 +301,11 @@ Otherwise return (values DEFAULT nil)."
              (hash-code (the fixnum (funcall hash-fun key)))
              (subscript (the fixnum (ghash-subscript hash-code vec2 n2)))
              (head (funcall aref-fun vec2 subscript)))
-        
+
         (setf (_ pair next) head)
         (funcall set-aref-fun vec2 subscript pair)))
 
     (setf (_ hash vec) vec2)))
-        
-        
 
 
 
@@ -318,7 +316,9 @@ Otherwise return (values DEFAULT nil)."
 
 
 
-       
+
+
+
 (declaim (ftype (function (ghash-table t t) t) set-ghash)
          (notinline set-ghash))
 
@@ -361,7 +361,7 @@ Otherwise return (values DEFAULT nil)."
                    (t
                     (and (> bucket-len 2)
                          (ghash-table-count> hash vlen)))))))
-        
+
         ;; rehash-ghash sets (_ hash count)
         (when (%need-rehash)
           (rehash-ghash hash)))))
@@ -370,9 +370,9 @@ Otherwise return (values DEFAULT nil)."
 
 (fmakunbound '(setf get-ghash))
 (defsetf get-ghash set-ghash)
-  
 
-          
+
+
 (defun rem-ghash (hash key)
   "Remove KEY from HASH.
 Return T if KEY was present in HASH, otherwise return NIL."
@@ -401,7 +401,7 @@ Return T if KEY was present in HASH, otherwise return NIL."
            (when (_ hash count)
              (setf (_ hash count) nil))
            (return t)))))
-               
+
 
 (declaim (type fixnum +ghash-threshold-capacity+))
 (defconstant +ghash-threshold-capacity+ 64)
@@ -464,7 +464,7 @@ TO-ALIST contents is not destructively modified."
   (do-ghash (key value) src
     (push (cons key value) to-alist))
   to-alist)
-  
+
 
 (defprint-object (obj ghash-table)
   (format t "~S ~S ~S ~S ~S ~S" :count (ghash-table-count obj)

@@ -75,7 +75,7 @@
             t
             (error "cannot happen! cannot deposit ~S back into ~S!" delta account1))))))
 
-  
+
 (defparameter *account1* (new 'account :name "Mario rossi" :balance 1000))
 (defparameter *account2* (new 'account :name "Giuseppe Verdi"))
 

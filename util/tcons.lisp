@@ -67,7 +67,7 @@ To use TCONS cells, prepend T to the name of most list-manipulating functions. E
  (defun tfirst (tlist)
    "Return the first element in a TCONS or TLIST."
    (when tlist (tcons-first tlist))))
-  
+
 (optimize-for-transaction*
  (:inline t)
  (defun trest (tlist)
@@ -139,7 +139,7 @@ This function should always be executed inside an STMX atomic block."
    (declare (type tcons tcons))
    (setf (tcons-first tcons) x)
    tcons))
-           
+
 
 (optimize-for-transaction*
  (:inline t)
@@ -148,7 +148,7 @@ This function should always be executed inside an STMX atomic block."
    (declare (type tcons tcons))
    (setf (tcons-rest tcons) x)
    tcons))
-           
+
 
 (defmacro tpush (value place)
   "Equivalent to PUSH, but for TCONS transactional cells.
@@ -178,7 +178,7 @@ Removes and returns the first element in PLACE."
               (,(first stores) (trest ,var)))
          ,store-form
          (tfirst ,var)))))
-      
+
 
 
 
@@ -190,7 +190,7 @@ Removes and returns the first element in PLACE."
   "Return true if OBJECT is a TLIST, and NIL otherwise."
   (or (null object) (tconsp object)))
 
-       
+
 (declaim (ftype (function (&rest t) (values tlist &optional)) tlist))
 
 (defun tlist (&rest list)
@@ -201,7 +201,7 @@ Removes and returns the first element in PLACE."
           (result nil))
       (dolist (e list result)
         (setf result (tcons e result))))))
-               
+
 
 (define-compiler-macro tlist (&whole form &rest list)
   (cond

@@ -27,12 +27,24 @@
   (:args (eax-val :scs (sb-vm::unsigned-reg) :target eax)
          (ecx-val :scs (sb-vm::unsigned-reg) :target ecx))
   (:arg-types sb-vm::unsigned-num sb-vm::unsigned-num)
-  (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::eax-offset :target r1 :from (:argument 0)) eax)
-  (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::ecx-offset :target r3 :from (:argument 1)) ecx)
+  (:temporary (:sc sb-vm::unsigned-reg
+                   :offset #.(or (find-symbol* :rax-offset :sb-vm)
+                                 (find-symbol* :eax-offset :sb-vm))
+                   :target r1 :from (:argument 0)) eax)
+  (:temporary (:sc sb-vm::unsigned-reg
+                   :offset #.(or (find-symbol* :rcx-offset :sb-vm)
+                                 (find-symbol* :ecx-offset :sb-vm))
+                   :target r3 :from (:argument 1)) ecx)
   #+x86-64
-  (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::ebx-offset :target r2) ebx)
+  (:temporary (:sc sb-vm::unsigned-reg
+                   :offset #.(or (find-symbol* :rbx-offset :sb-vm)
+                                 (find-symbol* :ebx-offset :sb-vm))
+                   :target r2) ebx)
   #+x86-64
-  (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::edx-offset :target r4) edx)
+  (:temporary (:sc sb-vm::unsigned-reg
+                   :offset #.(or (find-symbol* :rdx-offset :sb-vm)
+                                 (find-symbol* :edx-offset :sb-vm))
+                   :target r4) edx)
   (:results
    (r1 :scs (sb-vm::unsigned-reg))
    (r2 :scs (sb-vm::unsigned-reg))
@@ -98,7 +110,10 @@ abort error codes.")
   (:policy :fast-safe)
   (:translate %transaction-begin)
 
-  (:temporary (:sc sb-vm::unsigned-reg :offset sb-vm::eax-offset :target r1) eax)
+  (:temporary (:sc sb-vm::unsigned-reg
+                   :offset #.(or (find-symbol* :rax-offset :sb-vm)
+                                 (find-symbol* :eax-offset :sb-vm))
+                   :target r1) eax)
   (:results   (r1 :scs (sb-vm::unsigned-reg)))
   (:result-types sb-vm::unsigned-num)
   (:generator 0

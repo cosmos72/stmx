@@ -65,58 +65,52 @@ Supported systems
 STMX is currently tested on the following Common Lisp implementations:
 
 * [SBCL](http://sbcl.org/)
+  * version 2.0.9       (x86_64)   on Debian GNU/Linux bullseye (x86_64)
+  * version 2.0.6       (x86_64)   on Debian GNU/Linux bullseye (x86_64)
   * version 2.0.0       (x86_64)   on Debian GNU/Linux bullseye (x86_64)
   * version 1.5.4       (x86_64)   on Debian GNU/Linux bullseye (x86_64)
-  * version 1.5.2       (x86_64)   on Debian GNU/Linux bullseye (x86_64)
   * version 1.4.16      (x86_64)   on Debian GNU/Linux bullseye (x86_64)
-  * version 1.3.19      (x86_64)   on Debian GNU/Linux buster   (x86_64)
-  * version 1.3.6       (x86_64)   on Debian GNU/Linux stretch  (x86_64)
-  * version 1.3.5       (x86_64)   on Debian GNU/Linux stretch  (x86_64)
-  * version 1.3.4       (x86_64)   on Debian GNU/Linux stretch  (x86_64)
-  * version 1.3.3       (x86_64)   on Debian GNU/Linux stretch  (x86_64)
-  * version 1.3.2       (x86_64)   on Debian GNU/Linux stretch  (x86_64)
-  * version 1.3.1       (x86_64)   on Debian GNU/Linux stretch  (x86_64)
-  * version 1.2.10      (x86_64)   on Debian GNU/Linux stretch  (x86_64)
-  * version 1.1.15      (x86_64)   on Debian GNU/Linux stretch  (x86_64)
-  * version 1.1.14      (x86_64)   on Debian GNU/Linux stretch  (x86_64)
+  * version 1.3.19      (x86_64)   on Debian GNU/Linux bullseye (x86_64)
+  * version 1.2.14      (x86_64)   on Debian GNU/Linux bullseye (x86_64)
+  * version 1.1.15      (x86_64)   on Debian GNU/Linux bullseye (x86_64)
   * version 1.2.6       (x86)      on Debian GNU/Linux stretch  (x86_64)
-  * version 1.1.14      (x86)      on Debian GNU/Linux stretch  (x86_64)
   * version 1.2.8       (armhf)    on Debian GNU/Linux wheezy   (armhf) inside Qemu
   * version 1.1.15      (powerpc)  on Debian GNU/Linux stretch  (powerpc) inside Qemu
   * version 1.2.7       (x86_64)   on Windows 7                 (x86_64)
-  
+
+  Versions < 1.2 have too old builtin ASDF, and must be *manually* upgraded
+  to ASDF >= 3.1 to load STMX.
+
 * [ABCL](http://www.abcl.org/)
-  * version 1.3.3 with OpenJDK 7u91 (x86_64) on Debian GNU/Linux stretch (x86_64)
-  * version 1.3.2 with OpenJDK 7u91 (x86_64) on Debian GNU/Linux stretch (x86_64)
-  * version 1.3.1 with OpenJDK 7u91 (x86_64) on Debian GNU/Linux stretch (x86_64)
-  * version 1.2.1 with OpenJDK 7u91 (x86_64) on Debian GNU/Linux stretch (x86_64)
+  * version 1.7.1 with OpenJDK 11.0.8 (x86_64) on Debian GNU/Linux bullseye (x86_64)
   
 * [CCL](http://ccl.clozure.com/)
-  * version 1.11        (x86_64)   on Debian GNU/Linux stretch (x86_64)
-  * version 1.10        (x86_64)   on Debian GNU/Linux stretch (x86_64)
-  * version 1.11        (x86)      on Debian GNU/Linux stretch (x86_64)
-  * version 1.10        (x86)      on Debian GNU/Linux stretch (x86_64)
-  * version 1.10        (linuxarm) on Debian GNU/Linux wheezy  (armhf) inside Qemu
-  * version 1.9-r15761  (linuxppc) on Debian GNU/Linux wheezy  (powerpc) inside Qemu
+  * version 1.12        (x86_64)   on Debian GNU/Linux bullseye (x86_64)
+  * version 1.11        (x86_64)   on Debian GNU/Linux bullseye (x86_64)
+  * version 1.10        (x86_64)   on Debian GNU/Linux bullseye (x86_64)
+  * version 1.12        (x86)      on Debian GNU/Linux bullseye (x86_64)
+  * version 1.11        (x86)      on Debian GNU/Linux bullseye (x86_64)
+  * version 1.10        (x86)      on Debian GNU/Linux bullseye (x86_64)
+  * version 1.10        (linuxarm) on Debian GNU/Linux wheezy   (armhf) inside Qemu
+  * version 1.9-r15761  (linuxppc) on Debian GNU/Linux wheezy   (powerpc) inside Qemu
 
 * [CLISP](http://www.clisp.org/)
-  * version 2.49        (x86_64)   on Debian GNU/Linux stretch (x86_64)
+  * version 2.49.92     (x86_64)   on Debian GNU/Linux bullseye (x86_64)
 
-  CLISP lacks multi-threading, and its builtin ASDF must be *manually* upgraded to ASDF3
-  to load STMX.
+  CLISP lacks multi-threading, and its builtin ASDF must be *manually* upgraded
+  to ASDF >= 3.1 to load STMX.
   
-* [CMUCL](http://www.cons.org/cmucl/)
-  * version 20e Unicode (x86)      on Debian GNU/Linux stretch (x86_64)
-  * version 20d Unicode (x86)      on Debian GNU/Linux stretch (x86_64)
-  
-  CMUCL must be started with the command line options "-fpu" "x87"
-  to run STMX reliably, see [doc/supported-systems.md](doc/supported-systems.md).
-  
-  Version 20f and later no longer support the command line options "-fpu" "x87"
-  and are not supported by STMX, see Unsupported systems below.
-
-
 ### Partially supported systems
+
+* [CMUCL](http://www.cons.org/cmucl/)
+  * versions <= 20e should be started with the command line options "-fpu" "x87"
+  to improve STMX reliability, see [doc/supported-systems.md](doc/supported-systems.md).
+
+  Version >= 20f no longer support the command line options "-fpu" "x87"
+  and STMX runs reliably only in single-thread mode.
+
+  CMUCL has too old builtin ASDF, and must be *manually* upgraded
+  to ASDF >= 3.1 to load STMX.
 
 * [ECL](http://ecls.sourceforge.net/)
   * version 16.1.2      (x86_64)   on Debian GNU/Linux stretch (x86_64)
@@ -129,13 +123,6 @@ STMX is currently tested on the following Common Lisp implementations:
 
   ECL versions 16.0.0 and 16.1.2 run STMX reliably enough for lightweight use,
   but sometimes still hang in test suite.
-
-
-### Unsupported systems
-
-* [CMUCL](http://www.cons.org/cmucl/)
-  * version 20f and later no longer support the command line options "-fpu" "x87"
-  needed to run STMX reliably.
 
 
 ### Untested systems

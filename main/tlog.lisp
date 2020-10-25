@@ -211,7 +211,8 @@ Return T if slept, or NIL if some TVAR definitely changed before sleeping."
 
     (with-lock (lock)
       (unless (setf prevent-sleep (tlog-prevent-sleep log))
-        (condition-wait (tlog-semaphore log) lock #-ecl :timeout #-ecl 10)))
+        (condition-wait (tlog-semaphore log) lock
+                        #-(or cmucl ecl) :timeout #-(or cmucl ecl) 10)))
 
     (when (log.debug)
       (if prevent-sleep

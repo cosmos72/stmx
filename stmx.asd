@@ -32,15 +32,22 @@
   ((:static-file "stmx.asd")
    
    (:module :asm
-    :components #-(and sbcl (or x86 x86-64))
-                ()
-                #+(and sbcl (or x86 x86-64))
+    :components #+(and sbcl (or x86 x86-64))
                 ((:file "package")
                  (:file "compiler"        :depends-on ("package"))
-                 (:file "x86-32,64-insts" :depends-on ("compiler"))
+                 (:file "x86-32,64-known" :depends-on ("compiler"))
+                 (:file "x86-32,64-insts" :depends-on ("x86-32,64-known"))
                  (:file "x86-32,64-vops"  :depends-on ("x86-32,64-insts"))
                  (:file "cpuid"           :depends-on ("x86-32,64-vops"))
-                 (:file "transaction"     :depends-on ("x86-32,64-vops"))))
+                 (:file "transaction"     :depends-on ("x86-32,64-vops")))
+
+                #+(and sbcl (not (or x86 x86-64)))
+                ((:file "package")
+                 (:file "compiler"        :depends-on ("package"))
+                 (:file "notransaction"   :depends-on ("compiler")))
+
+                #-sbcl
+                ())
 
    (:module :lang
     :components ((:file "package")

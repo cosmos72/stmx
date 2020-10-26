@@ -28,9 +28,6 @@
 
 
 
-(declaim (ftype (function () boolean) transaction-supported-p))
-
-
 (defun lock-elision-supported-p ()
   "Test for HLE, i.e. hardware lock elision.
 HLE is supported if (cpuid 7) returns ebx with bit 4 set.
@@ -41,6 +38,8 @@ assembler instruction prefixes XACQUIRE and XRELEASE."
       (let ((ebx (nth-value 1 (cpuid 7))))
         (not (zerop (logand ebx #x10)))))))
 
+
+(declaim (ftype (function () boolean) transaction-supported-p))
 
 (defun transaction-supported-p ()
   "Test for RTM, i.e. hardware memory transactions.

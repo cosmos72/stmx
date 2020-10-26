@@ -16,10 +16,13 @@
 (in-package :stmx.asm)
 
 (defconstant +impl-package+
-  (loop :for pkg in '(:sb-x86-64-asm :sb-x86-asm :sb-vm)
+  (loop :for pkg in
+       #+(or x86 x86-64)           '(:sb-x86-64-asm :sb-x86-asm :sb-vm)
+       #+(or arm arm64)            '(:sb-arm64-asm :sb-arm-asm :sb-vm)
+       #-(or arm arm64 x86 x86-64) '(:sb-vm)
      :when (find-package pkg)
      :return pkg)
-  "Designator for the compiler internal package where we define Intel TSX CPU instructions")
+  "Designator for the SBCL internal package where we look for VOP-related symbols")
 
 (defun symbol-name* (symbol-name)
   (declare (type (or symbol string) symbol-name))
@@ -119,31 +122,3 @@
        ,@(if +defknown-has-overwrite-fndb-silently+ '(:overwrite-fndb-silently t) ())))
 
 
-;;; cpuid intrinsic
-
-(defknown %cpuid
-    ;;arg-types
-    ((unsigned-byte 32) (unsigned-byte 32))
-    ;;result-type
-    (values (unsigned-byte 32) (unsigned-byte 32)
-            (unsigned-byte 32) (unsigned-byte 32))
-    (sb-c::always-translatable))
-
-
-
-;;; RTM (restricted transactional memory) intrinsics
-
-(defknown %transaction-begin () (unsigned-byte 32)
-    (sb-c::always-translatable))
-
-(defknown %transaction-end () (values)
-    (sb-c::always-translatable))
-
-(defknown %transaction-abort ((unsigned-byte 8)) (values)
-    (sb-c::always-translatable))
-
-(defknown %transaction-running-p () boolean
-    ;; do NOT add the sb-c::movable and sb-c:foldable attributes: either of them
-    ;; would declare that %transaction-running-p result only depends on its arguments,
-    ;; which is NOT true: it also depends on HW state.
-    (sb-c::flushable sb-c::important-result sb-c::always-translatable))

@@ -81,7 +81,7 @@
 
 ;;;; ** implementation class: tlog
 
-(deftype tlog-func-vector () '(and vector (not simple-array)))
+(deftype tlog-func-vector () '(and (vector function *) (not simple-array)))
 
 (defstruct tlog
   "a transaction log (tlog) is a record of the reads and writes

@@ -958,7 +958,7 @@ that reaches 1.1 millions software transactions per second per CPU core
 using two threads, but STMX performance quickly decreases with more threads
 (reason still needs to be investigated).
 
-A small example with very short transactions is the [dining philosophers](example/dining-philosophers-stmx.lisp),
+A small example with very short transactions is the [dining philosophers](example/dining-philosophers.stmx.lisp),
 with 5 reads and 5 writes to transactional memory per atomic block,
 where each CPU core runs approximately 4.5 millions software transactions
 per second - hyperthreading has very limited effects.

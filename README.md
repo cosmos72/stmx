@@ -329,7 +329,7 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
   input/output. More details in the paragraph INPUT/OUTPUT DURING TRANSACTIONS
   below.
 
-  Note: new threads **must** be created with `(bordeaux-threads:start-thread)`
+  Note: new threads **must** be created with `(bordeaux-threads:make-thread)`
   in order to establish thread-local bindings needed by STMX. A safety check
   that detects missing thread-local bindings has been recently added to STMX.
   

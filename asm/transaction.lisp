@@ -16,7 +16,7 @@
 (in-package :stmx.asm)
 
 
-(declaim (ftype (function () fixnum)        transaction-begin)
+(declaim (ftype (function () (unsigned-byte 32)) transaction-begin)
          (ftype (function () (integer 0 0)) transaction-end)
          (ftype (function () (integer 0 0)) transaction-abort)
          (ftype (function () boolean)       transaction-running-p)
@@ -37,7 +37,7 @@ otherwise return code of the error that caused the transaction to abort.
 
 Invoking TRANSACTION-BEGIN while there is already a running hardware
 memory transaction has implementation-dependent effects."
-  (the (values fixnum  &optional)
+  (the (unsigned-byte 32)
     #-(and) (%transaction-begin)
     (sb-c::%primitive %xbegin)))
 

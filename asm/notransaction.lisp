@@ -16,11 +16,11 @@
 (in-package :stmx.asm)
 
 
-(declaim (ftype (function () fixnum)        transaction-begin)
-         (ftype (function () (integer 0 0)) transaction-end)
-         (ftype (function () (integer 0 0)) transaction-abort)
-         (ftype (function () boolean)       transaction-running-p)
-         (ftype (function (fixnum) boolean) transaction-rerun-may-succeed-p)
+(declaim (ftype (function () (values (unsigned-byte 32) &optional)) transaction-begin)
+         (ftype (function () (values                    &optional)) transaction-end)
+         (ftype (function () (values                    &optional)) transaction-abort)
+         (ftype (function () (values boolean            &optional)) transaction-running-p)
+         (ftype (function (fixnum) (values boolean      &optional)) transaction-rerun-may-succeed-p)
          (inline transaction-begin
                  transaction-end
                  transaction-abort
@@ -62,7 +62,7 @@ a non-zero error code (that describes the abort reason).
 
 Invoking TRANSACTION-END without a running hardware memory transaction
 has undefined consequences."
-  0)
+  (values))
 
 
 
@@ -91,7 +91,7 @@ with an implementation-dependent value."
   (unless (typep err-code '(unsigned-byte 8))
     (error 'type-error
            :expected-type '(unsigned-byte 8) :datum err-code))
-  `0)
+  `(values))
 
 
 

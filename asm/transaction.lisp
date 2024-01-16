@@ -16,17 +16,29 @@
 (in-package :stmx.asm)
 
 
-(declaim (ftype (function () (unsigned-byte 32)) transaction-begin)
-         (ftype (function () (integer 0 0)) transaction-end)
-         (ftype (function () (integer 0 0)) transaction-abort)
-         (ftype (function () boolean)       transaction-running-p)
-         (ftype (function (fixnum) boolean) transaction-rerun-may-succeed-p)
+(declaim ; (ftype (function () (values (unsigned-byte 32) &optional)) transaction-begin)
+         ; (ftype (function () (values                    &optional)) transaction-end)
+         ; (ftype (function () (values                    &optional)) transaction-abort)
+         ; (ftype (function () (values boolean            &optional)) transaction-running-p)
+         ; (ftype (function (fixnum) (values boolean      &optional)) transaction-rerun-may-succeed-p)
          (inline transaction-begin
                  transaction-end
                  transaction-abort
                  transaction-running-p
                  transaction-rerun-may-succeed-p))
 
+
+(defun %transaction-begin ()
+  (%transaction-begin))
+
+(defun %transaction-end ()
+  (%transaction-end))
+
+;(defun %transaction-abort (err-code)
+;  (%transaction-abort err-code))
+
+(defun %transaction-running-p ()
+  (%transaction-running-p))
 
 
 (defun transaction-begin ()
@@ -36,13 +48,9 @@ otherwise return code of the error that caused the transaction to abort.
 
 Invoking TRANSACTION-BEGIN while there is already a running hardware
 memory transaction has implementation-dependent effects."
+  (%transaction-begin)
+  #-(and) (sb-c::%primitive %xbegin))
 
-  ;; ideally VOP %xbegin would be declared to return (unsigned-byte 32) also on x86-64,
-  ;; but the nearest available VOP return types on x86-64 are positive-fixnum and unsigned-byte-63
-  ;; => use positive-fixnum, as it does not need boxing
-  (the #+x86-64 (and fixnum unsigned-byte) #-x86-64 (unsigned-byte 32)
-       #-(and) (%transaction-begin)
-       (sb-c::%primitive %xbegin)))
 
 
 
@@ -59,9 +67,11 @@ a non-zero error code (that describes the abort reason).
 
 Invoking TRANSACTION-END without a running hardware memory transaction
 has undefined consequences."
-  #-(and) (%transaction-end)
-  (sb-c::%primitive %xend)
-  0)
+  (%transaction-end)
+  #-(and) (progn
+            (sb-c::%primitive %xend)
+            0)
+  )
 
 
 

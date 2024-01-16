@@ -29,16 +29,16 @@
 
 ;;; RTM (restricted transactional memory) intrinsics
 
-(defknown %transaction-begin () (unsigned-byte 32)
+(defknown %transaction-begin () (values (unsigned-byte 32) &optional)
     (sb-c::always-translatable))
 
-(defknown %transaction-end () (values)
+(defknown %transaction-end () (values &optional)
     (sb-c::always-translatable))
 
-(defknown %transaction-abort ((unsigned-byte 8)) (values)
+(defknown %transaction-abort ((unsigned-byte 8)) (values &optional)
     (sb-c::always-translatable))
 
-(defknown %transaction-running-p () boolean
+(defknown %transaction-running-p () (values boolean &optional)
     ;; do NOT add the sb-c::movable and sb-c:foldable attributes: either of them
     ;; would declare that %transaction-running-p result only depends on its arguments,
     ;; which is NOT true: it also depends on HW state.

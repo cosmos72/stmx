@@ -29,7 +29,6 @@
 
 
 
-
 (defun transaction-begin ()
   "Start a hardware memory transaction.
 Return +transaction-started+ if transaction started successfully,
@@ -37,9 +36,14 @@ otherwise return code of the error that caused the transaction to abort.
 
 Invoking TRANSACTION-BEGIN while there is already a running hardware
 memory transaction has implementation-dependent effects."
-  (the (unsigned-byte 32)
-    #-(and) (%transaction-begin)
-    (sb-c::%primitive %xbegin)))
+
+  ;; ideally VOP %xbegin would be declared to return (unsigned-byte 32) also on x86-64,
+  ;; but the nearest available VOP return types on x86-64 are positive-fixnum and unsigned-byte-63
+  ;; => use positive-fixnum, as it does not need boxing
+  (the #+x86-64 (and fixnum unsigned-byte) #-x86-64 (unsigned-byte 32)
+       #-(and) (%transaction-begin)
+       (sb-c::%primitive %xbegin)))
+
 
 
 (defun transaction-end ()

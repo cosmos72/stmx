@@ -115,7 +115,11 @@ abort error codes.")
                                  (find-symbol* :eax-offset :sb-vm))
                    :target r1) eax)
   (:results   (r1 :scs (sb-vm::unsigned-reg)))
-  (:result-types sb-vm::unsigned-num)
+  ;; ideally VOP %xbegin would be declared to return (unsigned-byte 32) also on x86-64,
+  ;; but the nearest available VOP return types on x86-64 are positive-fixnum and unsigned-byte-63
+  ;; => use positive-fixnum, as it does not need boxing
+  (:result-types #+x86-64 sb-vm::positive-fixnum
+                 #-x86-64 sb-vm::unsigned-byte-32)
   (:generator 0
    (sb-assem:inst mov eax +transaction-started+)
    (sb-assem:inst xbegin)

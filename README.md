@@ -253,7 +253,7 @@ in the sources - remember `(describe 'some-symbol)` at REPL.
              (value2 :type string  :initarg :value2 :initform ""))))
 
         (transactional
-          (defstruct bar ()
+          (defstruct bar
             (value1 0  :type integer)
             (value2 "" :type string)))
 
